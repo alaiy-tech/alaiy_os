@@ -5,32 +5,17 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "connectors_section",
-  "primary_channel",
-  "col_break_1",
-  "logistics_provider",
-  "warehouse_provider",
-  "col_break_2",
-  "oms_provider",
-  "ai_provider",
-  "source_provider",
-  "shopify_section",
-  "shopify_store_url",
-  "col_break_shopify",
-  "shopify_access_token",
-  "fedex_section",
-  "fedex_account_number",
-  "col_break_fedex",
-  "fedex_api_key",
-  "fedex_api_secret",
-  "shiprocket_section",
-  "shiprocket_email",
-  "col_break_shiprocket",
-  "shiprocket_password",
-  "myntra_section",
-  "myntra_seller_id",
-  "col_break_myntra",
-  "myntra_api_key",
+  "cloudstore_section",
+  "cloudstore_api_url",
+  "col_break_cs_1",
+  "cloudstore_api_token",
+  "cloudstore_supplier",
+  "col_break_cs_2",
+  "cloudstore_price_list",
+  "cloudstore_default_warehouse",
+  "col_break_cs_3",
+  "cloudstore_sync_enabled",
+  "cloudstore_page_size",
   "ai_section",
   "claude_api_key",
   "col_break_ai",
@@ -49,136 +34,62 @@
  ],
  "fields": [
   {
-   "fieldname": "connectors_section",
+   "fieldname": "cloudstore_section",
    "fieldtype": "Section Break",
-   "label": "Active Connectors"
+   "label": "Cloudstore / The Corner"
   },
   {
-   "fieldname": "primary_channel",
-   "fieldtype": "Select",
-   "label": "Primary Channel",
-   "options": "\nShopify\nMyntra\nAmazon\nFlipkart\nNykaa"
-  },
-  {
-   "fieldname": "col_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "logistics_provider",
-   "fieldtype": "Select",
-   "label": "Logistics Provider",
-   "options": "\nFedEx\nShiprocket\nManual"
-  },
-  {
-   "fieldname": "warehouse_provider",
-   "fieldtype": "Select",
-   "label": "Warehouse Provider",
-   "options": "\nERPNext Internal\nGlobali WMS"
-  },
-  {
-   "fieldname": "col_break_2",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "oms_provider",
-   "fieldtype": "Select",
-   "label": "OMS Provider (optional)",
-   "options": "\nOMS Guru\nGobase"
-  },
-  {
-   "fieldname": "ai_provider",
-   "fieldtype": "Select",
-   "label": "AI Provider",
-   "options": "\nClaude\nOpenAI\nGemini"
-  },
-  {
-   "fieldname": "source_provider",
-   "fieldtype": "Select",
-   "label": "Source / Supplier",
-   "options": "\nThe Corner\nCSV\nAPI"
-  },
-  {
-   "fieldname": "shopify_section",
-   "fieldtype": "Section Break",
-   "label": "Shopify"
-  },
-  {
-   "fieldname": "shopify_store_url",
+   "fieldname": "cloudstore_api_url",
    "fieldtype": "Data",
-   "label": "Store URL",
-   "description": "e.g. your-store.myshopify.com"
+   "label": "API URL",
+   "description": "Sandbox: http://api-staging.fashiondealer.net  |  Prod: http://api.fashiondealer.net  (flag supplier to enable HTTPS)"
   },
   {
-   "fieldname": "col_break_shopify",
+   "fieldname": "col_break_cs_1",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "shopify_access_token",
+   "fieldname": "cloudstore_api_token",
    "fieldtype": "Password",
-   "label": "Access Token"
+   "label": "API Token"
   },
   {
-   "fieldname": "fedex_section",
-   "fieldtype": "Section Break",
-   "label": "FedEx"
+   "fieldname": "cloudstore_supplier",
+   "fieldtype": "Link",
+   "label": "Default Supplier",
+   "options": "Supplier"
   },
   {
-   "fieldname": "fedex_account_number",
-   "fieldtype": "Data",
-   "label": "Account Number"
-  },
-  {
-   "fieldname": "col_break_fedex",
+   "fieldname": "col_break_cs_2",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "fedex_api_key",
-   "fieldtype": "Data",
-   "label": "API Key"
+   "fieldname": "cloudstore_price_list",
+   "fieldtype": "Link",
+   "label": "Price List",
+   "options": "Price List"
   },
   {
-   "fieldname": "fedex_api_secret",
-   "fieldtype": "Password",
-   "label": "API Secret"
+   "fieldname": "cloudstore_default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
   },
   {
-   "fieldname": "shiprocket_section",
-   "fieldtype": "Section Break",
-   "label": "Shiprocket"
-  },
-  {
-   "fieldname": "shiprocket_email",
-   "fieldtype": "Data",
-   "label": "Email",
-   "options": "Email"
-  },
-  {
-   "fieldname": "col_break_shiprocket",
+   "fieldname": "col_break_cs_3",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "shiprocket_password",
-   "fieldtype": "Password",
-   "label": "Password"
+   "default": "0",
+   "fieldname": "cloudstore_sync_enabled",
+   "fieldtype": "Check",
+   "label": "Sync Enabled"
   },
   {
-   "fieldname": "myntra_section",
-   "fieldtype": "Section Break",
-   "label": "Myntra"
-  },
-  {
-   "fieldname": "myntra_seller_id",
-   "fieldtype": "Data",
-   "label": "Seller ID"
-  },
-  {
-   "fieldname": "col_break_myntra",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "myntra_api_key",
-   "fieldtype": "Password",
-   "label": "API Key"
+   "default": "100",
+   "fieldname": "cloudstore_page_size",
+   "fieldtype": "Int",
+   "label": "Page Size"
   },
   {
    "fieldname": "ai_section",
