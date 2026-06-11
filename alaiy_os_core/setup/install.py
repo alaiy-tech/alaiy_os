@@ -92,7 +92,7 @@ def _ensure_supplier(name: str, country: str = "") -> str:
         return name
     doc = frappe.new_doc("Supplier")
     doc.supplier_name = name
-    doc.supplier_group = "Supplier"
+    doc.supplier_group = "All Supplier Groups"
     doc.country = country
     doc.insert(ignore_permissions=True)
     frappe.logger().info(f"AlaiyOS: created Supplier '{name}'")
