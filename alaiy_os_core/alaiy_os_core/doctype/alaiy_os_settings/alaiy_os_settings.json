@@ -1,0 +1,286 @@
+{
+ "actions": [],
+ "creation": "2026-06-12 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "connectors_section",
+  "primary_channel",
+  "col_break_1",
+  "logistics_provider",
+  "warehouse_provider",
+  "col_break_2",
+  "oms_provider",
+  "ai_provider",
+  "source_provider",
+  "shopify_section",
+  "shopify_store_url",
+  "col_break_shopify",
+  "shopify_access_token",
+  "fedex_section",
+  "fedex_account_number",
+  "col_break_fedex",
+  "fedex_api_key",
+  "fedex_api_secret",
+  "shiprocket_section",
+  "shiprocket_email",
+  "col_break_shiprocket",
+  "shiprocket_password",
+  "myntra_section",
+  "myntra_seller_id",
+  "col_break_myntra",
+  "myntra_api_key",
+  "ai_section",
+  "claude_api_key",
+  "col_break_ai",
+  "openai_api_key",
+  "gemini_api_key",
+  "s3_section",
+  "s3_bucket",
+  "s3_region",
+  "col_break_s3",
+  "s3_access_key",
+  "s3_secret_key",
+  "feature_flags_section",
+  "enable_ai_enrichment",
+  "enable_ask_alaiy",
+  "enable_price_comparison"
+ ],
+ "fields": [
+  {
+   "fieldname": "connectors_section",
+   "fieldtype": "Section Break",
+   "label": "Active Connectors"
+  },
+  {
+   "fieldname": "primary_channel",
+   "fieldtype": "Select",
+   "label": "Primary Channel",
+   "options": "\nShopify\nMyntra\nAmazon\nFlipkart\nNykaa"
+  },
+  {
+   "fieldname": "col_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "logistics_provider",
+   "fieldtype": "Select",
+   "label": "Logistics Provider",
+   "options": "\nFedEx\nShiprocket\nManual"
+  },
+  {
+   "fieldname": "warehouse_provider",
+   "fieldtype": "Select",
+   "label": "Warehouse Provider",
+   "options": "\nERPNext Internal\nGlobali WMS"
+  },
+  {
+   "fieldname": "col_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "oms_provider",
+   "fieldtype": "Select",
+   "label": "OMS Provider (optional)",
+   "options": "\nOMS Guru\nGobase"
+  },
+  {
+   "fieldname": "ai_provider",
+   "fieldtype": "Select",
+   "label": "AI Provider",
+   "options": "\nClaude\nOpenAI\nGemini"
+  },
+  {
+   "fieldname": "source_provider",
+   "fieldtype": "Select",
+   "label": "Source / Supplier",
+   "options": "\nThe Corner\nCSV\nAPI"
+  },
+  {
+   "fieldname": "shopify_section",
+   "fieldtype": "Section Break",
+   "label": "Shopify"
+  },
+  {
+   "fieldname": "shopify_store_url",
+   "fieldtype": "Data",
+   "label": "Store URL",
+   "description": "e.g. your-store.myshopify.com"
+  },
+  {
+   "fieldname": "col_break_shopify",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shopify_access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "fieldname": "fedex_section",
+   "fieldtype": "Section Break",
+   "label": "FedEx"
+  },
+  {
+   "fieldname": "fedex_account_number",
+   "fieldtype": "Data",
+   "label": "Account Number"
+  },
+  {
+   "fieldname": "col_break_fedex",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "fedex_api_key",
+   "fieldtype": "Data",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "fedex_api_secret",
+   "fieldtype": "Password",
+   "label": "API Secret"
+  },
+  {
+   "fieldname": "shiprocket_section",
+   "fieldtype": "Section Break",
+   "label": "Shiprocket"
+  },
+  {
+   "fieldname": "shiprocket_email",
+   "fieldtype": "Data",
+   "label": "Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "col_break_shiprocket",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shiprocket_password",
+   "fieldtype": "Password",
+   "label": "Password"
+  },
+  {
+   "fieldname": "myntra_section",
+   "fieldtype": "Section Break",
+   "label": "Myntra"
+  },
+  {
+   "fieldname": "myntra_seller_id",
+   "fieldtype": "Data",
+   "label": "Seller ID"
+  },
+  {
+   "fieldname": "col_break_myntra",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "myntra_api_key",
+   "fieldtype": "Password",
+   "label": "API Key"
+  },
+  {
+   "fieldname": "ai_section",
+   "fieldtype": "Section Break",
+   "label": "AI Provider Keys"
+  },
+  {
+   "fieldname": "claude_api_key",
+   "fieldtype": "Password",
+   "label": "Claude API Key"
+  },
+  {
+   "fieldname": "col_break_ai",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "openai_api_key",
+   "fieldtype": "Password",
+   "label": "OpenAI API Key"
+  },
+  {
+   "fieldname": "gemini_api_key",
+   "fieldtype": "Password",
+   "label": "Gemini API Key"
+  },
+  {
+   "fieldname": "s3_section",
+   "fieldtype": "Section Break",
+   "label": "AWS S3"
+  },
+  {
+   "fieldname": "s3_bucket",
+   "fieldtype": "Data",
+   "label": "Bucket Name"
+  },
+  {
+   "fieldname": "s3_region",
+   "fieldtype": "Data",
+   "label": "Region",
+   "default": "ap-south-1"
+  },
+  {
+   "fieldname": "col_break_s3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "s3_access_key",
+   "fieldtype": "Data",
+   "label": "Access Key ID"
+  },
+  {
+   "fieldname": "s3_secret_key",
+   "fieldtype": "Password",
+   "label": "Secret Access Key"
+  },
+  {
+   "fieldname": "feature_flags_section",
+   "fieldtype": "Section Break",
+   "label": "Feature Flags"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_ai_enrichment",
+   "fieldtype": "Check",
+   "label": "Enable AI Listing Enrichment"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_ask_alaiy",
+   "fieldtype": "Check",
+   "label": "Enable Ask Alaiy"
+  },
+  {
+   "default": "0",
+   "fieldname": "enable_price_comparison",
+   "fieldtype": "Check",
+   "label": "Enable AI Price Comparison"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-06-12 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS Core",
+ "name": "Alaiy OS Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
