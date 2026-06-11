@@ -5,9 +5,6 @@ app_description = "Backend for Alaiy OS"
 app_email = "sarthak@alaiy.com"
 app_license = "unlicense"
 
-# Apps
-# ------------------
-
 # required_apps = []
 
 # Each item in the list will be shown as an app in the apps page
@@ -148,24 +145,26 @@ app_license = "unlicense"
 
 # Scheduled Tasks
 # ---------------
+# Uncomment and point to task functions as they are implemented.
 
-# scheduler_events = {
-# 	"all": [
-# 		"alaiy_os_core.tasks.all"
-# 	],
-# 	"daily": [
-# 		"alaiy_os_core.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"alaiy_os_core.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"alaiy_os_core.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"alaiy_os_core.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	# Pull orders from all active channels every 15 minutes.
+	# "cron": {
+	# 	"*/15 * * * *": ["alaiy_os_core.tasks.sync_orders"],
+	# },
+
+	# Push inventory levels to channels once an hour.
+	# "hourly": [
+	# 	"alaiy_os_core.tasks.push_inventory",
+	# ],
+
+	# Daily: account health snapshot, low-stock alerts, DRR bucket refresh.
+	# "daily": [
+	# 	"alaiy_os_core.tasks.daily_health_snapshot",
+	# 	"alaiy_os_core.tasks.check_low_stock",
+	# 	"alaiy_os_core.tasks.refresh_drr_buckets",
+	# ],
+}
 
 # Testing
 # -------
