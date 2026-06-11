@@ -4,17 +4,20 @@ from alaiy_os_core.setup.custom_fields import create_custom_fields
 
 
 def after_install():
-    """
-    Called by Frappe after `bench install-app alaiy_os_core` and on every `bench migrate`.
-    Registered in hooks.py as after_install and after_migrate.
-    All operations are idempotent — safe to run multiple times.
-    """
-    frappe.logger().info("AlaiyOS: running setup")
+    # Guard — don't run if ERPNext company setup hasn't been done yet
+    if not frappe.db.get_single_value("Global Defaults", "default_company"):
+        frappe.logger().warning(
+            "AlaiyOS: skipping after_install — ERPNext company not set up yet. "
+            "Run `bench --site <site> execute alaiy_os_core.setup.install.after_install` after completing ERPNext setup."
+        )
+        return
+
+    frappe.logger().info("AlaiyOS: running after_install setup")
     create_custom_fields()
     _setup_item_attributes()
     _setup_enabled_connectors()
     frappe.db.commit()
-    frappe.logger().info("AlaiyOS: setup complete")
+    frappe.logger().info("AlaiyOS: after_install complete")
 
 
 # ------------------------------------------------------------------ #
@@ -27,7 +30,8 @@ def _setup_item_attributes():
             doc = frappe.new_doc("Item Attribute")
             doc.attribute_name = attr_name
             doc.insert(ignore_permissions=True)
-            frappe.logger().info(f"AlaiyOS: created Item Attribute '{attr_name}'")
+            frappe.logger().info(
+                f"AlaiyOS: created Item Attribute '{attr_name}'")
 
 
 # ------------------------------------------------------------------ #
@@ -49,7 +53,8 @@ def _setup_cloudstore():
     cfg = get_connector_settings("cloudstore")
     frappe.logger().info("AlaiyOS: setting up Cloudstore connector")
 
-    supplier = _ensure_supplier(cfg["supplier_name"], cfg.get("supplier_country", ""))
+    supplier = _ensure_supplier(
+        cfg["supplier_name"], cfg.get("supplier_country", ""))
     price_list = _ensure_price_list(
         cfg["price_list_name"], cfg["price_list_currency"], buying=True, selling=False
     )
@@ -74,7 +79,8 @@ def _setup_cloudstore():
 def _setup_shopify():
     cfg = get_connector_settings("shopify")
     frappe.logger().info("AlaiyOS: setting up Shopify connector")
-    warehouse = _ensure_warehouse(cfg.get("warehouse_name", "Shopify Warehouse"))
+    warehouse = _ensure_warehouse(
+        cfg.get("warehouse_name", "Shopify Warehouse"))
     _update_alaiy_os_settings({
         "shopify_shop_url": cfg.get("shop_url", ""),
         "shopify_access_token": cfg.get("access_token", ""),
@@ -90,6 +96,10 @@ def _setup_shopify():
 def _ensure_supplier(name: str, country: str = "") -> str:
     if frappe.db.exists("Supplier", name):
         return name
+
+    # Ensure Supplier Group exists before creating supplier
+    _ensure_supplier_group("All Supplier Groups")
+
     doc = frappe.new_doc("Supplier")
     doc.supplier_name = name
     doc.supplier_group = "All Supplier Groups"
@@ -97,6 +107,16 @@ def _ensure_supplier(name: str, country: str = "") -> str:
     doc.insert(ignore_permissions=True)
     frappe.logger().info(f"AlaiyOS: created Supplier '{name}'")
     return name
+
+
+def _ensure_supplier_group(name: str):
+    if frappe.db.exists("Supplier Group", name):
+        return
+    doc = frappe.new_doc("Supplier Group")
+    doc.supplier_group_name = name
+    doc.is_group = 1
+    doc.insert(ignore_permissions=True)
+    frappe.logger().info(f"AlaiyOS: created Supplier Group '{name}'")
 
 
 def _ensure_price_list(name: str, currency: str, buying: bool, selling: bool) -> str:
@@ -163,7 +183,8 @@ def _update_alaiy_os_settings(values: dict):
 
     for fieldname, value in values.items():
         if not frappe.db.exists("DocField", {"parent": "Alaiy OS Settings", "fieldname": fieldname}):
-            frappe.logger().warning(f"AlaiyOS: field '{fieldname}' not found on Alaiy OS Settings — skipping")
+            frappe.logger().warning(
+                f"AlaiyOS: field '{fieldname}' not found on Alaiy OS Settings — skipping")
             continue
         current = getattr(settings, fieldname, None)
         if current and fieldname not in non_sensitive:
