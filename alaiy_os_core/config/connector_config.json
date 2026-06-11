@@ -1,0 +1,34 @@
+{
+  "_comment": "AlaiyOS connector configuration for Altomoda. Edit this file before deploying.",
+  "company": {
+    "name": "Altomoda",
+    "abbreviation": "ALT",
+    "currency": "INR",
+    "country": "India"
+  },
+  "connectors": {
+    "cloudstore": {
+      "enabled": true,
+      "api_url": "https://sandbox.csplatform.io:9950",
+      "api_token": "",
+      "supplier_name": "The Corner",
+      "supplier_country": "Italy",
+      "price_list_name": "Cloudstore Supplier Price",
+      "price_list_currency": "EUR",
+      "warehouse_name": "Altomoda Stores",
+      "page_size": 50
+    },
+    "shopify": {
+      "enabled": false,
+      "shop_url": "",
+      "access_token": "",
+      "warehouse_name": ""
+    },
+    "myntra": {
+      "enabled": false,
+      "api_url": "",
+      "api_key": "",
+      "warehouse_name": ""
+    }
+  }
+}
