@@ -9,6 +9,8 @@ in the service layer are responsible for catching and logging via frappe.
 import requests
 from typing import Any
 
+from alaiy_os_core.config import env
+
 
 class CloudstoreAPIError(Exception):
     def __init__(self, method: str, url: str, status_code: int, message: str):
@@ -19,13 +21,23 @@ class CloudstoreAPIError(Exception):
 
 
 class CloudstoreClient:
-    def __init__(self, base_url: str, token: str, timeout: int = 30):
-        self._base = base_url.rstrip("/")
-        self._token = token
+    def __init__(self, base_url: str | None = None, token: str | None = None, timeout: int = 30):
+        """
+        If base_url / token are passed explicitly, use them (useful in tests).
+        Otherwise fall back to env vars — the normal production path.
+        """
+        self._base = (base_url or env.CLOUDSTORE_API_URL).rstrip("/")
+        _token = token or env.CLOUDSTORE_API_TOKEN
         self._timeout = timeout
+
+        if not self._base:
+            raise ValueError("Cloudstore base URL not set — check CLOUDSTORE_API_URL in .env")
+        if not _token:
+            raise ValueError("Cloudstore API token not set — check CLOUDSTORE_API_TOKEN in .env")
+
         self._session = requests.Session()
         self._session.headers.update({
-            "Authorization": f"Bearer {token}",
+            "Authorization": f"Bearer {_token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
         })
@@ -117,3 +129,19 @@ class CloudstoreClient:
         if status:
             params["status"] = status
         return self._get("/orders", params=params)
+
+    # ------------------------------------------------------------------
+    # Health check
+    # ------------------------------------------------------------------
+
+    def health_check(self) -> dict:
+        """
+        Makes a real API call to verify credentials are valid.
+        Returns {"ok": True} or {"ok": False, "error": "..."}
+        Never raises — always returns a dict.
+        """
+        try:
+            self._get("/shop/v1/categories/roots", params={"_pageIndex": 0, "_pageSize": 1})
+            return {"ok": True}
+        except Exception as e:  # noqa: BLE001
+            return {"ok": False, "error": str(e)}
