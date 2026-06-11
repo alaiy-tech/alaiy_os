@@ -21,12 +21,13 @@ def _get_client_and_settings() -> tuple[CloudstoreClient | None, object | None]:
     """
     Return (client, settings) or (None, None) if sync should be skipped.
 
-    Guard 1 — config file: connector_config.json must have cloudstore.enabled = true.
-    Guard 2 — DB flag: Alaiy OS Settings.cloudstore_sync_enabled must be 1.
+    Guard 1 — .env flag: CLOUDSTORE_ENABLED must be true.
+    Guard 2 — DB flag: Alaiy OS Settings.cloudstore_sync_enabled must be 1
+              (operational toggle — can be flipped without redeployment).
     """
     from alaiy_os_core.config.loader import is_connector_enabled
     if not is_connector_enabled("cloudstore"):
-        frappe.logger().info("Cloudstore disabled in connector_config.json — skipping sync")
+        frappe.logger().info("Cloudstore disabled in .env — skipping sync")
         return None, None
 
     settings = frappe.get_single("Alaiy OS Settings")
@@ -34,17 +35,13 @@ def _get_client_and_settings() -> tuple[CloudstoreClient | None, object | None]:
         frappe.logger().info("Cloudstore disabled in Alaiy OS Settings — skipping sync")
         return None, None
 
-    if not settings.cloudstore_api_url or not settings.cloudstore_api_token:
-        frappe.log_error(
-            "cloudstore_api_url or cloudstore_api_token not set in Alaiy OS Settings.",
-            "Cloudstore sync skipped",
-        )
+    # Client reads URL + token from .env directly — no DB credential reads
+    try:
+        client = CloudstoreClient()
+    except ValueError as exc:
+        frappe.log_error(str(exc), "Cloudstore sync skipped — missing env config")
         return None, None
 
-    client = CloudstoreClient(
-        base_url=settings.cloudstore_api_url,
-        token=settings.get_password("cloudstore_api_token"),
-    )
     return client, settings
 
 

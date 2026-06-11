@@ -9,7 +9,7 @@ app_license = "MIT"
 # All setup helpers are idempotent so running on migrate is safe —
 # ensures master data and custom fields are present on fresh sites too.
 after_install = "alaiy_os_core.setup.install.after_install"
-after_migrate = "alaiy_os_core.setup.install.after_install"
+after_migrate = "alaiy_os_core.setup.install.after_migrate"
 
 scheduler_events = {
     "cron": {
