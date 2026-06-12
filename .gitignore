@@ -31,7 +31,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-
+.env
 # Dependency directories
 node_modules/
 jspm_packages/
