@@ -2,8 +2,8 @@
 Scheduled job entry points for Cloudstore sync.
 
 Registered in hooks.py scheduler_events; called by the Frappe RQ worker.
-Each entry point owns: settings read, client construction, service call,
-sync log write, and graceful error handling.
+Each entry point reads credentials from Alaiy OS Settings, constructs the
+client explicitly, then delegates to the service layer.
 """
 
 from __future__ import annotations
@@ -20,26 +20,20 @@ from alaiy_os_core.connectors.cloudstore import (
 def _get_client_and_settings() -> tuple[CloudstoreClient | None, object | None]:
     """
     Return (client, settings) or (None, None) if sync should be skipped.
-
-    Guard 1 — .env flag: CLOUDSTORE_ENABLED must be true.
-    Guard 2 — DB flag: Alaiy OS Settings.cloudstore_sync_enabled must be 1
-              (operational toggle — can be flipped without redeployment).
+    Reads cloudstore_enabled from DB — no env dependency.
     """
-    from alaiy_os_core.config.loader import is_connector_enabled
-    if not is_connector_enabled("cloudstore"):
-        frappe.logger().info("Cloudstore disabled in .env — skipping sync")
-        return None, None
-
     settings = frappe.get_single("Alaiy OS Settings")
-    if not settings.cloudstore_sync_enabled:
+    if not settings.cloudstore_enabled:
         frappe.logger().info("Cloudstore disabled in Alaiy OS Settings — skipping sync")
         return None, None
 
-    # Client reads URL + token from .env directly — no DB credential reads
     try:
-        client = CloudstoreClient()
+        client = CloudstoreClient(
+            base_url=settings.cloudstore_api_url or "",
+            token=settings.cloudstore_api_token or "",
+        )
     except ValueError as exc:
-        frappe.log_error(str(exc), "Cloudstore sync skipped — missing env config")
+        frappe.log_error(str(exc), "Cloudstore sync skipped — missing credentials")
         return None, None
 
     return client, settings
@@ -95,7 +89,7 @@ def sync_categories() -> None:
 
 
 def sync_full_catalog() -> None:
-    """Full product catalog sync — run once on setup or for a full refresh."""
+    """Full product catalog sync."""
     client, settings = _get_client_and_settings()
     if not client:
         return

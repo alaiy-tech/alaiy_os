@@ -1,15 +1,13 @@
 """
 HTTP transport for the Cloudstore / The Corner API.
 
-No frappe imports — this module is pure Python so it can be unit-tested
-without a running bench. All errors surface as CloudstoreAPIError; callers
-in the service layer are responsible for catching and logging via frappe.
+Pure Python — no frappe imports. Callers are responsible for reading
+credentials from Alaiy OS Settings and passing them explicitly.
+All errors surface as CloudstoreAPIError.
 """
 
 import requests
 from typing import Any
-
-from alaiy_os_core.config import env
 
 
 class CloudstoreAPIError(Exception):
@@ -21,23 +19,18 @@ class CloudstoreAPIError(Exception):
 
 
 class CloudstoreClient:
-    def __init__(self, base_url: str | None = None, token: str | None = None, timeout: int = 30):
-        """
-        If base_url / token are passed explicitly, use them (useful in tests).
-        Otherwise fall back to env vars — the normal production path.
-        """
-        self._base = (base_url or env.CLOUDSTORE_API_URL).rstrip("/")
-        _token = token or env.CLOUDSTORE_API_TOKEN
-        self._timeout = timeout
+    def __init__(self, base_url: str, token: str, timeout: int = 30):
+        if not base_url:
+            raise ValueError("Cloudstore API URL is required")
+        if not token:
+            raise ValueError("Cloudstore API token is required")
 
-        if not self._base:
-            raise ValueError("Cloudstore base URL not set — check CLOUDSTORE_API_URL in .env")
-        if not _token:
-            raise ValueError("Cloudstore API token not set — check CLOUDSTORE_API_TOKEN in .env")
+        self._base = base_url.rstrip("/")
+        self._timeout = timeout
 
         self._session = requests.Session()
         self._session.headers.update({
-            "Authorization": f"Bearer {_token}",
+            "Authorization": f"Bearer {token}",
             "Accept": "application/json",
             "Content-Type": "application/json",
         })
@@ -70,30 +63,19 @@ class CloudstoreClient:
         return data if isinstance(data, list) else data.get("data", [])
 
     def get_products(self, page: int = 1, page_size: int = 100, category_id: str | None = None) -> dict:
-        """
-        Return one page of products.
-
-        Response shape: { "data": [...], "total": int, "page": int, "page_size": int }
-        """
         params: dict = {"page": page, "page_size": page_size}
         if category_id:
             params["category_id"] = category_id
         return self._get("/products", params=params)
 
     def get_product(self, product_id: str) -> dict:
-        """Return a single product by its Cloudstore _id.$oid."""
         return self._get(f"/products/{product_id}")
 
     def get_product_variants(self, product_id: str) -> list[dict]:
-        """Return all variants (SKUs) for a product."""
         data = self._get(f"/products/{product_id}/variants")
         return data if isinstance(data, list) else data.get("data", [])
 
     def get_stock(self, sku_ids: list[str]) -> list[dict]:
-        """
-        Bulk stock query.  POST body: { "sku_ids": [...] }
-        Returns list of { "sku_id": str, "quantity": int }
-        """
         return self._post("/stock/query", body={"sku_ids": sku_ids})
 
     # ------------------------------------------------------------------
@@ -101,11 +83,6 @@ class CloudstoreClient:
     # ------------------------------------------------------------------
 
     def get_events(self, since_event_id: str | None = None, page_size: int = 200) -> dict:
-        """
-        Poll for stock/price/product change events.
-
-        Returns: { "data": [...], "last_event_id": str }
-        """
         params: dict = {"page_size": page_size}
         if since_event_id:
             params["since"] = since_event_id
@@ -116,15 +93,12 @@ class CloudstoreClient:
     # ------------------------------------------------------------------
 
     def create_order(self, order_payload: dict) -> dict:
-        """Push a purchase order to Cloudstore."""
         return self._post("/orders", body=order_payload)
 
     def get_order(self, order_id: str) -> dict:
-        """Fetch a single order by Cloudstore order ID."""
         return self._get(f"/orders/{order_id}")
 
     def get_orders(self, page: int = 1, page_size: int = 50, status: str | None = None) -> dict:
-        """Return a paginated list of orders."""
         params: dict = {"page": page, "page_size": page_size}
         if status:
             params["status"] = status
@@ -136,12 +110,12 @@ class CloudstoreClient:
 
     def health_check(self) -> dict:
         """
-        Makes a real API call to verify credentials are valid.
-        Returns {"ok": True} or {"ok": False, "error": "..."}
-        Never raises — always returns a dict.
+        Lightweight connectivity check using the categories endpoint.
+        Returns {"ok": True} or {"ok": False, "error": "..."}.
+        Never raises.
         """
         try:
-            self._get("/shop/v1/categories/roots", params={"_pageIndex": 0, "_pageSize": 1})
+            self._get("/categories", params={"page": 1, "page_size": 1})
             return {"ok": True}
         except Exception as e:  # noqa: BLE001
             return {"ok": False, "error": str(e)}
