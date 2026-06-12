@@ -1,0 +1,67 @@
+{
+ "actions": [],
+ "allow_rename": 0,
+ "autoname": "field:shopify_location_id",
+ "creation": "2026-06-12 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "shopify_location_id",
+  "location_name",
+  "is_active",
+  "erpnext_warehouse"
+ ],
+ "fields": [
+  {
+   "fieldname": "shopify_location_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shopify Location ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "location_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Location Name"
+  },
+  {
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "erpnext_warehouse",
+   "fieldtype": "Link",
+   "label": "ERPNext Warehouse",
+   "options": "Warehouse"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-12 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS Core",
+ "name": "Shopify Location",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
