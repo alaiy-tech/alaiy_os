@@ -1,3 +1,1 @@
-from alaiy_os_core.config import env
-
-__all__ = ["env"]
+# config package — credentials are read from Alaiy OS Settings (DB) at runtime

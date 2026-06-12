@@ -14,8 +14,14 @@
   "cloudstore_price_list",
   "cloudstore_default_warehouse",
   "col_break_cs_3",
-  "cloudstore_sync_enabled",
+  "cloudstore_enabled",
   "cloudstore_page_size",
+  "shopify_section",
+  "shopify_enabled",
+  "shopify_shop_url",
+  "col_break_sp_1",
+  "shopify_access_token",
+  "shopify_default_warehouse",
   "ai_section",
   "claude_api_key",
   "col_break_ai",
@@ -30,7 +36,8 @@
   "feature_flags_section",
   "enable_ai_enrichment",
   "enable_ask_alaiy",
-  "enable_price_comparison"
+  "enable_price_comparison",
+  "onboarding_complete"
  ],
  "fields": [
   {
@@ -42,7 +49,7 @@
    "fieldname": "cloudstore_api_url",
    "fieldtype": "Data",
    "label": "API URL",
-   "description": "Sandbox: http://api-staging.fashiondealer.net  |  Prod: http://api.fashiondealer.net  (flag supplier to enable HTTPS)"
+   "description": "Sandbox: https://sandbox.csplatform.io:9950  |  Prod: http://api.fashiondealer.net  (flag supplier to enable HTTPS)"
   },
   {
    "fieldname": "col_break_cs_1",
@@ -81,15 +88,47 @@
   },
   {
    "default": "0",
-   "fieldname": "cloudstore_sync_enabled",
+   "fieldname": "cloudstore_enabled",
    "fieldtype": "Check",
-   "label": "Sync Enabled"
+   "label": "Enabled"
   },
   {
    "default": "100",
    "fieldname": "cloudstore_page_size",
    "fieldtype": "Int",
    "label": "Page Size"
+  },
+  {
+   "fieldname": "shopify_section",
+   "fieldtype": "Section Break",
+   "label": "Shopify"
+  },
+  {
+   "default": "0",
+   "fieldname": "shopify_enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "shopify_shop_url",
+   "fieldtype": "Data",
+   "label": "Shop URL",
+   "description": "e.g. your-store.myshopify.com (no https://)"
+  },
+  {
+   "fieldname": "col_break_sp_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "shopify_access_token",
+   "fieldtype": "Password",
+   "label": "Access Token"
+  },
+  {
+   "fieldname": "shopify_default_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Warehouse",
+   "options": "Warehouse"
   },
   {
    "fieldname": "ai_section",
@@ -167,6 +206,13 @@
    "fieldname": "enable_price_comparison",
    "fieldtype": "Check",
    "label": "Enable AI Price Comparison"
+  },
+  {
+   "default": "0",
+   "fieldname": "onboarding_complete",
+   "fieldtype": "Check",
+   "label": "Onboarding Complete",
+   "hidden": 1
   }
  ],
  "issingle": 1,
