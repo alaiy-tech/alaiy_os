@@ -128,6 +128,8 @@ def toggle_connector(connector_id: str, enabled) -> dict:
         # Create master data on first enable
         if connector_id == "cloudstore":
             _setup_cloudstore_master_data(settings)
+        elif connector_id == "shopify":
+            _setup_shopify_master_data(settings)
 
     setattr(settings, meta["enabled_field"], 1 if enabled else 0)
     settings.save(ignore_permissions=True)
@@ -158,7 +160,17 @@ def _run_health_check(connector_id: str, settings) -> dict:
         except ValueError as e:
             return {"ok": False, "error": str(e)}
 
-    # Shopify and other connectors: not yet implemented
+    if connector_id == "shopify":
+        from alaiy_os_core.connectors.shopify.client import ShopifyClient
+        try:
+            client = ShopifyClient(
+                shop_url=settings.shopify_shop_url or "",
+                access_token=settings.shopify_access_token or "",
+            )
+            return client.health_check()
+        except ValueError as e:
+            return {"ok": False, "error": str(e)}
+
     return {"ok": True}
 
 
@@ -202,6 +214,37 @@ def _setup_cloudstore_master_data(settings) -> None:
     settings.cloudstore_price_list = price_list_name
     settings.cloudstore_default_warehouse = actual_warehouse
     # Don't save here — caller saves after this returns
+
+
+def _setup_shopify_master_data(settings) -> None:
+    """
+    Idempotently create the Price List needed for Shopify selling prices.
+    Also syncs Shopify locations into the Shopify Location DocType.
+    Called once when the Shopify connector is first enabled.
+    """
+    price_list_name = "Shopify Selling Price"
+    if not frappe.db.exists("Price List", price_list_name):
+        doc = frappe.new_doc("Price List")
+        doc.price_list_name = price_list_name
+        doc.currency = "EUR"
+        doc.buying = 0
+        doc.selling = 1
+        doc.enabled = 1
+        doc.insert(ignore_permissions=True)
+
+    settings.shopify_default_price_list = price_list_name
+
+    # Sync locations asynchronously — best-effort; failure here must not block enable
+    try:
+        from alaiy_os_core.connectors.shopify.client import ShopifyClient
+        from alaiy_os_core.connectors.shopify.inventory_service import sync_locations
+        client = ShopifyClient(
+            shop_url=settings.shopify_shop_url or "",
+            access_token=settings.shopify_access_token or "",
+        )
+        sync_locations(client)
+    except Exception as e:
+        frappe.log_error(str(e), "Shopify: location sync on first enable failed (non-fatal)")
 
 
 def _ensure_warehouse(name: str) -> str:

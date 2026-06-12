@@ -14,11 +14,15 @@ after_migrate = "alaiy_os_core.setup.install.after_migrate"
 scheduler_events = {
     "cron": {
         # Incremental stock/price event sync every 15 minutes
-        "*/15 * * * *": ["alaiy_os_core.connectors.cloudstore.sync_job.sync_incremental"],
+        "*/15 * * * *": [
+            "alaiy_os_core.connectors.cloudstore.sync_job.sync_incremental",
+            "alaiy_os_core.connectors.shopify.sync_job.pull_inventory",
+        ],
     },
     "daily": [
         # Full catalog + category refresh once a day (off-peak)
         "alaiy_os_core.connectors.cloudstore.sync_job.sync_categories",
         "alaiy_os_core.connectors.cloudstore.sync_job.sync_full_catalog",
+        "alaiy_os_core.connectors.shopify.sync_job.pull_full_catalog",
     ],
 }
