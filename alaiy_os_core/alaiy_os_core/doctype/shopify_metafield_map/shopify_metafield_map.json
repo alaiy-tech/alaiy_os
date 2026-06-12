@@ -1,0 +1,85 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "prompt",
+ "creation": "2026-06-12 00:00:00",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "erpnext_doctype",
+  "erpnext_fieldname",
+  "shopify_namespace",
+  "shopify_key",
+  "shopify_type",
+  "enabled"
+ ],
+ "fields": [
+  {
+   "fieldname": "erpnext_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "ERPNext DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "erpnext_fieldname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "ERPNext Fieldname",
+   "reqd": 1
+  },
+  {
+   "fieldname": "shopify_namespace",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shopify Namespace",
+   "default": "alaiy_os"
+  },
+  {
+   "fieldname": "shopify_key",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Shopify Key",
+   "reqd": 1
+  },
+  {
+   "fieldname": "shopify_type",
+   "fieldtype": "Select",
+   "label": "Shopify Metafield Type",
+   "options": "single_line_text_field\nmulti_line_text_field\nnumber_integer\nnumber_decimal\nboolean\ndate\ndatetime\njson",
+   "default": "single_line_text_field"
+  },
+  {
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "default": "1"
+  }
+ ],
+ "links": [],
+ "modified": "2026-06-12 00:00:00",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS Core",
+ "name": "Shopify Metafield Map",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}
