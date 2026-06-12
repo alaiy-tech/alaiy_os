@@ -22,6 +22,8 @@
   "col_break_sp_1",
   "shopify_access_token",
   "shopify_default_warehouse",
+  "shopify_default_price_list",
+  "shopify_online_store_publication_id",
   "ai_section",
   "claude_api_key",
   "col_break_ai",
@@ -129,6 +131,20 @@
    "fieldtype": "Link",
    "label": "Default Warehouse",
    "options": "Warehouse"
+  },
+  {
+   "fieldname": "shopify_default_price_list",
+   "fieldtype": "Link",
+   "label": "Default Price List",
+   "options": "Price List"
+  },
+  {
+   "fieldname": "shopify_online_store_publication_id",
+   "fieldtype": "Data",
+   "label": "Online Store Publication ID",
+   "read_only": 1,
+   "hidden": 1,
+   "description": "Auto-populated on first publish. Shopify GID for the Online Store channel."
   },
   {
    "fieldname": "ai_section",
