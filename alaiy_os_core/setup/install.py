@@ -10,10 +10,20 @@ from alaiy_os_core.setup.custom_fields import create_custom_fields
 
 
 def after_install():
+    _setup_warehouse_types()
     create_custom_fields()
     _setup_item_attributes()
-    frappe.db.commit()
     frappe.logger().info("AlaiyOS: install complete — finish setup via the web UI")
+    frappe.db.commit()
+
+
+def _setup_warehouse_types():
+    for wt in ["Finished Goods", "Work In Progress", "All",
+               "Goods In Transit", "Transit", "Stores", "Return"]:
+        if not frappe.db.exists("Warehouse Type", wt):
+            doc = frappe.new_doc("Warehouse Type")
+            doc.name = wt
+            doc.insert(ignore_permissions=True)
 
 
 def after_migrate():
