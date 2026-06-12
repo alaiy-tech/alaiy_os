@@ -17,6 +17,8 @@
   "col_break_counts",
   "items_updated",
   "items_skipped",
+  "items_synced",
+  "errors",
   "section_detail",
   "error_log",
   "last_event_id"
@@ -86,6 +88,18 @@
    "fieldname": "items_skipped",
    "fieldtype": "Int",
    "label": "Skipped"
+  },
+  {
+   "default": "0",
+   "fieldname": "items_synced",
+   "fieldtype": "Int",
+   "label": "Total Synced"
+  },
+  {
+   "default": "0",
+   "fieldname": "errors",
+   "fieldtype": "Int",
+   "label": "Errors"
   },
   {
    "fieldname": "section_detail",
