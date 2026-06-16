@@ -31,7 +31,7 @@ in-memory callables), so all blocked types share one handler function.
 
 import frappe
 
-from alaiy_os_core.config.workspace_config import get_blocked_doctypes
+from alaiy_os_core.client.config.workspace_config import get_blocked_doctypes
 
 
 def is_system_admin(user=None):
