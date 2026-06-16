@@ -142,7 +142,8 @@ STOCK_BLOCKED_DOCTYPES = [
 # "Serial No" appears in both visible and (accidentally) the blocked draft above.
 # Keep it visible — remove it from the blocked list defensively so the two lists
 # can never contradict each other.
-STOCK_BLOCKED_DOCTYPES = [d for d in STOCK_BLOCKED_DOCTYPES if d != "Serial No"]
+STOCK_BLOCKED_DOCTYPES = [
+    d for d in STOCK_BLOCKED_DOCTYPES if d != "Serial No"]
 
 
 # Reports that must be stripped from the Stock workspace UI (non-admins).
@@ -151,7 +152,8 @@ STOCK_BLOCKED_REPORTS = [
     "Stock Projected Qty",
     "Stock Ageing",
     "Item Price Stock",
-    "Warehouse wise Item Balance Age and Value",  # internal name of "Warehouse Wise Stock Balance"
+    # internal name of "Warehouse Wise Stock Balance"
+    "Warehouse wise Item Balance Age and Value",
     "Delivery Note Trends",
     "Purchase Receipt Trends",
     "Sales Order Analysis",

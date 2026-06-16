@@ -5,13 +5,13 @@ import os as _os
 # adds/removes its runtime permission guard on the next bench restart.
 from alaiy_os_core.permissions import HAS_PERMISSION_HOOK
 
-app_name        = "alaiy_os_core"
-app_title       = "Alaiy OS Core"
-app_publisher   = "Alaiy"
+app_name = "alaiy_os_core"
+app_title = "Alaiy OS Core"
+app_publisher = "Alaiy"
 app_description = "AlaiyOS Core — connector registry and branding layer"
-app_email       = "sarthak@alaiy.com"
-app_license     = "MIT"
-app_version     = "0.0.1"
+app_email = "sarthak@alaiy.com"
+app_license = "MIT"
+app_version = "0.0.1"
 
 # ── Deploy-time propagation ───────────────────────────────────────────────────
 # after_install: first install only (also sets admin password + full setup).
@@ -42,25 +42,33 @@ has_permission = HAS_PERMISSION_HOOK
 # Serve an Alaiy-branded manifest. Point your reverse proxy / front-end at this
 # route if you want PWA install to show Alaiy icons.
 website_route_rules = [
-    {"from_route": "/alaiy-manifest.json", "to_route": "alaiy_os_core.branding.get_manifest"},
+    {"from_route": "/alaiy-manifest.json",
+        "to_route": "alaiy_os_core.branding.get_manifest"},
 ]
 
 # Use file mtime as cache-buster so browsers always load the latest CSS/JS
 # after bench build + gunicorn restart, without needing a manual hard-refresh.
+
+
 def _v(rel):
     try:
         return str(int(_os.path.getmtime(_os.path.join(_os.path.dirname(__file__), rel))))
     except Exception:
         return "1"
 
+
 # ── Desk asset includes ───────────────────────────────────────────────────────
 # JS: main desk customisations + the client-side route guard.
 # CSS: theme overrides + branding (logo/favicon) overrides.
 app_include_js = [
-    "/assets/alaiy_os_core/js/alaiy_os_core.js?v=" + _v("public/js/alaiy_os_core.js"),
-    "/assets/alaiy_os_core/js/route_guard.js?v=" + _v("public/js/route_guard.js"),
+    "/assets/alaiy_os_core/js/alaiy_os_core.js?v=" +
+    _v("public/js/alaiy_os_core.js"),
+    "/assets/alaiy_os_core/js/route_guard.js?v=" +
+    _v("public/js/route_guard.js"),
 ]
 app_include_css = [
-    "/assets/alaiy_os_core/config/theme.css?v=" + _v("public/config/theme.css"),
-    "/assets/alaiy_os_core/css/branding.css?v=" + _v("public/css/branding.css"),
+    "/assets/alaiy_os_core/config/theme.css?v=" +
+    _v("public/config/theme.css"),
+    "/assets/alaiy_os_core/css/branding.css?v=" +
+    _v("public/css/branding.css"),
 ]
