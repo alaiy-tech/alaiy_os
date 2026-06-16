@@ -1,0 +1,9 @@
+Metadata-Version: 2.4
+Name: alaiy_os_core
+Version: 0.0.1
+Summary: AlaiyOS Core — connector registry and branding layer
+Author: Alaiy
+Author-email: sarthak@alaiy.com
+Dynamic: author
+Dynamic: author-email
+Dynamic: summary

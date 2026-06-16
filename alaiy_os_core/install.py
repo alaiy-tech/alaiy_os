@@ -2,6 +2,7 @@ import frappe
 from alaiy_os_core.public.config.brand_config import VISIBLE_WORKSPACES, DEFAULT_ADMIN_PASSWORD
 from alaiy_os_core.workspace.workspace_manager import patch_workspaces
 from alaiy_os_core import branding
+from alaiy_os_core.connectors.registry import setup_connectors
 
 
 def after_install():
@@ -28,6 +29,7 @@ def run_setup():
     patch_workspaces()
     branding.apply_branding()
     _apply_system_settings()
+    setup_connectors()
     frappe.db.commit()
     frappe.clear_cache()
 

@@ -28,7 +28,9 @@ frappe.provide("alaiy_os_core.ui");
   function hideOnboarding() {
     if (!(frappe.boot && frappe.boot.hide_onboarding)) return;
     // ERPNext 16 onboarding widget + its status strip.
-    $(".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status").hide();
+    $(
+      ".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status",
+    ).hide();
   }
 
   // ── 2. Redirect the bare desk root to the default workspace ────────────────
@@ -53,8 +55,9 @@ frappe.provide("alaiy_os_core.ui");
   // ERPNext 16 puts these in the sidebar header. We relocate the actual DOM
   // nodes into the navbar's right-hand <ul> so no core files are touched.
   function moveTopbarWidgets() {
-    var $navbarRight = $(".navbar .navbar-nav.d-flex, .navbar .navbar-collapse .navbar-nav")
-      .last();
+    var $navbarRight = $(
+      ".navbar .navbar-nav.d-flex, .navbar .navbar-collapse .navbar-nav",
+    ).last();
     if (!$navbarRight.length) {
       $navbarRight = $(".navbar .container > .navbar-nav").last();
     }
