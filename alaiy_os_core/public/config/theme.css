@@ -73,7 +73,7 @@
    ──────────────────────────────────────────────────────────── */
 :root {
   --font-stack:        "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-size-base:    13px;
+  --font-size-base:    15px;
 
   --primary:           var(--alaiy-primary);
   --primary-color:     var(--alaiy-primary);
@@ -206,7 +206,7 @@ h1, h2, h3, h4, h5, h6,
 .desk-sidebar .sidebar-group-title,
 .desk-sidebar .list-sidebar-label {
   color: var(--alaiy-sidebar-muted) !important;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -262,7 +262,6 @@ body,
   background-color: var(--alaiy-surface) !important;
   border: 1px solid var(--alaiy-border) !important;
   border-radius: var(--alaiy-radius-lg) !important;
-  padding: 
   box-shadow: var(--alaiy-shadow-sm) !important;
   transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
 }
@@ -322,7 +321,7 @@ textarea {
   border-radius: var(--alaiy-radius) !important;
   background-color: var(--alaiy-surface) !important;
   color: var(--alaiy-text) !important;
-  font-size: 13px;
+  font-size: 15px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -348,7 +347,7 @@ textarea {
 .dt-header {
   background-color: var(--alaiy-surface-muted) !important;
   border-bottom: 1px solid var(--alaiy-border) !important;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -448,7 +447,7 @@ a[href="/website"] {
 
 .alaiy-search-placeholder {
   flex: 1;
-  font-size: 12px;
+  font-size: 14px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   user-select: none;
@@ -458,7 +457,7 @@ a[href="/website"] {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  font-size: 10px;
+  font-size: 12px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   background-color: var(--alaiy-surface-muted);
@@ -472,10 +471,168 @@ a[href="/website"] {
 /* ── 34. About modal — Alaiy footer ─────────────────────────── */
 .alaiy-about-footer {
   text-align: center;
-  font-size: 12px;
+  font-size: 14px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   padding: 12px 0 4px;
   border-top: var(--alaiy-border-width) solid var(--alaiy-border);
   margin-top: 8px;
+}
+
+
+/* =============================================================
+   35. ERPNext 16 / Frappe v15+ SIDEBAR — blue background, white text
+   -------------------------------------------------------------
+   In ERPNext 16 the desk sidebar container is `.body-sidebar`
+   (with `.standard-sidebar` inside), NOT the older `.desk-sidebar`.
+   The earlier sections above target the legacy classes; this
+   block targets the CURRENT classes so the blue/white theme
+   actually applies on this version.
+
+   IMPORTANT: every selector here is scoped to a sidebar container
+   (.body-sidebar / .standard-sidebar / .layout-side-section) so
+   the white text / colour rules NEVER bleed into the navbar or
+   page head (that bleed is what made the top-bar icons invisible).
+   ============================================================= */
+
+/* Sidebar container background */
+.body-sidebar,
+.body-sidebar .standard-sidebar,
+.layout-side-section .standard-sidebar,
+.standard-sidebar {
+  background-color: var(--alaiy-sidebar-bg) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+}
+
+/* All sidebar item rows + their labels = white */
+.body-sidebar .standard-sidebar-item,
+.body-sidebar .standard-sidebar-item > a,
+.body-sidebar .standard-sidebar-item .sidebar-item-label,
+.standard-sidebar .standard-sidebar-item,
+.standard-sidebar .standard-sidebar-item > a,
+.standard-sidebar .standard-sidebar-item .sidebar-item-label,
+.body-sidebar .sidebar-item-label {
+  color: #ffffff !important;
+}
+
+/* Sidebar item icons */
+.body-sidebar .standard-sidebar-item .sidebar-item-icon svg,
+.body-sidebar .standard-sidebar-item svg,
+.standard-sidebar .standard-sidebar-item svg,
+.body-sidebar .sidebar-item-icon .icon {
+  color: var(--alaiy-sidebar-muted) !important;
+  fill: currentColor;
+}
+
+/* Hover */
+.body-sidebar .standard-sidebar-item:hover,
+.standard-sidebar .standard-sidebar-item:hover {
+  background-color: var(--alaiy-sidebar-hover) !important;
+  border-radius: var(--alaiy-radius) !important;
+}
+.body-sidebar .standard-sidebar-item:hover svg,
+.standard-sidebar .standard-sidebar-item:hover svg {
+  color: #ffffff !important;
+}
+
+/* Selected / active */
+.body-sidebar .standard-sidebar-item.selected,
+.standard-sidebar .standard-sidebar-item.selected,
+.body-sidebar .standard-sidebar-item.active,
+.standard-sidebar .standard-sidebar-item.active {
+  background-color: var(--alaiy-sidebar-active) !important;
+  border-radius: var(--alaiy-radius) !important;
+}
+.body-sidebar .standard-sidebar-item.selected .sidebar-item-label,
+.standard-sidebar .standard-sidebar-item.selected .sidebar-item-label,
+.body-sidebar .standard-sidebar-item.selected svg,
+.standard-sidebar .standard-sidebar-item.selected svg {
+  color: #ffffff !important;
+}
+
+/* Section group headings */
+.body-sidebar .standard-sidebar-section .sidebar-group-title,
+.standard-sidebar .standard-sidebar-section .sidebar-group-title,
+.body-sidebar .standard-sidebar-label {
+  color: var(--alaiy-sidebar-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Collapse chevrons / drop affordances */
+.body-sidebar .drop-icon,
+.standard-sidebar .drop-icon,
+.body-sidebar .sidebar-item-control {
+  color: var(--alaiy-sidebar-muted) !important;
+}
+
+/* The user/profile footer at the bottom of the sidebar */
+.body-sidebar .standard-sidebar .user-profile,
+.body-sidebar .sidebar-footer,
+.standard-sidebar .user-profile {
+  color: #ffffff !important;
+}
+
+
+/* =============================================================
+   36. NAVBAR ICON PROTECTION
+   -------------------------------------------------------------
+   The sidebar rules above are scoped, but ERPNext shares some
+   generic classes between the sidebar and the navbar. Re-assert
+   the navbar's own colours so the top-bar icons (home, search,
+   notifications, avatar) are always visible against the white
+   navbar — this fixes the "invisible top-bar icons" bug.
+   ============================================================= */
+.navbar .navbar-nav .nav-link,
+.navbar .navbar-nav .nav-link svg,
+.navbar .navbar-icon-group svg,
+.navbar .standard-sidebar-item svg,
+.navbar a svg,
+.navbar .icon {
+  color: var(--alaiy-text) !important;
+  fill: currentColor;
+}
+
+/* Relocated widgets (moved by ui_overrides.js) sit on the right */
+.navbar .alaiy-navbar-search,
+.navbar .alaiy-navbar-notif {
+  display: flex;
+  align-items: center;
+}
+
+
+/* =============================================================
+   37. BRANDING (merged from former branding.css)
+   -------------------------------------------------------------
+   Logo overrides are set natively via branding.py (Navbar/Website
+   Settings). These rules are the belt-and-suspenders layer that
+   force the Alaiy logo on the login page and hide hardcoded
+   Frappe/ERPNext text branding. Scoped to login/footer only — no
+   navbar bleed.
+   ============================================================= */
+:root {
+  --alaiy-logo-url: url("/assets/alaiy_os_core/branding/alaiyos-logo.svg");
+}
+
+/* Login / splash page logo */
+.page-card .page-card-head img.app-logo,
+.for-login .page-card-head img,
+.login-content .app-logo {
+  content: var(--alaiy-logo-url);
+  max-height: 40px;
+  width: auto;
+}
+
+/* Hide hardcoded Frappe/ERPNext text branding ("Powered by Frappe" etc.) */
+.footer-powered,
+.powered-by-frappe,
+a[href*="frappe.io"].powered-by,
+.navbar .frappe-versions {
+  display: none !important;
+}
+
+/* Login page framework links */
+.for-login a[href*="frappe.io"],
+.for-login a[href*="frappecloud.com"] {
+  display: none !important;
 }

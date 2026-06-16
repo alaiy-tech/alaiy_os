@@ -97,6 +97,25 @@ WORKSPACE_CONFIG = {
 
 
 # ------------------------------------------------------------------------------
+# GLOBAL_CONFIG — site-wide UX toggles (not workspace-specific).
+# ------------------------------------------------------------------------------
+# These are injected into frappe.boot by boot.py and consumed by ui_overrides.js.
+# Flip a value and redeploy (`bench migrate` + `bench build`) to change behaviour.
+# ------------------------------------------------------------------------------
+GLOBAL_CONFIG = {
+    # Onboarding / "Getting Started" panel (.onb-panel). False hides it everywhere.
+    "show_onboarding_panel": False,
+
+    # Workspace the desk redirects to when landing on the bare /app or /desk root.
+    "default_route": "stock",
+
+    # If False, the bare desk homepage redirects to `default_route` instead of
+    # showing Frappe's default workspace landing page.
+    "show_desk_homepage": False,
+}
+
+
+# ------------------------------------------------------------------------------
 # EXPLICIT STOCK BLOCK LIST
 # ------------------------------------------------------------------------------
 # The whitelist above already implies everything else is hidden. We ALSO keep an
@@ -231,3 +250,8 @@ def get_blocked_routes():
     routes = [_slugify_doctype(dt) for dt in get_blocked_doctypes()]
     routes += [f"query-report/{rpt}" for rpt in STOCK_BLOCKED_REPORTS]
     return routes
+
+
+def get_enabled_workspaces():
+    """Return the list of workspace names with enabled=True (order preserved)."""
+    return [name for name, cfg in WORKSPACE_CONFIG.items() if cfg.get("enabled")]

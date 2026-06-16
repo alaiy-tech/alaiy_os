@@ -58,17 +58,18 @@ def _v(rel):
 
 
 # ── Desk asset includes ───────────────────────────────────────────────────────
-# JS: main desk customisations + the client-side route guard.
-# CSS: theme overrides + branding (logo/favicon) overrides.
+# JS: main desk customisations + route guard + UI overrides (onboarding hide,
+#     default-route redirect, search/notification relocation).
+# CSS: single theme.css (sidebar blue/white styles merged in; no branding.css).
 app_include_js = [
     "/assets/alaiy_os_core/js/alaiy_os_core.js?v=" +
     _v("public/js/alaiy_os_core.js"),
     "/assets/alaiy_os_core/js/route_guard.js?v=" +
     _v("public/js/route_guard.js"),
+    "/assets/alaiy_os_core/js/ui_overrides.js?v=" +
+    _v("public/js/ui_overrides.js"),
 ]
 app_include_css = [
     "/assets/alaiy_os_core/config/theme.css?v=" +
-    _v("public/config/theme.css"),
-    "/assets/alaiy_os_core/css/branding.css?v=" +
-    _v("public/css/branding.css"),
+    _v("public/config/theme.css")
 ]
