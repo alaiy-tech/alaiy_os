@@ -44,7 +44,7 @@ this is the desired "remove from UI, keep backend" behaviour.
 
 import frappe
 
-from alaiy_os_core.config.workspace_config import (
+from alaiy_os_core.client.config.workspace_config import (
     WORKSPACE_CONFIG,
     get_blocked_reports,
 )
