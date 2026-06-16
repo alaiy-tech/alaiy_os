@@ -66,7 +66,6 @@ WORKSPACE_CONFIG = {
         "visible_reports": [
             "Stock Ledger",
             "Stock Balance",
-            "Stock Summary",
         ],
         # No standalone pages are whitelisted for Stock.
         "visible_pages": [],
@@ -146,10 +145,13 @@ STOCK_BLOCKED_DOCTYPES = [
     d for d in STOCK_BLOCKED_DOCTYPES if d != "Serial No"]
 
 
-# Reports that must be stripped from the Stock workspace UI (non-admins).
-# Used only by the workspace patcher (reports are not has_permission-scoped here).
+# Reports that must be stripped from the Stock workspace UI (non-admins) AND
+# blocked at the route level (Ctrl+K / direct /desk/query-report/<name> URLs).
+# Used by the workspace patcher (hide flag) and by get_blocked_routes() below.
+# Names are the report's exact `name` in tabReport (used verbatim in the URL).
 STOCK_BLOCKED_REPORTS = [
     "Stock Projected Qty",
+    "Stock Analytics",
     "Stock Ageing",
     "Item Price Stock",
     # internal name of "Warehouse Wise Stock Balance"
@@ -159,10 +161,15 @@ STOCK_BLOCKED_REPORTS = [
     "Sales Order Analysis",
     "Purchase Order Analysis",
     "Item Shortage Report",
+    "Serial No and Batch Traceability",
+    "Serial No Status",
+    "Serial No Ledger",
+    "Serial No Warranty Expiry",
     "Batch-Wise Balance History",
-    "Requested Items To Be Transferred",
     "Batch Item Expiry Status",
+    "Requested Items To Be Transferred",
     "Itemwise Recommended Reorder Level",
+    "Item Variant Details",
     "Subcontracted Raw Materials To Be Transferred",
     "Subcontracted Item To Be Received",
 ]
@@ -201,3 +208,26 @@ def get_blocked_doctypes():
 def get_blocked_reports():
     """Return the flat list of Reports stripped from workspace UIs (non-admins)."""
     return list(STOCK_BLOCKED_REPORTS)
+
+
+def _slugify_doctype(name):
+    """'Stock Entry' -> 'stock-entry' (matches Frappe's route slug)."""
+    return name.lower().replace(" ", "-")
+
+
+def get_blocked_routes():
+    """
+    Return the list of route patterns injected into frappe.boot.blocked_routes
+    for non-admin users. route_guard.js matches the current route against these.
+
+    Two kinds of entries:
+      * DocType list/form routes -> the slug, e.g. "stock-entry".
+        route_guard matches when route[0] in (List/Form/Tree/...) and
+        slug(route[1]) == entry.
+      * Report routes -> "query-report/<Exact Report Name>", e.g.
+        "query-report/Stock Projected Qty". route_guard matches the joined,
+        decoded route against this (case-insensitive).
+    """
+    routes = [_slugify_doctype(dt) for dt in get_blocked_doctypes()]
+    routes += [f"query-report/{rpt}" for rpt in STOCK_BLOCKED_REPORTS]
+    return routes

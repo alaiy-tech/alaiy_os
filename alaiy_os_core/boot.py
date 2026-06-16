@@ -15,7 +15,10 @@ extra API round-trip — it reads frappe.boot.blocked_doctypes directly.
 import frappe
 
 from alaiy_os_core.public.config import brand_config as cfg
-from alaiy_os_core.config.workspace_config import get_blocked_doctypes
+from alaiy_os_core.config.workspace_config import (
+    get_blocked_doctypes,
+    get_blocked_routes,
+)
 from alaiy_os_core.permissions import is_system_admin
 from alaiy_os_core import branding
 
@@ -44,8 +47,13 @@ def inject_branding_and_restrictions(bootinfo):
     bootinfo.app_logo_url = branding.LOGO_URL
     bootinfo.app_name = branding.APP_NAME
 
-    # Restrictions — role-scoped. Admins see everything, so no block list.
+    # Restrictions — role-scoped. Admins see everything, so empty lists.
+    #   blocked_doctypes -> DocType names (used by UI helpers / belt-and-suspenders)
+    #   blocked_routes   -> route patterns route_guard.js matches against:
+    #       "stock-entry", "delivery-note", "query-report/Stock Projected Qty", ...
     if is_system_admin(frappe.session.user):
         bootinfo.blocked_doctypes = []
+        bootinfo.blocked_routes = []
     else:
         bootinfo.blocked_doctypes = get_blocked_doctypes()
+        bootinfo.blocked_routes = get_blocked_routes()

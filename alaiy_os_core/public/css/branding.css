@@ -50,3 +50,97 @@ a[href*="frappe.io"].powered-by,
 .for-login a[href*="frappecloud.com"] {
   display: none !important;
 }
+
+
+/* =========================================================
+   BLUE SIDEBAR — deep navy-blue background, white text.
+
+   The workspace sidebar markup varies slightly across Frappe
+   versions, so we target every known container class. Only the
+   sidebar is themed; the main content area is untouched.
+   ========================================================= */
+
+:root {
+  --alaiy-side-bg: #0b2a3f; /* deep navy-blue */
+  --alaiy-side-hover: #123a52; /* lighter on hover */
+  --alaiy-side-active: #0e7490; /* selected item */
+  --alaiy-side-text: #ffffff; /* white labels */
+  --alaiy-side-muted: #9fc0d4; /* section headings / icons */
+}
+
+/* Sidebar container(s) */
+.layout-side-section,
+.desk-sidebar,
+.standard-sidebar,
+.workspace-sidebar,
+.body-sidebar-container .desk-sidebar,
+.sidebar-menu {
+  background-color: var(--alaiy-side-bg) !important;
+}
+
+/* Every sidebar item label = white */
+.desk-sidebar .sidebar-item-container .desk-sidebar-item,
+.desk-sidebar .standard-sidebar-item,
+.standard-sidebar .standard-sidebar-item,
+.sidebar-menu .sidebar-item,
+.layout-side-section .sidebar-item,
+.desk-sidebar .standard-sidebar-item .sidebar-item-label,
+.desk-sidebar a,
+.standard-sidebar a {
+  color: var(--alaiy-side-text) !important;
+}
+
+/* Icons */
+.desk-sidebar .standard-sidebar-item svg,
+.desk-sidebar .sidebar-item svg,
+.standard-sidebar .standard-sidebar-item svg,
+.sidebar-menu .sidebar-item svg,
+.desk-sidebar .item-anchor .icon {
+  color: var(--alaiy-side-muted) !important;
+  stroke: currentColor !important;
+}
+
+/* Hover state */
+.desk-sidebar .standard-sidebar-item:hover,
+.standard-sidebar .standard-sidebar-item:hover,
+.sidebar-menu .sidebar-item:hover,
+.layout-side-section .sidebar-item:hover {
+  background-color: var(--alaiy-side-hover) !important;
+  border-radius: 8px;
+}
+
+.desk-sidebar .standard-sidebar-item:hover svg,
+.standard-sidebar .standard-sidebar-item:hover svg {
+  color: var(--alaiy-side-text) !important;
+}
+
+/* Selected / active item */
+.desk-sidebar .standard-sidebar-item.selected,
+.standard-sidebar .standard-sidebar-item.selected,
+.desk-sidebar .standard-sidebar-item.active,
+.sidebar-menu .sidebar-item.active {
+  background-color: var(--alaiy-side-active) !important;
+  color: #ffffff !important;
+  border-radius: 8px;
+}
+
+.desk-sidebar .standard-sidebar-item.selected svg,
+.standard-sidebar .standard-sidebar-item.selected svg {
+  color: #ffffff !important;
+}
+
+/* Section group headings (e.g. "Reports", "Settings") */
+.desk-sidebar .standard-sidebar-section .sidebar-group-title,
+.standard-sidebar .sidebar-group-title,
+.desk-sidebar .standard-sidebar-label {
+  color: var(--alaiy-side-muted) !important;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Collapse/expand chevrons + the "Edit" / drop-target affordances */
+.desk-sidebar .drop-icon,
+.desk-sidebar .sidebar-item-control,
+.standard-sidebar .drop-icon {
+  color: var(--alaiy-side-muted) !important;
+}

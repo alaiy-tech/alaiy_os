@@ -3,20 +3,24 @@
 
    PURPOSE
    Block non-System-Administrators from navigating to DocTypes
-   that AlaiyOS has hidden from the UI (e.g. /app/stock-entry),
-   even via direct URL or a stale bookmark.
+   and Reports that AlaiyOS has hidden, even via a direct URL or
+   a stale bookmark (e.g. /desk/stock-entry or
+   /desk/query-report/Stock%20Projected%20Qty).
 
    HOW
-   The server injects `frappe.boot.blocked_doctypes` (a list of
-   DocType names) for non-admin users only — admins get an empty
-   list (see boot.inject_branding_and_restrictions). On every
-   route change we compare the target DocType against that list;
-   if it matches, we cancel navigation and show a clean message
-   instead of a broken/empty page.
+   The server injects `frappe.boot.blocked_routes` for non-admin
+   users only — admins get an empty list (see boot.py
+   inject_branding_and_restrictions). Each entry is either:
+     * a DocType slug             -> "stock-entry"
+     * a report route             -> "query-report/Stock Projected Qty"
+   On every route change we compare the current route against the
+   list; on a match we redirect the user to the Stock workspace
+   instead of letting the blocked page render.
 
    SAFE TO LOAD EVERYWHERE
-   All access is defensive (optional chaining / guards) so this
-   never throws on pages where frappe.router or boot aren't ready.
+   All access is defensive (guards everywhere) so this never throws
+   on pages where frappe.router / boot aren't ready, and never on
+   non-DocType / non-Report routes.
    ========================================================= */
 
 frappe.provide("alaiy_os_core.route_guard");
@@ -24,18 +28,32 @@ frappe.provide("alaiy_os_core.route_guard");
 (function () {
   "use strict";
 
-  // Normalise a DocType name to the slug Frappe uses in routes,
-  // e.g. "Stock Entry" -> "stock-entry".
-  function slugify(doctype) {
-    return String(doctype || "")
+  // Where blocked users are sent. The workspace route slug for "Stock".
+  var SAFE_ROUTE = "stock";
+
+  // Normalise any name to Frappe's route slug, e.g. "Stock Entry" -> "stock-entry".
+  function slugify(name) {
+    return String(name || "")
       .toLowerCase()
       .replace(/\s+/g, "-");
   }
 
   // Read the server-injected block list. Empty for admins / when unset.
-  function blockedSlugs() {
-    var list = (frappe.boot && frappe.boot.blocked_doctypes) || [];
-    return list.map(slugify);
+  // We split it into two buckets for cheap matching.
+  function blockedSets() {
+    var list = (frappe.boot && frappe.boot.blocked_routes) || [];
+    var doctypeSlugs = {};
+    var reportNames = {};
+    list.forEach(function (entry) {
+      entry = String(entry || "");
+      if (entry.toLowerCase().indexOf("query-report/") === 0) {
+        // Store the report name lower-cased for case-insensitive compare.
+        reportNames[entry.slice("query-report/".length).toLowerCase()] = true;
+      } else {
+        doctypeSlugs[entry.toLowerCase()] = true;
+      }
+    });
+    return { doctypes: doctypeSlugs, reports: reportNames };
   }
 
   // True if the user is a System Administrator — never block them.
@@ -43,7 +61,9 @@ frappe.provide("alaiy_os_core.route_guard");
   function isAdmin() {
     try {
       return (
-        frappe.user.has_role("System Manager") ||
+        (frappe.user_roles &&
+          frappe.user_roles.indexOf("System Manager") !== -1) ||
+        (frappe.user && frappe.user.has_role("System Manager")) ||
         frappe.session.user === "Administrator"
       );
     } catch (e) {
@@ -51,64 +71,58 @@ frappe.provide("alaiy_os_core.route_guard");
     }
   }
 
-  // Extract the DocType slug from a route array.
-  // Frappe routes look like: ["List","Stock Entry"] -> handled by frappe core
-  // as a slug already in the URL. We inspect frappe.get_route():
-  //   ["List", "stock-entry", "List"]  (list view)
-  //   ["Form", "stock-entry", "NEW..."] (form view)
-  function targetSlugFromRoute(route) {
-    if (!route || !route.length) return null;
+  // Decide whether the current route is blocked.
+  // route examples from frappe.get_route():
+  //   ["List", "stock-entry", "List"]            (list view)
+  //   ["Form", "stock-entry", "NEW-..."]         (form view)
+  //   ["query-report", "Stock Projected Qty"]    (report view)
+  function isBlockedRoute(route, sets) {
+    if (!route || !route.length) return false;
     var first = String(route[0] || "").toLowerCase();
+
+    // Report routes.
+    if (first === "query-report" && route[1]) {
+      // route[1] may be URL-decoded already by frappe; normalise spaces.
+      var reportName = decodeURIComponent(String(route[1])).toLowerCase();
+      return !!sets.reports[reportName];
+    }
+
+    // DocType list/form/tree/report-builder routes — route[1] is the slug.
     if (
-      ["list", "form", "tree", "report", "dashboard-view"].indexOf(first) === -1
+      ["list", "form", "tree", "report", "dashboard-view"].indexOf(first) !== -1
     ) {
-      return null;
+      var slug = slugify(route[1]);
+      return !!sets.doctypes[slug];
     }
-    // route[1] is the doctype slug for these view types.
-    return slugify(route[1]);
+
+    return false;
   }
 
-  // Show a clean, dismissible "not available" message.
-  function denyAccess() {
-    frappe.msgprint({
-      title: __("Not Available"),
-      indicator: "orange",
-      message: __(
-        "This feature is not available in your workspace. " +
-          "Please contact your administrator if you need access.",
-      ),
-    });
-  }
-
-  // Send the user somewhere safe (their first visible workspace, else /app).
-  function redirectHome() {
-    var ws =
-      (frappe.boot &&
-        frappe.boot.alaiy_config &&
-        frappe.boot.alaiy_config.visible_workspaces &&
-        frappe.boot.alaiy_config.visible_workspaces[0]) ||
-      null;
-    if (ws) {
-      frappe.set_route(ws.toLowerCase());
-    } else {
-      frappe.set_route("/app");
+  // Send the blocked user to the Stock workspace with a brief notice.
+  function redirectToStock() {
+    try {
+      frappe.show_alert(
+        {
+          message: __("This feature is not available."),
+          indicator: "orange",
+        },
+        3,
+      );
+    } catch (e) {
+      /* show_alert may not be ready on very early loads — ignore */
     }
+    frappe.set_route(SAFE_ROUTE);
   }
 
-  // Core check: if the current route targets a blocked DocType, deny + redirect.
+  // Core check: if the current route is blocked, redirect to Stock.
   alaiy_os_core.route_guard.check = function () {
     if (isAdmin()) return; // admins unaffected
 
-    var blocked = blockedSlugs();
-    if (!blocked.length) return;
-
+    var sets = blockedSets();
     var route = (frappe.get_route && frappe.get_route()) || [];
-    var slug = targetSlugFromRoute(route);
-    if (!slug) return;
 
-    if (blocked.indexOf(slug) !== -1) {
-      denyAccess();
-      redirectHome();
+    if (isBlockedRoute(route, sets)) {
+      redirectToStock();
     }
   };
 

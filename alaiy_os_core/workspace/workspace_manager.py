@@ -8,27 +8,37 @@ On every `bench migrate` (and on install), patch_workspaces() reads
 WORKSPACE_CONFIG and makes the LIVE ERPNext Workspace documents match it:
 
   * Disabled workspace  -> set is_hidden = 1 (kept in DB so it can come back).
-  * Enabled workspace   -> set is_hidden = 0, then SURGICALLY remove any
-                           DocType-/Report-/Page-type links and shortcuts that
-                           are NOT in that workspace's visible_* whitelist.
+  * Enabled workspace   -> set is_hidden = 0, then toggle the `hidden` flag on
+                           every `links` row: hidden = 0 for whitelisted
+                           DocTypes/Reports, hidden = 1 for everything else.
 
-WHY SURGICAL (not full replace)
-ERPNext (and admins) may add their own links to a workspace. We must only touch
-the controlled set — link rows that point at a DocType / Report / Page. We leave
-everything else (Card Breaks we still need, custom links, headers) untouched,
-except empty "Card Break" groups left dangling after we strip their children.
+================================================================================
+SIDEBAR DIAGNOSIS (why we toggle `hidden` instead of deleting rows)
+================================================================================
+In Frappe v15/v16 the left workspace sidebar tree AND the main card grid are
+BOTH rendered from the single `Workspace` doc's `links` child table. There is no
+separate hardcoded JS list of Stock items — the desk reads `tabWorkspace Link`
+and skips rows whose `hidden` flag is set. (`onboard` is a legacy flag that older
+render paths used to surface "getting started" items; we clear it too, belt and
+suspenders.)
+
+The reason all ~50 Stock items keep reappearing is that `bench migrate` re-imports
+ERPNext's standard fixture (erpnext/stock/workspace/stock/stock.json) into
+`tabWorkspace`, resetting every flag. That is exactly why this function runs in
+the `after_migrate` hook — AFTER the fixture sync — and re-applies our flags.
+
+We TOGGLE flags rather than delete rows so ERPNext's own data is never destroyed:
+re-enabling an item in config simply flips `hidden` back to 0 on the next deploy.
 
 IDEMPOTENT
-Running this repeatedly produces the same result: once a disallowed link is gone
-it stays gone; once is_hidden is set it stays set. Re-enabling in config restores
-visibility on the next run because ERPNext re-imports the standard workspace
-fixtures during migrate before this hook fires.
+Running this repeatedly produces the same result — each row's `hidden`/`onboard`
+flags are set to the value derived from config every time.
 
 ROLE SCOPE
-Workspaces in Frappe are global docs, so hiding a link hides it for everyone in
-the *default* workspace view. System Administrators still reach every DocType via
-the Awesome Bar / direct URL (we never deny them in permissions.py), so this is
-the desired "remove from UI, keep backend" behaviour.
+Workspaces are global docs, so hiding a link hides it for everyone in the desk
+view. System Administrators still reach every DocType/Report via the Awesome Bar
+and direct URL (route_guard skips admins; permissions.py never denies them), so
+this is the desired "remove from UI, keep backend" behaviour.
 ================================================================================
 """
 
@@ -81,7 +91,7 @@ def _patch_single_workspace(ws_name, ws_cfg, blocked_reports):
             frappe.db.set_value("Workspace", ws_name, "is_hidden", 1)
         return
 
-    # ── Enabled workspace: make sure it is visible, then prune links. ─────────
+    # ── Enabled workspace: make sure it is visible, then toggle link flags. ───
     doc = frappe.get_doc("Workspace", ws_name)
     if doc.is_hidden:
         doc.is_hidden = 0
@@ -90,30 +100,26 @@ def _patch_single_workspace(ws_name, ws_cfg, blocked_reports):
     visible_reports = set(ws_cfg.get("visible_reports", []))
     visible_pages = set(ws_cfg.get("visible_pages", []))
 
-    changed = False
-    changed |= _prune_links(doc, visible_doctypes,
-                            visible_reports, visible_pages, blocked_reports)
-    changed |= _prune_shortcuts(
-        doc, visible_doctypes, visible_reports, visible_pages)
+    _toggle_link_flags(
+        doc, visible_doctypes, visible_reports, visible_pages, blocked_reports
+    )
 
-    if changed or doc.is_hidden == 0:
-        # ignore_permissions: migrate runs as Administrator already, but be explicit.
-        doc.save(ignore_permissions=True)
+    # Always save: migrate just re-synced the fixture, so flags need re-applying
+    # every run. ignore_permissions because migrate runs as Administrator.
+    doc.save(ignore_permissions=True)
 
 
-def _is_allowed_link(link, visible_doctypes, visible_reports, visible_pages):
+def _is_visible_link(row, visible_doctypes, visible_reports, visible_pages):
     """
-    Decide whether a single `links` row should be KEPT.
-
-    We only judge rows that point at a DocType / Report / Page. Any other link
-    type (e.g. a custom URL or dashboard) is left untouched by returning True.
+    Return True if this `links` row points at a whitelisted target and should
+    therefore stay visible. Only DocType/Report/Page rows are judged; any other
+    custom link type defaults to visible (we never hide things we don't manage).
     """
-    link_to = (link.link_to or "").strip()
-    link_type = (link.link_type or "").strip()
+    link_to = (row.link_to or "").strip()
+    link_type = (row.link_type or "").strip()
 
     if not link_to:
-        # Header/Card Break or empty row — not our concern here.
-        return True
+        return True  # safety; real Card Breaks are handled by the caller
 
     if link_type == "DocType":
         return link_to in visible_doctypes
@@ -122,109 +128,61 @@ def _is_allowed_link(link, visible_doctypes, visible_reports, visible_pages):
     if link_type == "Page":
         return link_to in visible_pages
 
-    # Unknown/custom link type — do not touch it.
+    # Unknown/custom link type — leave it visible.
     return True
 
 
-def _prune_links(doc, visible_doctypes, visible_reports, visible_pages, blocked_reports):
+def _toggle_link_flags(doc, visible_doctypes, visible_reports, visible_pages, blocked_reports):
     """
-    Rebuild doc.links keeping only:
-      * Card Break group headers that still have at least one visible child, and
-      * Link rows that pass the whitelist check.
+    Set `hidden`/`onboard` on every Link row per the whitelist (NON-destructive):
 
-    Returns True if anything was removed.
+      * Whitelisted DocType/Report/Page link -> hidden = 0
+      * Everything else (Link rows)          -> hidden = 1, onboard = 0
+      * Card Break headers                   -> hidden = 1 if every Link under
+                                                them (until the next Card Break)
+                                                is hidden, else hidden = 0.
+
+    Rows are never deleted, so ERPNext's data is preserved and re-enabling an
+    item in config just flips its flag back on the next deploy.
     """
-    original = list(doc.links)
-    kept = []
-
-    for row in original:
-        row_type = (row.type or "").strip()
-
-        if row_type == _CARD_BREAK_TYPE:
-            # Defer the decision: keep the header for now, prune empty ones later.
-            kept.append(row)
-            continue
-
-        # Belt-and-suspenders: drop explicitly blocked reports even if a future
-        # config edit forgets to remove them from a visible list.
-        if (row.link_type or "") == "Report" and (row.link_to or "") in blocked_reports:
-            continue
-
-        if _is_allowed_link(row, visible_doctypes, visible_reports, visible_pages):
-            kept.append(row)
-        # else: dropped
-
-    kept = _drop_empty_card_breaks(kept)
-
-    if len(kept) != len(original):
-        doc.links = kept
-        _renumber(doc.links)
-        return True
-    return False
-
-
-def _drop_empty_card_breaks(rows):
-    """
-    Remove Card Break headers that have no Link rows before the next Card Break.
-    Keeps the UI clean (no empty section titles) after children were stripped.
-    """
-    result = []
-    i = 0
+    rows = list(doc.links)
     n = len(rows)
-    while i < n:
-        row = rows[i]
-        if (row.type or "").strip() == _CARD_BREAK_TYPE:
-            # Look ahead: is there at least one Link before the next Card Break?
-            has_child = False
-            j = i + 1
-            while j < n and (rows[j].type or "").strip() != _CARD_BREAK_TYPE:
-                if (rows[j].type or "").strip() == _LINK_ROW_TYPE:
-                    has_child = True
-                    break
-                j += 1
-            if has_child:
-                result.append(row)
-            # else: skip this empty Card Break header
-        else:
-            result.append(row)
-        i += 1
-    return result
 
+    # First pass: set hidden/onboard on every actual Link row.
+    for row in rows:
+        if (row.type or "").strip() != _LINK_ROW_TYPE:
+            continue  # Card Breaks handled in the second pass
 
-def _prune_shortcuts(doc, visible_doctypes, visible_reports, visible_pages):
-    """
-    Rebuild doc.shortcuts keeping only those pointing at whitelisted targets.
-    Shortcut rows use `type` (DocType/Report/Page/URL) and `link_to`.
-    Returns True if anything was removed.
-    """
-    original = list(doc.shortcuts)
-    kept = []
+        # Belt-and-suspenders: explicitly blocked reports are always hidden,
+        # even if a future config edit forgets to drop them from a visible list.
+        is_blocked_report = (
+            (row.link_type or "") == "Report"
+            and (row.link_to or "") in blocked_reports
+        )
 
-    for sc in original:
-        sc_type = (sc.type or "").strip()
-        link_to = (sc.link_to or "").strip()
+        visible = (
+            not is_blocked_report
+            and _is_visible_link(row, visible_doctypes, visible_reports, visible_pages)
+        )
 
-        if sc_type == "DocType":
-            if link_to in visible_doctypes:
-                kept.append(sc)
-        elif sc_type == "Report":
-            if link_to in visible_reports:
-                kept.append(sc)
-        elif sc_type == "Page":
-            if link_to in visible_pages:
-                kept.append(sc)
-        else:
-            # URL / dashboard / unknown — leave untouched.
-            kept.append(sc)
+        row.hidden = 0 if visible else 1
+        if not visible:
+            # Clear the legacy onboarding flag so hidden items never surface.
+            if hasattr(row, "onboard"):
+                row.onboard = 0
 
-    if len(kept) != len(original):
-        doc.shortcuts = kept
-        _renumber(doc.shortcuts)
-        return True
-    return False
+    # Second pass: hide Card Break headers whose entire section is now hidden.
+    for i, row in enumerate(rows):
+        if (row.type or "").strip() != _CARD_BREAK_TYPE:
+            continue
 
+        any_visible_child = False
+        j = i + 1
+        while j < n and (rows[j].type or "").strip() != _CARD_BREAK_TYPE:
+            child = rows[j]
+            if (child.type or "").strip() == _LINK_ROW_TYPE and not child.hidden:
+                any_visible_child = True
+                break
+            j += 1
 
-def _renumber(child_rows):
-    """Re-sequence child-table idx values after rows were removed (1-based)."""
-    for i, row in enumerate(child_rows, start=1):
-        row.idx = i
+        row.hidden = 0 if any_visible_child else 1
