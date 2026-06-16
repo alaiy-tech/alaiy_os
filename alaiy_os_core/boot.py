@@ -21,7 +21,7 @@ flag is missing client-side; the site still boots.
 import frappe
 
 from alaiy_os_core.public.config import brand_config as cfg
-from alaiy_os_core.config.workspace_config import (
+from alaiy_os_core.client.config.workspace_config import (
     GLOBAL_CONFIG,
     get_blocked_doctypes,
     get_blocked_routes,
