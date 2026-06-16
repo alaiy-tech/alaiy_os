@@ -1,0 +1,52 @@
+/* =========================================================
+   AlaiyOS Core — Branding overrides.
+
+   Loaded on every Desk page via app_include_css (hooks.py).
+
+   Most branding (navbar logo, favicon, login logo) is set
+   natively through Frappe settings docs in branding.py. This
+   CSS is the belt-and-suspenders layer that:
+     * forces the login-page + navbar logo to the Alaiy asset
+       even if a settings value is missed, and
+     * hides any hardcoded "Frappe"/"ERPNext" text branding.
+
+   Assets are served from alaiy_os_core/public/branding/.
+   ========================================================= */
+
+:root {
+  --alaiy-logo-url: url("/assets/alaiy_os_core/branding/alaiyos-logo.svg");
+}
+
+/* ── Login / splash page logo ─────────────────────────────── */
+/* Frappe renders the brand logo inside .for-login / .page-card.
+   Replace the <img> source via content where supported. */
+.page-card .page-card-head img.app-logo,
+.for-login .page-card-head img,
+.login-content .app-logo {
+  content: var(--alaiy-logo-url);
+  max-height: 40px;
+  width: auto;
+}
+
+/* ── Desk navbar logo ─────────────────────────────────────── */
+.navbar .navbar-brand img,
+.navbar-home img.app-logo {
+  content: var(--alaiy-logo-url);
+  max-height: 24px;
+  width: auto;
+}
+
+/* ── Hide hardcoded Frappe/ERPNext text branding ──────────── */
+/* "Powered by Frappe" footers and similar text marks. */
+.footer-powered,
+.powered-by-frappe,
+a[href*="frappe.io"].powered-by,
+.navbar .frappe-versions {
+  display: none !important;
+}
+
+/* ── Login page "Login with Frappe" / framework links ─────── */
+.for-login a[href*="frappe.io"],
+.for-login a[href*="frappecloud.com"] {
+  display: none !important;
+}

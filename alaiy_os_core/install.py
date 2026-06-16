@@ -1,5 +1,7 @@
 import frappe
 from alaiy_os_core.public.config.brand_config import VISIBLE_WORKSPACES, DEFAULT_ADMIN_PASSWORD
+from alaiy_os_core.workspace.workspace_manager import patch_workspaces
+from alaiy_os_core import branding
 
 
 def after_install():
@@ -14,7 +16,17 @@ def after_migrate():
 
 
 def run_setup():
+    """
+    Idempotent deploy-time setup. Order matters:
+      1. Hide non-visible workspaces (coarse, by name).
+      2. Patch enabled workspaces' links/shortcuts to the config whitelist.
+      3. Apply Alaiy branding (logo / app name / favicon) via settings docs.
+      4. Apply remaining system settings.
+    Safe to run repeatedly (after every `bench migrate`).
+    """
     _hide_workspaces()
+    patch_workspaces()
+    branding.apply_branding()
     _apply_system_settings()
     frappe.db.commit()
     frappe.clear_cache()
