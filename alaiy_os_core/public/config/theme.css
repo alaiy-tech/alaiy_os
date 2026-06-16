@@ -839,8 +839,6 @@ tbody tr td:first-child input[type="checkbox"] {
   font-size: 14px !important;
 }
 
-/* ── 19 continued ────────────────────────────────────────────── */
-
 /* Frappe tag / quick-filter chips */
 .tag {
   background-color: rgba(120, 194, 230, 0.12) !important;
@@ -1163,4 +1161,92 @@ tbody tr td:first-child input[type="checkbox"] {
 ::-webkit-scrollbar-thumb:hover {
   background-color: var(--alaiy-text-muted);
   opacity: 0.5;
+}
+
+
+/* ── 31. Hide Desktop & Website nav links (CSS fallback) ─────── */
+/* JS already removes these; CSS is belt-and-suspenders */
+a[href="/desk"],
+a[href="/website"] {
+  display: none !important;
+}
+
+
+/* ── 32. Hide dark/light theme toggle (CSS fallback) ─────────── */
+/* JS also hides it; CSS ensures it never flashes in */
+.switch-theme,
+.btn-switch-theme,
+[data-label="Switch Theme"],
+[data-original-title="Switch Theme"],
+.dark-mode-toggle,
+.color-mode-switcher,
+.theme-switcher,
+.theme-control,
+[data-action="switch_theme"] {
+  display: none !important;
+}
+
+
+/* ── 33. Topbar search bar ───────────────────────────────────── */
+.alaiy-topbar-search-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.alaiy-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px 0 8px;
+  background-color: var(--alaiy-surface) !important;
+  border: var(--alaiy-border-width) solid var(--alaiy-border) !important;
+  border-radius: var(--alaiy-radius-full) !important;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  min-width: 180px;
+}
+
+.alaiy-search-bar:hover {
+  border-color: var(--alaiy-primary) !important;
+  box-shadow: 0 0 0 2px var(--alaiy-primary-light) !important;
+}
+
+.alaiy-search-icon {
+  flex-shrink: 0;
+  color: var(--alaiy-text-muted);
+}
+
+.alaiy-search-placeholder {
+  flex: 1;
+  font-size: 12px;
+  font-family: "Poppins", sans-serif;
+  color: var(--alaiy-text-muted);
+  user-select: none;
+}
+
+.alaiy-search-kbd {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-family: "Poppins", sans-serif;
+  color: var(--alaiy-text-muted);
+  background-color: var(--alaiy-surface-muted);
+  border: var(--alaiy-border-width) solid var(--alaiy-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.4;
+}
+
+
+/* ── 34. About modal — Alaiy footer ─────────────────────────── */
+.alaiy-about-footer {
+  text-align: center;
+  font-size: 12px;
+  font-family: "Poppins", sans-serif;
+  color: var(--alaiy-text-muted);
+  padding: 12px 0 4px;
+  border-top: var(--alaiy-border-width) solid var(--alaiy-border);
+  margin-top: 8px;
 }
