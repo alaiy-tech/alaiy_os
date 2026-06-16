@@ -91,8 +91,10 @@ def _patch_single_workspace(ws_name, ws_cfg, blocked_reports):
     visible_pages = set(ws_cfg.get("visible_pages", []))
 
     changed = False
-    changed |= _prune_links(doc, visible_doctypes, visible_reports, visible_pages, blocked_reports)
-    changed |= _prune_shortcuts(doc, visible_doctypes, visible_reports, visible_pages)
+    changed |= _prune_links(doc, visible_doctypes,
+                            visible_reports, visible_pages, blocked_reports)
+    changed |= _prune_shortcuts(
+        doc, visible_doctypes, visible_reports, visible_pages)
 
     if changed or doc.is_hidden == 0:
         # ignore_permissions: migrate runs as Administrator already, but be explicit.

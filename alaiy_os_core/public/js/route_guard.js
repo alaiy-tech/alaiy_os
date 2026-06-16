@@ -59,7 +59,9 @@ frappe.provide("alaiy_os_core.route_guard");
   function targetSlugFromRoute(route) {
     if (!route || !route.length) return null;
     var first = String(route[0] || "").toLowerCase();
-    if (["list", "form", "tree", "report", "dashboard-view"].indexOf(first) === -1) {
+    if (
+      ["list", "form", "tree", "report", "dashboard-view"].indexOf(first) === -1
+    ) {
       return null;
     }
     // route[1] is the doctype slug for these view types.
