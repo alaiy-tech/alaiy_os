@@ -16,7 +16,7 @@ We never edit core files. We only write to settings singletons:
 
 ASSET PATHS
 The real brand assets already live in alaiy_os_core/public/branding/ and are
-served by Frappe at /assets/alaiy_os_core/branding/<file>. We reference those.
+served by Frappe at /assets/alaiy_os_core/assets/images/<file>. We reference those.
 (If you add files under public/images/, update the constants below.)
 ================================================================================
 """
@@ -26,9 +26,9 @@ import frappe
 APP_NAME = "Alaiy"
 
 # Public URLs of bundled brand assets (served from alaiy_os_core/public/branding).
-LOGO_URL = "/assets/alaiy_os_core/branding/alaiyos-logo.svg"
-FAVICON_URL = "/assets/alaiy_os_core/branding/favicon.ico"
-SPLASH_URL = "/assets/alaiy_os_core/branding/icon-512.png"
+LOGO_URL = "/assets/alaiy_os_core/assets/images/alaiyos-logo.svg"
+FAVICON_URL = "/assets/alaiy_os_core/assets/images/favicon.ico"
+SPLASH_URL = "/assets/alaiy_os_core/assets/images/icon-512.png"
 
 
 def apply_branding():
@@ -106,12 +106,12 @@ def get_manifest():
         "theme_color": "#ffffff",
         "icons": [
             {
-                "src": "/assets/alaiy_os_core/branding/icon-192.png",
+                "src": "/assets/alaiy_os_core/assets/images/icon-192.png",
                 "sizes": "192x192",
                 "type": "image/png",
             },
             {
-                "src": "/assets/alaiy_os_core/branding/icon-512.png",
+                "src": "/assets/alaiy_os_core/assets/images/icon-512.png",
                 "sizes": "512x512",
                 "type": "image/png",
             },

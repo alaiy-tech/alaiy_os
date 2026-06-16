@@ -31,7 +31,7 @@ extend_bootinfo = [
 
 # ── Branding ──────────────────────────────────────────────────────────────────
 # Desk navbar logo (used by Frappe natively in the top-left navbar).
-app_logo_url = "/assets/alaiy_os_core/branding/alaiyos-logo.svg"
+app_logo_url = "/assets/alaiy_os_core/assets/images/alaiyos-logo.svg"
 
 # ── Runtime permission enforcement ────────────────────────────────────────────
 # For each blocked DocType, deny access to non-System-Administrators so direct
@@ -70,6 +70,6 @@ app_include_js = [
     _v("public/js/ui_overrides.js"),
 ]
 app_include_css = [
-    "/assets/alaiy_os_core/config/theme.css?v=" +
-    _v("public/config/theme.css")
+    "/assets/alaiy_os_core/css/theme.css?v=" +
+    _v("public/css/theme.css")
 ]

@@ -45,7 +45,7 @@ frappe.provide("alaiy_os_core.ui");
     if (isRoot) {
       var target = (frappe.boot && frappe.boot.default_route) || "stock";
       // Avoid a redirect loop if we're already heading there.
-      if (frappe.get_route_str() !== target) {
+      if ((frappe.get_route_str() || "") !== target) {
         frappe.set_route(target);
       }
     }
