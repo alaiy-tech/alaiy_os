@@ -8,7 +8,7 @@ Everything in this folder is served at:
 
 | File | Purpose |
 |------|---------|
-| `theme.css` | ERPNext CSS overrides — Poppins font, sidebar, topbar, buttons, inputs. Loaded on every Desk page via `app_include_css` in hooks.py. |
+| `theme.css` | ERPNext CSS overrides — Bricolage Grotesque font, sidebar, topbar, buttons, inputs. Loaded on every Desk page via `app_include_css` in hooks.py. |
 
 ## Customising per brand
 
@@ -33,4 +33,4 @@ Example brand override snippet:
 Place any future static config files here:
 - `logo.svg`        — brand logo (reference in install.py via System Settings)
 - `favicon.ico`     — browser tab icon
-- `fonts/`          — self-hosted Poppins .woff2 files (replace the Google Fonts @import)
+- `fonts/`          — self-hosted Bricolage Grotesque .woff2 files (replace the Google Fonts @import)
