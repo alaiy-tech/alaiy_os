@@ -76,8 +76,10 @@ def inject_branding_and_restrictions(bootinfo):
         bootinfo.allowed_workspaces = get_enabled_workspaces()
 
         # ── Global UX toggles (from GLOBAL_CONFIG). ───────────────────────────
-        bootinfo.hide_onboarding = not GLOBAL_CONFIG.get("show_onboarding_panel", False)
-        bootinfo.show_desk_homepage = GLOBAL_CONFIG.get("show_desk_homepage", False)
+        bootinfo.hide_onboarding = not GLOBAL_CONFIG.get(
+            "show_onboarding_panel", False)
+        bootinfo.show_desk_homepage = GLOBAL_CONFIG.get(
+            "show_desk_homepage", False)
         bootinfo.default_route = GLOBAL_CONFIG.get("default_route", "stock")
 
         # ── Restrictions — role-scoped. Admins see everything (empty lists). ──

@@ -34,3 +34,14 @@ TOGGLE_DEFAULT_THEME = not CUSTOM_THEME
 ABOUT_WEBSITE_URL = "https://alaiy.com"
 ABOUT_GITHUB_URL  = "https://github.com/alaiy-tech"
 ABOUT_FOOTER_TEXT = "Built with ♥ by Alaiy"
+
+# ── Connectors ────────────────────────────────────────────────
+# IDs of connector integrations to activate on next `bench migrate`.
+# Supported values: "shopify"
+ENABLED_CONNECTORS: list[str] = ["shopify"]
+
+# Base URL of the Shopify connector server (used to register Frappe webhooks
+# that POST to the connector). Set to the connector's public URL, e.g. an
+# ngrok/Cloudflare Tunnel URL in local dev.
+# Required when "shopify" is in ENABLED_CONNECTORS.
+SHOPIFY_CONNECTOR_URL: str = ""
