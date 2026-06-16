@@ -10,6 +10,21 @@
 
 frappe.provide("alaiy_os_core");
 
+/* ── CSS cache-buster ─────────────────────────────────────── */
+/* The theme.css URL has no hash, so browsers cache it indefinitely.
+   Replace it with a versioned URL so every JS reload picks up
+   the latest CSS without requiring a manual hard-refresh. */
+(function () {
+  var CSS_PATH = "/assets/alaiy_os_core/config/theme.css";
+  var ver = (frappe.boot && frappe.boot.app_version) || "1";
+  var old = document.querySelector('link[href*="alaiy_os_core/config/theme.css"]');
+  if (old) old.remove();
+  var link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.href = CSS_PATH + "?v=" + ver;
+  document.head.appendChild(link);
+})();
+
 /* ── Helpers ─────────────────────────────────────────────── */
 alaiy_os_core.cfg = function () {
   return Object.assign(

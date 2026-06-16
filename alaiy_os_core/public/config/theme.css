@@ -139,6 +139,13 @@ button,
                BlinkMacSystemFont, "Segoe UI", sans-serif !important;
 }
 
+/* Frappe v16 sidebar */
+.body-sidebar,
+.body-sidebar * {
+  font-family: "Poppins", ui-sans-serif, system-ui, -apple-system,
+               BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
 h1, h2, h3, h4, h5, h6,
 .page-title,
 .form-header-title,
@@ -168,41 +175,54 @@ h1, h2, h3, h4, h5, h6,
 }
 
 
-/* ── 5. Sidebar ─────────────────────────────────────────────── */
-.desk-sidebar,
-.layout-side-section,
-.sidebar-wrapper {
+/* ── 5. Sidebar (Frappe v16: .body-sidebar) ─────────────────── */
+.body-sidebar {
   background-color: var(--alaiy-sidebar-bg) !important;
   border-right: var(--alaiy-border-width) solid var(--alaiy-sidebar-border) !important;
   width: var(--alaiy-sidebar-width) !important;
+  color: var(--alaiy-sidebar-text) !important;
+}
+
+/* All text inside sidebar defaults to sidebar-text colour */
+.body-sidebar .sidebar-item-label,
+.body-sidebar .sidebar-item-icon,
+.body-sidebar .sidebar-item-suffix,
+.body-sidebar .sidebar-header .header-title,
+.body-sidebar .sidebar-header .header-subtitle {
+  color: var(--alaiy-sidebar-text) !important;
+}
+
+/* Sidebar header subtitle (app name, e.g. "ERPNext") — slightly muted */
+.body-sidebar .sidebar-header .header-subtitle {
+  opacity: 0.6 !important;
 }
 
 /* Sidebar items — default */
-.desk-sidebar .sidebar-item,
-.desk-sidebar .standard-sidebar-item {
+.body-sidebar .standard-sidebar-item,
+.body-sidebar .sidebar-item {
   color: var(--alaiy-sidebar-text) !important;
   border-radius: var(--alaiy-radius-sm) !important;
   margin: 1px 6px;
-  padding: 8px 12px !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
+  padding: 8px 10px !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
   opacity: 0.85;
   transition: background-color 0.15s ease, opacity 0.15s ease;
 }
 
 /* Sidebar items — hover */
-.desk-sidebar .sidebar-item:hover,
-.desk-sidebar .standard-sidebar-item:hover {
+.body-sidebar .standard-sidebar-item:hover,
+.body-sidebar .sidebar-item:hover {
   background-color: var(--alaiy-sidebar-hover) !important;
   color: var(--alaiy-sidebar-text) !important;
   opacity: 1 !important;
 }
 
 /* Sidebar items — active / selected */
-.desk-sidebar .sidebar-item.selected,
-.desk-sidebar .standard-sidebar-item.selected,
-.desk-sidebar .sidebar-item.active,
-.desk-sidebar .standard-sidebar-item.active {
+.body-sidebar .standard-sidebar-item.selected,
+.body-sidebar .standard-sidebar-item.active,
+.body-sidebar .sidebar-item.selected,
+.body-sidebar .sidebar-item.active {
   background-color: var(--alaiy-sidebar-active) !important;
   color: var(--alaiy-sidebar-text) !important;
   opacity: 1 !important;
@@ -210,38 +230,34 @@ h1, h2, h3, h4, h5, h6,
 }
 
 /* Sidebar icons — default */
-.desk-sidebar .sidebar-item svg,
-.desk-sidebar .standard-sidebar-item svg,
-.desk-sidebar .sidebar-item .icon {
+.body-sidebar .standard-sidebar-item .sidebar-item-icon,
+.body-sidebar .sidebar-item .sidebar-item-icon {
   color: var(--alaiy-sidebar-text) !important;
   opacity: 0.6 !important;
 }
 
 /* Sidebar icons — active */
-.desk-sidebar .sidebar-item.selected svg,
-.desk-sidebar .standard-sidebar-item.selected svg,
-.desk-sidebar .sidebar-item.active svg,
-.desk-sidebar .standard-sidebar-item.active svg {
-  color: var(--alaiy-primary) !important;  /* sky-blue icon on active */
+.body-sidebar .standard-sidebar-item.selected .sidebar-item-icon,
+.body-sidebar .standard-sidebar-item.active .sidebar-item-icon {
+  color: var(--alaiy-primary) !important;
   opacity: 1 !important;
 }
 
-/* Sidebar section headings (AI / VIEWS / CHANNELS / OMS) */
-.desk-sidebar .sidebar-group-title,
-.desk-sidebar .list-sidebar-label,
-.desk-sidebar .standard-sidebar-section-title {
+/* Sidebar section headings */
+.body-sidebar .sidebar-group-title,
+.body-sidebar .standard-sidebar-section-title {
   color: var(--alaiy-sidebar-muted) !important;
   font-size: 10px !important;
   font-weight: 600 !important;
-  letter-spacing: 0.22em !important;   /* matches live: 2.2px on 10px = 0.22em */
+  letter-spacing: 0.22em !important;
   text-transform: uppercase !important;
   padding: 0 8px 6px !important;
   margin-top: 20px;
 }
 
-/* Admin / user row at bottom of sidebar */
-.desk-sidebar .user-info-section,
-.desk-sidebar .bottom-section {
+/* User row at bottom of sidebar */
+.body-sidebar .user-info-section,
+.body-sidebar .bottom-section {
   border-top: var(--alaiy-border-width) solid var(--alaiy-sidebar-border) !important;
   padding: 12px 8px !important;
   color: var(--alaiy-sidebar-text) !important;
