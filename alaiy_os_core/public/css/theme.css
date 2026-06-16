@@ -97,7 +97,7 @@ button,
 .form-control,
 .btn,
 .widget,
-.desk-sidebar,
+.body-sidebar,
 .layout-main,
 .page-container {
   font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
@@ -113,28 +113,25 @@ h1, h2, h3, h4, h5, h6,
 
 
 /* ── 5. Sidebar ──────────────────────────────────────────────*/
-.desk-sidebar,
-.layout-side-section,
+.body-sidebar,
 .sidebar-wrapper {
   background-color: var(--alaiy-sidebar-bg) !important;
   border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
 }
 
-.desk-sidebar,
-.body-sidebar-container .desk-sidebar,
-.layout-side-section {
+.body-sidebar {
   width: var(--alaiy-sidebar-width) !important;
   min-width: var(--alaiy-sidebar-width) !important;
   padding: 10px 8px !important;
 }
 
-.desk-sidebar .standard-sidebar-section,
-.desk-sidebar .sidebar-section {
+.body-sidebar .standard-sidebar-section,
+.body-sidebar .sidebar-section {
   margin-bottom: 14px !important;
 }
 
-.desk-sidebar .sidebar-item,
-.desk-sidebar .standard-sidebar-item {
+.body-sidebar .sidebar-item,
+.body-sidebar .standard-sidebar-item {
   color: var(--alaiy-sidebar-text) !important;
   border-radius: var(--alaiy-radius) !important;
   margin: var(--alaiy-item-gap) 4px;
@@ -144,47 +141,49 @@ h1, h2, h3, h4, h5, h6,
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.desk-sidebar .sidebar-item .sidebar-item-label,
-.desk-sidebar .standard-sidebar-item .sidebar-item-label,
-.desk-sidebar .standard-sidebar-label {
+.body-sidebar .sidebar-item .sidebar-item-label,
+.body-sidebar .standard-sidebar-item .sidebar-item-label,
+.body-sidebar .standard-sidebar-label {
   margin-left: 10px !important;
 }
 
-.desk-sidebar .sidebar-item:hover,
-.desk-sidebar .standard-sidebar-item:hover {
+.body-sidebar .sidebar-item:hover,
+.body-sidebar .standard-sidebar-item:hover {
   background-color: var(--alaiy-sidebar-hover) !important;
   color: #FFFFFF !important;
 }
 
-.desk-sidebar .sidebar-item.selected,
-.desk-sidebar .standard-sidebar-item.selected,
-.desk-sidebar .sidebar-item.active {
+.body-sidebar .sidebar-item.selected,
+.body-sidebar .standard-sidebar-item.selected,
+.body-sidebar .standard-sidebar-item.active-sidebar,
+.body-sidebar .sidebar-item.active {
   background-color: var(--alaiy-sidebar-active) !important;
   color: #FFFFFF !important;
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--alaiy-accent);
 }
 
-.desk-sidebar .sidebar-item svg,
-.desk-sidebar .standard-sidebar-item svg,
-.desk-sidebar .sidebar-item .icon {
+.body-sidebar .sidebar-item svg,
+.body-sidebar .standard-sidebar-item svg,
+.body-sidebar .sidebar-item .icon {
   color: var(--alaiy-sidebar-muted) !important;
   opacity: 1 !important;
 }
 
-.desk-sidebar .sidebar-item:hover svg,
-.desk-sidebar .standard-sidebar-item:hover svg {
+.body-sidebar .sidebar-item:hover svg,
+.body-sidebar .standard-sidebar-item:hover svg {
   color: var(--alaiy-accent) !important;
 }
 
-.desk-sidebar .sidebar-item.selected svg,
-.desk-sidebar .standard-sidebar-item.selected svg,
-.desk-sidebar .sidebar-item.active svg {
+.body-sidebar .sidebar-item.selected svg,
+.body-sidebar .standard-sidebar-item.selected svg,
+.body-sidebar .standard-sidebar-item.active-sidebar svg,
+.body-sidebar .sidebar-item.active svg {
   color: #FFFFFF !important;
 }
 
-.desk-sidebar .sidebar-group-title,
-.desk-sidebar .list-sidebar-label {
+.body-sidebar .sidebar-group-title,
+.body-sidebar .list-sidebar-label {
   color: var(--alaiy-sidebar-muted) !important;
   font-size: 10px;
   font-weight: 600;
@@ -192,6 +191,13 @@ h1, h2, h3, h4, h5, h6,
   text-transform: uppercase;
   padding: 0 14px;
   margin-bottom: 4px;
+}
+
+/* Item anchor text should inherit colour */
+.body-sidebar .standard-sidebar-item a.item-anchor,
+.body-sidebar .standard-sidebar-item a.item-anchor:hover {
+  color: inherit !important;
+  text-decoration: none !important;
 }
 
 

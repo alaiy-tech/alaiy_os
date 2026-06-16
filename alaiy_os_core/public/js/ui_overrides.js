@@ -86,6 +86,22 @@ frappe.provide("alaiy_os_core.ui");
     }
   }
 
+  // ── 4. Sidebar recovery ────────────────────────────────────────────────────
+  // In some Frappe v16 setups frappe.app is a plain {} instead of a
+  // frappe.Application instance, causing frappe.app.sidebar to be undefined
+  // and workspace navigation to render empty. Detect this and create the
+  // sidebar before the Workspace constructor runs (after app_ready).
+  function ensureSidebar() {
+    if (frappe.app && frappe.app.sidebar) return; // already initialised
+    if (!frappe.ui || typeof frappe.ui.Sidebar !== "function") return;
+    try {
+      var sidebar = new frappe.ui.Sidebar({});
+      if (frappe.app) frappe.app.sidebar = sidebar;
+    } catch (e) {
+      /* non-fatal */
+    }
+  }
+
   // ── Run all overrides for the current page ─────────────────────────────────
   alaiy_os_core.ui.apply = function () {
     try {
@@ -95,6 +111,23 @@ frappe.provide("alaiy_os_core.ui");
     }
     try {
       moveTopbarWidgets();
+    } catch (e) {
+      /* non-fatal */
+    }
+    // Belt-and-suspenders: if the workspace loaded before sidebar was wired,
+    // re-wire it now and trigger setup so navigation items appear.
+    try {
+      if (
+        frappe.workspace &&
+        !frappe.workspace.sidebar &&
+        frappe.app &&
+        frappe.app.sidebar
+      ) {
+        frappe.workspace.sidebar = frappe.app.sidebar;
+        if (typeof frappe.workspace.setup_sidebar === "function") {
+          frappe.workspace.setup_sidebar();
+        }
+      }
     } catch (e) {
       /* non-fatal */
     }
@@ -117,6 +150,7 @@ frappe.provide("alaiy_os_core.ui");
   }
 
   $(document).on("app_ready", function () {
+    ensureSidebar();
     bindRouter();
     alaiy_os_core.ui.apply();
   });
