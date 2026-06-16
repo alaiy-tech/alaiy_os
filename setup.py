@@ -1,7 +1,13 @@
 from setuptools import setup, find_packages
 
 with open("requirements.txt") as f:
-	install_requires = f.read().strip().split("\n")
+	# Keep only real requirement lines; skip blanks and "#" comments so that
+	# documentation comments in requirements.txt are not treated as packages.
+	install_requires = [
+		line.strip()
+		for line in f
+		if line.strip() and not line.strip().startswith("#")
+	]
 
 from alaiy_os_core import __version__ as version
 
