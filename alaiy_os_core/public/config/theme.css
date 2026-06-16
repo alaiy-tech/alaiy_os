@@ -20,41 +20,51 @@
    Swap these out per client without touching anything else.
    ──────────────────────────────────────────────────────────── */
 :root {
-  /* Brand palette */
-  --alaiy-primary:        #4F46E5;   /* indigo-600  */
-  --alaiy-primary-dark:   #3730A3;   /* indigo-800  */
-  --alaiy-primary-light:  #E0E7FF;   /* indigo-100  */
+  /* Brand palette — alaiy OS teal / deep-navy */
+  --alaiy-primary:        #0891B2;   /* cyan-600   */
+  --alaiy-primary-dark:   #0E7490;   /* cyan-700   */
+  --alaiy-primary-light:  #CFF7FB;   /* cyan-100   */
+  --alaiy-accent:         #22D3EE;   /* cyan-400 — the "OS" highlight */
 
   /* Surfaces */
-  --alaiy-bg:             #F8FAFC;   /* page background  */
+  --alaiy-bg:             #F5F9FB;   /* page background  */
   --alaiy-surface:        #FFFFFF;   /* cards, forms      */
-  --alaiy-surface-muted:  #F1F5F9;   /* subtle row tints  */
+  --alaiy-surface-muted:  #EDF3F7;   /* subtle row tints  */
 
-  /* Sidebar */
-  --alaiy-sidebar-bg:     #1E1B4B;   /* dark indigo       */
-  --alaiy-sidebar-hover:  #312E81;
-  --alaiy-sidebar-active: #4F46E5;
-  --alaiy-sidebar-text:   #C7D2FE;
-  --alaiy-sidebar-muted:  #818CF8;
+  /* Sidebar — deep navy-teal */
+  --alaiy-sidebar-bg:     #0B2A3F;   /* deep navy-teal    */
+  --alaiy-sidebar-hover:  #123A52;
+  --alaiy-sidebar-active: #0E7490;
+  --alaiy-sidebar-text:   #B6CCD9;
+  --alaiy-sidebar-muted:  #5E8298;
 
   /* Topbar */
   --alaiy-topbar-bg:      #FFFFFF;
-  --alaiy-topbar-border:  #E2E8F0;
+  --alaiy-topbar-border:  #E3EBF0;
 
   /* Text */
-  --alaiy-text:           #1E293B;
-  --alaiy-text-muted:     #64748B;
-  --alaiy-text-light:     #94A3B8;
+  --alaiy-text:           #0F2A3F;
+  --alaiy-text-muted:     #5A7184;
+  --alaiy-text-light:     #94A8B6;
 
   /* Border & shadow */
-  --alaiy-border:         #E2E8F0;
-  --alaiy-shadow-sm:      0 1px 2px rgba(0,0,0,0.05);
-  --alaiy-shadow:         0 2px 8px rgba(0,0,0,0.08);
+  --alaiy-border:         #E3EBF0;
+  --alaiy-border-width:   1px;
+  --alaiy-shadow-sm:      0 1px 3px rgba(15, 42, 63, 0.06);
+  --alaiy-shadow:         0 4px 16px rgba(15, 42, 63, 0.09);
+  --alaiy-shadow-lg:      0 8px 28px rgba(15, 42, 63, 0.12);
 
   /* Radius */
-  --alaiy-radius-sm:      4px;
-  --alaiy-radius:         8px;
-  --alaiy-radius-lg:      12px;
+  --alaiy-radius-sm:      6px;
+  --alaiy-radius:         10px;
+  --alaiy-radius-lg:      14px;
+  --alaiy-radius-full:    999px;
+
+  /* Layout & spacing */
+  --alaiy-sidebar-width:  256px;     /* wider than Frappe default */
+  --alaiy-item-gap:       4px;       /* vertical gap between items */
+  --alaiy-item-pad-y:     9px;
+  --alaiy-item-pad-x:     14px;
 }
 
 
@@ -84,6 +94,9 @@
 
   --sidebar-bg-color:  var(--alaiy-sidebar-bg);
   --navbar-bg:         var(--alaiy-topbar-bg);
+
+  /* Widen Frappe's sidebar column */
+  --sidebar-width:     var(--alaiy-sidebar-width);
 }
 
 
@@ -120,14 +133,39 @@ h1, h2, h3, h4, h5, h6,
 .layout-side-section,
 .sidebar-wrapper {
   background-color: var(--alaiy-sidebar-bg) !important;
-  border-right: 1px solid rgba(255, 255, 255, 0.06) !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+/* Wider sidebar + breathing room around the list */
+.desk-sidebar,
+.body-sidebar-container .desk-sidebar,
+.layout-side-section {
+  width: var(--alaiy-sidebar-width) !important;
+  min-width: var(--alaiy-sidebar-width) !important;
+  padding: 10px 8px !important;
+}
+
+.desk-sidebar .standard-sidebar-section,
+.desk-sidebar .sidebar-section {
+  margin-bottom: 14px !important;
 }
 
 .desk-sidebar .sidebar-item,
 .desk-sidebar .standard-sidebar-item {
   color: var(--alaiy-sidebar-text) !important;
-  border-radius: var(--alaiy-radius-sm);
-  margin: 1px 6px;
+  border-radius: var(--alaiy-radius) !important;
+  margin: var(--alaiy-item-gap) 4px;
+  padding: var(--alaiy-item-pad-y) var(--alaiy-item-pad-x) !important;
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+/* More space between the icon and label */
+.desk-sidebar .sidebar-item .sidebar-item-label,
+.desk-sidebar .standard-sidebar-item .sidebar-item-label,
+.desk-sidebar .standard-sidebar-label {
+  margin-left: 10px !important;
 }
 
 .desk-sidebar .sidebar-item:hover,
@@ -141,7 +179,8 @@ h1, h2, h3, h4, h5, h6,
 .desk-sidebar .sidebar-item.active {
   background-color: var(--alaiy-sidebar-active) !important;
   color: #FFFFFF !important;
-  font-weight: 500;
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--alaiy-accent);
 }
 
 /* Sidebar icons */
@@ -150,6 +189,11 @@ h1, h2, h3, h4, h5, h6,
 .desk-sidebar .sidebar-item .icon {
   color: var(--alaiy-sidebar-muted) !important;
   opacity: 1 !important;
+}
+
+.desk-sidebar .sidebar-item:hover svg,
+.desk-sidebar .standard-sidebar-item:hover svg {
+  color: var(--alaiy-accent) !important;
 }
 
 .desk-sidebar .sidebar-item.selected svg,
@@ -164,8 +208,10 @@ h1, h2, h3, h4, h5, h6,
   color: var(--alaiy-sidebar-muted) !important;
   font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
+  padding: 0 14px;
+  margin-bottom: 4px;
 }
 
 
@@ -215,34 +261,50 @@ body,
 .frappe-card {
   background-color: var(--alaiy-surface) !important;
   border: 1px solid var(--alaiy-border) !important;
-  border-radius: var(--alaiy-radius) !important;
+  border-radius: var(--alaiy-radius-lg) !important;
   box-shadow: var(--alaiy-shadow-sm) !important;
+  transition: box-shadow 0.18s ease, transform 0.18s ease, border-color 0.18s ease;
 }
 
-.widget:hover {
+.widget:hover,
+.frappe-card:hover {
   box-shadow: var(--alaiy-shadow) !important;
+  border-color: #D4E2EA !important;
+  transform: translateY(-1px);
 }
 
 
 /* ── 9. Buttons ──────────────────────────────────────────────*/
+.btn {
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
 .btn-primary {
   background-color: var(--alaiy-primary) !important;
   border-color: var(--alaiy-primary) !important;
   color: #FFFFFF !important;
   font-weight: 500;
-  border-radius: var(--alaiy-radius-sm) !important;
+  border-radius: var(--alaiy-radius) !important;
+  box-shadow: 0 1px 2px rgba(8, 145, 178, 0.25) !important;
 }
 
 .btn-primary:hover,
 .btn-primary:focus {
   background-color: var(--alaiy-primary-dark) !important;
   border-color: var(--alaiy-primary-dark) !important;
+  box-shadow: 0 2px 8px rgba(8, 145, 178, 0.3) !important;
 }
 
 .btn-secondary,
 .btn-default {
-  border-radius: var(--alaiy-radius-sm) !important;
+  border-radius: var(--alaiy-radius) !important;
   font-weight: 500;
+}
+
+.btn-secondary:hover,
+.btn-default:hover {
+  background-color: var(--alaiy-surface-muted) !important;
+  border-color: var(--alaiy-primary-light) !important;
 }
 
 
@@ -256,15 +318,16 @@ input[type="search"],
 select,
 textarea {
   border-color: var(--alaiy-border) !important;
-  border-radius: var(--alaiy-radius-sm) !important;
+  border-radius: var(--alaiy-radius) !important;
   background-color: var(--alaiy-surface) !important;
   color: var(--alaiy-text) !important;
   font-size: 13px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .form-control:focus {
   border-color: var(--alaiy-primary) !important;
-  box-shadow: 0 0 0 2px var(--alaiy-primary-light) !important;
+  box-shadow: 0 0 0 3px var(--alaiy-primary-light) !important;
   outline: none !important;
 }
 
