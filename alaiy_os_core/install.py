@@ -3,6 +3,7 @@ from alaiy_os_core.client.config.boot_config import VISIBLE_WORKSPACES, DEFAULT_
 from alaiy_os_core.workspace.workspace_manager import patch_workspaces
 from alaiy_os_core import branding
 from alaiy_os_core.connectors.registry import setup_connectors
+from alaiy_os_core.permissions import setup_role_permissions
 
 
 def after_install():
@@ -23,6 +24,7 @@ def run_setup():
       2. Patch enabled workspaces' links/shortcuts to the config whitelist.
       3. Apply Alaiy branding (logo / app name / favicon) via settings docs.
       4. Apply remaining system settings.
+      5. Set up role-based permissions (Altomoda Stock User role).
     Safe to run repeatedly (after every `bench migrate`).
     """
     _hide_workspaces()
@@ -30,6 +32,7 @@ def run_setup():
     branding.apply_branding()
     _apply_system_settings()
     setup_connectors()
+    setup_role_permissions()
     frappe.db.commit()
     frappe.clear_cache()
 

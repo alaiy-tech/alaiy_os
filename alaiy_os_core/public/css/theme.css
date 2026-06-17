@@ -553,12 +553,12 @@ a[href="/website"] {
 
 .body-sidebar .avatar-name-email span {
   color: var(--alaiy-sidebar-text) !important;
-  font-size: 13px !important;
+  font-size: 15px !important;
   font-weight: 500 !important;
 }
 
 .body-sidebar .avatar-name-email .text-secondary {
   color: var(--alaiy-sidebar-muted) !important;
-  font-size: 12px !important;
+  font-size: 13px !important;
   font-weight: 400 !important;
 }
