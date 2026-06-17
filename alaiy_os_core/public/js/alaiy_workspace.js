@@ -1,12 +1,13 @@
 /**
  * AlaiyOS Workspace Content Loader
  *
- * Intercepts workspace card / shortcut clicks for AlaiyOS users using a
- * capture-phase listener (fires before Frappe's bubble-phase jQuery handlers).
- * Instead of navigating to a DocType page, renders a list → form view inside
- * a full-height overlay within the workspace container.
+ * Intercepts workspace card, shortcut, AND sidebar link clicks for AlaiyOS
+ * users using a capture-phase listener (fires before Frappe's bubble-phase
+ * jQuery handlers). Instead of navigating to a DocType page, renders a list →
+ * form view inside an overlay within the main-content area of the workspace.
  *
- * Route stays at /app/alaiy-os throughout — route_guard.js is never triggered.
+ * The sidebar stays visible while content renders on the right.
+ * Route stays at /app/alaiy-os throughout.
  *
  * Depends on (loaded before this file):
  *   constants/roles.js — ALAIY_OS_ROLES, ALAIY_OS_BYPASS, ALAIY_OS_ROUTE
@@ -36,18 +37,20 @@ const ALAIY_LABEL_TO_DOCTYPE = {
   "Customer Groups":      "Customer Group",
   "Address":              "Address",
   "Contact":              "Contact",
+  "Contacts":             "Contact",
   "UTM Source":           "UTM Source",
   "Purchase Order":       "Purchase Order",
   "Purchase Invoice":     "Purchase Invoice",
   "Supplier":             "Supplier",
   "Supplier Group":       "Supplier Group",
-  "Contacts":             "Contact",
 };
 /* eslint-enable no-unused-vars */
 
-// Clicks on these labels are handled by alaiy_settings.js or are placeholders
+// Clicks on these labels are handled elsewhere or are not yet implemented
 const _SKIP_LABELS = new Set([
-  "Settings", "Ask AlaiyOS", "Dashboard", "My Pinned", "Reports & Analytics",
+  "Settings", "Ask Alaiy", "Dashboard", "My Pinned", "Reports & Analytics",
+  // section headers (never have a doctype)
+  "Inventory", "Orders", "Purchase", "More",
 ]);
 
 // ── Module state ──────────────────────────────────────────────────────────────
@@ -65,11 +68,17 @@ function _isAlaiyWsUser() {
 
 // ── Label extraction ──────────────────────────────────────────────────────────
 function _labelFrom(el) {
+  // data-label is the most reliable — set by Frappe on sidebar items and cards
+  const dl = el.getAttribute && el.getAttribute("data-label");
+  if (dl && dl.trim()) return dl.trim();
+
   const selectors = [
     ".link-item-label",
     ".widget-title",
     ".shortcut-widget-box .widget-head .widget-title",
     ".item-name",
+    ".sidebar-item-label",
+    ".standard-sidebar-label",
     "span",
   ];
   for (const sel of selectors) {
@@ -79,13 +88,15 @@ function _labelFrom(el) {
       if (t) return t;
     }
   }
-  return (el.getAttribute("data-label") || el.textContent || "").trim().split("\n")[0].trim();
+  return (el.textContent || "").trim().split("\n")[0].trim();
 }
 
 // ── Overlay management ────────────────────────────────────────────────────────
+// The overlay covers only the main content area so the sidebar stays visible.
 AW._ensureOverlay = function () {
+  // Target the main content section specifically so the sidebar is NOT covered.
   const ws = document.querySelector(
-    ".workspace-container, .layout-main-section, .page-content"
+    ".layout-main-section, .workspace-container, .layout-main-section-wrapper, .page-content"
   );
   if (!ws) return null;
 
@@ -230,9 +241,9 @@ AW._mountForm = function (host, doctype, docname) {
 AW._onCapture = function (e) {
   if (!_isAlaiyWsUser()) return;
 
-  // Only on the Alaiy OS workspace route.
-  // frappe.get_route_str() returns "Workspaces/Alaiy OS" when on the workspace,
-  // not the "alaiy-os" slug — use the URL path as the reliable check.
+  // Only fire when on the Alaiy OS workspace route.
+  // frappe.get_route_str() returns "Workspaces/Alaiy OS" on the workspace page,
+  // not the URL slug — use pathname as the reliable check.
   const route = (frappe.get_route_str && frappe.get_route_str()) || "";
   const onWorkspace = window.location.pathname.includes("/" + ALAIY_OS_ROUTE) ||
                       route.startsWith(ALAIY_OS_ROUTE);
@@ -241,11 +252,13 @@ AW._onCapture = function (e) {
   // Never intercept clicks inside our own overlay
   if (e.target.closest && e.target.closest("#alaiy-ws-content")) return;
 
-  // Find a workspace link or shortcut element in the ancestor chain
+  // Match workspace cards, shortcuts AND workspace sidebar items
   const target = e.target.closest
     ? e.target.closest(
         ".link-item, .workspace-link-item, .shortcut-widget-box, " +
-        ".workspace-shortcut-card, [data-doctype]"
+        ".workspace-shortcut-card, [data-doctype], " +
+        ".standard-sidebar-item, .workspace-sidebar-item, " +
+        ".sidebar-item-container, [data-label]"
       )
     : null;
   if (!target) return;
