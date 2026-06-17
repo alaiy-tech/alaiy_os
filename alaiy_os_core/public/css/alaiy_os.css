@@ -9,8 +9,8 @@
 /* ── Poppins font ─────────────────────────────────────────────────────────── */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
 
-/* Apply Poppins to the workspace content area and the workspace sidebar panel.
- * Scoped away from the global ERPNext desk so admin users are unaffected.
+/* Apply Poppins broadly across the desk UI — workspace, navbar, dropdowns,
+ * onboarding sidebar, and all ERPNext panels AlaiyOS users interact with.
  * The !important mirrors what Frappe itself uses so our rule wins. */
 .layout-main-section,
 .layout-main-section input,
@@ -26,7 +26,7 @@
 .layout-main-section h4,
 .layout-main-section h5,
 .layout-main-section h6,
-/* workspace sidebar left-panel (second column within the workspace page) */
+/* workspace sidebar left-panel */
 .layout-side-section,
 .layout-side-section input,
 .layout-side-section button,
@@ -40,8 +40,44 @@
 .standard-sidebar-item span,
 .standard-sidebar-item a,
 .sidebar-item-label,
-.sidebar-section-head {
+.sidebar-section-head,
+/* navbar user chip + avatar */
+.navbar-user,
+.navbar-user *,
+/* top-navbar dropdowns */
+.dropdown-menu,
+.dropdown-menu li,
+.dropdown-menu a,
+.dropdown-menu button,
+.dropdown-item,
+/* onboarding / getting-started sidebar */
+.onboarding-sidebar,
+.onboarding-sidebar *,
+.modules-section,
+/* any .px-2 element within the desk layout */
+.layout-side-section .px-2,
+.layout-side-section .px-2 * {
     font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* ── Sidebar width ─────────────────────────────────────────────────────────── */
+
+/* The workspace-specific sidebar (left panel inside the workspace page).
+ * Uses the Frappe CSS variable where possible; the explicit width is a fallback. */
+:root {
+    --sidebar-width: 240px;
+}
+
+.layout-side-section {
+    width: 240px !important;
+    min-width: 240px !important;
+}
+
+/* Reposition the collapse/expand toggle button to match the new 240px width.
+ * Frappe anchors it with `left` relative to the sidebar's right edge. */
+.collapse-sidebar-link.sidebar-toggle-btn,
+.btn-collapse-sidebar {
+    left: 240px !important;
 }
 
 /* Workspace sidebar header logo */

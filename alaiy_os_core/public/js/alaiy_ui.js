@@ -5,17 +5,23 @@
  * route_guard.js and alaiy_settings.js.
  *
  * Depends on (loaded before this file):
+ *   constants/roles.js         — ALAIY_OS_ROLES, ALAIY_OS_BYPASS, ALAIY_OS_WORKSPACE
  *   constants/route_titles.js  — ALAIY_ROUTE_TITLES, ALAIY_ROUTE_PREFIX_TITLES
  *
- * Exports (window globals, used by route_guard.js and alaiy_settings.js):
+ * Exports (window globals used by other modules):
  *   updateAlaiyTitle(section)   — sets document.title to the brand format
  *   resolveAlaiySection(route)  — maps a Frappe route string to a section label
  */
 
+// ── User check ────────────────────────────────────────────────────────────────
+// Returns true for AlaiyOS-only users; false for admins/system managers.
+function _isAlaiyUser() {
+  const roles = frappe.user_roles || [];
+  if (ALAIY_OS_BYPASS.some((r) => roles.includes(r))) return false;
+  return ALAIY_OS_ROLES.some((r) => roles.includes(r));
+}
+
 // ── Company name helper ───────────────────────────────────────────────────────
-// Reads the ERPNext default company from frappe.boot, appends " OS" to form
-// the page-title prefix.  e.g. company "Alto Moda" → prefix "Alto Moda OS".
-// Falls back to "Alaiy OS" if boot data is not available (e.g. login page).
 function _getAlaiyTitlePrefix() {
   const company =
     (frappe.boot &&
@@ -30,115 +36,151 @@ function _getAlaiyTitlePrefix() {
 function _patchAboutModal(modalEl) {
   const $m = $(modalEl);
   if ($m.find(".modal-title").first().text().trim() !== "About") return;
+  if ($m.find(".alaiy-about-patched").length) return; // already patched
 
-  // Remove Frappe Framework version row and Installed Apps label
+  // Remove Frappe version row, "Installed Apps" label, and the app-version list
   $m.find(".about-info-rows, .about-info-row, .about-section-label").remove();
 
-  // Replace app-versions list with Alaiy attribution
+  // Replace #about-app-versions with "Built by Alaiy" credit
   const $av = $m.find("#about-app-versions");
+  const credit =
+    '<p class="alaiy-about-patched" style="margin:16px 0 0;font-size:13px;color:var(--text-muted)">' +
+      'Built by <a href="https://alaiy.com" target="_blank" rel="noopener noreferrer">Alaiy</a>' +
+    "</p>";
+
   if ($av.length) {
-    $av.html(
-      '<p style="margin:16px 0 0;font-size:13px;color:var(--text-muted)">' +
-        'Built by <a href="https://alaiy.com" target="_blank" rel="noopener noreferrer">Alaiy</a>' +
-      "</p>"
-    );
+    $av.replaceWith(credit);
+  } else {
+    $m.find(".about-body").append(credit);
   }
 }
 
 function _startAboutModalObserver() {
   if (window._alaiyAboutObserver) return;
+
+  // Bootstrap modal shown event — fires reliably in Frappe v16
+  $(document).on("shown.bs.modal.alaiy", ".modal", function () {
+    _patchAboutModal(this);
+  });
+
+  // MutationObserver fallback for Frappe dialogs that bypass Bootstrap
   window._alaiyAboutObserver = new MutationObserver(function (mutations) {
     mutations.forEach(function (mut) {
       mut.addedNodes.forEach(function (node) {
         if (node.nodeType !== 1) return;
-        if (node.classList.contains("modal") || node.classList.contains("frappe-dialog")) {
-          requestAnimationFrame(function () { _patchAboutModal(node); });
-        }
+        var targets = [node].concat(
+          Array.from(node.querySelectorAll ? node.querySelectorAll(".modal, .frappe-dialog") : [])
+        );
+        targets.forEach(function (el) {
+          if (el.classList.contains("modal") || el.classList.contains("frappe-dialog")) {
+            requestAnimationFrame(function () { _patchAboutModal(el); });
+          }
+        });
       });
     });
   });
-  window._alaiyAboutObserver.observe(document.body, { childList: true });
+  window._alaiyAboutObserver.observe(document.body, { childList: true, subtree: true });
 }
 
-// ── Sidebar header patch ──────────────────────────────────────────────────────
+// ── Navbar / sidebar dropdown patch ──────────────────────────────────────────
+// Removes items that are irrelevant for AlaiyOS-only users:
+//   • "Desktop"         — link back to /desk (not relevant inside AlaiyOS)
+//   • "Workspaces"      — link to workspace switcher (AlaiyOS users have one workspace)
+//   • "Website"         — link to public website frontend
+//   • "Frappe Support"  — sub-item under Help (Frappe-specific)
 
-function _patchSidebarHeader() {
-  const company =
-    (frappe.boot && frappe.boot.sysdefaults && frappe.boot.sysdefaults.company) || "Alaiy";
-  const titleText = company + " OS";
+function _patchNavbarDropdown() {
+  if (!_isAlaiyUser()) return;
 
-  $(".sidebar-header").each(function () {
-    const $h = $(this);
+  var REMOVE_LABELS = ["Desktop", "Workspaces", "Website"];
 
-    // Replace icon with logo-square.png (only once per element)
-    const $icon = $h.find(".sidebar-item-icon");
-    if ($icon.length && !$icon.find(".alaiy-logo-img").length) {
-      $icon.empty().append(
-        $('<img class="alaiy-logo-img">')
-          .attr("src", "/assets/alaiy_os_core/images/logo-square.png")
-          .attr("alt", "Logo")
-          .css({ width: "28px", height: "28px", objectFit: "contain", borderRadius: "4px" })
-      );
-    }
-
-    // Header title: "{Company} OS"
-    const $title = $h.find(".header-title");
-    if ($title.length && $title.text().trim() !== titleText) $title.text(titleText);
-
-    // Header subtitle: "Alaiy OS"
-    const $sub = $h.find(".header-subtitle");
-    if ($sub.length && $sub.text().trim() !== "Alaiy OS") $sub.text("Alaiy OS");
+  // Remove items whose exact text matches REMOVE_LABELS
+  $("a").filter(function () {
+    return REMOVE_LABELS.indexOf($(this).text().trim()) !== -1;
+  }).each(function () {
+    var $li = $(this).closest("li");
+    ($li.length ? $li : $(this)).remove();
   });
+
+  // Remove "Frappe Support" sub-item under Help
+  $("a").filter(function () {
+    return /^frappe\s+support$/i.test($(this).text().trim());
+  }).each(function () {
+    var $li = $(this).closest("li");
+    ($li.length ? $li : $(this)).remove();
+  });
+
+  // Also catch it by href
+  $("a[href*='support.frappe.io']").each(function () {
+    var $li = $(this).closest("li");
+    ($li.length ? $li : $(this)).remove();
+  });
+
+  // Clean up stacked/leading/trailing dividers that become orphaned
+  $(".dropdown-divider + .dropdown-divider").remove();
+  $(".dropdown-menu .dropdown-divider:first-child").remove();
+  $(".dropdown-menu .dropdown-divider:last-child").remove();
 }
 
-// ── Getting Started / Onboarding hider ───────────────────────────────────────
+function _startNavDropdownObserver() {
+  if (window._alaiyNavDropInited) return;
+  window._alaiyNavDropInited = true;
 
-function _hideGettingStarted() {
-  $(".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status").hide();
-  $(".sidebar-item-getting-started, [data-label='Getting Started']").hide();
-  $(".standard-sidebar-item, .sidebar-item").filter(function () {
-    return $(this).text().trim() === "Getting Started";
-  }).hide();
+  // Re-run whenever any Bootstrap dropdown opens
+  $(document).on("shown.bs.dropdown.alaiy", function () {
+    setTimeout(_patchNavbarDropdown, 0);
+  });
+
+  // Also patch whenever a new dropdown-menu is inserted (Frappe renders lazily)
+  var obs = new MutationObserver(function (mutations) {
+    var needed = false;
+    mutations.forEach(function (mut) {
+      mut.addedNodes.forEach(function (node) {
+        if (node.nodeType !== 1) return;
+        if (
+          (node.classList && node.classList.contains("dropdown-menu")) ||
+          (node.querySelector && node.querySelector(".dropdown-menu"))
+        ) {
+          needed = true;
+        }
+      });
+    });
+    if (needed) setTimeout(_patchNavbarDropdown, 50);
+  });
+  obs.observe(document.body, { childList: true, subtree: true });
+
+  // Initial pass (handles anything already rendered at app_ready)
+  setTimeout(_patchNavbarDropdown, 0);
 }
 
 // ── Page-container failsafe ───────────────────────────────────────────────────
-// Frappe shows the page-container after all async setup (including socket.io).
-// If socket.io fails (no Redis/socket server in dev), the promise rejects and
-// page.show() is never called — leaving the workspace hidden under the splash.
-// Poll briefly after app_ready until the container is visible or give up.
+// If socket.io fails the promise rejects and page.show() is never called —
+// leaving the workspace hidden under the splash screen.  Poll briefly.
 function _ensurePageVisible() {
   var attempts = 0;
   var interval = setInterval(function () {
     attempts++;
-    var pc = document.querySelector(".page-container");
+    var pc     = document.querySelector(".page-container");
     var splash = document.querySelector(".centered.splash");
     if (pc && getComputedStyle(pc).display === "none") {
-      pc.style.removeProperty("display"); // let Frappe's own CSS/JS win if it wakes up
+      pc.style.removeProperty("display");
       pc.style.display = "block";
     }
     if (splash && getComputedStyle(splash).display !== "none") {
       splash.style.display = "none";
     }
-    // Stop once page is visible or after 5 seconds
     if ((pc && pc.offsetHeight > 0) || attempts >= 10) {
       clearInterval(interval);
     }
   }, 500);
 }
 
-// ── Wire all patches ──────────────────────────────────────────────────────────
+// ── Wire patches ──────────────────────────────────────────────────────────────
 
 $(document).on("app_ready", function () {
   _startAboutModalObserver();
-  _patchSidebarHeader();
-  _hideGettingStarted();
+  _startNavDropdownObserver();
   _ensurePageVisible();
-});
-
-$(document).on("page-change", function () {
-  _patchSidebarHeader();
-  _hideGettingStarted();
-  setTimeout(function () { _patchSidebarHeader(); _hideGettingStarted(); }, 400);
 });
 
 // ── Title helpers ─────────────────────────────────────────────────────────────
@@ -147,25 +189,18 @@ $(document).on("page-change", function () {
  * Set the browser tab title to:
  *   "<Company> OS — <section> | Alaiy OS"
  *
- * The company name is read live from frappe.boot each time so it stays
- * correct across page loads without a hard-coded constant.
- *
- * @param {string|null} section  e.g. "Stock", "Settings · Selling".
- *   Pass null / undefined to reset to "Dashboard".
+ * @param {string|null} section  e.g. "Sales Order", "Catalog · Products".
  */
 // eslint-disable-next-line no-unused-vars
 function updateAlaiyTitle(section) {
   const prefix = _getAlaiyTitlePrefix();
   document.title =
-    prefix + " \u2014 " + (section || "Dashboard") + " | Alaiy OS";
+    prefix + " — " + (section || "Dashboard") + " | Alaiy OS";
 }
 
 /**
  * Resolve a Frappe route string to an AlaiyOS section label.
  * Called by route_guard.js on every navigation.
- *
- * Uses ALAIY_ROUTE_TITLES and ALAIY_ROUTE_PREFIX_TITLES from
- * constants/route_titles.js (loaded before this file).
  *
  * @param {string} route  frappe.get_route_str() value.
  * @returns {string}
@@ -174,16 +209,14 @@ function updateAlaiyTitle(section) {
 function resolveAlaiySection(route) {
   if (!route) return "Dashboard";
 
-  // Exact match
   if (ALAIY_ROUTE_TITLES[route]) return ALAIY_ROUTE_TITLES[route];
 
-  // Prefix match (Form/*)
   for (const entry of ALAIY_ROUTE_PREFIX_TITLES) {
     if (route.startsWith(entry.prefix)) return entry.title;
   }
 
-  // Workspace root and settings panel (title managed by alaiy_settings.js)
-  if (route.startsWith("alaiy-os")) return "Dashboard";
+  if (route.startsWith("alaiy-os") ||
+      route === "Workspaces/" + ALAIY_OS_WORKSPACE) return "Dashboard";
 
   return "Alaiy OS";
 }
