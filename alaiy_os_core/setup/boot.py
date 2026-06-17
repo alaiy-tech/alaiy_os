@@ -66,3 +66,24 @@ def on_session_creation(login_manager):
     elif meta.has_field("home_page"):
         frappe.db.set_value("User", login_manager.user,
                             "home_page", "/app/alaiy-os")
+
+
+def on_login(login_manager):
+    """
+    Runs immediately after credentials are validated (before session creation).
+    For AlaiyOS users: set the post-login redirect so Frappe sends them to
+    /app/alaiy-os instead of / (which desk_access=0 would otherwise trigger).
+
+    Belt-and-suspenders with on_session_creation and the default_workspace
+    field — whichever fires last wins, but they all point to the same place.
+    """
+    user = login_manager.user
+    user_roles = set(frappe.get_roles(user))
+    bypass = {"System Manager", "Administrator"}
+    is_alaiy = bool(user_roles & ALAIY_OS_ROLES) and not bool(user_roles & bypass)
+
+    if not is_alaiy:
+        return
+
+    # Override the post-login redirect Frappe calculates from home_page / desk_access.
+    login_manager.redirect_post_login = "/app/alaiy-os"

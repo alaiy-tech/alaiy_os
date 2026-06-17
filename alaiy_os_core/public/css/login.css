@@ -1,0 +1,136 @@
+/*
+ * AlaiyOS — Login Page Branding
+ * Applied only to website/login routes (web_include_css).
+ * Does NOT affect the ERPNext desk for any user.
+ */
+
+/* ── Variables ───────────────────────────────────────────────────────────── */
+:root {
+    --alaiy-login-primary:  #0b2a3f;   /* Deep navy */
+    --alaiy-login-accent:   #0891b2;   /* Cyan-600 — matches desk theme */
+    --alaiy-login-bg:       #f5f9fb;
+    --alaiy-login-card-bg:  #ffffff;
+    --alaiy-login-radius:   12px;
+    --alaiy-login-shadow:   0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+/* ── Page Background ─────────────────────────────────────────────────────── */
+body.login-page {
+    background: var(--alaiy-login-bg);
+    font-family: "Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+/* ── Top-left horizontal logo ────────────────────────────────────────────── */
+/*
+ * Frappe's login page has no top-left logo slot in the Jinja template.
+ * We use a body::before pseudo-element to inject it via CSS without
+ * touching the server-side template.
+ * If position:fixed is clipped by the page container, switch to absolute.
+ */
+body.login-page::before {
+    content: "";
+    display: block;
+    position: fixed;
+    top: 24px;
+    left: 32px;
+    width: 140px;
+    height: 40px;
+    background-image: url('/assets/alaiy_os_core/images/logo-hor.svg');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: left center;
+    z-index: 100;
+}
+
+/* ── Login card ──────────────────────────────────────────────────────────── */
+.login-content {
+    background: var(--alaiy-login-card-bg) !important;
+    border-radius: var(--alaiy-login-radius) !important;
+    box-shadow: var(--alaiy-login-shadow) !important;
+    border: none !important;
+    padding: 40px !important;
+    max-width: 420px;
+    width: 100%;
+}
+
+/* ── Splash / card logo (logo-square.png centred above the form) ─────────── */
+/*
+ * Hide whatever logo Frappe renders inside .text-center and replace with
+ * logo-square.png via a ::before pseudo-element on the same container.
+ */
+.login-content .text-center img {
+    display: none;
+}
+
+.login-content .text-center::before {
+    content: "";
+    display: block;
+    width: 72px;
+    height: 72px;
+    margin: 0 auto 20px;
+    background-image: url('/assets/alaiy_os_core/images/logo-square.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: center;
+}
+
+/* ── App name / title below logo ─────────────────────────────────────────── */
+.login-content h4.login-title,
+.login-content .application-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--alaiy-login-primary);
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+/* ── Form inputs ─────────────────────────────────────────────────────────── */
+.login-form .form-control,
+.login-form input[type="email"],
+.login-form input[type="password"],
+.login-form input[type="text"] {
+    border-radius: 8px !important;
+    border: 1px solid #e2e8f0 !important;
+    padding: 10px 14px !important;
+    font-size: 14px !important;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.login-form .form-control:focus,
+.login-form input:focus {
+    border-color: var(--alaiy-login-accent) !important;
+    box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.15) !important;
+    outline: none;
+}
+
+/* ── Sign in button ──────────────────────────────────────────────────────── */
+.login-form .btn-login,
+.login-form button[type="submit"],
+.login-form .btn-primary {
+    background: var(--alaiy-login-primary) !important;
+    border-color: var(--alaiy-login-primary) !important;
+    border-radius: 8px !important;
+    font-weight: 600 !important;
+    font-size: 14px !important;
+    padding: 10px 0 !important;
+    width: 100%;
+    transition: opacity 0.15s;
+}
+
+.login-form .btn-login:hover,
+.login-form button[type="submit"]:hover {
+    opacity: 0.9;
+}
+
+/* ── Secondary links ─────────────────────────────────────────────────────── */
+.login-content .sign-up-message a,
+.login-content a {
+    color: var(--alaiy-login-accent) !important;
+    font-size: 13px;
+}
+
+/* ── Footer / powered-by strip ───────────────────────────────────────────── */
+.login-footer,
+.powered-by {
+    display: none !important;
+}

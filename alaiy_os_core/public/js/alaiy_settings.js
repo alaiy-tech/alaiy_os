@@ -27,34 +27,84 @@ frappe.provide("alaiy_os");
 // Single source of truth for the settings layout. Add/remove a tab here only.
 const ALAIY_SETTINGS_TABS = [
   // ── Single DocType forms ──────────────────────────────────────────────────
-  { id: "stock",         label: "Stock",                 icon: "package",      type: "single", doctype: "Stock Settings" },
-  { id: "item-variants", label: "Item Variant Settings", icon: "settings",     type: "single", doctype: "Item Variant Settings" },
-  { id: "selling",       label: "Selling",               icon: "briefcase",    type: "single", doctype: "Selling Settings" },
-  { id: "buying",        label: "Buying",                icon: "shopping-cart", type: "single", doctype: "Buying Settings" },
-  { id: "accounts",      label: "Accounts",              icon: "accounting",   type: "single", doctype: "Accounts Settings" },
-
-  // ── Stacked: multiple lists/forms on one page ─────────────────────────────
   {
-    id: "organisation", label: "Organisation", icon: "building", type: "stacked",
+    id: "stock",
+    label: "Stock",
+    icon: "package",
+    type: "single",
+    doctype: "Stock Settings",
+  },
+  {
+    id: "item-variants",
+    label: "Item Variant Settings",
+    icon: "settings",
+    type: "single",
+    doctype: "Item Variant Settings",
+  },
+  {
+    id: "selling",
+    label: "Selling",
+    icon: "briefcase",
+    type: "single",
+    doctype: "Selling Settings",
+  },
+  {
+    id: "buying",
+    label: "Buying",
+    icon: "shopping-cart",
+    type: "single",
+    doctype: "Buying Settings",
+  },
+  {
+    id: "accounts",
+    label: "Accounts",
+    icon: "accounting",
+    type: "single",
+    doctype: "Accounts Settings",
+  },
+
+  // ── System Settings (Single) ──────────────────────────────────────────────
+  {
+    id: "system",
+    label: "System",
+    icon: "settings",
+    type: "single",
+    doctype: "System Settings",
+  },
+
+  // ── Stacked: multiple lists/forms on one page ────────────────────────────────
+  {
+    id: "organisation",
+    label: "Organisation",
+    icon: "building",
+    type: "stacked",
     items: [
-      { label: "Company",       doctype: "Company" },
-      { label: "Letter Head",   doctype: "Letter Head" },
-      { label: "Email Account", doctype: "Email Account" },
+      { label: "Company",               doctype: "Company",               type: "list"   },
+      { label: "Letter Head",           doctype: "Letter Head",           type: "list"   },
+      { label: "Email Account",         doctype: "Email Account",         type: "list"   },
+      { label: "Item Variant Settings", doctype: "Item Variant Settings", type: "single" },
+      { label: "Currency Exchange",     doctype: "Currency Exchange",     type: "list"   },
     ],
   },
   {
-    id: "users", label: "Users", icon: "users", type: "stacked",
+    id: "users",
+    label: "Users",
+    icon: "users",
+    type: "stacked",
     items: [
       { label: "Users", doctype: "User" },
       { label: "Roles", doctype: "Role" },
     ],
   },
   {
-    id: "audits", label: "Audits", icon: "list", type: "stacked",
+    id: "audits",
+    label: "Audits",
+    icon: "list",
+    type: "stacked",
     items: [
-      { label: "Activity Log",   doctype: "Activity Log" },
+      { label: "Activity Log", doctype: "Activity Log" },
       { label: "Permission Log", doctype: "Permission Log" },
-      { label: "Access Log",     doctype: "Access Log" },
+      { label: "Access Log", doctype: "Access Log" },
     ],
   },
 ];
@@ -75,7 +125,7 @@ alaiy_os.settings = {
    */
   open() {
     const workspace = document.querySelector(
-      ".workspace-container, .layout-main-section"
+      ".workspace-container, .layout-main-section",
     );
     if (!workspace) {
       frappe.msgprint(__("Could not find the workspace container."));
@@ -87,12 +137,22 @@ alaiy_os.settings = {
     }
 
     AlaiySettings.panel.classList.add("visible");
-    this._activateTab(AlaiySettings.activeTabId || ALAIY_SETTINGS_TABS[0].id);
+    const firstTabId = AlaiySettings.activeTabId || ALAIY_SETTINGS_TABS[0].id;
+    this._activateTab(firstTabId);
+    // Update title to reflect the settings panel being open
+    if (typeof updateAlaiyTitle === "function") {
+      const firstTab = ALAIY_SETTINGS_TABS.find((t) => t.id === firstTabId);
+      updateAlaiyTitle("Settings \u00b7 " + (firstTab ? firstTab.label : "Settings"));
+    }
   },
 
   close() {
     if (AlaiySettings.panel) {
       AlaiySettings.panel.classList.remove("visible");
+    }
+    // Return title to workspace default
+    if (typeof updateAlaiyTitle === "function") {
+      updateAlaiyTitle("Dashboard");
     }
   },
 
@@ -166,7 +226,10 @@ alaiy_os.settings = {
 
     const tab = ALAIY_SETTINGS_TABS.find((t) => t.id === tabId);
     if (!tab) return;
-
+    // Update browser tab title
+    if (typeof updateAlaiyTitle === "function") {
+      updateAlaiyTitle("Settings \u00b7 " + tab.label);
+    }
     this._renderContent(tab);
   },
 
@@ -210,8 +273,9 @@ alaiy_os.settings = {
   },
 
   /**
-   * Stacked tabs (Organisation, Users, Audits): one card per item, each
-   * holding a compact list. Clicking a row drills into that record's form.
+   * Stacked tabs (Organisation, Users, Audits): one card per item.
+   * Items with type "single" mount a Single DocType form directly.
+   * Items with type "list" (or no type) render a records list with drill-down.
    */
   _mountStackedItems(container, tab) {
     tab.items.forEach((item) => {
@@ -229,7 +293,14 @@ alaiy_os.settings = {
 
       container.appendChild(card);
 
-      this._mountListInContainer(body, item.doctype, tab.id);
+      // Route to the correct renderer based on item type
+      if (item.type === "single") {
+        // Single DocType — mount the form directly (no list)
+        this._mountSingleForm(body, item.doctype);
+      } else {
+        // List DocType — render records table with drill-down
+        this._mountListInContainer(body, item.doctype, tab.id);
+      }
     });
   },
 
@@ -284,7 +355,7 @@ alaiy_os.settings = {
           tr.appendChild(nameTd);
           tr.appendChild(modTd);
           tr.addEventListener("click", () =>
-            this._drilldown(doctype, row.name, parentTabId)
+            this._drilldown(doctype, row.name, parentTabId),
           );
           tbody.appendChild(tr);
         });
@@ -307,6 +378,11 @@ alaiy_os.settings = {
    */
   _drilldown(doctype, docname, parentTabId) {
     AlaiySettings.drilldown = { doctype, docname, parentTabId };
+    // Update title to reflect the drilled-into section
+    if (typeof updateAlaiyTitle === "function") {
+      const parentTab = ALAIY_SETTINGS_TABS.find((t) => t.id === parentTabId);
+      updateAlaiyTitle("Settings \u00b7 " + (parentTab ? parentTab.label : "Settings"));
+    }
     const content = this._resetContent();
 
     const back = document.createElement("div");
@@ -346,7 +422,9 @@ alaiy_os.settings = {
           // Fail loudly — do not silently swallow. Operator can switch this
           // branch to `frappe.set_route("Form", doctype, docname)` if needed.
           frappe.msgprint(
-            __("Unable to render the form for {0} in-place on this build.", [doctype])
+            __("Unable to render the form for {0} in-place on this build.", [
+              doctype,
+            ]),
           );
           return;
         }
@@ -358,7 +436,7 @@ alaiy_os.settings = {
           // eslint-disable-next-line no-console
           console.error("[AlaiyOS] settings form render failed:", e);
           frappe.msgprint(
-            __("Could not load {0}: {1}", [doctype, e.message || e])
+            __("Could not load {0}: {1}", [doctype, e.message || e]),
           );
         }
       });
@@ -381,7 +459,7 @@ alaiy_os.settings = {
 // link whose label is exactly "Settings".
 document.addEventListener("click", function (e) {
   const target = e.target.closest(
-    ".widget.shortcut-widget-box, .shortcut-widget-box, .workspace-shortcut-card, .link-item, a"
+    ".widget.shortcut-widget-box, .shortcut-widget-box, .workspace-shortcut-card, .link-item, a",
   );
   if (!target) return;
 

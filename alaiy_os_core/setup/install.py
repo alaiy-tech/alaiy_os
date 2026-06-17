@@ -57,7 +57,7 @@ def _run_provisioning():
     reconcile_doctype_permissions()
     restrict_standard_workspaces()
     configure_login_redirect(config)
-    clear_stale_branding()
+    configure_branding()
     frappe.db.commit()
     frappe.clear_cache()
 
@@ -67,14 +67,24 @@ def _run_provisioning():
 ROLES = ["Alaiy OS Manager", "Alaiy OS User"]
 
 
+# VERIFY AFTER DEPLOY: desk_access=0 should still allow /app/* routes in Frappe v16.
+# If frappe.boot does not load or frappe.user_roles is empty for AlaiyOS users,
+# set desk_access back to 1 and rely on route_guard + boot hooks to block /desk.
 def create_roles():
     for role_name in ROLES:
         if not frappe.db.exists("Role", role_name):
             frappe.get_doc({
                 "doctype": "Role",
                 "role_name": role_name,
-                "desk_access": 1
+                "desk_access": 0,
+                "home_page": "/app/alaiy-os",
             }).insert(ignore_permissions=True)
+        else:
+            # On migrate: re-enforce in case someone flipped these in the UI
+            frappe.db.set_value("Role", role_name, {
+                "desk_access": 0,
+                "home_page": "/app/alaiy-os",
+            })
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
@@ -295,13 +305,11 @@ TARGET_DOCTYPES = [
     "Selling Settings",
     "Buying Settings",
     "Accounts Settings",
-    "Global Defaults",
-
+    "Global Defaults",    "System Settings",
     # ── Organisation ───────────────────────────
     "Company",
     "Letter Head",
-    "Email Account",
-
+    "Email Account",    "Currency Exchange",
     # ── Users ──────────────────────────────────
     "User",
     "Role",
@@ -376,7 +384,8 @@ DESK_INFRA_DOCTYPES = [    # ── Workspace ───────────�
     # Needed so getpage / workspace module can load the workspace document.
     "Workspace",
     "Workspace Link",
-    "Workspace Shortcut",    # ── Frappe desk core ────────────────────────────────────────────────────
+    # ── Frappe desk core ────────────────────────────────────────────────────
+    "Workspace Shortcut",
     "Page",
     "Report",
     "DocType",
@@ -403,7 +412,7 @@ DESK_INFRA_DOCTYPES = [    # ── Workspace ───────────�
 
 
 def reconcile_doctype_permissions():
-    _infra_set  = set(DESK_INFRA_DOCTYPES)
+    _infra_set = set(DESK_INFRA_DOCTYPES)
     _all_desired = set(TARGET_DOCTYPES) | _infra_set
 
     for role in ROLES:
@@ -462,24 +471,22 @@ def restrict_standard_workspaces():
             ws.save(ignore_permissions=True)
 
 
-# ── Stale branding cleanup ───────────────────────────────────────────────────
+# ── Branding ──────────────────────────────────────────────────────────────
 
-# Correct logo path after moving from public/assets/images/ → public/images/
-_LOGO_URL = "/assets/alaiy_os_core/images/logo-square.png"
+_LOGO_SQUARE = "/assets/alaiy_os_core/images/logo-square.png"
+_LOGO_HOR    = "/assets/alaiy_os_core/images/logo-hor.svg"
+_FAVICON     = "/assets/alaiy_os_core/images/icon.png"
 
 
-def clear_stale_branding():
+def configure_branding():
     """
-    Reset Frappe settings that previous versions of this app wrote with logo
-    URLs that no longer resolve.  Idempotent — safe to run on every migrate.
+    Set Frappe Settings singletons to use AlaiyOS brand assets.
+    Idempotent — safe to run on every migrate.
 
-    Previous branding.py wrote these paths (now deleted):
-      /assets/alaiy_os_core/assets/images/logo-hor.svg   ← gone
-      /assets/alaiy_os_core/assets/images/logo-square.png ← old path
-      /assets/alaiy_os_core/assets/images/icon.png        ← gone
-
-    Replaces them with the current logo URL or clears the field so the
-    browser stops logging 404s on the login page and the desk navbar.
+    Assets served from public/images/ after bench build:
+      logo-square.png — workspace sidebar + login card splash
+      logo-hor.svg    — login page top-left horizontal logo
+      icon.png        — browser favicon
     """
     def _safe_set(doctype, field, value):
         try:
@@ -488,20 +495,21 @@ def clear_stale_branding():
                 frappe.db.set_single_value(doctype, field, value)
         except Exception:
             frappe.log_error(
-                title="AlaiyOS: clear_stale_branding failed",
+                title="AlaiyOS: configure_branding failed",
                 message=frappe.get_traceback(),
             )
 
-    # Navbar (desk top-left logo)
-    _safe_set("Navbar Settings",  "app_logo",     _LOGO_URL)
+    # Desk navbar top-left logo
+    _safe_set("Navbar Settings",  "app_logo",     _LOGO_SQUARE)
     # Login page / website branding
-    _safe_set("Website Settings", "app_logo",     _LOGO_URL)
-    _safe_set("Website Settings", "banner_image", _LOGO_URL)
+    _safe_set("Website Settings", "app_logo",     _LOGO_HOR)
+    _safe_set("Website Settings", "banner_image", _LOGO_HOR)
     _safe_set("Website Settings", "brand_html",
-              f'<img src="{_LOGO_URL}" alt="Alaiy OS" style="height:24px">')
-    # Clear deleted assets — let Frappe use its defaults
-    _safe_set("Website Settings", "favicon",      "")
-    _safe_set("Website Settings", "splash_image", "")
+              f'<img src="{_LOGO_HOR}" alt="Alaiy OS" style="height:32px">')
+    _safe_set("Website Settings", "splash_image", _LOGO_SQUARE)
+    # Favicon (read from both singletons depending on Frappe version)
+    _safe_set("System Settings",  "favicon",      _FAVICON)
+    _safe_set("Website Settings", "favicon",      _FAVICON)
     # App name
     _safe_set("System Settings",  "app_name",     "Alaiy OS")
     _safe_set("Website Settings", "app_name",     "Alaiy OS")
