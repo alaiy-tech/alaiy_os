@@ -23,6 +23,8 @@ frappe.router.on("change", function () {
   if (!isAlaiy) return;
 
   const route = frappe.get_route_str() || "";
+  // "alaiy-os" covers the workspace and all its in-panel form mounts
+  // (settings forms are rendered inside the panel DOM — they do not change the route)
   if (!route.startsWith("alaiy-os")) {
     frappe.set_route("alaiy-os");
   }

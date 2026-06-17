@@ -13,5 +13,8 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_session_creation = "alaiy_os_core.setup.boot.on_session_creation"
 
 # Client-side assets — scoped, minimal
-app_include_js = ["/assets/alaiy_os_core/js/route_guard.js"]
+app_include_js = [
+    "/assets/alaiy_os_core/js/route_guard.js",
+    "/assets/alaiy_os_core/js/alaiy_settings.js",
+]
 app_include_css = ["/assets/alaiy_os_core/css/alaiy_os.css"]

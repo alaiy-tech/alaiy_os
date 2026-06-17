@@ -278,7 +278,7 @@
       "hidden": 0,
       "is_query_report": 0,
       "label": "Settings",
-      "link_to": "Stock Entry",
+      "link_to": "Stock Settings",
       "link_type": "DocType",
       "onboard": 0,
       "type": "Link"
@@ -322,6 +322,13 @@
       "doc_view": "",
       "label": "My Pinned",
       "link_to": "Stock Entry",
+      "type": "DocType"
+    },
+    {
+      "color": "grey",
+      "doc_view": "",
+      "label": "Settings",
+      "link_to": "Stock Settings",
       "type": "DocType"
     }
   ],

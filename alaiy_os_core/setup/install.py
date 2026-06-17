@@ -113,10 +113,15 @@ def create_or_update_user(config):
 WORKSPACE_NAME = "Alaiy OS"
 LOGO_URL = "/assets/alaiy_os_core/images/logo-square.png"
 
-# The dummy entries (Ask AlaiyOS, Dashboard, My Pinned, Reports & Analytics,
-# Settings) all point to "Stock Entry" as a placeholder so Frappe renders them
-# without throwing a missing-doctype error. They will be replaced with real
-# targets in the next iteration. Do not add click handlers or special behaviour.
+# The dummy entries (Ask AlaiyOS, Dashboard, My Pinned, Reports & Analytics)
+# all point to "Stock Entry" as a placeholder so Frappe renders them without
+# throwing a missing-doctype error. They will be replaced with real targets in
+# the next iteration. Do not add click handlers or special behaviour to them.
+#
+# The "Settings" entry is the exception: its click is intercepted by
+# alaiy_settings.js, which opens an in-workspace panel instead of navigating.
+# Its link_to ("Stock Settings") is just a valid placeholder so Frappe renders
+# the card without error.
 WORKSPACE_SHORTCUTS = [
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Ask AlaiyOS", "color": "purple"},
@@ -124,6 +129,9 @@ WORKSPACE_SHORTCUTS = [
         "label": "Dashboard",   "color": "blue"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "My Pinned",   "color": "green"},
+    # Settings — JS intercepts this click; link_to is a placeholder only
+    {"type": "DocType", "link_to": "Stock Settings",
+        "label": "Settings",    "color": "grey"},
 ]
 
 WORKSPACE_LINKS = [
@@ -188,8 +196,9 @@ WORKSPACE_LINKS = [
     {"type": "Card Break", "label": "More", "icon": "bar-chart"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Entry", "label": "Reports & Analytics"},
+    # Settings — click intercepted by alaiy_settings.js (opens in-workspace panel)
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Entry", "label": "Settings"},
+        "link_to": "Stock Settings", "label": "Settings"},
 ]
 
 
@@ -278,6 +287,29 @@ TARGET_DOCTYPES = [
     "Purchase Invoice Item",
     "Supplier",
     "Supplier Group",
+
+    # ── Settings (Single DocTypes) ──────────────
+    "Stock Settings",
+    "Item Variant Settings",
+    "Selling Settings",
+    "Buying Settings",
+    "Accounts Settings",
+    "Global Defaults",
+
+    # ── Organisation ───────────────────────────
+    "Company",
+    "Letter Head",
+    "Email Account",
+
+    # ── Users ──────────────────────────────────
+    "User",
+    "Role",
+
+    # ── Audits (Log DocTypes — read only) ──────
+    "Activity Log",
+    "Permission Log",
+    "Access Log",
+    "Error Log",                      # Dependency of Activity Log views
 
     # ── Shared dependencies ─────────────────────
     "UOM",
