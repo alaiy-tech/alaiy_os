@@ -362,4 +362,20 @@ def restrict_standard_workspaces():
 def configure_login_redirect(config):
     email = config["ALAIY_OS_ADMIN_EMAIL"]
     if frappe.db.exists("User", email):
-        frappe.db.set_value("User", email, "home_page", "/app/alaiy-os")
+        set_user_landing(email)
+
+
+def set_user_landing(user):
+    """
+    Point a user at the Alaiy OS workspace on login.
+
+    Frappe renamed/removed the User landing field across versions:
+      * v16+ uses `default_workspace` (Link to Workspace -> stores "Alaiy OS").
+      * older versions used `home_page` (stores a route like "/app/alaiy-os").
+    Set whichever field exists so this never crashes migrate.
+    """
+    meta = frappe.get_meta("User")
+    if meta.has_field("default_workspace"):
+        frappe.db.set_value("User", user, "default_workspace", WORKSPACE_NAME)
+    elif meta.has_field("home_page"):
+        frappe.db.set_value("User", user, "home_page", "/app/alaiy-os")

@@ -37,7 +37,7 @@ def boot_session(bootinfo):
 def on_session_creation(login_manager):
     """
     Runs immediately after a successful login.
-    For AlaiyOS users: set the home_page DB field so Frappe's own
+    For AlaiyOS users: set the user's default landing so Frappe's own
     redirect logic sends them to the workspace.
     """
     user_roles = set(frappe.get_roles(login_manager.user))
@@ -48,5 +48,11 @@ def on_session_creation(login_manager):
     if not is_alaiy:
         return
 
-    frappe.db.set_value("User", login_manager.user,
-                        "home_page", "/app/alaiy-os")
+    # Frappe v16+ uses `default_workspace`; older versions used `home_page`.
+    meta = frappe.get_meta("User")
+    if meta.has_field("default_workspace"):
+        frappe.db.set_value("User", login_manager.user,
+                            "default_workspace", ALAIY_OS_WORKSPACE)
+    elif meta.has_field("home_page"):
+        frappe.db.set_value("User", login_manager.user,
+                            "home_page", "/app/alaiy-os")
