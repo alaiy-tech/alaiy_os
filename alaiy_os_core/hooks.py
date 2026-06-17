@@ -19,9 +19,13 @@ app_include_js = [
     "/assets/alaiy_os_core/js/constants/roles.js",
     "/assets/alaiy_os_core/js/constants/route_titles.js",
     "/assets/alaiy_os_core/js/constants/settings_tabs.js",
-    # shared title utils
+    # shared title / UI utils
     "/assets/alaiy_os_core/js/alaiy_ui.js",
+    # workspace embedded content loader (intercepts card clicks before Frappe)
+    "/assets/alaiy_os_core/js/alaiy_workspace.js",
+    # route guard (confines AlaiyOS users to alaiy-os route)
     "/assets/alaiy_os_core/js/route_guard.js",
+    # settings panel
     "/assets/alaiy_os_core/js/alaiy_settings.js",
 ]
 app_include_css = [
