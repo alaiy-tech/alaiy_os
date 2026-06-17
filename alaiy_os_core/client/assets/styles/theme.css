@@ -73,7 +73,7 @@
    ──────────────────────────────────────────────────────────── */
 :root {
   --font-stack:        "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  --font-size-base:    13px;
+  --font-size-base:    16px;
 
   --primary:           var(--alaiy-primary);
   --primary-color:     var(--alaiy-primary);
@@ -205,7 +205,7 @@ h1, h2, h3, h4, h5, h6,
 .desk-sidebar .sidebar-group-title,
 .desk-sidebar .list-sidebar-label {
   color: var(--alaiy-sidebar-muted) !important;
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -320,7 +320,7 @@ textarea {
   border-radius: var(--alaiy-radius) !important;
   background-color: var(--alaiy-surface) !important;
   color: var(--alaiy-text) !important;
-  font-size: 13px;
+  font-size: 16px;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
@@ -346,7 +346,7 @@ textarea {
 .dt-header {
   background-color: var(--alaiy-surface-muted) !important;
   border-bottom: 1px solid var(--alaiy-border) !important;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -446,7 +446,7 @@ a[href="/website"] {
 
 .alaiy-search-placeholder {
   flex: 1;
-  font-size: 12px;
+  font-size: 15px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   user-select: none;
@@ -456,7 +456,7 @@ a[href="/website"] {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  font-size: 10px;
+  font-size: 13px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   background-color: var(--alaiy-surface-muted);
@@ -470,7 +470,7 @@ a[href="/website"] {
 /* ── 34. About modal — Alaiy footer ─────────────────────────── */
 .alaiy-about-footer {
   text-align: center;
-  font-size: 12px;
+  font-size: 15px;
   font-family: "Bricolage Grotesque", sans-serif;
   color: var(--alaiy-text-muted);
   padding: 12px 0 4px;
