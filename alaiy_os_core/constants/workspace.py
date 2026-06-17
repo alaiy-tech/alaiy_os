@@ -1,8 +1,9 @@
 """
 AlaiyOS workspace definition — single source of truth for the Alaiy OS
-workspace layout (shortcuts + link cards).
+workspace layout (shortcuts + link cards + sidebar).
 
-Consumed by setup/install.py:create_or_update_workspace().
+Consumed by setup/install.py:create_or_update_workspace() and
+create_or_update_workspace_sidebar().
 """
 
 from alaiy_os_core.constants.branding import LOGO_SQUARE
@@ -20,18 +21,9 @@ STANDARD_WORKSPACES_TO_HIDE = [
     "Build", "Home", "Learn", "Website", "Customization",
 ]
 
-# The dummy entries (Ask AlaiyOS, Dashboard, My Pinned, Reports & Analytics)
-# all point to "Stock Entry" as a placeholder so Frappe renders them without
-# throwing a missing-doctype error. They will be replaced with real targets in
-# the next iteration. Do not add click handlers or special behaviour to them.
-#
-# The "Settings" entry is the exception: its click is intercepted by
-# alaiy_settings.js, which opens an in-workspace panel instead of navigating.
-# Its link_to ("Stock Settings") is just a valid placeholder so Frappe renders
-# the card without error.
 WORKSPACE_SHORTCUTS = [
     {"type": "DocType", "link_to": "Stock Entry",
-        "label": "Ask AlaiyOS", "color": "purple"},
+        "label": "Ask Alaiy",   "color": "purple"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Dashboard",   "color": "blue"},
     {"type": "DocType", "link_to": "Stock Entry",
@@ -42,29 +34,29 @@ WORKSPACE_SHORTCUTS = [
 ]
 
 WORKSPACE_LINKS = [
-    # ── STOCK ──────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Stock", "icon": "package"},
+    # ── INVENTORY ──────────────────────────────────────────────────────────────
+    {"type": "Card Break", "label": "Inventory", "icon": "package"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Entry",            "label": "Stock Entry"},
+        "link_to": "Stock Entry",             "label": "Stock Entry"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item",                   "label": "Products"},
+        "link_to": "Item",                    "label": "Products"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Group",             "label": "Item Group"},
+        "link_to": "Item Group",              "label": "Item Group"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Attribute",         "label": "Item Attribute"},
+        "link_to": "Item Attribute",          "label": "Item Attribute"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Price",             "label": "Item Price"},
+        "link_to": "Item Price",              "label": "Item Price"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Variant Attribute", "label": "Item Variant Details"},
+        "link_to": "Item Variant Attribute",  "label": "Item Variant Details"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Brand",                  "label": "Brand"},
+        "link_to": "Brand",                   "label": "Brand"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Reconciliation",   "label": "Stock Reconciliation"},
+        "link_to": "Stock Reconciliation",    "label": "Stock Reconciliation"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Receipt",       "label": "Purchase Receipt"},
+        "link_to": "Purchase Receipt",        "label": "Purchase Receipt"},
 
-    # ── SELLING ────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Selling", "icon": "briefcase"},
+    # ── ORDERS ─────────────────────────────────────────────────────────────────
+    {"type": "Card Break", "label": "Orders", "icon": "briefcase"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Sales Order",    "label": "Sales Order"},
     {"type": "Link", "link_type": "DocType",
@@ -84,8 +76,8 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "UTM Source",     "label": "UTM Source"},
 
-    # ── BUYING ─────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Buying", "icon": "shopping-cart"},
+    # ── PURCHASE ───────────────────────────────────────────────────────────────
+    {"type": "Card Break", "label": "Purchase", "icon": "shopping-cart"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Purchase Order",   "label": "Purchase Order"},
     {"type": "Link", "link_type": "DocType",
@@ -109,31 +101,53 @@ WORKSPACE_LINKS = [
 ]
 
 # Sidebar items for the left-panel navigation of the Alaiy OS workspace.
-# Mirrors the workspace link sections so users can quickly jump to any DocType.
 # The Workspace Sidebar record (name="Alaiy OS", for_user="") is the global
-# default sidebar for the workspace — empty for_user means all users see it.
+# default sidebar — empty for_user means all users on this workspace see it.
 WORKSPACE_SIDEBAR_ITEMS = [
-    {"type": "Link",         "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": WORKSPACE_NAME, "child": 0, "indent": 0},
+    # Top-level action buttons (dummy targets; JS intercepts Settings)
+    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": "Ask Alaiy",          "child": 0, "indent": 0},
+    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": "Dashboard",          "child": 0, "indent": 0},
+    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": "My Pinned",          "child": 0, "indent": 0},
 
-    # Stock
-    {"type": "Section Break", "label": "Stock",               "child": 0, "indent": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry",          "label": "Stock Entry",          "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Item",                 "label": "Products",             "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Item Group",           "label": "Item Group",           "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Stock Reconciliation", "label": "Stock Reconciliation", "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt",     "label": "Purchase Receipt",     "child": 1},
+    # Inventory section
+    {"type": "Section Break", "label": "Inventory",          "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry",            "label": "Stock Entry",          "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item",                   "label": "Products",             "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Group",             "label": "Item Group",           "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Attribute",         "label": "Item Attribute",       "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Price",             "label": "Item Price",           "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Variant Attribute", "label": "Item Variant Details", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Brand",                  "label": "Brand",                "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Stock Reconciliation",   "label": "Stock Reconciliation", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt",       "label": "Purchase Receipt",     "child": 1},
 
-    # Selling
-    {"type": "Section Break", "label": "Selling",             "child": 0, "indent": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Sales Order",   "label": "Sales Order",   "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice", "label": "Sales Invoice", "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Customer",      "label": "Customers",     "child": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Price List",    "label": "Price List",    "child": 1},
+    # Orders section
+    {"type": "Section Break", "label": "Orders",             "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Sales Order",    "label": "Sales Order",    "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice",  "label": "Sales Invoice",  "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Price List",     "label": "Price List",     "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Pricing Rule",   "label": "Pricing Rule",   "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Customer",       "label": "Customers",      "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Customer Group", "label": "Customer Groups","child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Address",        "label": "Address",        "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Contact",        "label": "Contact",        "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "UTM Source",     "label": "UTM Source",     "child": 1},
 
-    # Buying
-    {"type": "Section Break", "label": "Buying",              "child": 0, "indent": 1},
+    # Purchase section
+    {"type": "Section Break", "label": "Purchase",           "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Order",   "label": "Purchase Order",   "child": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Invoice", "label": "Purchase Invoice", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt", "label": "Purchase Receipt", "child": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Supplier",         "label": "Supplier",         "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Supplier Group",   "label": "Supplier Group",   "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Contact",          "label": "Contacts",         "child": 1},
+
+    # Bottom actions
+    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": "Reports & Analytics", "child": 0, "indent": 0},
+    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": "Settings",            "child": 0, "indent": 0},
 ]

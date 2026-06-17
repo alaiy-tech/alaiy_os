@@ -137,6 +137,8 @@ def create_or_update_user(config):
         if changed:
             user.save(ignore_permissions=True)
 
+    set_user_landing(email)
+
 
 # ── Workspace ───────────────────────────────────────────────────────────────
 
