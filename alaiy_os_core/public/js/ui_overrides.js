@@ -21,13 +21,36 @@
 
 frappe.provide("alaiy_os_core.ui");
 
+/* ── 0. Null-safe Container.toggle_sidebar (TOP-LEVEL, runs synchronously) ──
+   This file is parsed before $(document).ready() fires, so the patch is in
+   place when frappe.Application.startup() runs inside the ready callback.
+
+   frappe.views.Container.toggle_sidebar() is called during set_route() in
+   startup(). If frappe.container.sidebar hasn't been wired yet the call
+   throws, which propagates through the Application constructor and leaves
+   frappe.app as a plain {} (the assignment never completes). Making it a
+   no-op when sidebar is not yet wired lets Application fully initialise.    */
+(function () {
+  if (
+    frappe.views &&
+    frappe.views.Container &&
+    frappe.views.Container.prototype &&
+    typeof frappe.views.Container.prototype.toggle_sidebar === "function"
+  ) {
+    var _origToggle = frappe.views.Container.prototype.toggle_sidebar;
+    frappe.views.Container.prototype.toggle_sidebar = function (show) {
+      if (!this.sidebar) return; // not wired yet — skip silently
+      return _origToggle.call(this, show);
+    };
+  }
+})();
+
 (function () {
   "use strict";
 
   // ── 1. Hide the onboarding / "Getting Started" panel ───────────────────────
   function hideOnboarding() {
     if (!(frappe.boot && frappe.boot.hide_onboarding)) return;
-    // ERPNext 16 onboarding widget + its status strip.
     $(
       ".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status",
     ).hide();
@@ -35,7 +58,7 @@ frappe.provide("alaiy_os_core.ui");
 
   // ── 2. Redirect the bare desk root to the default workspace ────────────────
   function redirectDefaultRoute() {
-    if (frappe.boot && frappe.boot.show_desk_homepage) return; // homepage allowed
+    if (frappe.boot && frappe.boot.show_desk_homepage) return;
 
     var route = (frappe.get_route && frappe.get_route()) || [];
     var isRoot =
@@ -44,16 +67,15 @@ frappe.provide("alaiy_os_core.ui");
 
     if (isRoot) {
       var target = (frappe.boot && frappe.boot.default_route) || "stock";
-      // Avoid a redirect loop if we're already heading there.
-      if ((frappe.get_route_str() || "") !== target) {
+      var current = "";
+      try { current = frappe.get_route_str() || ""; } catch (e) { /* not ready */ }
+      if (current !== target) {
         frappe.set_route(target);
       }
     }
   }
 
   // ── 3. Move Search + Notifications into the navbar (right side) ─────────────
-  // ERPNext 16 puts these in the sidebar header. We relocate the actual DOM
-  // nodes into the navbar's right-hand <ul> so no core files are touched.
   function moveTopbarWidgets() {
     var $navbarRight = $(
       ".navbar .navbar-nav.d-flex, .navbar .navbar-collapse .navbar-nav",
@@ -61,9 +83,8 @@ frappe.provide("alaiy_os_core.ui");
     if (!$navbarRight.length) {
       $navbarRight = $(".navbar .container > .navbar-nav").last();
     }
-    if (!$navbarRight.length) return; // navbar not ready yet
+    if (!$navbarRight.length) return;
 
-    // --- Search trigger (the sidebar "Search Ctrl+K" affordance). ---
     var $search = $(
       ".sidebar-search, .body-sidebar .search-bar, .standard-sidebar .sidebar-search",
     ).first();
@@ -74,7 +95,6 @@ frappe.provide("alaiy_os_core.ui");
       $navbarRight.prepend($searchLi);
     }
 
-    // --- Notifications bell. ---
     var $notif = $(
       ".notifications-list .dropdown, .navbar-notifications, .sidebar .notifications, .body-sidebar .notifications",
     ).first();
@@ -87,13 +107,18 @@ frappe.provide("alaiy_os_core.ui");
   }
 
   // ── 4. Sidebar recovery ────────────────────────────────────────────────────
-  // In some Frappe v16 setups frappe.app is a plain {} instead of a
-  // frappe.Application instance, causing frappe.app.sidebar to be undefined
-  // and workspace navigation to render empty. Detect this and create the
-  // sidebar before the Workspace constructor runs (after app_ready).
+  // With the Container.toggle_sidebar patch above, frappe.Application should
+  // now complete its startup and set frappe.app.sidebar correctly. This
+  // function is a belt-and-suspenders fallback only.
+  //
+  // IMPORTANT: only create a new Sidebar if .body-sidebar does NOT already
+  // exist in the DOM. Application always creates one in make_sidebar(); if we
+  // create a second one there are two sidebar panels visible.
   function ensureSidebar() {
     if (frappe.app && frappe.app.sidebar) return; // already initialised
     if (!frappe.ui || typeof frappe.ui.Sidebar !== "function") return;
+    // Don't create a second sidebar DOM if Application already made one.
+    if (document.querySelector(".body-sidebar")) return;
     try {
       var sidebar = new frappe.ui.Sidebar({});
       if (frappe.app) frappe.app.sidebar = sidebar;
@@ -104,18 +129,9 @@ frappe.provide("alaiy_os_core.ui");
 
   // ── Run all overrides for the current page ─────────────────────────────────
   alaiy_os_core.ui.apply = function () {
-    try {
-      hideOnboarding();
-    } catch (e) {
-      /* non-fatal */
-    }
-    try {
-      moveTopbarWidgets();
-    } catch (e) {
-      /* non-fatal */
-    }
-    // Belt-and-suspenders: if the workspace loaded before sidebar was wired,
-    // re-wire it now and trigger setup so navigation items appear.
+    try { hideOnboarding(); } catch (e) { /* non-fatal */ }
+    try { moveTopbarWidgets(); } catch (e) { /* non-fatal */ }
+    // If workspace loaded before sidebar was wired, re-wire and trigger setup.
     try {
       if (
         frappe.workspace &&
@@ -128,20 +144,14 @@ frappe.provide("alaiy_os_core.ui");
           frappe.workspace.setup_sidebar();
         }
       }
-    } catch (e) {
-      /* non-fatal */
-    }
+    } catch (e) { /* non-fatal */ }
   };
 
-  // page-change fires after each SPA navigation (sidebar may re-render).
   $(document).on("page-change", function () {
     alaiy_os_core.ui.apply();
-    // Defer once more: ERPNext 16 renders the onboarding widget async.
     setTimeout(alaiy_os_core.ui.apply, 300);
   });
 
-  // Default-route redirect must hook the router so it fires on the very first
-  // navigation as well as subsequent ones.
   function bindRouter() {
     if (frappe.router && frappe.router.on) {
       frappe.router.on("change", redirectDefaultRoute);
@@ -155,8 +165,10 @@ frappe.provide("alaiy_os_core.ui");
     alaiy_os_core.ui.apply();
   });
 
-  // Fallback if app_ready already fired before this script loaded.
-  if (typeof frappe !== "undefined" && frappe.router) {
-    bindRouter();
+  // frappe.router is set synchronously in desk.bundle before $(document).ready.
+  // Only wire the change handler here — do NOT call redirectDefaultRoute()
+  // directly, as frappe.get_route_str() may throw at this early stage.
+  if (typeof frappe !== "undefined" && frappe.router && frappe.router.on) {
+    frappe.router.on("change", redirectDefaultRoute);
   }
 })();
