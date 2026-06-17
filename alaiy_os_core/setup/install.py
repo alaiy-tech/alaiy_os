@@ -331,8 +331,77 @@ PERMISSION_MAP = {
     "print": 1, "email": 1,
 }
 
+# Read-only permission map for Frappe desk-infrastructure DocTypes.
+# AlaiyOS users need to read these for the desk to function but must NOT
+# create, edit, or delete Frappe internals.
+READ_ONLY_MAP = {
+    "read": 1, "write": 0, "create": 0, "delete": 0,
+    "submit": 0, "cancel": 0, "amend": 0,
+    "report": 1, "export": 0, "import": 0,
+    "print": 0, "email": 0,
+}
+
+# Frappe desk infrastructure DocTypes that require read-only Custom DocPerm
+# records so the desk boots and renders forms correctly for AlaiyOS users.
+#
+# WHY THESE ARE NEEDED
+# --------------------
+# When an AlaiyOS user loads the desk, Frappe checks has_permission() for
+# every DocType it tries to read — including internal ones like Page, Report,
+# and DocType itself. Without an explicit Custom DocPerm (or a standard
+# DocPerm that covers the AlaiyOS roles), those checks fail and produce the
+# error: "User does not have doctype access via role permission for document
+# <DocType>".
+#
+# These DocTypes are interconnected as follows:
+#   Page          — custom pages linked from sidebar / shortcuts
+#   Report        — report definitions; Page depends on these for report-pages
+#   DocType       — schema metadata required for every form render
+#   Module Def    — module registry; DocType rows reference a Module Def
+#   Custom Field  — extra fields attached to DocTypes; read during form render
+#   Property Setter — field-level overrides; read during form render
+#   Client Script — client-side hooks; loaded on form open
+#   Server Script — server-side hooks; executed on doc events
+#   Notification + Notification Log — bell icon in the topbar
+#   Energy Point Log — activity tracking (loaded in bootinfo)
+#   Print Format  — print templates; linked from every document Print button
+#   Print Settings — global print config; read during print-preview render
+#   System Settings — system-wide config; read during desk boot
+#   Installed Application — app list; checked during desk initialisation
+#   User Permission — per-user record filters; checked on every list load
+#   Role Profile  — role bundle definitions; read during user form render
+#   User Type     — determines desk vs website access; read during boot
+DESK_INFRA_DOCTYPES = [
+    # ── Frappe desk core ────────────────────────────────────────────────────
+    "Page",
+    "Report",
+    "DocType",
+    "Module Def",
+    "Custom Field",
+    "Property Setter",
+    "Client Script",
+    "Server Script",
+    # ── Notifications ───────────────────────────────────────────────────────
+    "Notification",
+    "Notification Log",
+    "Energy Point Log",
+    # ── Printing ────────────────────────────────────────────────────────────
+    "Print Format",
+    "Print Settings",
+    # ── System ──────────────────────────────────────────────────────────────
+    "System Settings",
+    "Installed Application",
+    # ── User management ─────────────────────────────────────────────────────
+    "User Permission",
+    "Role Profile",
+    "User Type",
+]
+
 
 def reconcile_doctype_permissions():
+    _infra_set  = set(DESK_INFRA_DOCTYPES)
+    _all_desired = set(TARGET_DOCTYPES) | _infra_set
+
     for role in ROLES:
         existing_records = frappe.get_all(
             "Custom DocPerm",
@@ -340,22 +409,22 @@ def reconcile_doctype_permissions():
             fields=["name", "parent"]
         )
         existing_doctypes = {r.parent for r in existing_records}
-        desired_doctypes = set(TARGET_DOCTYPES)
 
-        # Add permissions for new DocTypes
-        for dt in desired_doctypes - existing_doctypes:
+        # Add permissions for DocTypes not yet covered
+        for dt in _all_desired - existing_doctypes:
             if frappe.db.exists("DocType", dt):
+                pmap = READ_ONLY_MAP if dt in _infra_set else PERMISSION_MAP
                 frappe.get_doc({
                     "doctype": "Custom DocPerm",
                     "parent": dt,
                     "parenttype": "DocType",
                     "parentfield": "permissions",
                     "role": role,
-                    **PERMISSION_MAP
+                    **pmap
                 }).insert(ignore_permissions=True)
 
-        # Remove permissions for DocTypes no longer in the list
-        for dt in existing_doctypes - desired_doctypes:
+        # Remove permissions for DocTypes no longer in either list
+        for dt in existing_doctypes - _all_desired:
             stale = frappe.get_all(
                 "Custom DocPerm",
                 filters={"parent": dt, "role": role},
