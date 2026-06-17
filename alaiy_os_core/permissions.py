@@ -7,7 +7,7 @@ WHAT THIS DOES
 Two complementary mechanisms protect DocTypes from unauthorised access:
 
 1. ROLE-BASED PERMISSIONS (setup_role_permissions)
-   Creates the "Altomoda Stock User" role and assigns it explicit Custom DocPerm
+   Creates the "ERP Administrator" role and assigns it explicit Custom DocPerm
    records for every whitelisted DocType in workspace_config.WORKSPACE_CONFIG.
    This is the *positive* grant: users with only this role can access exactly the
    DocTypes in visible_doctypes and nothing else — Frappe's permission layer
@@ -40,9 +40,9 @@ from alaiy_os_core.client.config.workspace_config import (
 
 
 # ── Role name ─────────────────────────────────────────────────────────────────
-ROLE_NAME = "Altomoda Stock User"
+ROLE_NAME = "ERP Administrator"
 
-# ── Per-DocType permission flags for the Altomoda Stock User role ──────────────
+# ── Per-DocType permission flags for the ERP Administrator role ──────────────
 # Keys mirror Frappe's Custom DocPerm fields. Omitted flags default to 0.
 # Only DocTypes that are also in workspace_config.WORKSPACE_CONFIG[*].visible_doctypes
 # actually get permissions applied — this dict just declares the *desired* flags.
@@ -68,7 +68,7 @@ _DOCTYPE_PERMS = {
 
 def setup_role_permissions():
     """
-    Idempotent: create the Altomoda Stock User role and assign it Custom DocPerm
+    Idempotent: create the ERP Administrator role and assign it Custom DocPerm
     records that match the Stock workspace whitelist in workspace_config.py.
 
     Called from install.run_setup() on every `bench migrate` so that adding a
@@ -114,7 +114,8 @@ def _apply_doctype_permissions():
             continue  # DocType not installed on this site — skip
 
         # Idempotent: wipe and re-create so config is always authoritative
-        frappe.db.delete("Custom DocPerm", {"parent": doctype, "role": ROLE_NAME})
+        frappe.db.delete("Custom DocPerm", {
+                         "parent": doctype, "role": ROLE_NAME})
 
         frappe.get_doc({
             "doctype": "Custom DocPerm",

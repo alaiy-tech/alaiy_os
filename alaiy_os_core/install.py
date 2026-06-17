@@ -24,7 +24,7 @@ def run_setup():
       2. Patch enabled workspaces' links/shortcuts to the config whitelist.
       3. Apply Alaiy branding (logo / app name / favicon) via settings docs.
       4. Apply remaining system settings.
-      5. Set up role-based permissions (Altomoda Stock User role).
+      5. Set up role-based permissions (Client Admin role).
     Safe to run repeatedly (after every `bench migrate`).
     """
     _hide_workspaces()
