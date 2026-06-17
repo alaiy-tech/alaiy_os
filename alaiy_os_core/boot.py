@@ -40,6 +40,8 @@ def extend_bootinfo(bootinfo):
             custom_theme=cfg.CUSTOM_THEME,
             toggle_default_theme=cfg.TOGGLE_DEFAULT_THEME,
             visible_workspaces=cfg.VISIBLE_WORKSPACES,
+            company_name=getattr(cfg, "COMPANY_NAME", "Alto Moda OS"),
+            hide_onboarding=getattr(cfg, "HIDE_ONBOARDING", True),
         )
     except Exception:
         # Never let a bootinfo error crash the whole session.
@@ -76,8 +78,7 @@ def inject_branding_and_restrictions(bootinfo):
         bootinfo.allowed_workspaces = get_enabled_workspaces()
 
         # ── Global UX toggles (from GLOBAL_CONFIG). ───────────────────────────
-        bootinfo.hide_onboarding = not GLOBAL_CONFIG.get(
-            "show_onboarding_panel", False)
+        bootinfo.hide_onboarding = getattr(cfg, "HIDE_ONBOARDING", True)
         bootinfo.show_desk_homepage = GLOBAL_CONFIG.get(
             "show_desk_homepage", False)
         bootinfo.default_route = GLOBAL_CONFIG.get("default_route", "stock")

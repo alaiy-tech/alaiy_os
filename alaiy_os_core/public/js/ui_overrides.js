@@ -51,14 +51,29 @@ frappe.provide("alaiy_os_core.ui");
   // ── 1. Page title branding ──────────────────────────────────────────────────
   var _titleObserver = null;
 
+  function _companyName() {
+    return (
+      (frappe.boot && frappe.boot.alaiy_config && frappe.boot.alaiy_config.company_name) ||
+      (alaiy_os_core && alaiy_os_core.cfg && alaiy_os_core.cfg().company_name) ||
+      "Alto Moda OS"
+    );
+  }
+
   function applyBrandedTitle() {
+    var company = _companyName();
+    var suffix = " | alaiyOS";
     var cur = document.title || "";
-    if (cur.indexOf("Altomoda OS") === 0) return;
+    // Already fully branded
+    if (cur.indexOf(company) === 0 && cur.indexOf(suffix) !== -1) return;
+    // Strip existing branding prefixes/suffixes so we don't double-up
     var clean = cur
       .replace(/^\s*ERPNext\s*[-–|]\s*/i, "")
       .replace(/\s*[-–|]\s*ERPNext\s*$/i, "")
+      .replace(/^\s*Alto Moda OS\s*[-–|]\s*/i, "")
+      .replace(/^\s*Altomoda OS\s*[-–|]\s*/i, "")
+      .replace(/\s*\|\s*alaiyOS\s*$/i, "")
       .trim();
-    document.title = "Altomoda OS" + (clean ? " - " + clean : "");
+    document.title = company + (clean ? " - " + clean : "") + suffix;
   }
 
   function setupTitleBranding() {
@@ -72,13 +87,37 @@ frappe.provide("alaiy_os_core.ui");
 
   // ── 2. Hide the onboarding / "Getting Started" panel ───────────────────────
   function hideOnboarding() {
-    if (!(frappe.boot && frappe.boot.hide_onboarding)) return;
-    $(
-      ".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status",
-    ).hide();
+    var cfg = alaiy_os_core && alaiy_os_core.cfg && alaiy_os_core.cfg();
+    var shouldHide = (frappe.boot && frappe.boot.hide_onboarding) ||
+                     (cfg && cfg.hide_onboarding);
+    if (!shouldHide) return;
+    // Main content onboarding widgets
+    $(".onb-panel, .onboarding-widget-box, .ws-onboarding, .onboarding-status").hide();
+    // Sidebar "Getting Started" link
+    $(".onboarding-sidebar, .sidebar-item-getting-started").hide();
+    $(".standard-sidebar-item, .sidebar-item").filter(function () {
+      return $(this).text().trim() === "Getting Started";
+    }).hide();
   }
 
-  // ── 3. Redirect the bare desk root to the default workspace ────────────────
+  // ── 3. Sidebar header & user-button branding ────────────────────────────────
+  function patchSidebarHeader() {
+    var company = _companyName();
+    // Replace "ERPNext" subtitle in the workspace header
+    $(".sidebar-item-label.header-subtitle").each(function () {
+      var $el = $(this);
+      if ($el.text().trim() === "ERPNext" || $el.text().trim() === "ERPNext Desk") {
+        $el.text(company);
+      }
+    });
+    // Fix the broken empty var() on the icon background
+    $(".sidebar-header .sidebar-item-icon[style*='background-color: var()']").css(
+      "background-color",
+      "var(--alaiy-sidebar-active)"
+    );
+  }
+
+  // ── 4. Redirect the bare desk root to the default workspace ────────────────
   function redirectDefaultRoute() {
     if (frappe.boot && frappe.boot.show_desk_homepage) return;
 
@@ -97,7 +136,7 @@ frappe.provide("alaiy_os_core.ui");
     }
   }
 
-  // ── 4. Move Search + Notifications into the navbar (right side) ─────────────
+  // ── 5. Move Search + Notifications into the navbar (right side) ─────────────
   function moveTopbarWidgets() {
     var $navbarRight = $(
       ".navbar .navbar-nav.d-flex, .navbar .navbar-collapse .navbar-nav",
@@ -128,7 +167,7 @@ frappe.provide("alaiy_os_core.ui");
     }
   }
 
-  // ── 5. Sidebar recovery ────────────────────────────────────────────────────
+  // ── 6. Sidebar recovery ────────────────────────────────────────────────────
   // With the Container.toggle_sidebar patch above, frappe.Application should
   // now complete its startup and set frappe.app.sidebar correctly. This
   // function is a belt-and-suspenders fallback only.
@@ -152,6 +191,7 @@ frappe.provide("alaiy_os_core.ui");
   // ── Run all overrides for the current page ─────────────────────────────────
   alaiy_os_core.ui.apply = function () {
     try { hideOnboarding(); } catch (e) { /* non-fatal */ }
+    try { patchSidebarHeader(); } catch (e) { /* non-fatal */ }
     try { moveTopbarWidgets(); } catch (e) { /* non-fatal */ }
     // If workspace loaded before sidebar was wired, re-wire and trigger setup.
     try {

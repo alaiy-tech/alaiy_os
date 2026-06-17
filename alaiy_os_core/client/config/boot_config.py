@@ -10,6 +10,15 @@ Python reads it directly; JS reads it via frappe.boot.alaiy_config
 # Set once on fresh install (after_install). Never reset on migrate.
 DEFAULT_ADMIN_PASSWORD = "admin123"
 
+# ── Branding / page title ──────────────────────────────────────
+# Company / product name shown in every browser tab title.
+# Format: "{COMPANY_NAME} - {Page} | alaiyOS"  e.g. "Alto Moda OS - Stock | alaiyOS"
+COMPANY_NAME: str = "Alto Moda OS"
+
+# ── Onboarding ────────────────────────────────────────────────
+# True  → hide the "Getting Started" guide from the sidebar and workspace.
+HIDE_ONBOARDING: bool = True
+
 # ── Workspaces ────────────────────────────────────────────────
 # Every workspace NOT in this list gets is_hidden = 1 on every setup run.
 VISIBLE_WORKSPACES = ["Stock"]

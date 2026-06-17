@@ -469,3 +469,96 @@ a[href="/website"] {
   border-top: var(--alaiy-border-width) solid var(--alaiy-border);
   margin-top: 8px;
 }
+
+
+/* ── 35. Sidebar workspace header (app icon + title + subtitle) ── */
+.body-sidebar .sidebar-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 8px 12px !important;
+  margin-bottom: 4px !important;
+  border-radius: var(--alaiy-radius) !important;
+  text-decoration: none !important;
+  color: #FFFFFF !important;
+}
+
+.body-sidebar .sidebar-header:hover {
+  background-color: var(--alaiy-sidebar-hover) !important;
+}
+
+/* Fix broken empty var() on icon background */
+.body-sidebar .sidebar-header .sidebar-item-icon,
+.body-sidebar .sidebar-header .sidebar-item-icon[style*="background-color: var()"] {
+  background-color: var(--alaiy-primary) !important;
+  border-radius: var(--alaiy-radius-sm) !important;
+  flex-shrink: 0 !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.body-sidebar .sidebar-header .header-logo img {
+  width: 20px !important;
+  height: 20px !important;
+  filter: brightness(0) invert(1) !important;
+}
+
+.body-sidebar .sidebar-header .header-title {
+  color: #FFFFFF !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.2 !important;
+  margin-left: 0 !important;
+}
+
+.body-sidebar .sidebar-header .header-subtitle {
+  color: var(--alaiy-sidebar-muted) !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  margin-left: 0 !important;
+  line-height: 1.2 !important;
+}
+
+.body-sidebar .sidebar-header .drop-icon {
+  color: var(--alaiy-sidebar-muted) !important;
+  margin-left: auto !important;
+}
+
+
+/* ── 36. Sidebar bottom user button ─────────────────────────── */
+.body-sidebar .dropdown-navbar-user,
+.body-sidebar .dropdown-mobile {
+  background-color: transparent !important;
+}
+
+.body-sidebar .sidebar-user-button,
+.body-sidebar .dropdown-navbar-user .nav-link {
+  display: flex !important;
+  align-items: center !important;
+  padding: 8px 10px !important;
+  border-radius: var(--alaiy-radius) !important;
+  color: var(--alaiy-sidebar-text) !important;
+  text-decoration: none !important;
+  transition: background-color 0.15s ease;
+  width: 100% !important;
+}
+
+.body-sidebar .sidebar-user-button:hover,
+.body-sidebar .dropdown-navbar-user .nav-link:hover {
+  background-color: var(--alaiy-sidebar-hover) !important;
+}
+
+.body-sidebar .avatar-name-email span {
+  color: var(--alaiy-sidebar-text) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+}
+
+.body-sidebar .avatar-name-email .text-secondary {
+  color: var(--alaiy-sidebar-muted) !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}

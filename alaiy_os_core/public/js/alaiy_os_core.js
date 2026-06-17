@@ -20,6 +20,8 @@ alaiy_os_core.cfg = function () {
       custom_theme: true,
       toggle_default_theme: false,
       visible_workspaces: ["Stock"],
+      company_name: "Alto Moda OS",
+      hide_onboarding: true,
       about_website_url: "https://alaiy.com",
       about_github_url: "https://github.com/alaiy-tech",
       about_footer_text: "Built with â™¥ by Alaiy",
