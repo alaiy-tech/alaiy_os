@@ -15,23 +15,33 @@ def _is_alaiy_user():
 def boot_session(bootinfo):
     """
     Runs on every page load.
-    For AlaiyOS users: strip all workspaces except Alaiy OS from the sidebar data
-    sent to the browser, and force the home page to the workspace.
+    For AlaiyOS users: strip all workspaces except Alaiy OS from the sidebar
+    data sent to the browser.
+
+    NOTE: we do NOT set bootinfo.home_page here.  In Frappe v16 that field
+    causes desk.js startup() to call frappe.set_route() before the workspace
+    module is initialised, which hits frappe.desk.desk_page.getpage and
+    returns 404.  The user's default_workspace field (set in
+    on_session_creation / configure_login_redirect) is the correct v16
+    mechanism for controlling the landing workspace.
     """
     if not _is_alaiy_user():
         return
 
-    # Filter sidebar pages
+    # Filter sidebar pages — defensive: only apply if the workspace is found.
+    # An empty filter would leave the user with no sidebar, breaking the desk.
     if hasattr(bootinfo, "sidebar_pages") and bootinfo.sidebar_pages:
         pages = bootinfo.sidebar_pages.get("pages", [])
-        bootinfo.sidebar_pages["pages"] = [
+        filtered = [
             p for p in pages
-            if p.get("title") == ALAIY_OS_WORKSPACE
-            or p.get("label") == ALAIY_OS_WORKSPACE
-            or p.get("name") == ALAIY_OS_WORKSPACE
+            if str(p.get("title", "")).strip() == ALAIY_OS_WORKSPACE
+            or str(p.get("label", "")).strip() == ALAIY_OS_WORKSPACE
+            or str(p.get("name",  "")).strip() == ALAIY_OS_WORKSPACE
         ]
-
-    bootinfo.home_page = ALAIY_OS_ROUTE
+        if filtered:
+            bootinfo.sidebar_pages["pages"] = filtered
+        # If the workspace isn't found in sidebar_pages yet (first install
+        # race condition), leave the sidebar untouched so the desk still boots.
 
 
 def on_session_creation(login_manager):
