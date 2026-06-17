@@ -126,6 +126,8 @@ DESK_INFRA_DOCTYPES = [
     "Workspace",
     "Workspace Link",
     "Workspace Shortcut",
+    "Workspace Sidebar",
+    "Workspace Sidebar Item",
     # ── Frappe desk core ────────────────────────────────────────────────────
     "Page",
     "Report",
