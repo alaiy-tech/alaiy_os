@@ -101,12 +101,38 @@ function _hideGettingStarted() {
   }).hide();
 }
 
+// ── Page-container failsafe ───────────────────────────────────────────────────
+// Frappe shows the page-container after all async setup (including socket.io).
+// If socket.io fails (no Redis/socket server in dev), the promise rejects and
+// page.show() is never called — leaving the workspace hidden under the splash.
+// Poll briefly after app_ready until the container is visible or give up.
+function _ensurePageVisible() {
+  var attempts = 0;
+  var interval = setInterval(function () {
+    attempts++;
+    var pc = document.querySelector(".page-container");
+    var splash = document.querySelector(".centered.splash");
+    if (pc && getComputedStyle(pc).display === "none") {
+      pc.style.removeProperty("display"); // let Frappe's own CSS/JS win if it wakes up
+      pc.style.display = "block";
+    }
+    if (splash && getComputedStyle(splash).display !== "none") {
+      splash.style.display = "none";
+    }
+    // Stop once page is visible or after 5 seconds
+    if ((pc && pc.offsetHeight > 0) || attempts >= 10) {
+      clearInterval(interval);
+    }
+  }, 500);
+}
+
 // ── Wire all patches ──────────────────────────────────────────────────────────
 
 $(document).on("app_ready", function () {
   _startAboutModalObserver();
   _patchSidebarHeader();
   _hideGettingStarted();
+  _ensurePageVisible();
 });
 
 $(document).on("page-change", function () {

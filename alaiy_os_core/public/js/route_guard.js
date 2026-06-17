@@ -28,13 +28,6 @@ $(document).on("app_ready", function () {
     // Only act for AlaiyOS users.
     if (!ALAIY_OS_ROLES.some((r) => roles.includes(r))) return;
 
-    // Block the legacy /desk full-page route (server route, not an SPA route).
-    const path = window.location.pathname || "";
-    if (path.startsWith("/desk")) {
-      window.location.replace("/app/" + ALAIY_OS_ROUTE);
-      return;
-    }
-
     const route = frappe.get_route_str() || "";
     if (!route.startsWith(ALAIY_OS_ROUTE)) {
       frappe.set_route(ALAIY_OS_ROUTE);

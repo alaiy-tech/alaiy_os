@@ -74,11 +74,8 @@ def on_session_creation(login_manager):
 def on_login(login_manager):
     """
     Runs immediately after credentials are validated (before session creation).
-    For AlaiyOS users: set the post-login redirect so Frappe sends them to
-    /app/alaiy-os instead of / (which desk_access=0 would otherwise trigger).
-
-    Belt-and-suspenders with on_session_creation and the default_workspace
-    field — whichever fires last wins, but they all point to the same place.
+    For AlaiyOS users: set the post-login redirect via frappe.local.response
+    so Frappe sends them to /app/alaiy-os.
     """
     user = login_manager.user
     user_roles = set(frappe.get_roles(user))
@@ -89,5 +86,6 @@ def on_login(login_manager):
     if not is_alaiy:
         return
 
-    # Override the post-login redirect Frappe calculates from home_page / desk_access.
-    login_manager.redirect_post_login = "/app/alaiy-os"
+    # Set redirect via frappe.local.response — works in Frappe v16 where
+    # LoginManager uses __slots__ and does not accept arbitrary attributes.
+    frappe.local.response["redirect_to"] = "/app/alaiy-os"
