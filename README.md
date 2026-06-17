@@ -1,36 +1,67 @@
-# alaiy_os_core / config
+# Alaiy OS Core
 
-Static assets that configure the AlaiyOS Desk experience.
-Everything in this folder is served at:
-  /assets/alaiy_os_core/config/<filename>
+A clean, minimal Frappe v16 / ERPNext v16 app that provisions a self-contained
+**Alaiy OS** workspace environment on install and keeps it reconciled on every
+`bench migrate`.
 
-## Files
+The app uses only Frappe's supported hooks and APIs. It does **not** monkey-patch
+Frappe internals, fake the sidebar via the DOM, or inject global UI overrides.
 
-| File | Purpose |
-|------|---------|
-| `theme.css` | ERPNext CSS overrides — Bricolage Grotesque font, sidebar, topbar, buttons, inputs. Loaded on every Desk page via `app_include_css` in hooks.py. |
+## What it provisions
 
-## Customising per brand
+On `after_install` and `after_migrate` (`alaiy_os_core/setup/install.py`):
 
-All brand-specific values are CSS variables at the top of `theme.css`
-under the `/* 2. AlaiyOS design tokens */` block. To override for a
-specific client, load a second CSS file after this one that re-declares
-only the `--alaiy-*` variables you want to change. No other rules need
-to be touched.
+1. **Roles** — `Alaiy OS Manager` and `Alaiy OS User`.
+2. **Admin user** — created from `boot_config.py`; password set once on install.
+3. **Workspace** — `Alaiy OS`, with links/shortcuts rebuilt from code each run
+   (the app is the source of truth — manual UI edits are overwritten on migrate).
+4. **DocType permissions** — `Custom DocPerm` records reconciled two-way (added
+   for new target DocTypes, removed for ones dropped from the list).
+5. **Standard workspace restrictions** — AlaiyOS roles stripped from standard
+   ERPNext workspaces so they don't appear in the sidebar for AlaiyOS users.
+6. **Login redirect** — the admin user's `home_page` is set to `/app/alaiy-os`.
 
-Example brand override snippet:
-```css
-:root {
-  --alaiy-primary:       #E63946;  /* brand red   */
-  --alaiy-primary-dark:  #C1121F;
-  --alaiy-primary-light: #FFE5E7;
-  --alaiy-sidebar-bg:    #1A0A0B;
-}
+## Configuration
+
+All credentials live in a single file:
+`alaiy_os_core/client/config/boot_config.py`
+
+```python
+ALAIY_OS_ADMIN_USERNAME = "alaiyosadmin"
+ALAIY_OS_ADMIN_EMAIL    = "admin@example.com"
+ALAIY_OS_ADMIN_PASSWORD = "alaiyos123"
 ```
 
-## Adding more config assets
+Install **fails loudly** if any of these are missing or empty.
 
-Place any future static config files here:
-- `logo.svg`        — brand logo (reference in install.py via System Settings)
-- `favicon.ico`     — browser tab icon
-- `fonts/`          — self-hosted Bricolage Grotesque .woff2 files (replace the Google Fonts @import)
+## Access control — three layers
+
+1. `home_page` DB field — redirects AlaiyOS users on login.
+2. `boot_session` hook — filters the sidebar boot data to only `Alaiy OS`.
+3. `public/js/route_guard.js` — intercepts client-side navigation and redirects
+   AlaiyOS users back to `alaiy-os`.
+
+All three explicitly bypass `System Manager` and `Administrator`.
+
+## Install
+
+```bash
+bench get-app alaiy_os_core /path/to/alaiy-os-core
+bench --site <site> install-app alaiy_os_core
+bench --site <site> migrate
+bench build --app alaiy_os_core
+```
+
+## Structure
+
+```
+alaiy_os_core/
+├── hooks.py
+├── client/config/boot_config.py     # credentials
+├── setup/install.py                 # all provisioning logic
+├── setup/boot.py                    # boot_session + on_session_creation
+├── public/images/logo-square.png    # app icon
+├── public/js/route_guard.js         # client-side route protection
+├── public/css/alaiy_os.css          # scoped styles (no global overrides)
+└── workspace/Alaiy OS/Alaiy OS.json # workspace fixture for version control
+```
