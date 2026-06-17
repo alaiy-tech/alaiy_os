@@ -1,8 +1,11 @@
 import frappe
 
-ALAIY_OS_ROLES = {"Alaiy OS Manager", "Alaiy OS User"}
-ALAIY_OS_WORKSPACE = "Alaiy OS"
-ALAIY_OS_ROUTE = "alaiy-os"
+from alaiy_os_core.constants.roles import ROLES
+from alaiy_os_core.constants.workspace import WORKSPACE_NAME, WORKSPACE_ROUTE
+
+ALAIY_OS_ROLES = set(ROLES)
+ALAIY_OS_WORKSPACE = WORKSPACE_NAME
+ALAIY_OS_ROUTE = WORKSPACE_ROUTE
 
 
 def _is_alaiy_user():

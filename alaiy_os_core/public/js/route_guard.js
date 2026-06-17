@@ -1,56 +1,47 @@
 /**
  * AlaiyOS Route Guard
  *
- * Intercepts every client-side route change.
- * If the logged-in user is an AlaiyOS user (and not a system admin),
- * any route outside of /app/alaiy-os is immediately redirected back.
+ * Confines AlaiyOS users (and not system admins) to the Alaiy OS workspace.
+ * Any client-side route outside of `alaiy-os` is redirected back to it, and
+ * the legacy /desk page is hard-redirected to /app/alaiy-os.
  *
- * This is the third layer:
+ * Layers of confinement:
  *   Layer 1 — default_workspace DB field (Frappe v16 redirects on login)
  *   Layer 2 — boot_session hook (filters sidebar in boot data)
  *   Layer 3 — this file (intercepts runtime navigation)
  *
- * IMPORTANT: The handler is registered only after app_ready.
- * Registering on frappe.router "change" at parse time fires during
- * desk.js startup() — before the workspace module is initialised — which
- * causes frappe.set_route("alaiy-os") to hit getpage and return 404.
- * Deferring to app_ready means the guard only runs for user-initiated
- * navigations, not the initial boot sequence.
+ * Registered only after app_ready so it never fires during desk.js startup()
+ * (which would call set_route before the workspace module is initialised and
+ * 404 on getpage).
  *
- * Depends on: alaiy_ui.js (loaded before this file via app_include_js order)
- * Globals used: updateAlaiyTitle(), resolveAlaiySection()
+ * Depends on (loaded earlier in app_include_js):
+ *   constants/roles.js  — ALAIY_OS_ROLES, ALAIY_OS_BYPASS, ALAIY_OS_ROUTE
+ *   alaiy_ui.js         — updateAlaiyTitle(), resolveAlaiySection()
  */
 $(document).on("app_ready", function () {
   frappe.router.on("change", function () {
-    const bypass = ["System Manager", "Administrator"];
     const roles = frappe.user_roles || [];
-    const isAdmin = bypass.some((r) => roles.includes(r));
 
-    if (isAdmin) return;
+    // System admins are never confined.
+    if (ALAIY_OS_BYPASS.some((r) => roles.includes(r))) return;
 
-    const isAlaiy = ["Alaiy OS Manager", "Alaiy OS User"].some((r) =>
-      roles.includes(r),
-    );
-    if (!isAlaiy) return;
+    // Only act for AlaiyOS users.
+    if (!ALAIY_OS_ROLES.some((r) => roles.includes(r))) return;
 
-    // Block /desk legacy full-page route (not a Frappe SPA route, so use
-    // window.location.replace rather than frappe.set_route)
+    // Block the legacy /desk full-page route (server route, not an SPA route).
     const path = window.location.pathname || "";
     if (path.startsWith("/desk")) {
-      window.location.replace("/app/alaiy-os");
+      window.location.replace("/app/" + ALAIY_OS_ROUTE);
       return;
     }
 
     const route = frappe.get_route_str() || "";
-    // "alaiy-os" covers the workspace and all its in-panel form mounts
-    // (settings forms are rendered inside the panel DOM — they do not change the route)
-    if (!route.startsWith("alaiy-os")) {
-      frappe.set_route("alaiy-os");
+    if (!route.startsWith(ALAIY_OS_ROUTE)) {
+      frappe.set_route(ALAIY_OS_ROUTE);
       return;
     }
 
-    // Update browser tab title for this route.
-    // Functions are defined in alaiy_ui.js which loads before this file.
+    // On the workspace: keep the browser tab title in sync.
     if (typeof updateAlaiyTitle === "function") {
       updateAlaiyTitle(resolveAlaiySection(route));
     }

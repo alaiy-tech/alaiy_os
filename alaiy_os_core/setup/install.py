@@ -5,13 +5,11 @@ This module is the single source of truth for the AlaiyOS environment. It runs
 on `after_install` (fresh install) and `after_migrate` (every deploy), and
 reconciles the live ERPNext site to match the definitions in this file.
 
-Idempotency contract:
-  * Roles                          create / skip if exists
-  * User                           create + set password / reconcile roles only
-  * Workspace                      create / overwrite links + shortcuts
-  * DocType permissions            add new, remove stale (two-way diff)
-  * Standard workspace restrictions strip AlaiyOS roles (idempotent)
-  * Login redirect                 set home_page (idempotent)
+Data definitions live in alaiy_os_core/constants/:
+  * roles.py        — ROLES
+  * workspace.py    — WORKSPACE_NAME, shortcuts, links, STANDARD_WORKSPACES_TO_HIDE
+  * permissions.py  — TARGET_DOCTYPES, DESK_INFRA_DOCTYPES, permission maps
+  * branding.py     — logo / favicon asset paths
 
 The app code is authoritative — manual edits made in the ERPNext UI to the
 Alaiy OS workspace links/shortcuts or to the reconciled permissions are
@@ -25,7 +23,22 @@ import frappe
 import frappe.utils.password
 
 from alaiy_os_core.client.config import boot_config
-from alaiy_os_core.client.config.boot_config import STANDARD_WORKSPACES_TO_HIDE
+from alaiy_os_core.constants import branding
+from alaiy_os_core.constants.roles import ROLES
+from alaiy_os_core.constants.workspace import (
+    WORKSPACE_NAME,
+    WORKSPACE_SHORTCUTS,
+    WORKSPACE_LINKS,
+    STANDARD_WORKSPACES_TO_HIDE,
+)
+from alaiy_os_core.constants.permissions import (
+    PERMISSION_MAP,
+    READ_ONLY_MAP,
+    TARGET_DOCTYPES,
+    DESK_INFRA_DOCTYPES,
+)
+
+LOGO_URL = branding.LOGO_SQUARE
 
 
 # ── Config loading (MUST FAIL LOUDLY) ─────────────────────────────────────────
@@ -68,27 +81,27 @@ def _run_provisioning():
 
 # ── Roles ─────────────────────────────────────────────────────────────────────
 
-ROLES = ["Alaiy OS Manager", "Alaiy OS User"]
-
-
-# VERIFY AFTER DEPLOY: desk_access=0 should still allow /app/* routes in Frappe v16.
-# If frappe.boot does not load or frappe.user_roles is empty for AlaiyOS users,
-# set desk_access back to 1 and rely on route_guard + boot hooks to block /desk.
 def create_roles():
+    """
+    Create both AlaiyOS roles with desk access.
+
+    IMPORTANT — desk_access MUST be 1.
+    These users live entirely inside the /app desk (the Alaiy OS workspace).
+    Setting desk_access=0 makes Frappe v16 treat them as Website Users and
+    blocks every /app/* route, so home_page=/app/alaiy-os bounces to "/" and
+    back — an infinite login redirect loop. The /desk legacy route is blocked
+    instead by route_guard.js + boot redirects, not by removing desk access.
+    """
     for role_name in ROLES:
         if not frappe.db.exists("Role", role_name):
             frappe.get_doc({
                 "doctype": "Role",
                 "role_name": role_name,
-                "desk_access": 0,
-                "home_page": "/app/alaiy-os",
+                "desk_access": 1,
             }).insert(ignore_permissions=True)
         else:
-            # On migrate: re-enforce in case someone flipped these in the UI
-            frappe.db.set_value("Role", role_name, {
-                "desk_access": 0,
-                "home_page": "/app/alaiy-os",
-            })
+            # Re-enforce on migrate in case it was flipped in the UI.
+            frappe.db.set_value("Role", role_name, "desk_access", 1)
 
 
 # ── User ──────────────────────────────────────────────────────────────────────
@@ -125,98 +138,6 @@ def create_or_update_user(config):
 
 # ── Workspace ───────────────────────────────────────────────────────────────
 
-WORKSPACE_NAME = "Alaiy OS"
-LOGO_URL = "/assets/alaiy_os_core/images/logo-square.png"
-
-# The dummy entries (Ask AlaiyOS, Dashboard, My Pinned, Reports & Analytics)
-# all point to "Stock Entry" as a placeholder so Frappe renders them without
-# throwing a missing-doctype error. They will be replaced with real targets in
-# the next iteration. Do not add click handlers or special behaviour to them.
-#
-# The "Settings" entry is the exception: its click is intercepted by
-# alaiy_settings.js, which opens an in-workspace panel instead of navigating.
-# Its link_to ("Stock Settings") is just a valid placeholder so Frappe renders
-# the card without error.
-WORKSPACE_SHORTCUTS = [
-    {"type": "DocType", "link_to": "Stock Entry",
-        "label": "Ask AlaiyOS", "color": "purple"},
-    {"type": "DocType", "link_to": "Stock Entry",
-        "label": "Dashboard",   "color": "blue"},
-    {"type": "DocType", "link_to": "Stock Entry",
-        "label": "My Pinned",   "color": "green"},
-    # Settings — JS intercepts this click; link_to is a placeholder only
-    {"type": "DocType", "link_to": "Stock Settings",
-        "label": "Settings",    "color": "grey"},
-]
-
-WORKSPACE_LINKS = [
-    # ── STOCK ──────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Stock", "icon": "package"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Entry",            "label": "Stock Entry"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item",                   "label": "Products"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Group",             "label": "Item Group"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Attribute",         "label": "Item Attribute"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Price",             "label": "Item Price"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Variant Attribute", "label": "Item Variant Details"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Brand",                  "label": "Brand"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Reconciliation",   "label": "Stock Reconciliation"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Receipt",       "label": "Purchase Receipt"},
-
-    # ── SELLING ────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Selling", "icon": "briefcase"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Sales Order",    "label": "Sales Order"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Sales Invoice",  "label": "Sales Invoice"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Price List",     "label": "Price List"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Pricing Rule",   "label": "Pricing Rule"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Customer",       "label": "Customers"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Customer Group", "label": "Customer Groups"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Address",        "label": "Address"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Contact",        "label": "Contact"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "UTM Source",     "label": "UTM Source"},
-
-    # ── BUYING ─────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Buying", "icon": "shopping-cart"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Order",   "label": "Purchase Order"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Invoice", "label": "Purchase Invoice"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Receipt", "label": "Purchase Receipt"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Supplier",         "label": "Supplier"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Supplier Group",   "label": "Supplier Group"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Contact",          "label": "Contacts"},
-
-    # ── BOTTOM DUMMIES ─────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "More", "icon": "bar-chart"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Entry", "label": "Reports & Analytics"},
-    # Settings — click intercepted by alaiy_settings.js (opens in-workspace panel)
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Settings", "label": "Settings"},
-]
-
-
 def _block_id(label):
     """Deterministic 10-char block ID — stable across migrate runs."""
     return hashlib.md5(f"alaiy-block-{label}".encode()).hexdigest()[:10]
@@ -229,13 +150,10 @@ def _build_workspace_content():
     In Frappe v16, the workspace canvas is driven by the `content` field —
     a JSON-encoded array of block editor nodes. `links` and `shortcuts` store
     the DATA; `content` stores the LAYOUT referencing them by name.
+    Empty `'[]'` renders a blank workspace even with populated links/shortcuts.
 
-    Empty `'[]'` renders a completely blank workspace even if `links` and
-    `shortcuts` are fully populated.  This is the root cause of the
-    '/app/alaiy-os' blank-page bug.
-
-    Block types used:
-      shortcut — data.shortcut_name must match the label in the shortcuts table
+    Block types:
+      shortcut — data.shortcut_name must match a label in the shortcuts table
       card     — data.card_name must match a Card Break label in the links table
     """
     blocks = []
@@ -289,9 +207,9 @@ def create_or_update_workspace():
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
 
-        ws.icon    = LOGO_URL
-        ws.content = content     # regenerate from code every run
-        ws.type    = "Workspace"  # ensure the v16 type field is set
+        ws.icon = LOGO_URL
+        ws.content = content      # regenerate from code every run
+        ws.type = "Workspace"     # ensure the v16 type field is set
 
         # Ensure roles are present
         existing_roles = {r.role for r in ws.roles}
@@ -303,163 +221,6 @@ def create_or_update_workspace():
 
 
 # ── DocType permissions — full reconciliation ─────────────────────────────────
-
-TARGET_DOCTYPES = [
-    # ── Stock ──────────────────────────────────
-    "Stock Entry",
-    "Stock Entry Detail",
-    "Stock Entry Type",
-    "Item",
-    "Item Default",
-    "Item Barcode",
-    "Item Group",
-    "Item Attribute",
-    "Item Attribute Value",
-    "Item Price",
-    "Item Variant Attribute",
-    "Brand",
-    "Stock Reconciliation",
-    "Stock Reconciliation Item",
-    "Purchase Receipt",
-    "Purchase Receipt Item",
-
-    # ── Selling ────────────────────────────────
-    "Sales Order",
-    "Sales Order Item",
-    "Sales Invoice",
-    "Sales Invoice Item",
-    "Packed Item",
-    "Price List",
-    "Pricing Rule",
-    "Pricing Rule Detail",
-    "Customer",
-    "Customer Detail",
-    "Customer Group",
-    "Address",
-    "Contact",
-    "Contact Email",
-    "Contact Phone",
-    "UTM Source",
-
-    # ── Buying ─────────────────────────────────
-    "Purchase Order",
-    "Purchase Order Item",
-    "Purchase Invoice",
-    "Purchase Invoice Item",
-    "Supplier",
-    "Supplier Group",
-
-    # ── Settings (Single DocTypes) ──────────────
-    "Stock Settings",
-    "Item Variant Settings",
-    "Selling Settings",
-    "Buying Settings",
-    "Accounts Settings",
-    "Global Defaults",    "System Settings",
-    # ── Organisation ───────────────────────────
-    "Company",
-    "Letter Head",
-    "Email Account",    "Currency Exchange",
-    # ── Users ──────────────────────────────────
-    "User",
-    "Role",
-
-    # ── Audits (Log DocTypes — read only) ──────
-    "Activity Log",
-    "Permission Log",
-    "Access Log",
-    "Error Log",                      # Dependency of Activity Log views
-
-    # ── Shared dependencies ─────────────────────
-    "UOM",
-    "UOM Conversion Detail",
-    "Currency",
-    "Company",
-    "Warehouse",
-    "Cost Center",
-    "Tax Category",
-    "Account",
-    "Payment Terms Template",
-    "Terms and Conditions",
-]
-
-PERMISSION_MAP = {
-    "read": 1, "write": 1, "create": 1, "delete": 0,
-    "submit": 1, "cancel": 1, "amend": 1,
-    "report": 1, "export": 1, "import": 0,
-    "print": 1, "email": 1,
-}
-
-# Read-only permission map for Frappe desk-infrastructure DocTypes.
-# AlaiyOS users need to read these for the desk to function but must NOT
-# create, edit, or delete Frappe internals.
-READ_ONLY_MAP = {
-    "read": 1, "write": 0, "create": 0, "delete": 0,
-    "submit": 0, "cancel": 0, "amend": 0,
-    "report": 1, "export": 0, "import": 0,
-    "print": 0, "email": 0,
-}
-
-# Frappe desk infrastructure DocTypes that require read-only Custom DocPerm
-# records so the desk boots and renders forms correctly for AlaiyOS users.
-#
-# WHY THESE ARE NEEDED
-# --------------------
-# When an AlaiyOS user loads the desk, Frappe checks has_permission() for
-# every DocType it tries to read — including internal ones like Page, Report,
-# and DocType itself. Without an explicit Custom DocPerm (or a standard
-# DocPerm that covers the AlaiyOS roles), those checks fail and produce the
-# error: "User does not have doctype access via role permission for document
-# <DocType>".
-#
-# These DocTypes are interconnected as follows:
-#   Page          — custom pages linked from sidebar / shortcuts
-#   Report        — report definitions; Page depends on these for report-pages
-#   DocType       — schema metadata required for every form render
-#   Module Def    — module registry; DocType rows reference a Module Def
-#   Custom Field  — extra fields attached to DocTypes; read during form render
-#   Property Setter — field-level overrides; read during form render
-#   Client Script — client-side hooks; loaded on form open
-#   Server Script — server-side hooks; executed on doc events
-#   Notification + Notification Log — bell icon in the topbar
-#   Energy Point Log — activity tracking (loaded in bootinfo)
-#   Print Format  — print templates; linked from every document Print button
-#   Print Settings — global print config; read during print-preview render
-#   System Settings — system-wide config; read during desk boot
-#   Installed Application — app list; checked during desk initialisation
-#   User Permission — per-user record filters; checked on every list load
-#   Role Profile  — role bundle definitions; read during user form render
-#   User Type     — determines desk vs website access; read during boot
-DESK_INFRA_DOCTYPES = [    # ── Workspace ────────────────────────────────────────────────────────────
-    # Needed so getpage / workspace module can load the workspace document.
-    "Workspace",
-    "Workspace Link",
-    # ── Frappe desk core ────────────────────────────────────────────────────
-    "Workspace Shortcut",
-    "Page",
-    "Report",
-    "DocType",
-    "Module Def",
-    "Custom Field",
-    "Property Setter",
-    "Client Script",
-    "Server Script",
-    # ── Notifications ───────────────────────────────────────────────────────
-    "Notification",
-    "Notification Log",
-    "Energy Point Log",
-    # ── Printing ────────────────────────────────────────────────────────────
-    "Print Format",
-    "Print Settings",
-    # ── System ──────────────────────────────────────────────────────────────
-    "System Settings",
-    "Installed Application",
-    # ── User management ─────────────────────────────────────────────────────
-    "User Permission",
-    "Role Profile",
-    "User Type",
-]
-
 
 def reconcile_doctype_permissions():
     _infra_set = set(DESK_INFRA_DOCTYPES)
@@ -501,8 +262,7 @@ def reconcile_doctype_permissions():
 
 
 # ── Restrict standard workspaces ──────────────────────────────────────────────
-# List imported from boot_config.py — edit it there.
-
+# List imported from constants/workspace.py — edit it there.
 
 def restrict_standard_workspaces():
     for ws_name in STANDARD_WORKSPACES_TO_HIDE:
@@ -517,20 +277,10 @@ def restrict_standard_workspaces():
 
 # ── Branding ──────────────────────────────────────────────────────────────
 
-_LOGO_SQUARE = "/assets/alaiy_os_core/images/logo-square.png"
-_LOGO_HOR = "/assets/alaiy_os_core/images/logo-hor.svg"
-_FAVICON = "/assets/alaiy_os_core/images/icon.png"
-
-
 def configure_branding():
     """
     Set Frappe Settings singletons to use AlaiyOS brand assets.
     Idempotent — safe to run on every migrate.
-
-    Assets served from public/images/ after bench build:
-      logo-square.png — workspace sidebar + login card splash
-      logo-hor.svg    — login page top-left horizontal logo
-      icon.png        — browser favicon
     """
     def _safe_set(doctype, field, value):
         try:
@@ -544,19 +294,19 @@ def configure_branding():
             )
 
     # Desk navbar top-left logo
-    _safe_set("Navbar Settings",  "app_logo",     _LOGO_HOR)
+    _safe_set("Navbar Settings",  "app_logo",     branding.LOGO_HOR)
     # Login page / website branding
-    _safe_set("Website Settings", "app_logo",     _LOGO_SQUARE)
-    _safe_set("Website Settings", "banner_image", _LOGO_HOR)
+    _safe_set("Website Settings", "app_logo",     branding.LOGO_SQUARE)
+    _safe_set("Website Settings", "banner_image", branding.LOGO_HOR)
     _safe_set("Website Settings", "brand_html",
-              f'<img src="{_LOGO_HOR}" alt="Alaiy OS" style="height:32px">')
-    _safe_set("Website Settings", "splash_image", _LOGO_SQUARE)
+              f'<img src="{branding.LOGO_HOR}" alt="{branding.APP_NAME}" style="height:32px">')
+    _safe_set("Website Settings", "splash_image", branding.LOGO_SQUARE)
     # Favicon (read from both singletons depending on Frappe version)
-    _safe_set("System Settings",  "favicon",      _FAVICON)
-    _safe_set("Website Settings", "favicon",      _FAVICON)
+    _safe_set("System Settings",  "favicon",      branding.FAVICON)
+    _safe_set("Website Settings", "favicon",      branding.FAVICON)
     # App name
-    _safe_set("System Settings",  "app_name",     "Alaiy OS")
-    _safe_set("Website Settings", "app_name",     "Alaiy OS")
+    _safe_set("System Settings",  "app_name",     branding.APP_NAME)
+    _safe_set("Website Settings", "app_name",     branding.APP_NAME)
 
 
 # ── Login redirect ─────────────────────────────────────────────────────────
