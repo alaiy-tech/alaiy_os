@@ -27,8 +27,8 @@ APP_NAME = "Alaiy"
 
 # Public URLs of bundled brand assets (served from alaiy_os_core/public/branding).
 LOGO_URL = "/assets/alaiy_os_core/assets/images/alaiyos-logo.svg"
-FAVICON_URL = "/assets/alaiy_os_core/assets/images/favicon.ico"
-SPLASH_URL = "/assets/alaiy_os_core/assets/images/icon-512.png"
+FAVICON_URL = "/assets/alaiy_os_core/assets/images/logo-512.png"
+SPLASH_URL = "/assets/alaiy_os_core/assets/images/logo-512.png"
 
 
 def apply_branding():
@@ -106,12 +106,12 @@ def get_manifest():
         "theme_color": "#ffffff",
         "icons": [
             {
-                "src": "/assets/alaiy_os_core/assets/images/icon-192.png",
+                "src": "/assets/alaiy_os_core/assets/images/logo-512.png",
                 "sizes": "192x192",
                 "type": "image/png",
             },
             {
-                "src": "/assets/alaiy_os_core/assets/images/icon-512.png",
+                "src": "/assets/alaiy_os_core/assets/images/logo-512.png",
                 "sizes": "512x512",
                 "type": "image/png",
             },

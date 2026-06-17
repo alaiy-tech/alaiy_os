@@ -24,7 +24,7 @@ REDIRECT_HOME_TO_WORKSPACE = True
 # ── Theme ─────────────────────────────────────────────────────
 # Apply alaiy_os_core/public/config/theme.css overrides to ERPNext Desk.
 # When True, TOGGLE_DEFAULT_THEME is automatically forced to False.
-CUSTOM_THEME = True
+CUSTOM_THEME = False
 
 # Show the light/dark mode switcher in the user-settings dropdown.
 # Set False (or leave as auto) when CUSTOM_THEME = True.
@@ -32,7 +32,7 @@ TOGGLE_DEFAULT_THEME = not CUSTOM_THEME
 
 # ── About modal ───────────────────────────────────────────────
 ABOUT_WEBSITE_URL = "https://alaiy.com"
-ABOUT_GITHUB_URL  = "https://github.com/alaiy-tech"
+ABOUT_GITHUB_URL = "https://github.com/alaiy-tech"
 ABOUT_FOOTER_TEXT = "Built with ♥ by Alaiy"
 
 # ── Connectors ────────────────────────────────────────────────
