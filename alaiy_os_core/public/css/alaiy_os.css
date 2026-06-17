@@ -1,0 +1,16 @@
+/*
+ * AlaiyOS Workspace — Scoped Styles
+ *
+ * Rules here are intentionally scoped to AlaiyOS contexts.
+ * Do NOT add global ERPNext UI overrides here.
+ * Global overrides affect all users including admins — that is not wanted.
+ */
+
+/* Workspace sidebar header logo */
+.desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
+.desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {
+    background-image: url('/assets/alaiy_os_core/images/logo-square.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
