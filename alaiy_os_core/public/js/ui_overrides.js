@@ -48,7 +48,29 @@ frappe.provide("alaiy_os_core.ui");
 (function () {
   "use strict";
 
-  // ── 1. Hide the onboarding / "Getting Started" panel ───────────────────────
+  // ── 1. Page title branding ──────────────────────────────────────────────────
+  var _titleObserver = null;
+
+  function applyBrandedTitle() {
+    var cur = document.title || "";
+    if (cur.indexOf("Altomoda OS") === 0) return;
+    var clean = cur
+      .replace(/^\s*ERPNext\s*[-–|]\s*/i, "")
+      .replace(/\s*[-–|]\s*ERPNext\s*$/i, "")
+      .trim();
+    document.title = "Altomoda OS" + (clean ? " - " + clean : "");
+  }
+
+  function setupTitleBranding() {
+    if (_titleObserver) { _titleObserver.disconnect(); _titleObserver = null; }
+    var titleEl = document.querySelector("title");
+    if (!titleEl) return;
+    _titleObserver = new MutationObserver(applyBrandedTitle);
+    _titleObserver.observe(titleEl, { childList: true, subtree: true, characterData: true });
+    applyBrandedTitle();
+  }
+
+  // ── 2. Hide the onboarding / "Getting Started" panel ───────────────────────
   function hideOnboarding() {
     if (!(frappe.boot && frappe.boot.hide_onboarding)) return;
     $(
@@ -56,7 +78,7 @@ frappe.provide("alaiy_os_core.ui");
     ).hide();
   }
 
-  // ── 2. Redirect the bare desk root to the default workspace ────────────────
+  // ── 3. Redirect the bare desk root to the default workspace ────────────────
   function redirectDefaultRoute() {
     if (frappe.boot && frappe.boot.show_desk_homepage) return;
 
@@ -75,7 +97,7 @@ frappe.provide("alaiy_os_core.ui");
     }
   }
 
-  // ── 3. Move Search + Notifications into the navbar (right side) ─────────────
+  // ── 4. Move Search + Notifications into the navbar (right side) ─────────────
   function moveTopbarWidgets() {
     var $navbarRight = $(
       ".navbar .navbar-nav.d-flex, .navbar .navbar-collapse .navbar-nav",
@@ -106,7 +128,7 @@ frappe.provide("alaiy_os_core.ui");
     }
   }
 
-  // ── 4. Sidebar recovery ────────────────────────────────────────────────────
+  // ── 5. Sidebar recovery ────────────────────────────────────────────────────
   // With the Container.toggle_sidebar patch above, frappe.Application should
   // now complete its startup and set frappe.app.sidebar correctly. This
   // function is a belt-and-suspenders fallback only.
@@ -149,7 +171,7 @@ frappe.provide("alaiy_os_core.ui");
 
   $(document).on("page-change", function () {
     alaiy_os_core.ui.apply();
-    setTimeout(alaiy_os_core.ui.apply, 300);
+    setTimeout(function () { alaiy_os_core.ui.apply(); applyBrandedTitle(); }, 300);
   });
 
   function bindRouter() {
@@ -162,6 +184,7 @@ frappe.provide("alaiy_os_core.ui");
   $(document).on("app_ready", function () {
     ensureSidebar();
     bindRouter();
+    setupTitleBranding();
     alaiy_os_core.ui.apply();
   });
 

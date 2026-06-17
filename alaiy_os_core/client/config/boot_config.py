@@ -24,7 +24,7 @@ REDIRECT_HOME_TO_WORKSPACE = True
 # ── Theme ─────────────────────────────────────────────────────
 # Apply alaiy_os_core/public/config/theme.css overrides to ERPNext Desk.
 # When True, TOGGLE_DEFAULT_THEME is automatically forced to False.
-CUSTOM_THEME = False
+CUSTOM_THEME = True
 
 # Show the light/dark mode switcher in the user-settings dropdown.
 # Set False (or leave as auto) when CUSTOM_THEME = True.

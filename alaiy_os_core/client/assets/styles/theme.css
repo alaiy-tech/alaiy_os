@@ -7,13 +7,12 @@
    inside a brand-specific CSS file loaded after this one.
    ============================================================= */
 
-/* ── 1. Bricolage Grotesque font ──────────────────────────────────────────
+/* ── 1. Poppins font ──────────────────────────────────────────
    Using Google Fonts CDN. To self-host instead, replace this
    @import with @font-face blocks pointing to files placed in
    alaiy_os_core/public/config/fonts/.
    ──────────────────────────────────────────────────────────── */
-@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,200..800&display=swap');
-
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
 /* ── 2. AlaiyOS design tokens ─────────────────────────────────
    All brand-specific values live here as CSS variables.
    Swap these out per client without touching anything else.
@@ -72,7 +71,7 @@
    native Frappe components pick up the theme automatically.
    ──────────────────────────────────────────────────────────── */
 :root {
-  --font-stack:        "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-stack:        "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-size-base:    16px;
 
   --primary:           var(--alaiy-primary);
@@ -115,14 +114,14 @@ button,
 .desk-sidebar,
 .layout-main,
 .page-container {
-  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 
 h1, h2, h3, h4, h5, h6,
 .page-title,
 .form-header-title,
 .list-row-head .list-header-subject {
-  font-family: "Bricolage Grotesque", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   font-weight: 600;
 }
 
@@ -447,7 +446,7 @@ a[href="/website"] {
 .alaiy-search-placeholder {
   flex: 1;
   font-size: 15px;
-  font-family: "Bricolage Grotesque", sans-serif;
+  font-family: "Poppins", sans-serif;
   color: var(--alaiy-text-muted);
   user-select: none;
 }
@@ -457,7 +456,7 @@ a[href="/website"] {
   display: inline-flex;
   align-items: center;
   font-size: 13px;
-  font-family: "Bricolage Grotesque", sans-serif;
+  font-family: "Poppins", sans-serif;
   color: var(--alaiy-text-muted);
   background-color: var(--alaiy-surface-muted);
   border: var(--alaiy-border-width) solid var(--alaiy-border);
@@ -471,7 +470,7 @@ a[href="/website"] {
 .alaiy-about-footer {
   text-align: center;
   font-size: 15px;
-  font-family: "Bricolage Grotesque", sans-serif;
+  font-family: "Poppins", sans-serif;
   color: var(--alaiy-text-muted);
   padding: 12px 0 4px;
   border-top: var(--alaiy-border-width) solid var(--alaiy-border);
