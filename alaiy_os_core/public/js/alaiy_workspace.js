@@ -230,9 +230,13 @@ AW._mountForm = function (host, doctype, docname) {
 AW._onCapture = function (e) {
   if (!_isAlaiyWsUser()) return;
 
-  // Only on the Alaiy OS workspace route
+  // Only on the Alaiy OS workspace route.
+  // frappe.get_route_str() returns "Workspaces/Alaiy OS" when on the workspace,
+  // not the "alaiy-os" slug — use the URL path as the reliable check.
   const route = (frappe.get_route_str && frappe.get_route_str()) || "";
-  if (!route.startsWith(ALAIY_OS_ROUTE)) return;
+  const onWorkspace = window.location.pathname.includes("/" + ALAIY_OS_ROUTE) ||
+                      route.startsWith(ALAIY_OS_ROUTE);
+  if (!onWorkspace) return;
 
   // Never intercept clicks inside our own overlay
   if (e.target.closest && e.target.closest("#alaiy-ws-content")) return;

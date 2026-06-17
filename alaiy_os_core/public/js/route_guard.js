@@ -29,7 +29,11 @@ $(document).on("app_ready", function () {
     if (!ALAIY_OS_ROLES.some((r) => roles.includes(r))) return;
 
     const route = frappe.get_route_str() || "";
-    if (!route.startsWith(ALAIY_OS_ROUTE)) {
+    // frappe.get_route_str() returns "Workspaces/Alaiy OS" when on the workspace,
+    // not the "alaiy-os" slug — use the URL path as the reliable check.
+    const onAlaiyRoute = window.location.pathname.includes("/" + ALAIY_OS_ROUTE) ||
+                         route.startsWith(ALAIY_OS_ROUTE);
+    if (!onAlaiyRoute) {
       frappe.set_route(ALAIY_OS_ROUTE);
       return;
     }
