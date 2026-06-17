@@ -35,7 +35,7 @@ body.login-page::before {
     left: 32px;
     width: 140px;
     height: 40px;
-    background-image: url('/assets/alaiy_os_core/images/logo-hor.svg');
+    background-image: url('/assets/alaiy_os_core/images/logo-hor.png');
     background-repeat: no-repeat;
     background-size: contain;
     background-position: left center;

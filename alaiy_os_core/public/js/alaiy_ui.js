@@ -1,86 +1,60 @@
 /**
  * AlaiyOS — Shared UI Utilities
  *
- * Loaded FIRST in app_include_js so that route_guard.js and
- * alaiy_settings.js can reference the globals defined here.
+ * Loaded after constants/ files in app_include_js, and before
+ * route_guard.js and alaiy_settings.js.
  *
- * Exports (to the global window scope, intentionally):
- *   ALAIY_ROUTE_TITLES          — exact-match route → section name
- *   ALAIY_ROUTE_PREFIX_TITLES   — prefix-match for Form/* routes
+ * Depends on (loaded before this file):
+ *   constants/route_titles.js  — ALAIY_ROUTE_TITLES, ALAIY_ROUTE_PREFIX_TITLES
+ *
+ * Exports (window globals, used by route_guard.js and alaiy_settings.js):
  *   updateAlaiyTitle(section)   — sets document.title to the brand format
+ *   resolveAlaiySection(route)  — maps a Frappe route string to a section label
  */
 
-// ── Brand title constants ─────────────────────────────────────────────────────
-const ALAIY_TITLE_PREFIX = "Alto Moda OS";
-
-// ── Exact-match route → section name ─────────────────────────────────────────
-// Keys are frappe.get_route_str() values.
-const ALAIY_ROUTE_TITLES = {
-  // Workspace root (both the raw route and with trailing slash)
-  "alaiy-os": "Dashboard",
-
-  // Stock
-  "List/Stock Entry/List": "Stock",
-  "List/Item/List": "Stock",
-  "List/Item Group/List": "Stock",
-  "List/Item Attribute/List": "Stock",
-  "List/Item Price/List": "Stock",
-  "List/Item Variant Attribute/List": "Stock",
-  "List/Brand/List": "Stock",
-  "List/Stock Reconciliation/List": "Stock",
-  "List/Purchase Receipt/List": "Stock · Purchase Receipt",
-
-  // Selling
-  "List/Sales Order/List": "Selling",
-  "List/Sales Invoice/List": "Selling",
-  "List/Price List/List": "Selling",
-  "List/Pricing Rule/List": "Selling",
-  "List/Customer/List": "Selling",
-  "List/Customer Group/List": "Selling",
-  "List/Address/List": "Selling",
-  "List/Contact/List": "Selling",
-  "List/UTM Source/List": "Selling",
-
-  // Buying
-  "List/Purchase Order/List": "Buying",
-  "List/Purchase Invoice/List": "Buying",
-  "List/Supplier/List": "Buying",
-  "List/Supplier Group/List": "Buying",
-};
-
-// ── Prefix-match for Form/* routes (Form/<DocType>/<name>) ───────────────────
-const ALAIY_ROUTE_PREFIX_TITLES = [
-  { prefix: "Form/Stock Entry", title: "Stock" },
-  { prefix: "Form/Item", title: "Stock" },
-  { prefix: "Form/Stock Reconciliation", title: "Stock" },
-  { prefix: "Form/Purchase Receipt", title: "Stock · Purchase Receipt" },
-  { prefix: "Form/Sales Order", title: "Selling" },
-  { prefix: "Form/Sales Invoice", title: "Selling" },
-  { prefix: "Form/Customer", title: "Selling" },
-  { prefix: "Form/Purchase Order", title: "Buying" },
-  { prefix: "Form/Purchase Invoice", title: "Buying" },
-  { prefix: "Form/Supplier", title: "Buying" },
-];
+// ── Company name helper ───────────────────────────────────────────────────────
+// Reads the ERPNext default company from frappe.boot, appends " OS" to form
+// the page-title prefix.  e.g. company "Alto Moda" → prefix "Alto Moda OS".
+// Falls back to "Alaiy OS" if boot data is not available (e.g. login page).
+function _getAlaiyTitlePrefix() {
+  const company =
+    (frappe.boot &&
+      frappe.boot.sysdefaults &&
+      frappe.boot.sysdefaults.company) ||
+    null;
+  return company ? company + " OS" : "Alaiy OS";
+}
 
 // ── Title helpers ─────────────────────────────────────────────────────────────
 
 /**
- * Set the browser tab title to:  "Alto Moda OS — <section> | Alaiy OS"
- * Pass `null` or `undefined` to reset to "Dashboard".
+ * Set the browser tab title to:
+ *   "<Company> OS — <section> | Alaiy OS"
+ *
+ * The company name is read live from frappe.boot each time so it stays
+ * correct across page loads without a hard-coded constant.
+ *
+ * @param {string|null} section  e.g. "Stock", "Settings · Selling".
+ *   Pass null / undefined to reset to "Dashboard".
  */
+// eslint-disable-next-line no-unused-vars
 function updateAlaiyTitle(section) {
+  const prefix = _getAlaiyTitlePrefix();
   document.title =
-    ALAIY_TITLE_PREFIX +
-    " \u2014 " +
-    (section || "Dashboard") +
-    " | " +
-    "Alaiy OS";
+    prefix + " \u2014 " + (section || "Dashboard") + " | Alaiy OS";
 }
 
 /**
  * Resolve a Frappe route string to an AlaiyOS section label.
  * Called by route_guard.js on every navigation.
+ *
+ * Uses ALAIY_ROUTE_TITLES and ALAIY_ROUTE_PREFIX_TITLES from
+ * constants/route_titles.js (loaded before this file).
+ *
+ * @param {string} route  frappe.get_route_str() value.
+ * @returns {string}
  */
+// eslint-disable-next-line no-unused-vars
 function resolveAlaiySection(route) {
   if (!route) return "Dashboard";
 
@@ -92,7 +66,7 @@ function resolveAlaiySection(route) {
     if (route.startsWith(entry.prefix)) return entry.title;
   }
 
-  // Workspace root and settings panel (managed separately by alaiy_settings.js)
+  // Workspace root and settings panel (title managed by alaiy_settings.js)
   if (route.startsWith("alaiy-os")) return "Dashboard";
 
   return "Alaiy OS";

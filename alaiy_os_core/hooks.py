@@ -15,7 +15,10 @@ on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
 app_include_js = [
-    # shared constants + title utils (load first)
+    # constants — loaded first so all other files can reference these globals
+    "/assets/alaiy_os_core/js/constants/route_titles.js",
+    "/assets/alaiy_os_core/js/constants/settings_tabs.js",
+    # shared title utils
     "/assets/alaiy_os_core/js/alaiy_ui.js",
     "/assets/alaiy_os_core/js/route_guard.js",
     "/assets/alaiy_os_core/js/alaiy_settings.js",

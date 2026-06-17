@@ -23,91 +23,8 @@
 
 frappe.provide("alaiy_os");
 
-// ── Tab Definitions ───────────────────────────────────────────────────────────
-// Single source of truth for the settings layout. Add/remove a tab here only.
-const ALAIY_SETTINGS_TABS = [
-  // ── Single DocType forms ──────────────────────────────────────────────────
-  {
-    id: "stock",
-    label: "Stock",
-    icon: "package",
-    type: "single",
-    doctype: "Stock Settings",
-  },
-  {
-    id: "item-variants",
-    label: "Item Variant Settings",
-    icon: "settings",
-    type: "single",
-    doctype: "Item Variant Settings",
-  },
-  {
-    id: "selling",
-    label: "Selling",
-    icon: "briefcase",
-    type: "single",
-    doctype: "Selling Settings",
-  },
-  {
-    id: "buying",
-    label: "Buying",
-    icon: "shopping-cart",
-    type: "single",
-    doctype: "Buying Settings",
-  },
-  {
-    id: "accounts",
-    label: "Accounts",
-    icon: "accounting",
-    type: "single",
-    doctype: "Accounts Settings",
-  },
-
-  // ── System Settings (Single) ──────────────────────────────────────────────
-  {
-    id: "system",
-    label: "System",
-    icon: "settings",
-    type: "single",
-    doctype: "System Settings",
-  },
-
-  // ── Stacked: multiple lists/forms on one page ────────────────────────────────
-  {
-    id: "organisation",
-    label: "Organisation",
-    icon: "building",
-    type: "stacked",
-    items: [
-      { label: "Company",               doctype: "Company",               type: "list"   },
-      { label: "Letter Head",           doctype: "Letter Head",           type: "list"   },
-      { label: "Email Account",         doctype: "Email Account",         type: "list"   },
-      { label: "Item Variant Settings", doctype: "Item Variant Settings", type: "single" },
-      { label: "Currency Exchange",     doctype: "Currency Exchange",     type: "list"   },
-    ],
-  },
-  {
-    id: "users",
-    label: "Users",
-    icon: "users",
-    type: "stacked",
-    items: [
-      { label: "Users", doctype: "User" },
-      { label: "Roles", doctype: "Role" },
-    ],
-  },
-  {
-    id: "audits",
-    label: "Audits",
-    icon: "list",
-    type: "stacked",
-    items: [
-      { label: "Activity Log", doctype: "Activity Log" },
-      { label: "Permission Log", doctype: "Permission Log" },
-      { label: "Access Log", doctype: "Access Log" },
-    ],
-  },
-];
+// ALAIY_SETTINGS_TABS is defined in constants/settings_tabs.js (loaded before
+// this file via app_include_js). Edit tab definitions there, not here.
 
 // ── State ──────────────────────────────────────────────────────────────────
 const AlaiySettings = {
@@ -142,7 +59,9 @@ alaiy_os.settings = {
     // Update title to reflect the settings panel being open
     if (typeof updateAlaiyTitle === "function") {
       const firstTab = ALAIY_SETTINGS_TABS.find((t) => t.id === firstTabId);
-      updateAlaiyTitle("Settings \u00b7 " + (firstTab ? firstTab.label : "Settings"));
+      updateAlaiyTitle(
+        "Settings \u00b7 " + (firstTab ? firstTab.label : "Settings"),
+      );
     }
   },
 
@@ -381,7 +300,9 @@ alaiy_os.settings = {
     // Update title to reflect the drilled-into section
     if (typeof updateAlaiyTitle === "function") {
       const parentTab = ALAIY_SETTINGS_TABS.find((t) => t.id === parentTabId);
-      updateAlaiyTitle("Settings \u00b7 " + (parentTab ? parentTab.label : "Settings"));
+      updateAlaiyTitle(
+        "Settings \u00b7 " + (parentTab ? parentTab.label : "Settings"),
+      );
     }
     const content = this._resetContent();
 

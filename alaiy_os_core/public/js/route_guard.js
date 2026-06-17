@@ -29,7 +29,7 @@ $(document).on("app_ready", function () {
     if (isAdmin) return;
 
     const isAlaiy = ["Alaiy OS Manager", "Alaiy OS User"].some((r) =>
-      roles.includes(r)
+      roles.includes(r),
     );
     if (!isAlaiy) return;
 

@@ -6,6 +6,30 @@
  * Global overrides affect all users including admins — that is not wanted.
  */
 
+/* ── Poppins font ─────────────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+
+/* Apply Poppins to the workspace and all elements inside it.
+ * Scoped to .layout-main-section so admin users outside the AlaiyOS
+ * workspace are unaffected. The !important mirrors what Frappe itself
+ * uses for its own font override so our rule wins specificity races. */
+.layout-main-section,
+.layout-main-section input,
+.layout-main-section textarea,
+.layout-main-section select,
+.layout-main-section button,
+.layout-main-section .form-control,
+.layout-main-section .btn,
+.layout-main-section .widget,
+.layout-main-section h1,
+.layout-main-section h2,
+.layout-main-section h3,
+.layout-main-section h4,
+.layout-main-section h5,
+.layout-main-section h6 {
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
 /* Workspace sidebar header logo */
 .desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
 .desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {

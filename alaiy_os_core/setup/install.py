@@ -18,10 +18,14 @@ Alaiy OS workspace links/shortcuts or to the reconciled permissions are
 overwritten on the next `bench migrate`.
 """
 
+import hashlib
+import json
+
 import frappe
 import frappe.utils.password
 
 from alaiy_os_core.client.config import boot_config
+from alaiy_os_core.client.config.boot_config import STANDARD_WORKSPACES_TO_HIDE
 
 
 # ── Config loading (MUST FAIL LOUDLY) ─────────────────────────────────────────
@@ -213,17 +217,62 @@ WORKSPACE_LINKS = [
 ]
 
 
+def _block_id(label):
+    """Deterministic 10-char block ID — stable across migrate runs."""
+    return hashlib.md5(f"alaiy-block-{label}".encode()).hexdigest()[:10]
+
+
+def _build_workspace_content():
+    """
+    Generate the Frappe v16 workspace content JSON string.
+
+    In Frappe v16, the workspace canvas is driven by the `content` field —
+    a JSON-encoded array of block editor nodes. `links` and `shortcuts` store
+    the DATA; `content` stores the LAYOUT referencing them by name.
+
+    Empty `'[]'` renders a completely blank workspace even if `links` and
+    `shortcuts` are fully populated.  This is the root cause of the
+    '/app/alaiy-os' blank-page bug.
+
+    Block types used:
+      shortcut — data.shortcut_name must match the label in the shortcuts table
+      card     — data.card_name must match a Card Break label in the links table
+    """
+    blocks = []
+
+    # Shortcut row — col:3 → 4 shortcuts per row (12-col grid)
+    for s in WORKSPACE_SHORTCUTS:
+        blocks.append({
+            "id":   _block_id(f"sc:{s['label']}"),
+            "type": "shortcut",
+            "data": {"shortcut_name": s["label"], "col": 3},
+        })
+
+    # Card grid — col:4 → 3 cards per row
+    for link in WORKSPACE_LINKS:
+        if link.get("type") == "Card Break":
+            blocks.append({
+                "id":   _block_id(f"card:{link['label']}"),
+                "type": "card",
+                "data": {"card_name": link["label"], "col": 4},
+            })
+
+    return json.dumps(blocks)
+
+
 def create_or_update_workspace():
+    content = _build_workspace_content()
+
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype": "Workspace",
             "label": WORKSPACE_NAME,
             "title": WORKSPACE_NAME,
             "name": WORKSPACE_NAME,
-            "is_standard": 1,
+            "type": "Workspace",   # required in Frappe v16
             "public": 1,
             "icon": LOGO_URL,
-            "category": "Modules",
+            "content": content,    # drives the v16 workspace canvas
             "roles": [{"role": r} for r in ROLES],
             "shortcuts": WORKSPACE_SHORTCUTS,
             "links": WORKSPACE_LINKS,
@@ -232,7 +281,7 @@ def create_or_update_workspace():
     else:
         ws = frappe.get_doc("Workspace", WORKSPACE_NAME)
 
-        # Always overwrite links and shortcuts — app code is source of truth
+        # Always overwrite links, shortcuts and content — app code is source of truth
         ws.set("links", [])
         ws.set("shortcuts", [])
         for link in WORKSPACE_LINKS:
@@ -240,8 +289,9 @@ def create_or_update_workspace():
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
 
-        # Ensure icon stays set
-        ws.icon = LOGO_URL
+        ws.icon    = LOGO_URL
+        ws.content = content     # regenerate from code every run
+        ws.type    = "Workspace"  # ensure the v16 type field is set
 
         # Ensure roles are present
         existing_roles = {r.role for r in ws.roles}
@@ -451,13 +501,7 @@ def reconcile_doctype_permissions():
 
 
 # ── Restrict standard workspaces ──────────────────────────────────────────────
-
-STANDARD_WORKSPACES_TO_HIDE = [
-    "Stock", "Selling", "Buying", "Accounting", "HR", "CRM",
-    "Manufacturing", "Projects", "Assets", "Quality", "Support",
-    "Payroll", "ERPNext Integrations", "Settings", "Users",
-    "Build", "Home", "Learn", "Website", "Customization"
-]
+# List imported from boot_config.py — edit it there.
 
 
 def restrict_standard_workspaces():
@@ -474,8 +518,8 @@ def restrict_standard_workspaces():
 # ── Branding ──────────────────────────────────────────────────────────────
 
 _LOGO_SQUARE = "/assets/alaiy_os_core/images/logo-square.png"
-_LOGO_HOR    = "/assets/alaiy_os_core/images/logo-hor.svg"
-_FAVICON     = "/assets/alaiy_os_core/images/icon.png"
+_LOGO_HOR = "/assets/alaiy_os_core/images/logo-hor.svg"
+_FAVICON = "/assets/alaiy_os_core/images/icon.png"
 
 
 def configure_branding():
@@ -500,9 +544,9 @@ def configure_branding():
             )
 
     # Desk navbar top-left logo
-    _safe_set("Navbar Settings",  "app_logo",     _LOGO_SQUARE)
+    _safe_set("Navbar Settings",  "app_logo",     _LOGO_HOR)
     # Login page / website branding
-    _safe_set("Website Settings", "app_logo",     _LOGO_HOR)
+    _safe_set("Website Settings", "app_logo",     _LOGO_SQUARE)
     _safe_set("Website Settings", "banner_image", _LOGO_HOR)
     _safe_set("Website Settings", "brand_html",
               f'<img src="{_LOGO_HOR}" alt="Alaiy OS" style="height:32px">')

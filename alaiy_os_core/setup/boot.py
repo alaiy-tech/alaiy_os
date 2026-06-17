@@ -80,7 +80,8 @@ def on_login(login_manager):
     user = login_manager.user
     user_roles = set(frappe.get_roles(user))
     bypass = {"System Manager", "Administrator"}
-    is_alaiy = bool(user_roles & ALAIY_OS_ROLES) and not bool(user_roles & bypass)
+    is_alaiy = bool(user_roles & ALAIY_OS_ROLES) and not bool(
+        user_roles & bypass)
 
     if not is_alaiy:
         return
