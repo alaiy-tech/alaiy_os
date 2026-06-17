@@ -29,6 +29,7 @@ from alaiy_os_core.constants.workspace import (
     WORKSPACE_NAME,
     WORKSPACE_SHORTCUTS,
     WORKSPACE_LINKS,
+    WORKSPACE_SIDEBAR_ITEMS,
     STANDARD_WORKSPACES_TO_HIDE,
 )
 from alaiy_os_core.constants.permissions import (
@@ -71,6 +72,7 @@ def _run_provisioning():
     create_roles()
     create_or_update_user(config)
     create_or_update_workspace()
+    create_or_update_workspace_sidebar()
     reconcile_doctype_permissions()
     restrict_standard_workspaces()
     configure_login_redirect(config)
@@ -218,6 +220,42 @@ def create_or_update_workspace():
                 ws.append("roles", {"role": role_name})
 
         ws.save(ignore_permissions=True)
+
+
+# ── Workspace Sidebar ────────────────────────────────────────────────────────
+
+def create_or_update_workspace_sidebar():
+    """
+    Provision the global left-panel sidebar for the Alaiy OS workspace.
+
+    Frappe renders the sidebar when a `Workspace Sidebar` record exists with:
+      name     == workspace name ("Alaiy OS")
+      for_user == ""  (empty = visible to all users on this workspace)
+
+    A user-specific record (for_user set) is only visible to that one user,
+    which is why the AlaiyOS user sees no sidebar if the record was created
+    by the admin through the UI (it gets pinned to the admin's email).
+
+    We always overwrite items so the app code stays the source of truth.
+    """
+    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+        sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
+        sidebar.for_user = ""       # ensure global scope
+        sidebar.set("items", [])
+        for item in WORKSPACE_SIDEBAR_ITEMS:
+            sidebar.append("items", item)
+        sidebar.save(ignore_permissions=True)
+    else:
+        sidebar = frappe.get_doc({
+            "doctype": "Workspace Sidebar",
+            "name":    WORKSPACE_NAME,
+            "title":   WORKSPACE_NAME,
+            "for_user": "",
+            "standard": 0,
+            "app":     "alaiy_os_core",
+            "items":   WORKSPACE_SIDEBAR_ITEMS,
+        })
+        sidebar.insert(ignore_permissions=True)
 
 
 # ── DocType permissions — full reconciliation ─────────────────────────────────

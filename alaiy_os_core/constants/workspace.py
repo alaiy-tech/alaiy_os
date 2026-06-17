@@ -107,3 +107,33 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Settings", "label": "Settings"},
 ]
+
+# Sidebar items for the left-panel navigation of the Alaiy OS workspace.
+# Mirrors the workspace link sections so users can quickly jump to any DocType.
+# The Workspace Sidebar record (name="Alaiy OS", for_user="") is the global
+# default sidebar for the workspace — empty for_user means all users see it.
+WORKSPACE_SIDEBAR_ITEMS = [
+    {"type": "Link",         "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+     "label": WORKSPACE_NAME, "child": 0, "indent": 0},
+
+    # Stock
+    {"type": "Section Break", "label": "Stock",               "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry",          "label": "Stock Entry",          "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item",                 "label": "Products",             "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Group",           "label": "Item Group",           "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Stock Reconciliation", "label": "Stock Reconciliation", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt",     "label": "Purchase Receipt",     "child": 1},
+
+    # Selling
+    {"type": "Section Break", "label": "Selling",             "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Sales Order",   "label": "Sales Order",   "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice", "label": "Sales Invoice", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Customer",      "label": "Customers",     "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Price List",    "label": "Price List",    "child": 1},
+
+    # Buying
+    {"type": "Section Break", "label": "Buying",              "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Order",   "label": "Purchase Order",   "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Invoice", "label": "Purchase Invoice", "child": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Supplier",         "label": "Supplier",         "child": 1},
+]
