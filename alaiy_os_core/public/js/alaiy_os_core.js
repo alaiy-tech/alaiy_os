@@ -10,20 +10,6 @@
 
 frappe.provide("alaiy_os_core");
 
-/* â”€â”€ CSS cache-buster â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-/* The theme.css URL has no hash, so browsers cache it indefinitely.
-   Replace it with a versioned URL so every JS reload picks up
-   the latest CSS without requiring a manual hard-refresh. */
-(function () {
-  var CSS_PATH = "/assets/alaiy_os_core/css/theme.css";
-  var ver = (frappe.boot && frappe.boot.app_version) || "1";
-  var old = document.querySelector('link[href*="alaiy_os_core/css/theme.css"]');
-  if (old) old.remove();
-  var link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = CSS_PATH + "?v=" + ver;
-  document.head.appendChild(link);
-})();
 
 /* â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 alaiy_os_core.cfg = function () {
