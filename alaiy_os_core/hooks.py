@@ -13,7 +13,7 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
-_V = "20260619a"
+_V = "20260619b"
 
 app_include_js = [
     # constants — loaded first so all other files can reference these globals
