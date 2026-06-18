@@ -19,9 +19,6 @@ WORKSPACE_SHORTCUTS = [
         "label": "Dashboard",   "color": "blue"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "My Pinned",   "color": "green"},
-    # Settings — JS intercepts this click; link_to is a placeholder only
-    {"type": "DocType", "link_to": "Stock Settings",
-        "label": "Settings",    "color": "grey"},
 ]
 
 WORKSPACE_LINKS = [
@@ -82,13 +79,15 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Contact",        "label": "Contacts"},
 
-    # ── BOTTOM DUMMIES ─────────────────────────────────────────────────────────
+    # ── BOTTOM ────────────────────────────────────────────────────────────────
     {"type": "Card Break", "label": "More", "icon": "bar-chart"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Entry",    "label": "Reports & Analytics"},
-    # Settings — click intercepted by alaiy_settings.js
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Stock Settings", "label": "Settings"},
+
+    # ── SETTINGS ──────────────────────────────────────────────────────────────
+    {"type": "Card Break", "label": "Settings", "icon": "settings"},
+    {"type": "Link", "link_type": "Page",
+        "link_to": "connector-settings", "label": "Connectors"},
 ]
 
 # Sidebar items — mirrors ALAIY_SIDEBAR_CONFIG in public/constants/workspace_config.js.
@@ -168,6 +167,10 @@ WORKSPACE_SIDEBAR_ITEMS = [
     # Bottom standalone actions
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "Reports & Analytics", "child": 0, "indent": 0, "icon": "chart-column"},
-    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": "Settings",            "child": 0, "indent": 0, "icon": "settings"},
+
+    # Settings section
+    {"type": "Section Break", "label": "Settings",
+        "icon": "settings", "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "Page", "link_to": "connector-settings",
+     "label": "Connectors", "child": 1, "icon": "plug"},
 ]
