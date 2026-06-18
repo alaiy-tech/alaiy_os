@@ -10,11 +10,6 @@ COMPANY_NAME     = "Alto Moda"
 COMPANY_CURRENCY = "INR"
 COMPANY_COUNTRY  = "India"
 
-# ── AlaiyOS admin user ─────────────────────────────────────────────────────────
-ALAIY_OS_ADMIN_USERNAME = "alaiyosadmin"
-ALAIY_OS_ADMIN_EMAIL    = "admin@alaiy.com"
-ALAIY_OS_ADMIN_PASSWORD = "alaiyos123"
-
 # ── Features ───────────────────────────────────────────────────────────────────
 # Toggle on every migrate — True shows the "Getting Started" onboarding panel
 # in the workspace sidebar; False hides it by clearing the module_onboarding
