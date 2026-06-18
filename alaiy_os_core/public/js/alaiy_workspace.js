@@ -102,7 +102,6 @@ AW._ensureOverlay = function () {
 AW.close = function () {
   if (AW._overlay) AW._overlay.classList.remove("visible");
   AW._doctype = null;
-  window.history.pushState({}, "", _osUrl());
   if (typeof updateAlaiyTitle === "function") updateAlaiyTitle("Dashboard");
 };
 
@@ -147,13 +146,6 @@ AW.openList = function (doctype, label) {
   const body = document.createElement("div");
   body.className = "alaiy-ws-body";
   overlay.appendChild(body);
-
-  // Update URL to /app/os/<slug>
-  window.history.pushState(
-    { alaiy: doctype },
-    "",
-    _osUrl(_labelToSlug(label || doctype))
-  );
 
   AW._renderList(body, doctype, label);
   if (typeof updateAlaiyTitle === "function") updateAlaiyTitle(label || doctype);
