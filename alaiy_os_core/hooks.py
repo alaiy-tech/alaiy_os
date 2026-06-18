@@ -13,26 +13,28 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
+_V = "20260618"
+
 app_include_js = [
     # constants — loaded first so all other files can reference these globals
-    "/assets/alaiy_os_core/constants/roles.js",
-    "/assets/alaiy_os_core/constants/workspace_config.js",
-    "/assets/alaiy_os_core/constants/route_titles.js",
-    "/assets/alaiy_os_core/constants/settings_tabs.js",
+    f"/assets/alaiy_os_core/constants/roles.js?v={_V}",
+    f"/assets/alaiy_os_core/constants/workspace_config.js?v={_V}",
+    f"/assets/alaiy_os_core/constants/route_titles.js?v={_V}",
+    f"/assets/alaiy_os_core/constants/settings_tabs.js?v={_V}",
     # shared title / UI utils
-    "/assets/alaiy_os_core/js/alaiy_ui.js",
+    f"/assets/alaiy_os_core/js/alaiy_ui.js?v={_V}",
     # workspace embedded content loader (intercepts card + sidebar clicks)
-    "/assets/alaiy_os_core/js/alaiy_workspace.js",
+    f"/assets/alaiy_os_core/js/alaiy_workspace.js?v={_V}",
     # route guard: /desk redirect + sidebar collapse + title update
-    "/assets/alaiy_os_core/js/route_guard.js",
+    f"/assets/alaiy_os_core/js/route_guard.js?v={_V}",
     # settings panel
-    "/assets/alaiy_os_core/js/alaiy_settings.js",
+    f"/assets/alaiy_os_core/js/alaiy_settings.js?v={_V}",
 ]
 app_include_css = [
-    "/assets/alaiy_os_core/css/core.css",
+    f"/assets/alaiy_os_core/css/core.css?v={_V}",
 ]
 
 # Website assets (login page only — NOT the desk)
 web_include_css = [
-    "/assets/alaiy_os_core/css/login.css",
+    f"/assets/alaiy_os_core/css/login.css?v={_V}",
 ]
