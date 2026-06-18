@@ -8,6 +8,13 @@ app_version = "0.0.1"
 after_install = "alaiy_os_core.setup.install.after_install"
 after_migrate = "alaiy_os_core.setup.install.after_migrate"
 
+# Inject Poppins font for the desk via <link> tag (faster than CSS @import)
+head_html = (
+    '<link rel="preconnect" href="https://fonts.googleapis.com">'
+    '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+    '<link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">'
+)
+
 # Boot + auth hooks
 boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"

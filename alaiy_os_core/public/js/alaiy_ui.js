@@ -38,21 +38,34 @@ function _patchAboutModal(modalEl) {
   if ($m.find(".modal-title").first().text().trim() !== "About") return;
   if ($m.find(".alaiy-about-patched").length) return; // already patched
 
-  // Remove Frappe version row, "Installed Apps" label, and the app-version list
-  $m.find(".about-info-rows, .about-info-row, .about-section-label").remove();
+  // ── Logo: replace Frappe wordmark with alaiyOS logo ──
+  $m.find(".about-frappe-wordmark")
+    .attr("src", "/assets/alaiy_os_core/images/alaiy/logo-hor.png")
+    .attr("alt", "Alaiy OS")
+    .css({ height: "28px", width: "auto" });
 
-  // Replace #about-app-versions with "Built by Alaiy" credit
-  const $av = $m.find("#about-app-versions");
-  const credit =
-    '<p class="alaiy-about-patched" style="margin:16px 0 0;font-size:13px;color:var(--text-muted)">' +
-      'Built by <a href="https://alaiy.com" target="_blank" rel="noopener noreferrer">Alaiy</a>' +
-    "</p>";
+  // ── Tagline ───────────────────────────────────────────
+  $m.find(".about-tagline").text("An AI-native E-Commerce OS");
 
-  if ($av.length) {
-    $av.replaceWith(credit);
-  } else {
-    $m.find(".about-body").append(credit);
-  }
+  // ── Social buttons: update URLs, remove Forum ─────────
+  $m.find("a.about-icon-btn[href*='frappe.io']").attr("href", "https://alaiy.com");
+  $m.find("a.about-icon-btn[href*='github.com']").attr("href", "https://github.com/alaiy-tech");
+  // Remove forum button (message-circle icon)
+  $m.find("a.about-icon-btn[href*='discuss']").remove();
+  $m.find("a.about-icon-btn").filter(function () {
+    return $(this).find("use[href*='message-circle'], use[xlink\\:href*='message-circle']").length > 0;
+  }).remove();
+
+  // ── Footer copyright → Built with ❤️ by Alaiy ────────
+  $m.find(".about-footer").html(
+    'Built with \u2764\ufe0f by <a href="https://alaiy.com" target="_blank" rel="noopener noreferrer">Alaiy</a>'
+  );
+
+  // ── Remove version/installed-apps rows ────────────────
+  $m.find(".about-info-rows, .about-info-row, .about-section-label, #about-app-versions").remove();
+
+  // Mark patched
+  $m.find(".about-body").append('<span class="alaiy-about-patched" style="display:none"></span>');
 }
 
 function _startAboutModalObserver() {

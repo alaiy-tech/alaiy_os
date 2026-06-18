@@ -1,137 +1,231 @@
-{% extends "templates/web.html" %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Login | Alaiy OS</title>
+  <link rel="icon" type="image/png" href="/assets/alaiy_os_core/images/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-{% block title %}Alaiy OS{% endblock %}
+    html, body {
+      font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      background: #ffffff;
+      min-height: 100vh;
+      color: #0b2a3f;
+    }
 
-{% block favicon %}
-<link rel="shortcut icon" href="/assets/alaiy_os_core/images/icon.png" type="image/png">
-{% endblock %}
+    /* Override any Frappe base styles that may leak in */
+    * { font-family: inherit; }
 
-{# Hide top navbar — login page has no need for it #}
-{% block navbar %}
-{% if show_language_picker %}{{ super() }}{% endif %}
-{% endblock %}
+    .topbar {
+      position: fixed;
+      top: 24px;
+      left: 32px;
+      z-index: 100;
+    }
+    .topbar img { height: 26px; display: block; }
 
-{% block head_include %}
-{{ include_style('login.bundle.css') }}
-{% endblock %}
+    .page {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 80px 20px 48px;
+    }
 
-{% macro logo_head(title=null) %}
-<div class="page-card-head">
-  <img class="app-logo" src="{{ logo or '/assets/alaiy_os_core/images/logo-square.png' }}" alt="{{ app_name or 'Alaiy OS' }}">
-  <h4>{% if title %}{{ _(title) }}{% else %}{{ app_name or 'Alaiy OS' }}{% endif %}</h4>
-</div>
-{% endmacro %}
+    .card { width: 100%; max-width: 420px; }
 
-{% block page_content %}
-<div>
-  <noscript>
-    <div class="text-center my-5">
-      <h4>{{ _("Javascript is disabled on your browser") }}</h4>
-      <p class="text-muted">{{ _("You need to enable JavaScript for your app to work.") }}</p>
-    </div>
-  </noscript>
+    .client-logo {
+      display: block;
+      max-width: 220px;
+      height: auto;
+      margin: 0 auto 36px;
+    }
 
-  <section class="for-login">
-    {{ logo_head() }}
-    <div class="login-content page-card">
-      <form class="form-signin form-login" role="form">
-        {% if not disable_user_pass_login or (ldap_settings and ldap_settings.enabled) %}
-        <div class="page-card-body">
-          <div class="form-group">
-            <label class="form-label sr-only" for="login_email">{{ login_label or _("Email") }}</label>
-            <div class="email-field">
-              <input type="text" id="login_email" class="form-control"
-                placeholder="{{ login_name_placeholder or _('jane@example.com') }}"
-                required autofocus autocomplete="username">
-              <svg class="field-icon email-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <use class="es-lock" href="#es-line-email"></use>
-              </svg>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label sr-only" for="login_password">{{ _("Password") }}</label>
-            <div class="password-field">
-              <input type="password" id="login_password" class="form-control"
-                placeholder="•••••" autocomplete="current-password" required>
-              <svg class="field-icon password-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <use class="es-lock" href="#es-line-lock"></use>
-              </svg>
-              <span toggle="#login_password" class="toggle-password text-muted">{{ _('Show') }}</span>
-            </div>
-          </div>
-          {% if not disable_user_pass_login %}
-          <p class="forgot-password-message">
-            <a href="#forgot">{{ _("Forgot Password?") }}</a>
-          </p>
-          {% endif %}
+    .heading {
+      font-size: 22px;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 6px;
+      font-family: "Poppins", sans-serif;
+    }
+    .subheading {
+      font-size: 13px;
+      color: #64748b;
+      text-align: center;
+      margin-bottom: 28px;
+      font-family: "Poppins", sans-serif;
+    }
+
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+    }
+    .label {
+      font-size: 13px;
+      font-weight: 500;
+      font-family: "Poppins", sans-serif;
+    }
+    .forgot {
+      font-size: 12px;
+      color: #0891b2;
+      text-decoration: none;
+      font-family: "Poppins", sans-serif;
+    }
+    .forgot:hover { text-decoration: underline; }
+
+    input[type="email"],
+    input[type="password"],
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 14px;
+      font-family: "Poppins", sans-serif !important;
+      font-size: 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      outline: none;
+      color: #0b2a3f;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      margin-bottom: 16px;
+      -webkit-appearance: none;
+    }
+    input:focus {
+      border-color: #0891b2;
+      box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
+    }
+    input::placeholder { color: #94a3b8; font-family: "Poppins", sans-serif; }
+
+    .btn-login {
+      width: 100%;
+      padding: 11px;
+      background: #0b2a3f;
+      color: #fff;
+      font-family: "Poppins", sans-serif !important;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      margin-top: 4px;
+      -webkit-appearance: none;
+    }
+    .btn-login:hover { opacity: 0.88; }
+    .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .error-msg {
+      color: #dc2626;
+      font-size: 12px;
+      font-family: "Poppins", sans-serif;
+      margin-bottom: 12px;
+      min-height: 16px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <img src="/assets/alaiy_os_core/images/logo-hor.png" alt="Alaiy OS">
+  </div>
+
+  <div class="page">
+    <div class="card">
+
+      <img
+        class="client-logo"
+        src="/assets/alaiy_os_core/client/assets/client-logo-hor.png"
+        alt="Alto Moda"
+      >
+
+      <h1 class="heading">Login</h1>
+      <p class="subheading">Enter your email below to login to your account</p>
+
+      <p class="error-msg" id="err"></p>
+
+      <form id="login-form" novalidate>
+        <label class="label" for="usr">Email</label>
+        <input id="usr" name="usr" type="email" placeholder="m@example.com" autocomplete="username" required>
+
+        <div class="label-row">
+          <label class="label" for="pwd">Password</label>
+          <a class="forgot" href="/update-password">Forgot your password?</a>
         </div>
-        {% endif %}
-        <div class="page-card-actions">
-          {% if not disable_user_pass_login %}
-          <button class="btn btn-sm btn-primary btn-block btn-login" type="submit">{{ _("Login") }}</button>
-          {% endif %}
-          {% if ldap_settings and ldap_settings.enabled %}
-          <button class="btn btn-sm {{ 'btn-primary' if disable_user_pass_login else 'btn-default' }} btn-block btn-login btn-ldap-login">
-            {{ _("Login with LDAP") }}
-          </button>
-          {% endif %}
-        </div>
+        <input id="pwd" name="pwd" type="password" autocomplete="current-password" required>
+
+        <button class="btn-login" id="submit-btn" type="submit">Login</button>
       </form>
-    </div>
-    {% if not disable_signup and not disable_user_pass_login %}
-    <div class="text-center sign-up-message">
-      {{ _("Don't have an account?") }} <a href="#signup">{{ _("Sign up") }}</a>
-    </div>
-    {% endif %}
-  </section>
 
-  <section class="for-signup {{ 'signup-disabled' if disable_signup else '' }}">
-    {{ logo_head(_('Create an Account')) }}
-    <div class="login-content page-card">
-      {% if not disable_signup %}
-        {{ signup_form_template }}
-      {% else %}
-      <div class="page-card-head mb-2">
-        <span class="indicator gray">{{ _("Signup Disabled") }}</span>
-        <p class="text-muted text-normal sign-up-message mt-1 mb-8">
-          {{ _("Signups have been disabled for this website.") }}
-        </p>
-        <div><a href="/" class="btn btn-primary btn-md">{{ _("Home") }}</a></div>
-      </div>
-      {% endif %}
     </div>
-  </section>
+  </div>
 
-  <section class="for-forgot">
-    {{ logo_head('Forgot Password') }}
-    <div class="login-content page-card">
-      <form class="form-signin form-forgot hide" role="form">
-        <div class="page-card-body">
-          <div class="email-field">
-            <input type="email" id="forgot_email" class="form-control"
-              placeholder="{{ _('Email Address') }}" required autofocus autocomplete="username">
-            <svg class="field-icon email-icon" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <use class="es-lock" href="#es-line-email"></use>
-            </svg>
-          </div>
-        </div>
-        <div class="page-card-actions">
-          <button class="btn btn-sm btn-primary btn-block btn-forgot" type="submit">
-            {{ _("Reset Password") }}
-          </button>
-          <p class="text-center sign-up-message">
-            <a href="#login">{{ _("Back to Login") }}</a>
-          </p>
-        </div>
-      </form>
-    </div>
-  </section>
-</div>
-{% endblock %}
+  <script>
+    (function () {
+      var form = document.getElementById("login-form");
+      var btn  = document.getElementById("submit-btn");
+      var err  = document.getElementById("err");
 
-{% block footer %}{% endblock %}
-{% block sidebar %}{% endblock %}
+      // Read redirect-to from query string (Frappe passes this when session expires)
+      function getRedirectTo() {
+        var params = new URLSearchParams(window.location.search);
+        var r = params.get("redirect-to") || params.get("redirect_to") || "";
+        // Safety: only allow relative paths to prevent open redirect
+        if (r && r.startsWith("/") && !r.startsWith("//")) return r;
+        return "/app/Workspaces/OS";
+      }
 
-{% block script %}
-<script>{% include "templates/includes/login/login.js" %}</script>
-{% endblock %}
+      // Read CSRF token from cookie
+      function getCsrf() {
+        var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : "";
+      }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        err.textContent = "";
+        btn.disabled = true;
+        btn.textContent = "Logging in\u2026";
+
+        var body = new URLSearchParams({
+          usr: document.getElementById("usr").value.trim(),
+          pwd: document.getElementById("pwd").value,
+        });
+
+        fetch("/api/method/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "X-Frappe-CSRF-Token": getCsrf(),
+          },
+          body: body.toString(),
+        })
+        .then(function (r) {
+          return r.json().then(function (j) { return { status: r.status, json: j }; });
+        })
+        .then(function (res) {
+          if (res.status === 200 && res.json.message === "Logged In") {
+            // Prefer server-supplied redirect, then query param, then default
+            window.location.href = res.json.home_page || getRedirectTo();
+          } else {
+            var msg = (res.json && (res.json.message || res.json.exc_type)) || "Invalid credentials";
+            err.textContent = msg;
+            btn.disabled = false;
+            btn.textContent = "Login";
+          }
+        })
+        .catch(function () {
+          err.textContent = "Login failed. Please try again.";
+          btn.disabled = false;
+          btn.textContent = "Login";
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

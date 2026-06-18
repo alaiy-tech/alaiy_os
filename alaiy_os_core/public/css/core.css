@@ -6,8 +6,7 @@
  * Global overrides affect all users including admins — that is not wanted.
  */
 
-/* ── Poppins font ─────────────────────────────────────────────────────────── */
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+/* Poppins is loaded via <link> in head_html (hooks.py) — faster than @import */
 
 /* Apply Poppins broadly across the desk UI — workspace, navbar, dropdowns,
  * onboarding sidebar, and all ERPNext panels AlaiyOS users interact with.
