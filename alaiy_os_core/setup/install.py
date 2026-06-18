@@ -225,6 +225,7 @@ def create_or_update_workspace():
             "shortcuts": WORKSPACE_SHORTCUTS,
             "links":     WORKSPACE_LINKS,
         })
+        ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
     else:
         ws = frappe.get_doc("Workspace", WORKSPACE_NAME)
@@ -242,6 +243,7 @@ def create_or_update_workspace():
         ws.public = 1
         ws.content = content
         ws.roles = []
+        ws.flags.ignore_validate = True
         ws.save(ignore_permissions=True)
 
 
