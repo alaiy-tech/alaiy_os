@@ -38,6 +38,7 @@ TARGET_DOCTYPES = [
     "Item Attribute",
     "Item Attribute Value",
     "Item Price",
+    "Item Variant",
     "Item Variant Attribute",
     "Brand",
     "Stock Reconciliation",
