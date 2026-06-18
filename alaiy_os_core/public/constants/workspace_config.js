@@ -27,6 +27,7 @@ const ALAIY_SIDEBAR_CONFIG = [
   // ── Catalog (pricing items included here; no separate Pricing section) ───────
   { label: "Catalog",              type: "section", icon: "grid" },
   { label: "Products",             type: "link", doctype: "Item",                 icon: "package" },
+  { label: "Item Variants",        type: "link", doctype: "Item Variant",         icon: "layers" },
   { label: "Item Group",           type: "link", doctype: "Item Group",           icon: "boxes" },
   { label: "Item Attribute",       type: "link", doctype: "Item Attribute",       icon: "list-filter" },
   { label: "Brand",                type: "link", doctype: "Brand",                icon: "badge" },
