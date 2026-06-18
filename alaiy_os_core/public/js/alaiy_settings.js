@@ -36,14 +36,21 @@ const AlaiySettings = {
 };
 
 alaiy_os.settings = {
-  /**
-   * Called when the Settings shortcut/link is clicked.
-   * Builds the panel once, then shows it and activates the first tab.
-   */
+  /** Open the panel at the last-active tab (or the first tab). */
   open() {
-    const workspace = document.querySelector(
-      ".workspace-container, .layout-main-section",
-    );
+    this.openTab(null);
+  },
+
+  /**
+   * Open the panel and activate a specific tab.
+   * Uses .layout-main-section as the container so the workspace sidebar
+   * remains visible while the panel is open.
+   */
+  openTab(tabId) {
+    // Prefer the main content section so the sidebar stays visible.
+    const workspace =
+      document.querySelector(".layout-main-section") ||
+      document.querySelector(".workspace-container");
     if (!workspace) {
       frappe.msgprint(__("Could not find the workspace container."));
       return;
@@ -54,13 +61,13 @@ alaiy_os.settings = {
     }
 
     AlaiySettings.panel.classList.add("visible");
-    const firstTabId = AlaiySettings.activeTabId || ALAIY_SETTINGS_TABS[0].id;
-    this._activateTab(firstTabId);
-    // Update title to reflect the settings panel being open
+    const targetTabId =
+      tabId || AlaiySettings.activeTabId || ALAIY_SETTINGS_TABS[0].id;
+    this._activateTab(targetTabId);
     if (typeof updateAlaiyTitle === "function") {
-      const firstTab = ALAIY_SETTINGS_TABS.find((t) => t.id === firstTabId);
+      const tab = ALAIY_SETTINGS_TABS.find((t) => t.id === targetTabId);
       updateAlaiyTitle(
-        "Settings \u00b7 " + (firstTab ? firstTab.label : "Settings"),
+        "Settings \u00b7 " + (tab ? tab.label : "Settings"),
       );
     }
   },
@@ -635,24 +642,72 @@ alaiy_os.settings = {
   },
 };
 
-// ── Hook into the Settings shortcut/link click ───────────────────────────────
-// Event delegation on the document so it survives Frappe re-rendering the
-// workspace on route change. Matches both the shortcut card and the sidebar
-// link whose label is exactly "Settings".
-document.addEventListener("click", function (e) {
-  const target = e.target.closest(
-    ".widget.shortcut-widget-box, .shortcut-widget-box, .workspace-shortcut-card, .link-item, a",
-  );
-  if (!target) return;
+// ── Workspace sidebar injection ───────────────────────────────────────────────
+// Injects a "Settings" section into the workspace sidebar (.layout-side-section)
+// whenever the user is on the OS workspace. Re-runs on every route change.
 
-  const labelText = (target.textContent || "").trim();
-  if (labelText !== "Settings") return;
-
-  // Only act inside the Alaiy OS workspace route.
+function _alaiyIsOSRoute() {
   const route = (frappe.get_route_str && frappe.get_route_str()) || "";
-  if (!route.startsWith("os")) return;
+  return (
+    route.startsWith("os") || route === "Workspaces/" + ALAIY_OS_WORKSPACE
+  );
+}
 
-  e.preventDefault();
-  e.stopPropagation();
-  alaiy_os.settings.open();
+function _alaiyInjectSettingsSidebar() {
+  if (!_alaiyIsOSRoute()) return;
+  if (document.getElementById("alaiy-settings-sidebar")) return;
+
+  const sidebar = document.querySelector(".layout-side-section");
+  if (!sidebar) return;
+
+  const section = document.createElement("div");
+  section.id = "alaiy-settings-sidebar";
+
+  const heading = document.createElement("div");
+  heading.className = "alaiy-settings-sidebar-heading";
+  heading.textContent = __("Settings");
+  section.appendChild(heading);
+
+  // ── Connectors link ──────────────────────────────────────────────────────
+  const connectorsLink = document.createElement("div");
+  connectorsLink.className = "alaiy-settings-sidebar-link";
+  connectorsLink.dataset.settingsTab = "connectors";
+  connectorsLink.innerHTML =
+    '<span class="settings-sidebar-link-icon">' +
+    frappe.utils.icon("plug", "sm") +
+    "</span>" +
+    '<span class="settings-sidebar-link-label">' +
+    __("Connectors") +
+    "</span>";
+  connectorsLink.addEventListener("click", function () {
+    section
+      .querySelectorAll(".alaiy-settings-sidebar-link")
+      .forEach(function (el) {
+        el.classList.remove("active");
+      });
+    connectorsLink.classList.add("active");
+    alaiy_os.settings.openTab("connectors");
+  });
+  section.appendChild(connectorsLink);
+
+  sidebar.appendChild(section);
+}
+
+function _alaiyTrySidebarInject() {
+  // Poll briefly — Frappe renders the sidebar asynchronously after route change.
+  var tries = 0;
+  var poll = setInterval(function () {
+    _alaiyInjectSettingsSidebar();
+    if (document.getElementById("alaiy-settings-sidebar") || ++tries >= 12) {
+      clearInterval(poll);
+    }
+  }, 350);
+}
+
+$(document).on("app_ready", _alaiyTrySidebarInject);
+frappe.router.on("change", function () {
+  // Remove the section when leaving the OS workspace so it re-injects fresh on return.
+  var existing = document.getElementById("alaiy-settings-sidebar");
+  if (existing) existing.remove();
+  if (_alaiyIsOSRoute()) _alaiyTrySidebarInject();
 });

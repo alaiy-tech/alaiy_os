@@ -223,6 +223,60 @@ input, textarea, select, button,
 }
 
 
+/* ── Injected "Settings" sidebar section (OS workspace only) ────────────────── */
+
+#alaiy-settings-sidebar {
+    margin-top: 8px;
+    padding: 12px 0 4px;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+}
+
+.alaiy-settings-sidebar-heading {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--text-muted, #8d99a6);
+    padding: 0 12px 6px;
+}
+
+.alaiy-settings-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 12px;
+    cursor: pointer;
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--text-color, #1c2126);
+    transition: background 0.12s;
+    user-select: none;
+}
+
+.alaiy-settings-sidebar-link:hover {
+    background: var(--control-bg-on-gray, #f4f5f6);
+}
+
+.alaiy-settings-sidebar-link.active {
+    background: var(--primary-light, #e8f3ff);
+    color: var(--primary, #2490ef);
+    font-weight: 500;
+}
+
+.settings-sidebar-link-icon {
+    width: 16px;
+    height: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.alaiy-settings-sidebar-link.active .settings-sidebar-link-icon {
+    opacity: 1;
+}
+
 /* ── Connector Settings Cards ─────────────────────────────────────────────── */
 
 .alaiy-connector-card {
