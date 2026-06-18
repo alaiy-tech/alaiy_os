@@ -223,6 +223,158 @@ input, textarea, select, button,
 }
 
 
+/* ── Connector Settings Cards ─────────────────────────────────────────────── */
+
+.alaiy-connector-card {
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 10px;
+    margin-bottom: 24px;
+    overflow: hidden;
+    background: var(--bg-color, #fff);
+}
+
+.alaiy-connector-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 22px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--control-bg, #f8fafc);
+}
+
+.alaiy-connector-icon-wrap {
+    width: 44px;
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    background: var(--bg-color, #fff);
+    border: 1px solid var(--border-color, #e2e8f0);
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.alaiy-connector-icon-img {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+}
+
+.alaiy-connector-meta {
+    flex: 1;
+    min-width: 0;
+}
+
+.alaiy-connector-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-color, #1c2126);
+}
+
+.alaiy-connector-subtitle {
+    font-size: 12px;
+    color: var(--text-muted, #8d99a6);
+    margin-top: 2px;
+    text-transform: capitalize;
+}
+
+.alaiy-connector-status {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: capitalize;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+.alaiy-connector-status.status-connected {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.alaiy-connector-status.status-failed {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.alaiy-connector-status.status-untested {
+    background: var(--control-bg, #f4f5f6);
+    color: var(--text-muted, #8d99a6);
+}
+
+.alaiy-connector-body {
+    padding: 20px 22px;
+}
+
+.alaiy-connector-field-row {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.alaiy-connector-field-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text-color, #1c2126);
+    white-space: nowrap;
+    margin: 0;
+}
+
+.alaiy-connector-field-input {
+    font-size: 13px;
+    height: 34px;
+    padding: 5px 10px;
+}
+
+.alaiy-connector-field-check-wrap {
+    display: flex;
+    align-items: center;
+}
+
+.alaiy-connector-field-desc-row {
+    grid-column: 1 / -1;
+    margin-top: -8px;
+    margin-bottom: 10px;
+    padding-left: 192px;
+}
+
+.alaiy-connector-field-desc {
+    font-size: 11px;
+    color: var(--text-muted, #8d99a6);
+}
+
+.alaiy-connector-footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 22px;
+    border-top: 1px solid var(--border-color, #e2e8f0);
+    background: var(--control-bg, #f8fafc);
+}
+
+.alaiy-connector-last-tested {
+    font-size: 11px;
+    color: var(--text-muted, #8d99a6);
+    margin-left: auto;
+}
+
+.alaiy-connector-result {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.alaiy-connector-result.success {
+    color: #166534;
+}
+
+.alaiy-connector-result.error {
+    color: #991b1b;
+}
+
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
  * with the AlaiyOS square logo. Hide the SVG text inside the icon-container. */
 .sidebar-header .icon-container {

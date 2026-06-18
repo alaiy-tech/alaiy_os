@@ -181,6 +181,8 @@ alaiy_os.settings = {
       this._mountSingleForm(content, tab.doctype);
     } else if (tab.type === "stacked") {
       this._mountStackedItems(content, tab);
+    } else if (tab.type === "connectors") {
+      this._mountConnectorsTab(content);
     }
   },
 
@@ -371,6 +373,265 @@ alaiy_os.settings = {
     el.className = "settings-loading";
     el.textContent = __("Loading…");
     container.appendChild(el);
+  },
+
+  // ── Connectors tab ────────────────────────────────────────────────────────
+
+  _mountConnectorsTab(container) {
+    this._showLoading(container);
+    frappe.call({
+      method: "alaiy_os_core.api.connectors.get_all_connectors",
+      callback: (r) => {
+        container.querySelector(".settings-loading")?.remove();
+        const connectors = r.message || [];
+        if (!connectors.length) {
+          const empty = document.createElement("div");
+          empty.className = "text-muted";
+          empty.style.paddingTop = "8px";
+          empty.textContent = __(
+            "No connectors installed. Install a connector app and run bench migrate.",
+          );
+          container.appendChild(empty);
+          return;
+        }
+        connectors.forEach((c) => this._buildConnectorCard(container, c));
+      },
+      error: () => {
+        container.querySelector(".settings-loading")?.remove();
+        const err = document.createElement("div");
+        err.className = "text-danger";
+        err.style.paddingTop = "8px";
+        err.textContent = __("Could not load connectors.");
+        container.appendChild(err);
+      },
+    });
+  },
+
+  _buildConnectorCard(container, connector) {
+    const card = document.createElement("div");
+    card.className = "alaiy-connector-card";
+    card.dataset.connectorId = connector.connector_id;
+
+    // ── Header ──────────────────────────────────────────────────────────────
+    const header = document.createElement("div");
+    header.className = "alaiy-connector-header";
+
+    const iconWrap = document.createElement("div");
+    iconWrap.className = "alaiy-connector-icon-wrap";
+    if (connector.icon_url) {
+      const img = document.createElement("img");
+      img.src = connector.icon_url;
+      img.alt = connector.connector_name;
+      img.className = "alaiy-connector-icon-img";
+      iconWrap.appendChild(img);
+    } else {
+      iconWrap.innerHTML = frappe.utils.icon(connector.icon || "plug", "lg");
+    }
+    header.appendChild(iconWrap);
+
+    const meta = document.createElement("div");
+    meta.className = "alaiy-connector-meta";
+    const subtitle = [connector.connector_type, connector.description]
+      .filter(Boolean)
+      .join(" · ");
+    meta.innerHTML =
+      `<div class="alaiy-connector-name">${connector.connector_name}</div>` +
+      (subtitle
+        ? `<div class="alaiy-connector-subtitle">${subtitle}</div>`
+        : "");
+    header.appendChild(meta);
+
+    const statusBadge = document.createElement("div");
+    const statusVal = connector.connection_status || "untested";
+    statusBadge.className = `alaiy-connector-status status-${statusVal}`;
+    statusBadge.textContent = statusVal.replace(/-/g, " ");
+    header.appendChild(statusBadge);
+
+    card.appendChild(header);
+
+    // ── Body (fields, loaded async) ──────────────────────────────────────────
+    const body = document.createElement("div");
+    body.className = "alaiy-connector-body";
+    this._showLoading(body);
+    card.appendChild(body);
+
+    // ── Footer ───────────────────────────────────────────────────────────────
+    const footer = document.createElement("div");
+    footer.className = "alaiy-connector-footer";
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "btn btn-sm btn-primary alaiy-connector-save";
+    saveBtn.textContent = __("Save & Test");
+    footer.appendChild(saveBtn);
+
+    if (connector.last_tested_at) {
+      const testedEl = document.createElement("span");
+      testedEl.className = "alaiy-connector-last-tested";
+      testedEl.textContent = __(
+        "Last tested: {0}",
+        [frappe.datetime.comment_when(connector.last_tested_at)],
+      );
+      footer.appendChild(testedEl);
+    }
+
+    const resultMsg = document.createElement("div");
+    resultMsg.className = "alaiy-connector-result";
+    footer.appendChild(resultMsg);
+
+    card.appendChild(footer);
+    container.appendChild(card);
+
+    // Load field config
+    frappe.call({
+      method: "alaiy_os_core.api.connectors.get_connector_config",
+      args: { connector_id: connector.connector_id },
+      callback: (r) => {
+        body.querySelector(".settings-loading")?.remove();
+        const { fields, values } = r.message || {};
+        if (!fields || !fields.length) {
+          const p = document.createElement("p");
+          p.className = "text-muted";
+          p.textContent = __("No configuration fields.");
+          body.appendChild(p);
+          return;
+        }
+        fields.forEach((f) => this._renderConnectorField(body, f, values[f.fieldname]));
+      },
+      error: () => {
+        body.querySelector(".settings-loading")?.remove();
+        const p = document.createElement("p");
+        p.className = "text-danger";
+        p.textContent = __("Could not load settings.");
+        body.appendChild(p);
+      },
+    });
+
+    // Save & Test handler
+    saveBtn.addEventListener("click", () => {
+      const vals = this._collectConnectorValues(body);
+      saveBtn.disabled = true;
+      saveBtn.textContent = __("Saving…");
+      resultMsg.textContent = "";
+      resultMsg.className = "alaiy-connector-result";
+
+      frappe.call({
+        method: "alaiy_os_core.api.connectors.save_and_test",
+        args: {
+          connector_id: connector.connector_id,
+          values: JSON.stringify(vals),
+        },
+        callback: (r) => {
+          saveBtn.disabled = false;
+          saveBtn.textContent = __("Save & Test");
+          const res = r.message || {};
+          if (res.success) {
+            resultMsg.className = "alaiy-connector-result success";
+            resultMsg.textContent =
+              "✓ " + (res.message || __("Connected successfully"));
+            statusBadge.className = "alaiy-connector-status status-connected";
+            statusBadge.textContent = "connected";
+          } else {
+            resultMsg.className = "alaiy-connector-result error";
+            resultMsg.textContent =
+              "✗ " + (res.message || __("Connection failed"));
+            statusBadge.className = "alaiy-connector-status status-failed";
+            statusBadge.textContent = "failed";
+          }
+        },
+        error: () => {
+          saveBtn.disabled = false;
+          saveBtn.textContent = __("Save & Test");
+          resultMsg.className = "alaiy-connector-result error";
+          resultMsg.textContent = __("An error occurred. Check the console.");
+        },
+      });
+    });
+  },
+
+  _renderConnectorField(container, field, value) {
+    const row = document.createElement("div");
+    row.className = "alaiy-connector-field-row";
+
+    const label = document.createElement("label");
+    label.className = "alaiy-connector-field-label";
+    label.textContent = field.label || field.fieldname;
+
+    let input;
+    if (field.fieldtype === "Password") {
+      input = document.createElement("input");
+      input.type = "password";
+      input.className = "form-control alaiy-connector-field-input";
+      input.dataset.fieldname = field.fieldname;
+      input.dataset.fieldtype = "password";
+      input.placeholder =
+        value && value._set
+          ? __("(saved — type to replace)")
+          : __("Enter value");
+    } else if (field.fieldtype === "Check") {
+      const wrap = document.createElement("div");
+      wrap.className = "alaiy-connector-field-check-wrap";
+      input = document.createElement("input");
+      input.type = "checkbox";
+      input.dataset.fieldname = field.fieldname;
+      input.dataset.fieldtype = "check";
+      input.checked = !!value;
+      wrap.appendChild(input);
+      row.appendChild(label);
+      row.appendChild(wrap);
+      container.appendChild(row);
+      return;
+    } else if (field.fieldtype === "Select" && field.options) {
+      input = document.createElement("select");
+      input.className = "form-control alaiy-connector-field-input";
+      input.dataset.fieldname = field.fieldname;
+      field.options.split("\n").forEach((opt) => {
+        const option = document.createElement("option");
+        option.value = opt;
+        option.textContent = opt || __("(select)");
+        if (opt === value) option.selected = true;
+        input.appendChild(option);
+      });
+    } else {
+      input = document.createElement("input");
+      input.type = field.fieldtype === "Int" ? "number" : "text";
+      input.className = "form-control alaiy-connector-field-input";
+      input.dataset.fieldname = field.fieldname;
+      input.value = value !== null && value !== undefined ? value : "";
+    }
+
+    if (field.description) {
+      const desc = document.createElement("div");
+      desc.className = "alaiy-connector-field-desc";
+      desc.textContent = field.description;
+      row.appendChild(label);
+      row.appendChild(input);
+      container.appendChild(row);
+      const descRow = document.createElement("div");
+      descRow.className = "alaiy-connector-field-desc-row";
+      descRow.appendChild(desc);
+      container.appendChild(descRow);
+      return;
+    }
+
+    row.appendChild(label);
+    row.appendChild(input);
+    container.appendChild(row);
+  },
+
+  _collectConnectorValues(body) {
+    const values = {};
+    body.querySelectorAll("[data-fieldname]").forEach((el) => {
+      const name = el.dataset.fieldname;
+      const type = el.dataset.fieldtype;
+      if (type === "check") {
+        values[name] = el.checked ? 1 : 0;
+      } else if (type === "password") {
+        if (el.value.trim()) values[name] = el.value.trim();
+      } else {
+        values[name] = el.value;
+      }
+    });
+    return values;
   },
 };
 

@@ -93,4 +93,12 @@ const ALAIY_SETTINGS_TABS = [
       { label: "Access Log", doctype: "Access Log", type: "list" },
     ],
   },
+
+  // ── Connector settings (dynamic — loaded from OS Connector Registry) ────
+  {
+    id: "connectors",
+    label: "Connectors",
+    icon: "plug",
+    type: "connectors",
+  },
 ];
