@@ -44,12 +44,6 @@ const ALAIY_SIDEBAR_CONFIG = [
     doctype: "Item Attribute",
     icon: "list-filter",
   },
-  {
-    label: "Item Variants",
-    type: "link",
-    doctype: "Item Variant Settings",
-    icon: "layers",
-  },
   { label: "Brand", type: "link", doctype: "Brand", icon: "badge" },
   { label: "Item Price", type: "link", doctype: "Item Price", icon: "tag" },
   { label: "Price List", type: "link", doctype: "Price List", icon: "tags" },
@@ -112,7 +106,7 @@ const ALAIY_SIDEBAR_CONFIG = [
     label: "Customer Group",
     type: "link",
     doctype: "Customer Group",
-    icon: "users-2",
+    icon: "users-round",
   },
   { label: "Address", type: "link", doctype: "Address", icon: "map-pinned" },
   {

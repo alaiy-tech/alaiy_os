@@ -13,37 +13,37 @@ const ALAIY_ROUTE_TITLES = {
   "os": "Dashboard",
 
   // Inventory
-  "List/Stock Entry/List":          "Inventory · Stock Entry",
-  "List/Stock Reconciliation/List": "Inventory · Stock Reconciliation",
-  "List/Purchase Receipt/List":     "Inventory · Purchase Receipt",
+  "List/Stock Entry/List":          "Inventory - Stock Entry",
+  "List/Stock Reconciliation/List": "Inventory - Stock Reconciliation",
+  "List/Purchase Receipt/List":     "Inventory - Purchase Receipt",
 
   // Catalog
-  "List/Item/List":            "Catalog · Products",
-  "List/Item Group/List":      "Catalog · Item Group",
-  "List/Item Attribute/List":  "Catalog · Item Attribute",
-  "List/Brand/List":           "Catalog · Brand",
+  "List/Item/List":            "Catalog - Products",
+  "List/Item Group/List":      "Catalog - Item Group",
+  "List/Item Attribute/List":  "Catalog - Item Attribute",
+  "List/Brand/List":           "Catalog - Brand",
 
   // Sales
-  "List/Sales Order/List":   "Sales · Sales Order",
-  "List/Sales Invoice/List": "Sales · Sales Invoice",
+  "List/Sales Order/List":   "Sales - Sales Order",
+  "List/Sales Invoice/List": "Sales - Sales Invoice",
 
   // Customers
   "List/Customer/List":       "Customers",
-  "List/Customer Group/List": "Customers · Customer Group",
-  "List/Address/List":        "Customers · Address",
-  "List/Contact/List":        "Customers · Contact",
-  "List/UTM Source/List":     "Customers · UTM Source",
+  "List/Customer Group/List": "Customers - Customer Group",
+  "List/Address/List":        "Customers - Address",
+  "List/Contact/List":        "Customers - Contact",
+  "List/UTM Source/List":     "Customers - UTM Source",
 
   // Procurement
-  "List/Purchase Order/List":   "Procurement · Purchase Order",
-  "List/Purchase Invoice/List": "Procurement · Purchase Invoice",
-  "List/Supplier/List":         "Procurement · Supplier",
-  "List/Supplier Group/List":   "Procurement · Supplier Group",
+  "List/Purchase Order/List":   "Procurement - Purchase Order",
+  "List/Purchase Invoice/List": "Procurement - Purchase Invoice",
+  "List/Supplier/List":         "Procurement - Supplier",
+  "List/Supplier Group/List":   "Procurement - Supplier Group",
 
   // Pricing
-  "List/Item Price/List":   "Pricing · Item Price",
-  "List/Price List/List":   "Pricing · Price List",
-  "List/Pricing Rule/List": "Pricing · Pricing Rule",
+  "List/Item Price/List":   "Pricing - Item Price",
+  "List/Price List/List":   "Pricing - Price List",
+  "List/Pricing Rule/List": "Pricing - Pricing Rule",
 };
 
 // eslint-disable-next-line no-unused-vars

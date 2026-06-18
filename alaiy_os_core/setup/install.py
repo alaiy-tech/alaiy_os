@@ -6,7 +6,6 @@ Reconciles the site's workspace, branding and company to match this codebase.
 
 Data definitions:
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
-  constants/branding.py    — logo / favicon asset paths
   constants/onboarding.py  — ONBOARDING_NAME, ONBOARDING_STEPS
 
 Client config:
@@ -19,7 +18,6 @@ import json
 import frappe
 
 from alaiy_os_core.client.config import boot_config
-from alaiy_os_core.constants import branding
 from alaiy_os_core.constants.workspace import (
     WORKSPACE_NAME,
     WORKSPACE_SHORTCUTS,
@@ -121,7 +119,12 @@ def skip_erpnext_onboarding():
     Also marks all Module Onboarding records for ERPNext modules as complete
     so the Getting Started banners are suppressed.
     """
-    # 1. Mark the global setup wizard complete
+    # 1. Mark the global setup wizard complete via DefaultValue
+    #    frappe.db.get_default("setup_complete") reads from tabDefaultValue —
+    #    this is the canonical Frappe mechanism used by the setup wizard.
+    frappe.db.set_default("setup_complete", 1)
+
+    # Also set the System Settings field if it exists (ERPNext-specific)
     if frappe.db.exists("DocType", "System Settings"):
         try:
             meta = frappe.get_meta("System Settings")

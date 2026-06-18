@@ -22,13 +22,6 @@ const ALAIY_SETTINGS_TABS = [
     doctype: "Stock Settings",
   },
   {
-    id: "item-variants",
-    label: "Item Variant Settings",
-    icon: "settings",
-    type: "single",
-    doctype: "Item Variant Settings",
-  },
-  {
     id: "selling",
     label: "Selling",
     icon: "briefcase",

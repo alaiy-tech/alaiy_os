@@ -10,15 +10,7 @@ public/constants/workspace_config.js (the JS counterpart).
 """
 
 WORKSPACE_NAME = "OS"
-
-# Standard ERPNext workspaces from which AlaiyOS roles are removed on every
-# migrate, so they don't appear in the desk sidebar for AlaiyOS users.
-STANDARD_WORKSPACES_TO_HIDE = [
-    "Stock", "Selling", "Buying", "Accounting", "HR", "CRM",
-    "Manufacturing", "Projects", "Assets", "Quality", "Support",
-    "Payroll", "ERPNext Integrations", "Settings", "Users",
-    "Build", "Home", "Learn", "Website", "Customization",
-]
+WORKSPACE_ROUTE = "os"  # URL slug: /desk/os
 
 WORKSPACE_SHORTCUTS = [
     {"type": "DocType", "link_to": "Stock Entry",
@@ -48,8 +40,6 @@ WORKSPACE_LINKS = [
         "link_to": "Item Group",      "label": "Item Group"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Item Attribute",  "label": "Item Attribute"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Variant Settings", "label": "Item Variants"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Brand",           "label": "Brand"},
     {"type": "Link", "link_type": "DocType",
@@ -129,8 +119,6 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Item Group",     "child": 1, "icon": "boxes"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Attribute",
      "label": "Item Attribute", "child": 1, "icon": "list-filter"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Item Variant Settings",
-     "label": "Item Variants", "child": 1, "icon": "layers"},
     {"type": "Link", "link_type": "DocType", "link_to": "Brand",
      "label": "Brand",         "child": 1, "icon": "badge"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Price",
@@ -169,7 +157,7 @@ WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Customer",
      "label": "Customer",        "child": 1, "icon": "user"},
     {"type": "Link", "link_type": "DocType", "link_to": "Customer Group",
-     "label": "Customer Group", "child": 1, "icon": "users-2"},
+     "label": "Customer Group", "child": 1, "icon": "users-round"},
     {"type": "Link", "link_type": "DocType", "link_to": "Address",
      "label": "Address",         "child": 1, "icon": "map-pinned"},
     {"type": "Link", "link_type": "DocType", "link_to": "UTM Source",

@@ -8,22 +8,12 @@
  *   constants/route_titles.js — ALAIY_ROUTE_TITLES, ALAIY_ROUTE_PREFIX_TITLES
  */
 
-// ── Company name helper ───────────────────────────────────────────────────────
-function _getAlaiyTitlePrefix() {
-  const company =
-    (frappe.boot &&
-      frappe.boot.sysdefaults &&
-      frappe.boot.sysdefaults.company) ||
-    null;
-  return company ? company + " OS" : "Alaiy OS";
-}
-
 // ── Page-container failsafe ───────────────────────────────────────────────────
 function _ensurePageVisible() {
   var attempts = 0;
   var interval = setInterval(function () {
     attempts++;
-    var pc     = document.querySelector(".page-container");
+    var pc = document.querySelector(".page-container");
     var splash = document.querySelector(".centered.splash");
     if (pc && getComputedStyle(pc).display === "none") {
       pc.style.removeProperty("display");
@@ -48,8 +38,7 @@ $(document).on("app_ready", function () {
 
 // eslint-disable-next-line no-unused-vars
 function updateAlaiyTitle(section) {
-  const prefix = _getAlaiyTitlePrefix();
-  document.title = prefix + " — " + (section || "Dashboard") + " | Alaiy OS";
+  document.title = (section || "Dashboard") + " | Alaiy OS";
 }
 
 // eslint-disable-next-line no-unused-vars
