@@ -11,9 +11,9 @@ public/constants/workspace_config.js (the JS counterpart).
 
 from alaiy_os_core.constants.branding import LOGO_SQUARE
 
-WORKSPACE_NAME  = "OS"
+WORKSPACE_NAME = "OS"
 WORKSPACE_ROUTE = "os"
-LOGO_URL        = LOGO_SQUARE
+LOGO_URL = LOGO_SQUARE
 
 # Standard ERPNext workspaces from which AlaiyOS roles are removed on every
 # migrate, so they don't appear in the desk sidebar for AlaiyOS users.
@@ -53,6 +53,8 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Item Attribute",  "label": "Item Attribute"},
     {"type": "Link", "link_type": "DocType",
+        "link_to": "Item Variant Settings", "label": "Item Variants"},
+    {"type": "Link", "link_type": "DocType",
         "link_to": "Brand",           "label": "Brand"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Item Price",      "label": "Item Price"},
@@ -86,7 +88,7 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Customer",       "label": "Customer"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Customer Group", "label": "Customer Groups"},
+        "link_to": "Customer Group", "label": "Customer Group"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Address",        "label": "Address"},
     {"type": "Link", "link_type": "DocType",
@@ -115,20 +117,24 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
 
     # Inventory
-    {"type": "Section Break", "label": "Inventory",  "icon": "archive",        "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Inventory",
+        "icon": "archive",        "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry",
      "label": "Stock Entry",          "child": 1, "icon": "package-plus"},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Reconciliation",
      "label": "Stock Reconciliation", "child": 1, "icon": "clipboard-check"},
 
     # Catalog (pricing items included; no separate Pricing section)
-    {"type": "Section Break", "label": "Catalog",    "icon": "grid",           "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Catalog",
+        "icon": "grid",           "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Item",
      "label": "Products",       "child": 1, "icon": "package"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Group",
      "label": "Item Group",     "child": 1, "icon": "boxes"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Attribute",
      "label": "Item Attribute", "child": 1, "icon": "list-filter"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Variant Settings",
+     "label": "Item Variants", "child": 1, "icon": "layers"},
     {"type": "Link", "link_type": "DocType", "link_to": "Brand",
      "label": "Brand",         "child": 1, "icon": "badge"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Price",
@@ -139,14 +145,16 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Pricing Rule",  "child": 1, "icon": "badge-percent"},
 
     # Sales
-    {"type": "Section Break", "label": "Sales",      "icon": "trending-up",    "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Sales",
+        "icon": "trending-up",    "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Order",
      "label": "Sales Order",   "child": 1, "icon": "shopping-cart"},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice",
      "label": "Sales Invoice", "child": 1, "icon": "receipt"},
 
     # Procurement (Purchase Receipt moved here from Inventory)
-    {"type": "Section Break", "label": "Procurement", "icon": "package-search", "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Procurement",
+        "icon": "package-search", "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Order",
      "label": "Purchase Order",   "child": 1, "icon": "file-input"},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Invoice",
@@ -160,11 +168,12 @@ WORKSPACE_SIDEBAR_ITEMS = [
 
     # Customers (Contact removed; Contacts consolidated from bottom standalone)
     # Label "Customer" (singular) avoids ALAIY_SKIP_LABELS collision with section "Customers".
-    {"type": "Section Break", "label": "Customers",  "icon": "users",          "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Customers",
+        "icon": "users",          "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Customer",
      "label": "Customer",        "child": 1, "icon": "user"},
     {"type": "Link", "link_type": "DocType", "link_to": "Customer Group",
-     "label": "Customer Groups", "child": 1, "icon": "users-2"},
+     "label": "Customer Group", "child": 1, "icon": "users-2"},
     {"type": "Link", "link_type": "DocType", "link_to": "Address",
      "label": "Address",         "child": 1, "icon": "map-pinned"},
     {"type": "Link", "link_type": "DocType", "link_to": "UTM Source",

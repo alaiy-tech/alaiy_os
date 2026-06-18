@@ -10,15 +10,7 @@ after_migrate = "alaiy_os_core.setup.install.after_migrate"
 
 # Boot + auth hooks
 boot_session = "alaiy_os_core.setup.boot.boot_session"
-on_session_creation = "alaiy_os_core.setup.boot.on_session_creation"
 on_login = "alaiy_os_core.setup.boot.on_login"
-
-# Route any user with an AlaiyOS role to the workspace on login.
-# Works in addition to the per-user default_workspace DB field set in install.py.
-role_home_page = {
-    "Alaiy OS User":    "/app/Workspaces/OS",
-    "Alaiy OS Manager": "/app/Workspaces/OS",
-}
 
 # Desk assets (loaded for logged-in desk users)
 app_include_js = [
@@ -31,13 +23,11 @@ app_include_js = [
     "/assets/alaiy_os_core/js/alaiy_ui.js",
     # workspace embedded content loader (intercepts card + sidebar clicks)
     "/assets/alaiy_os_core/js/alaiy_workspace.js",
-    # route guard (confines AlaiyOS users to /os route)
-    "/assets/alaiy_os_core/js/route_guard.js",
     # settings panel
     "/assets/alaiy_os_core/js/alaiy_settings.js",
 ]
 app_include_css = [
-    "/assets/alaiy_os_core/css/alaiy_os.css",
+    "/assets/alaiy_os_core/css/core.css",
 ]
 
 # Website assets (login page only — NOT the desk)
