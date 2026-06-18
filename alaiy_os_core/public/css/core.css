@@ -1,0 +1,346 @@
+/*
+ * AlaiyOS Workspace — Scoped Styles
+ *
+ * Rules here are intentionally scoped to AlaiyOS contexts.
+ * Do NOT add global ERPNext UI overrides here.
+ * Global overrides affect all users including admins — that is not wanted.
+ */
+
+/* ── Poppins font ─────────────────────────────────────────────────────────── */
+@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
+
+/* Apply Poppins broadly across the desk UI — workspace, navbar, dropdowns,
+ * onboarding sidebar, and all ERPNext panels AlaiyOS users interact with.
+ * The !important mirrors what Frappe itself uses so our rule wins. */
+.layout-main-section,
+.layout-main-section input,
+.layout-main-section textarea,
+.layout-main-section select,
+.layout-main-section button,
+.layout-main-section .form-control,
+.layout-main-section .btn,
+.layout-main-section .widget,
+.layout-main-section h1,
+.layout-main-section h2,
+.layout-main-section h3,
+.layout-main-section h4,
+.layout-main-section h5,
+.layout-main-section h6,
+/* workspace sidebar left-panel — wildcard covers all descendants including
+ * the bottom user card regardless of which element tags Frappe uses */
+.layout-side-section,
+.layout-side-section *,
+.desk-sidebar,
+.desk-sidebar *,
+.workspace-sidebar,
+.workspace-sidebar *,
+/* bottom user card (avatar / name / email / Getting Started link) */
+.body-sidebar-bottom,
+.body-sidebar-bottom *,
+.sidebar-bottom-area,
+.sidebar-bottom-area *,
+/* top-navbar dropdowns */
+.dropdown-menu,
+.dropdown-menu li,
+.dropdown-menu a,
+.dropdown-menu button,
+.dropdown-item,
+/* onboarding / getting-started sidebar */
+.onboarding-sidebar,
+.onboarding-sidebar *,
+.modules-section {
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* ── Sidebar item labels — override Frappe's per-element font rules ──────── */
+/* Frappe sets font-family on .standard-sidebar-item and its children via
+ * inline styles or highly-specific rules. These selectors beat those. */
+.standard-sidebar-item,
+.standard-sidebar-item .sidebar-item-label,
+.standard-sidebar-item .sidebar-item-icon,
+.standard-sidebar-item span,
+.standard-sidebar-item a,
+.sidebar-item-container,
+.sidebar-item-container .sidebar-item-label,
+.sidebar-item-container span,
+.sidebar-menu-item,
+.sidebar-menu-item .sidebar-item-label,
+.sidebar-section-label,
+.sidebar-section .sidebar-item-label,
+.desk-sidebar .item-anchor,
+.desk-sidebar .item-anchor span,
+.desk-sidebar .sidebar-label {
+    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+}
+
+/* ── Sidebar width ─────────────────────────────────────────────────────────── */
+
+/* The workspace-specific sidebar (left panel inside the workspace page).
+ * Uses the Frappe CSS variable where possible; the explicit width is a fallback. */
+:root {
+    --sidebar-width: 240px;
+}
+
+.layout-side-section {
+    width: 240px !important;
+    min-width: 240px !important;
+}
+
+/* Reposition the collapse/expand toggle button to match the new 240px width.
+ * Frappe anchors it with `left` relative to the sidebar's right edge. */
+.collapse-sidebar-link.sidebar-toggle-btn,
+.btn-collapse-sidebar {
+    left: 240px !important;
+}
+
+/* Workspace sidebar header logo */
+.desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
+.desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {
+    background-image: url('/assets/alaiy_os_core/images/logo-square.png');
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
+}
+
+/* ── Settings Panel ──────────────────────────────────────────────────────── */
+
+/* Overlay container that sits inside the workspace content area */
+#alaiy-settings-panel {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: var(--bg-color, #fff);
+    z-index: 10;
+    overflow: hidden;
+}
+
+#alaiy-settings-panel.visible {
+    display: flex;
+}
+
+/* Left: tab list — vertical tabs with a section label above */
+.alaiy-settings-tabs {
+    width: 220px;
+    min-width: 220px;
+    border-right: 1px solid var(--border-color, #e2e8f0);
+    padding: 24px 0;
+    overflow-y: auto;
+    flex-shrink: 0;
+}
+
+.alaiy-settings-tabs .tab-section-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted, #8d99a6);
+    padding: 16px 20px 6px;
+}
+
+.alaiy-settings-tabs .tab-section-label:first-child {
+    padding-top: 0;
+}
+
+.alaiy-settings-tabs .tab-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 20px;
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--text-color, #1c2126);
+    border-radius: 0;
+    transition: background 0.12s;
+}
+
+.alaiy-settings-tabs .tab-item:hover {
+    background: var(--control-bg, #f4f5f6);
+}
+
+.alaiy-settings-tabs .tab-item.active {
+    background: var(--primary-light, #e8f3ff);
+    color: var(--primary, #2490ef);
+    font-weight: 500;
+}
+
+.alaiy-settings-tabs .tab-item .tab-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+    flex-shrink: 0;
+}
+
+/* Right: content area where forms / lists are mounted */
+.alaiy-settings-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 40px;
+    position: relative;
+}
+
+.alaiy-settings-content .settings-section-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-color, #1c2126);
+    margin-bottom: 24px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+/* Back button shown when drilled into a list record */
+.alaiy-settings-content .settings-back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: var(--primary, #2490ef);
+    cursor: pointer;
+    margin-bottom: 16px;
+}
+
+.alaiy-settings-content .settings-back-btn:hover {
+    text-decoration: underline;
+}
+
+/* Stack multiple forms/lists vertically (Organisation / Users / Audits) */
+.alaiy-settings-stacked-form {
+    margin-bottom: 40px;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.alaiy-settings-stacked-form .stacked-form-header {
+    background: var(--control-bg, #f4f5f6);
+    padding: 12px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+}
+
+.alaiy-settings-stacked-form .stacked-form-body {
+    padding: 20px;
+}
+
+/* Loading spinner inside the content area */
+.alaiy-settings-content .settings-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 200px;
+    color: var(--text-muted);
+    font-size: 13px;
+    gap: 10px;
+}
+
+/* ── Workspace Embedded Content Overlay ─────────────────────────────────────── */
+
+#alaiy-ws-content {
+    display: none;
+    position: absolute;
+    inset: 0;
+    background: var(--bg-color, #fff);
+    z-index: 20;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+#alaiy-ws-content.visible {
+    display: flex;
+}
+
+.alaiy-ws-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 24px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    background: var(--bg-color, #fff);
+    flex-shrink: 0;
+}
+
+.alaiy-ws-back {
+    background: none;
+    border: none;
+    color: var(--primary, #2490ef);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.alaiy-ws-back:hover {
+    background: var(--control-bg, #f4f5f6);
+}
+
+.alaiy-ws-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-color, #1c2126);
+    flex: 1;
+}
+
+.alaiy-ws-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+}
+
+/* List table */
+.alaiy-ws-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+}
+
+.alaiy-ws-table thead th {
+    text-align: left;
+    padding: 8px 12px;
+    background: var(--control-bg, #f4f5f6);
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    font-weight: 600;
+    color: var(--text-muted, #8d99a6);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.alaiy-ws-table tbody tr {
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.alaiy-ws-table tbody tr:hover {
+    background: var(--control-bg, #f4f5f6);
+}
+
+.alaiy-ws-table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color, #e2e8f0);
+    color: var(--text-color, #1c2126);
+}
+
+/* Loading / empty states */
+.alaiy-ws-loading,
+.alaiy-ws-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 160px;
+    font-size: 13px;
+    color: var(--text-muted, #8d99a6);
+}
+
+/* Form host within overlay */
+.alaiy-ws-form-host {
+    min-height: 200px;
+}
+
+/* Sidebar header logo */
+.sidebar-header .alaiy-logo-img {
+    display: block;
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+    border-radius: 4px;
+}
