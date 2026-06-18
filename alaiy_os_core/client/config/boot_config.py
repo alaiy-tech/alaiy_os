@@ -6,8 +6,8 @@
 # This drives the workspace title ("<COMPANY_NAME> OS") and the default company.
 # If the company record does not yet exist in ERPNext it will be created
 # automatically using COMPANY_CURRENCY and COMPANY_COUNTRY.
-COMPANY_NAME     = "Altomoda"
-COMPANY_CURRENCY = "USD"
+COMPANY_NAME     = "Alto Moda"
+COMPANY_CURRENCY = "INR"
 COMPANY_COUNTRY  = "India"
 
 # ── AlaiyOS admin user ─────────────────────────────────────────────────────────
