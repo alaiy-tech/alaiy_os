@@ -19,7 +19,7 @@ On `after_install` and `after_migrate` (`alaiy_os_core/setup/install.py`):
    for new target DocTypes, removed for ones dropped from the list).
 5. **Standard workspace restrictions** — AlaiyOS roles stripped from standard
    ERPNext workspaces so they don't appear in the sidebar for AlaiyOS users.
-6. **Login redirect** — the admin user's `home_page` is set to `/app/alaiy-os`.
+6. **Login redirect** — the admin user's `home_page` is set to `/app/os`.
 
 ## Configuration
 
@@ -39,7 +39,7 @@ Install **fails loudly** if any of these are missing or empty.
 1. `home_page` DB field — redirects AlaiyOS users on login.
 2. `boot_session` hook — filters the sidebar boot data to only `Alaiy OS`.
 3. `public/js/route_guard.js` — intercepts client-side navigation and redirects
-   AlaiyOS users back to `alaiy-os`.
+   AlaiyOS users back to `/os`.
 
 All three explicitly bypass `System Manager` and `Administrator`.
 
@@ -62,6 +62,6 @@ alaiy_os_core/
 ├── setup/boot.py                    # boot_session + on_session_creation
 ├── public/images/logo-square.png    # app icon
 ├── public/js/route_guard.js         # client-side route protection
-├── public/css/alaiy_os.css          # scoped styles (no global overrides)
+├── public/css/core.css          # scoped styles (no global overrides)
 └── workspace/Alaiy OS/Alaiy OS.json # workspace fixture for version control
 ```
