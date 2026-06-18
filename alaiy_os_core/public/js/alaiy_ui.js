@@ -38,7 +38,7 @@ function _buildAboutModal() {
     'font-family:Poppins,sans-serif;position:relative;box-shadow:0 8px 40px rgba(0,0,0,0.18)">',
     '  <button id="alaiy-about-close" style="position:absolute;top:12px;right:16px;background:none;',
     '    border:none;font-size:20px;cursor:pointer;color:#64748b;line-height:1">&times;</button>',
-    '  <img src="/assets/alaiy_os_core/images/alaiy/logo-hor.png" alt="Alaiy OS"',
+    '  <img src="/assets/alaiy_os_core/images/logo-hor.png" alt="Alaiy OS"',
     '    style="height:28px;display:block;margin-bottom:10px">',
     '  <p style="margin:0 0 20px;font-size:13px;color:#64748b">An AI-native E-Commerce OS</p>',
     '  <div style="display:flex;gap:12px;margin-bottom:20px">',
