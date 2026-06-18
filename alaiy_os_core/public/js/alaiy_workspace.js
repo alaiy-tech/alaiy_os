@@ -22,7 +22,7 @@ frappe.provide("alaiy_os.workspace");
 const AW = alaiy_os.workspace;
 AW._overlay = null;
 AW._doctype = null;
-AW._inited  = false;
+AW._inited = false;
 
 // ── URL helpers ───────────────────────────────────────────────────────────────
 function _labelToSlug(str) {
@@ -76,14 +76,15 @@ function _labelFrom(el) {
 // ── Overlay management ────────────────────────────────────────────────────────
 AW._ensureOverlay = function () {
   const ws = document.querySelector(
-    ".layout-main-section, .layout-main-section-wrapper, .workspace-container, .page-content"
+    ".layout-main-section, .layout-main-section-wrapper, .workspace-container, .page-content",
   );
   if (!ws) return null;
 
   if (!AW._overlay || !document.body.contains(AW._overlay)) {
     const el = document.createElement("div");
     el.id = "alaiy-ws-content";
-    if (getComputedStyle(ws).position === "static") ws.style.position = "relative";
+    if (getComputedStyle(ws).position === "static")
+      ws.style.position = "relative";
     ws.appendChild(el);
     AW._overlay = el;
   }
@@ -125,7 +126,9 @@ AW.openList = function (doctype, label) {
   header.className = "alaiy-ws-header";
   header.innerHTML =
     '<button class="alaiy-ws-back">← Back</button>' +
-    '<span class="alaiy-ws-title">' + (label || doctype) + "</span>" +
+    '<span class="alaiy-ws-title">' +
+    (label || doctype) +
+    "</span>" +
     '<button class="btn btn-primary btn-sm alaiy-ws-new">＋ New</button>';
   overlay.appendChild(header);
 
@@ -139,7 +142,8 @@ AW.openList = function (doctype, label) {
   overlay.appendChild(body);
 
   AW._renderList(body, doctype, label);
-  if (typeof updateAlaiyTitle === "function") updateAlaiyTitle(label || doctype);
+  if (typeof updateAlaiyTitle === "function")
+    updateAlaiyTitle(label || doctype);
 };
 
 AW._renderList = function (body, doctype, label) {
@@ -170,7 +174,7 @@ AW._renderList = function (body, doctype, label) {
       const tb = document.createElement("tbody");
 
       rows.forEach(function (row) {
-        const tr  = document.createElement("tr");
+        const tr = document.createElement("tr");
         const td1 = document.createElement("td");
         td1.textContent = row.name;
         const td2 = document.createElement("td");
@@ -188,7 +192,8 @@ AW._renderList = function (body, doctype, label) {
     error: function () {
       body.innerHTML =
         '<div class="text-danger" style="padding:20px">Could not load ' +
-        doctype + ".</div>";
+        doctype +
+        ".</div>";
     },
   });
 };
@@ -235,7 +240,8 @@ AW._mountForm = function (host, doctype, docname) {
         console.error("[AlaiyOS workspace] form render:", e);
         host.innerHTML =
           '<div class="text-warning" style="padding:20px">Could not render form: ' +
-          (e.message || e) + ".</div>";
+          (e.message || e) +
+          ".</div>";
       }
     });
   });
@@ -253,9 +259,9 @@ AW._onCapture = function (e) {
   const target = e.target.closest
     ? e.target.closest(
         ".link-item, .workspace-link-item, .shortcut-widget-box, " +
-        ".workspace-shortcut-card, [data-doctype], " +
-        ".standard-sidebar-item, .workspace-sidebar-item, " +
-        ".sidebar-item-container"
+          ".workspace-shortcut-card, [data-doctype], " +
+          ".standard-sidebar-item, .workspace-sidebar-item, " +
+          ".sidebar-item-container",
       )
     : null;
   if (!target) return;
@@ -285,7 +291,9 @@ $(document).on("page-change", function () {
   const slug = sessionStorage.getItem("alaiy_pending_subroute");
   if (!slug) return;
   sessionStorage.removeItem("alaiy_pending_subroute");
-  setTimeout(function () { AW.openBySlug(slug); }, 350);
+  setTimeout(function () {
+    AW.openBySlug(slug);
+  }, 350);
 });
 
 // ── Init ──────────────────────────────────────────────────────────────────────

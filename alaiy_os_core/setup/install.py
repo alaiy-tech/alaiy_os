@@ -54,6 +54,8 @@ def _cleanup_legacy_workspace():
 
 def _run_provisioning():
     set_company_defaults()
+    configure_system_settings()
+    skip_erpnext_onboarding()
     _cleanup_legacy_workspace()
     create_module_def()
     create_or_update_workspace()
@@ -90,6 +92,65 @@ def set_company_defaults():
 
     frappe.db.set_single_value(
         "Global Defaults", "default_company", company_name)
+
+
+# ── System Settings ──────────────────────────────────────────────────────────
+
+def configure_system_settings():
+    """Sync language and timezone from boot_config into System Settings."""
+    def _safe_set(field, value):
+        if not value:
+            return
+        try:
+            meta = frappe.get_meta("System Settings")
+            if meta.has_field(field):
+                frappe.db.set_single_value("System Settings", field, value)
+        except Exception:
+            frappe.log_error(
+                title="AlaiyOS: configure_system_settings failed",
+                message=frappe.get_traceback(),
+            )
+
+    _safe_set("language", getattr(boot_config, "LANGUAGE", ""))
+    _safe_set("time_zone", getattr(boot_config, "TIMEZONE", ""))
+
+
+def skip_erpnext_onboarding():
+    """
+    Mark the ERPNext setup wizard as complete so it never pops up.
+    Also marks all Module Onboarding records for ERPNext modules as complete
+    so the Getting Started banners are suppressed.
+    """
+    # 1. Mark the global setup wizard complete
+    if frappe.db.exists("DocType", "System Settings"):
+        try:
+            meta = frappe.get_meta("System Settings")
+            if meta.has_field("setup_complete"):
+                frappe.db.set_single_value("System Settings", "setup_complete", 1)
+        except Exception:
+            pass
+
+    # 2. Mark ERPNext's setup wizard step table complete if it exists
+    for dt in ("Setup Progress", "ERPNext Settings"):
+        if not frappe.db.exists("DocType", dt):
+            continue
+        try:
+            meta = frappe.get_meta(dt)
+            if meta.has_field("setup_complete"):
+                frappe.db.set_single_value(dt, "setup_complete", 1)
+        except Exception:
+            pass
+
+    # 3. Mark all existing Module Onboarding records as complete
+    for name in frappe.get_all("Module Onboarding", pluck="name"):
+        try:
+            frappe.db.set_value("Module Onboarding", name, "is_complete", 1)
+        except Exception:
+            pass
+
+    # 4. Dismiss onboarding for all users by setting User.onboarding_status
+    if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
+        frappe.db.sql("UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
 
 
 # ── Module Def ────────────────────────────────────────────────────────────────

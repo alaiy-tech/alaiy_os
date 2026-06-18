@@ -9,11 +9,7 @@ Keep sidebar section labels and DocType links in sync with
 public/constants/workspace_config.js (the JS counterpart).
 """
 
-from alaiy_os_core.constants.branding import LOGO_SQUARE
-
 WORKSPACE_NAME = "OS"
-WORKSPACE_ROUTE = "os"
-LOGO_URL = LOGO_SQUARE
 
 # Standard ERPNext workspaces from which AlaiyOS roles are removed on every
 # migrate, so they don't appear in the desk sidebar for AlaiyOS users.

@@ -4,6 +4,8 @@
  * Does NOT affect the ERPNext desk for any user.
  */
 
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+
 /* ── Variables ───────────────────────────────────────────────────────────── */
 :root {
     --alaiy-login-primary:  #0b2a3f;   /* Deep navy */
