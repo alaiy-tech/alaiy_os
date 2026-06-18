@@ -34,6 +34,11 @@
 .desk-sidebar *,
 .workspace-sidebar,
 .workspace-sidebar *,
+/* bottom user card (avatar / name / email / Getting Started link) */
+.body-sidebar-bottom,
+.body-sidebar-bottom *,
+.sidebar-bottom-area,
+.sidebar-bottom-area *,
 /* top-navbar dropdowns */
 .dropdown-menu,
 .dropdown-menu li,
