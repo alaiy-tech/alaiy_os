@@ -48,44 +48,17 @@ def boot_session(bootinfo):
 
 
 def on_session_creation(login_manager):
-    """
-    Runs immediately after a successful login.
-    For AlaiyOS users: set the user's default landing so Frappe's own
-    redirect logic sends them to the workspace.
-    """
-    user_roles = set(frappe.get_roles(login_manager.user))
-    bypass = {"System Manager", "Administrator"}
-    is_alaiy = bool(user_roles & ALAIY_OS_ROLES) and not bool(
-        user_roles & bypass)
-
-    if not is_alaiy:
-        return
-
-    # Frappe v16+ uses `default_workspace`; older versions used `home_page`.
-    meta = frappe.get_meta("User")
-    if meta.has_field("default_workspace"):
-        frappe.db.set_value("User", login_manager.user,
-                            "default_workspace", ALAIY_OS_WORKSPACE)
-    elif meta.has_field("home_page"):
-        frappe.db.set_value("User", login_manager.user,
-                            "home_page", "/app/alaiy-os")
+    pass
 
 
 def on_login(login_manager):
     """
     Runs immediately after credentials are validated (before session creation).
-    For AlaiyOS users: set the post-login redirect via frappe.local.response
-    so Frappe sends them to /app/alaiy-os.
+    Any user with an AlaiyOS role lands on the workspace. System Manager /
+    Administrator bypass confinement via route_guard.js once they arrive.
     """
-    user = login_manager.user
-    user_roles = set(frappe.get_roles(user))
-    bypass = {"System Manager", "Administrator"}
-    is_alaiy = bool(user_roles & ALAIY_OS_ROLES) and not bool(
-        user_roles & bypass)
-
-    if not is_alaiy:
+    user_roles = set(frappe.get_roles(login_manager.user))
+    if not bool(user_roles & ALAIY_OS_ROLES):
         return
 
-    # Set redirect via frappe.local.response — works in Frappe v16 where
-    # LoginManager uses __slots__ and does not accept arbitrary attributes.
-    frappe.local.response["redirect_to"] = "/app/alaiy-os"
+    frappe.local.response["redirect_to"] = "/app/Workspaces/OS"

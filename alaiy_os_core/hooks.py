@@ -1,7 +1,7 @@
 app_name = "alaiy_os_core"
 app_title = "Alaiy OS Core"
 app_publisher = "AlaiyOS"
-app_description = "AlaiyOS workspace provisioner for ERPNext"
+app_description = "AlaiyOS core functionality and workspace"
 app_version = "0.0.1"
 
 # Provisioning hooks
@@ -16,8 +16,8 @@ on_login = "alaiy_os_core.setup.boot.on_login"
 # Route any user with an AlaiyOS role to the workspace on login.
 # Works in addition to the per-user default_workspace DB field set in install.py.
 role_home_page = {
-    "Alaiy OS User":    "/app/os",
-    "Alaiy OS Manager": "/app/os",
+    "Alaiy OS User":    "/app/Workspaces/OS",
+    "Alaiy OS Manager": "/app/Workspaces/OS",
 }
 
 # Desk assets (loaded for logged-in desk users)
@@ -31,7 +31,7 @@ app_include_js = [
     "/assets/alaiy_os_core/js/alaiy_ui.js",
     # workspace embedded content loader (intercepts card + sidebar clicks)
     "/assets/alaiy_os_core/js/alaiy_workspace.js",
-    # route guard (confines AlaiyOS users to alaiy-os route)
+    # route guard (confines AlaiyOS users to /os route)
     "/assets/alaiy_os_core/js/route_guard.js",
     # settings panel
     "/assets/alaiy_os_core/js/alaiy_settings.js",
