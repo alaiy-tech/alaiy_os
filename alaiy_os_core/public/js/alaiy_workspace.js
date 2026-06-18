@@ -46,7 +46,9 @@ function _osUrl(slug) {
 function _isOsPath(path) {
   return (
     path.startsWith("/app/" + ALAIY_OS_ROUTE) ||
-    path.startsWith("/desk/" + ALAIY_OS_ROUTE)
+    path.startsWith("/desk/" + ALAIY_OS_ROUTE) ||
+    path.startsWith("/app/Workspaces/" + ALAIY_OS_WORKSPACE) ||
+    path.startsWith("/desk/Workspaces/" + ALAIY_OS_WORKSPACE)
   );
 }
 
