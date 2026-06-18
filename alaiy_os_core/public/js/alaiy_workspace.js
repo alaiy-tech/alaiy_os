@@ -12,8 +12,7 @@
  * then by the page-change listener below (opens the overlay).
  *
  * Depends on (loaded before this file):
- *   constants/roles.js          — ALAIY_OS_ROLES, ALAIY_OS_BYPASS,
- *                                 ALAIY_OS_ROUTE, ALAIY_OS_WORKSPACE
+ *   constants/roles.js          — ALAIY_OS_ROUTE, ALAIY_OS_WORKSPACE
  *   constants/workspace_config.js — ALAIY_LABEL_TO_DOCTYPE, ALAIY_SKIP_LABELS
  *   alaiy_ui.js                 — updateAlaiyTitle()
  */
@@ -33,10 +32,9 @@ function _labelToSlug(str) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-// Detect whether this Frappe instance uses /app/ or /desk/ as the desk base.
+// Always use /desk/ as the desk base.
 function _deskBase() {
-  var seg = window.location.pathname.split("/")[1];
-  return "/" + ((seg === "app" || seg === "desk") ? seg : "app") + "/";
+  return "/desk/";
 }
 
 function _osUrl(slug) {
@@ -45,19 +43,12 @@ function _osUrl(slug) {
 
 function _isOsPath(path) {
   return (
-    path.startsWith("/app/" + ALAIY_OS_ROUTE) ||
     path.startsWith("/desk/" + ALAIY_OS_ROUTE) ||
-    path.startsWith("/app/Workspaces/" + ALAIY_OS_WORKSPACE) ||
     path.startsWith("/desk/Workspaces/" + ALAIY_OS_WORKSPACE)
   );
 }
 
-// ── User check ────────────────────────────────────────────────────────────────
-function _isAlaiyWsUser() {
-  const roles = frappe.user_roles || [];
-  if (ALAIY_OS_BYPASS.some((r) => roles.includes(r))) return false;
-  return ALAIY_OS_ROLES.some((r) => roles.includes(r));
-}
+// Click interceptor applies to all desk users inside the OS workspace.
 
 // ── Label extraction ──────────────────────────────────────────────────────────
 function _labelFrom(el) {
@@ -252,7 +243,7 @@ AW._mountForm = function (host, doctype, docname) {
 
 // ── Capture-phase click interceptor ──────────────────────────────────────────
 AW._onCapture = function (e) {
-  if (!_isAlaiyWsUser()) return;
+  // (applies to all users on the OS workspace)
 
   const path = window.location.pathname;
   if (!_isOsPath(path)) return;

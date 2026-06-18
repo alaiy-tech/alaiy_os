@@ -38,4 +38,4 @@ def on_login(login_manager):
     if "application/json" in content_type:
         return
 
-    frappe.local.response["redirect_to"] = f"/app/Workspaces/{WORKSPACE_NAME}"
+    frappe.local.response["redirect_to"] = f"/desk/Workspaces/{WORKSPACE_NAME}"

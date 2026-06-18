@@ -30,6 +30,8 @@ app_include_js = [
     "/assets/alaiy_os_core/js/alaiy_ui.js",
     # workspace embedded content loader (intercepts card + sidebar clicks)
     "/assets/alaiy_os_core/js/alaiy_workspace.js",
+    # route guard: /desk redirect + sidebar collapse + title update
+    "/assets/alaiy_os_core/js/route_guard.js",
     # settings panel
     "/assets/alaiy_os_core/js/alaiy_settings.js",
 ]

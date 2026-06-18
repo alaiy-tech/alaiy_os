@@ -1,7 +1,7 @@
 """
 AlaiyOS Module Onboarding configuration.
 
-Set ENABLE_ONBOARDING = True in client/config/boot_config.py to activate
+Set ENABLE_MODULE_ONBOARDING = True in client/config/boot_config.py to activate
 Getting Started on the workspace sidebar.
 
 Edit ONBOARDING_STEPS to customise what the onboarding guide shows.

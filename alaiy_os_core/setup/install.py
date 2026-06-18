@@ -11,7 +11,6 @@ Data definitions:
 
 Client config:
   client/config/boot_config.py    — COMPANY_NAME, COMPANY_CURRENCY, COMPANY_COUNTRY
-  client/config/branding_config.py — CLIENT_LOGO_*, CLIENT_APP_NAME
 """
 
 import hashlib
@@ -19,7 +18,7 @@ import json
 
 import frappe
 
-from alaiy_os_core.client.config import boot_config, branding_config
+from alaiy_os_core.client.config import boot_config
 from alaiy_os_core.constants import branding
 from alaiy_os_core.constants.workspace import (
     WORKSPACE_NAME,
@@ -74,7 +73,8 @@ def set_company_defaults():
 
     if not frappe.db.exists("Company", company_name):
         try:
-            abbr = "".join(w[0].upper() for w in company_name.split()[:3]) or company_name[:3].upper()
+            abbr = "".join(w[0].upper() for w in company_name.split()[
+                           :3]) or company_name[:3].upper()
             frappe.get_doc({
                 "doctype":          "Company",
                 "company_name":     company_name,
@@ -88,7 +88,8 @@ def set_company_defaults():
                 message=frappe.get_traceback(),
             )
 
-    frappe.db.set_single_value("Global Defaults", "default_company", company_name)
+    frappe.db.set_single_value(
+        "Global Defaults", "default_company", company_name)
 
 
 # ── Module Def ────────────────────────────────────────────────────────────────
@@ -133,13 +134,14 @@ def _build_workspace_content():
 
 
 def _get_workspace_title():
-    default_company = frappe.db.get_single_value("Global Defaults", "default_company") or ""
+    default_company = frappe.db.get_single_value(
+        "Global Defaults", "default_company") or ""
     return (default_company + " OS") if default_company else WORKSPACE_NAME
 
 
 def create_or_update_workspace():
     content = _build_workspace_content()
-    title   = _get_workspace_title()
+    title = _get_workspace_title()
 
     # Workspace is public — visible to all desk users without role restriction.
     # System Manager has full access by default.
@@ -168,14 +170,14 @@ def create_or_update_workspace():
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
-        ws.title   = title
-        ws.icon    = "layout-dashboard"
-        ws.module  = MODULE_NAME
-        ws.app     = "alaiy_os_core"
-        ws.type    = "Workspace"
-        ws.public  = 1
+        ws.title = title
+        ws.icon = "layout-dashboard"
+        ws.module = MODULE_NAME
+        ws.app = "alaiy_os_core"
+        ws.type = "Workspace"
+        ws.public = 1
         ws.content = content
-        ws.roles   = []
+        ws.roles = []
         ws.save(ignore_permissions=True)
 
 
@@ -205,7 +207,7 @@ def create_or_update_workspace_sidebar():
 # ── Module Onboarding ─────────────────────────────────────────────────────────
 
 def create_or_update_onboarding():
-    enable = getattr(boot_config, "ENABLE_ONBOARDING", False)
+    enable = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
 
     if not enable:
         if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
@@ -253,13 +255,21 @@ def configure_branding():
                 message=frappe.get_traceback(),
             )
 
-    _safe_set("Navbar Settings",  "app_logo",     branding_config.CLIENT_LOGO_HOR)
-    _safe_set("Website Settings", "app_logo",     branding_config.CLIENT_LOGO_HOR)
-    _safe_set("Website Settings", "banner_image", branding_config.CLIENT_LOGO_HOR)
+    _safe_set("Navbar Settings",  "app_logo",
+              "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
+    _safe_set("Website Settings", "app_logo",
+              "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
+    _safe_set("Website Settings", "banner_image",
+              "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
     _safe_set("Website Settings", "brand_html",
-              f'<img src="{branding_config.CLIENT_LOGO_HOR}" alt="{branding_config.CLIENT_APP_NAME}" style="height:32px">')
-    _safe_set("Website Settings", "splash_image", branding_config.CLIENT_LOGO_SQUARE)
-    _safe_set("System Settings",  "favicon",      branding_config.CLIENT_FAVICON)
-    _safe_set("Website Settings", "favicon",      branding_config.CLIENT_FAVICON)
-    _safe_set("System Settings",  "app_name",     branding_config.CLIENT_APP_NAME)
-    _safe_set("Website Settings", "app_name",     branding_config.CLIENT_APP_NAME)
+              f'<img src="/assets/alaiy_os_core/client/assets/client-logo-hor.png" alt="{boot_config.COMPANY_NAME} OS" style="height:32px">')
+    _safe_set("Website Settings", "splash_image",
+              "/assets/alaiy_os_core/client/assets/client-logo-square.png")
+    _safe_set("System Settings",  "favicon",
+              "/assets/alaiy_os_core/client/assets/client-icon.png")
+    _safe_set("Website Settings", "favicon",
+              "/assets/alaiy_os_core/client/assets/client-icon.png")
+    _safe_set("System Settings",  "app_name",
+              boot_config.COMPANY_NAME + " OS")
+    _safe_set("Website Settings", "app_name",
+              boot_config.COMPANY_NAME)

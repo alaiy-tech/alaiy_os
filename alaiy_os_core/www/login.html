@@ -27,7 +27,7 @@
       left: 32px;
       z-index: 100;
     }
-    .topbar img { height: 26px; display: block; }
+    .topbar img { height: 34px; display: block; }
 
     .page {
       display: flex;
@@ -41,23 +41,23 @@
 
     .client-logo {
       display: block;
-      max-width: 220px;
+      max-width: 240px;
       height: auto;
-      margin: 0 auto 36px;
+      margin: 0 auto 28px;
     }
 
     .heading {
-      font-size: 22px;
+      font-size: 24px;
       font-weight: 700;
       text-align: center;
       margin-bottom: 6px;
       font-family: "Poppins", sans-serif;
     }
     .subheading {
-      font-size: 13px;
+      font-size: 14px;
       color: #64748b;
       text-align: center;
-      margin-bottom: 28px;
+      margin-bottom: 18px;
       font-family: "Poppins", sans-serif;
     }
 
@@ -68,7 +68,7 @@
       margin-bottom: 6px;
     }
     .label {
-      font-size: 13px;
+      font-size: 14px;
       font-weight: 500;
       font-family: "Poppins", sans-serif;
     }
@@ -150,9 +150,10 @@
       <p class="error-msg" id="err"></p>
 
       <form id="login-form" novalidate>
-        <label class="label" for="usr">Email</label>
-        <input id="usr" name="usr" type="email" placeholder="m@example.com" autocomplete="username" required>
-
+        <div class="label-row">
+           <label class="label" for="usr">Email</label>
+        <input id="usr" name="usr" type="email" placeholder="admin@example.com" autocomplete="username" required>
+        </div>
         <div class="label-row">
           <label class="label" for="pwd">Password</label>
           <a class="forgot" href="/update-password">Forgot your password?</a>
@@ -177,7 +178,7 @@
         var r = params.get("redirect-to") || params.get("redirect_to") || "";
         // Safety: only allow relative paths to prevent open redirect
         if (r && r.startsWith("/") && !r.startsWith("//")) return r;
-        return "/app/Workspaces/OS";
+        return "/desk/os";
       }
 
       // Read CSRF token from cookie
