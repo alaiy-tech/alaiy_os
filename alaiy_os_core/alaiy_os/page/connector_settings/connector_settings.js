@@ -14,17 +14,28 @@ frappe.pages["connector-settings"].on_page_show = function (wrapper) {
 
 	$(page.body).empty();
 
+	// Highlight the "Connectors" sidebar item as active
+	document.querySelectorAll(".sidebar-item-container").forEach((el) => {
+		if (el.getAttribute("item-name") === "Connectors") {
+			el.classList.add("active-sidebar");
+		} else {
+			el.classList.remove("active-sidebar");
+		}
+	});
+
+	const bodyEl = page.body instanceof jQuery ? page.body[0] : page.body;
+
 	if (
 		window.alaiy_os &&
 		alaiy_os.settings &&
 		typeof alaiy_os.settings._mountConnectorsTab === "function"
 	) {
-		alaiy_os.settings._mountConnectorsTab(page.body);
+		alaiy_os.settings._mountConnectorsTab(bodyEl);
 	} else {
 		const msg = document.createElement("div");
 		msg.className = "alert alert-warning";
 		msg.style.margin = "0";
 		msg.textContent = __("Connector settings module not loaded.");
-		page.body.appendChild(msg);
+		bodyEl.appendChild(msg);
 	}
 };
