@@ -389,7 +389,7 @@ document.addEventListener("click", function (e) {
 
   // Only act inside the Alaiy OS workspace route.
   const route = (frappe.get_route_str && frappe.get_route_str()) || "";
-  if (!route.startsWith("alaiy-os")) return;
+  if (!route.startsWith("os")) return;
 
   e.preventDefault();
   e.stopPropagation();

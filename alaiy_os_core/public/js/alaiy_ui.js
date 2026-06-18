@@ -215,7 +215,7 @@ function resolveAlaiySection(route) {
     if (route.startsWith(entry.prefix)) return entry.title;
   }
 
-  if (route.startsWith("alaiy-os") ||
+  if (route.startsWith("os") ||
       route === "Workspaces/" + ALAIY_OS_WORKSPACE) return "Dashboard";
 
   return "Alaiy OS";
