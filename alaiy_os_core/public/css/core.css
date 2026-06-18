@@ -9,43 +9,32 @@
 /* ── Poppins font ───────────────────────────────────────────────────────────────────────────────────── */
 @import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
 
-/* Apply Poppins broadly across the desk UI — workspace, navbar, dropdowns,
- * onboarding sidebar, and all ERPNext panels AlaiyOS users interact with.
- * The !important mirrors what Frappe itself uses so our rule wins. */
+/* Apply Poppins across the entire desk UI — body, navbar, workspace, forms,
+ * lists, dropdowns, and all ERPNext panels the user interacts with. */
+body,
+body *,
+input, textarea, select, button,
+.navbar,
+.navbar *,
+.page-head,
+.page-head *,
 .layout-main-section,
-.layout-main-section input,
-.layout-main-section textarea,
-.layout-main-section select,
-.layout-main-section button,
-.layout-main-section .form-control,
-.layout-main-section .btn,
-.layout-main-section .widget,
-.layout-main-section h1,
-.layout-main-section h2,
-.layout-main-section h3,
-.layout-main-section h4,
-.layout-main-section h5,
-.layout-main-section h6,
-/* workspace sidebar left-panel — wildcard covers all descendants including
- * the bottom user card regardless of which element tags Frappe uses */
+.layout-main-section *,
 .layout-side-section,
 .layout-side-section *,
 .desk-sidebar,
 .desk-sidebar *,
 .workspace-sidebar,
 .workspace-sidebar *,
-/* bottom user card (avatar / name / email / Getting Started link) */
 .body-sidebar-bottom,
 .body-sidebar-bottom *,
 .sidebar-bottom-area,
 .sidebar-bottom-area *,
-/* top-navbar dropdowns */
 .dropdown-menu,
 .dropdown-menu li,
 .dropdown-menu a,
 .dropdown-menu button,
 .dropdown-item,
-/* onboarding / getting-started sidebar */
 .onboarding-sidebar,
 .onboarding-sidebar *,
 .modules-section {
@@ -336,11 +325,16 @@
     min-height: 200px;
 }
 
-/* Sidebar header logo */
-.sidebar-header .alaiy-logo-img {
-    display: block;
-    width: 28px;
-    height: 28px;
-    object-fit: contain;
-    border-radius: 4px;
+/* Sidebar header logo — replace the Frappe-generated "OS" letter circle
+ * with the AlaiyOS square logo. Hide the SVG text inside the icon-container. */
+.sidebar-header .icon-container {
+    background-image: url('/assets/alaiy_os_core/images/logo-square.png') !important;
+    background-size: 80% !important;
+    background-repeat: no-repeat !important;
+    background-position: center !important;
+    background-color: #0b2a3f !important;
+}
+.sidebar-header .icon-container svg,
+.sidebar-header .icon-container text {
+    display: none !important;
 }
