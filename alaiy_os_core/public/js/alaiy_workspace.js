@@ -33,8 +33,21 @@ function _labelToSlug(str) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
+// Detect whether this Frappe instance uses /app/ or /desk/ as the desk base.
+function _deskBase() {
+  var seg = window.location.pathname.split("/")[1];
+  return "/" + ((seg === "app" || seg === "desk") ? seg : "app") + "/";
+}
+
 function _osUrl(slug) {
-  return "/app/" + ALAIY_OS_ROUTE + (slug ? "/" + slug : "");
+  return _deskBase() + ALAIY_OS_ROUTE + (slug ? "/" + slug : "");
+}
+
+function _isOsPath(path) {
+  return (
+    path.startsWith("/app/" + ALAIY_OS_ROUTE) ||
+    path.startsWith("/desk/" + ALAIY_OS_ROUTE)
+  );
 }
 
 // ── User check ────────────────────────────────────────────────────────────────
@@ -248,8 +261,7 @@ AW._onCapture = function (e) {
   if (!_isAlaiyWsUser()) return;
 
   const path = window.location.pathname;
-  const onWorkspace = path.startsWith("/app/" + ALAIY_OS_ROUTE);
-  if (!onWorkspace) return;
+  if (!_isOsPath(path)) return;
 
   if (e.target.closest && e.target.closest("#alaiy-ws-content")) return;
 
@@ -283,7 +295,7 @@ AW._onCapture = function (e) {
 // has rendered and open the appropriate overlay.
 $(document).on("page-change", function () {
   const path = window.location.pathname;
-  if (!path.startsWith("/app/" + ALAIY_OS_ROUTE)) return;
+  if (!_isOsPath(path)) return;
 
   const slug = sessionStorage.getItem("alaiy_pending_subroute");
   if (!slug) return;

@@ -38,16 +38,14 @@ WORKSPACE_SHORTCUTS = [
 
 WORKSPACE_LINKS = [
     # ── INVENTORY ──────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Inventory", "icon": "package"},
+    {"type": "Card Break", "label": "Inventory", "icon": "archive"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Entry",          "label": "Stock Entry"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Reconciliation", "label": "Stock Reconciliation"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Purchase Receipt",     "label": "Purchase Receipt"},
 
-    # ── CATALOG ────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Catalog", "icon": "box"},
+    # ── CATALOG (includes pricing items) ───────────────────────────────────────
+    {"type": "Card Break", "label": "Catalog", "icon": "grid"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Item",            "label": "Products"},
     {"type": "Link", "link_type": "DocType",
@@ -56,46 +54,45 @@ WORKSPACE_LINKS = [
         "link_to": "Item Attribute",  "label": "Item Attribute"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Brand",           "label": "Brand"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Item Price",      "label": "Item Price"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Price List",      "label": "Price List"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Pricing Rule",    "label": "Pricing Rule"},
 
     # ── SALES ──────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Sales", "icon": "shopping-cart"},
+    {"type": "Card Break", "label": "Sales", "icon": "trending-up"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Sales Order",   "label": "Sales Order"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Sales Invoice", "label": "Sales Invoice"},
 
-    # ── CUSTOMERS ──────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Customers", "icon": "users"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Customer",       "label": "Customers"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Customer Group", "label": "Customer Groups"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Address",        "label": "Address"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "Contact",        "label": "Contact"},
-    {"type": "Link", "link_type": "DocType",
-        "link_to": "UTM Source",     "label": "UTM Source"},
-
-    # ── PROCUREMENT ────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Procurement", "icon": "truck"},
+    # ── PROCUREMENT (Purchase Receipt moved here from Inventory) ───────────────
+    {"type": "Card Break", "label": "Procurement", "icon": "package-search"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Purchase Order",   "label": "Purchase Order"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Purchase Invoice", "label": "Purchase Invoice"},
     {"type": "Link", "link_type": "DocType",
+        "link_to": "Purchase Receipt", "label": "Purchase Receipt"},
+    {"type": "Link", "link_type": "DocType",
         "link_to": "Supplier",         "label": "Supplier"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Supplier Group",   "label": "Supplier Group"},
 
-    # ── PRICING ────────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Pricing", "icon": "tag"},
+    # ── CUSTOMERS (Contact removed; Contacts consolidated from bottom) ──────────
+    {"type": "Card Break", "label": "Customers", "icon": "users"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Item Price",   "label": "Item Price"},
+        "link_to": "Customer",       "label": "Customer"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Price List",   "label": "Price List"},
+        "link_to": "Customer Group", "label": "Customer Groups"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Pricing Rule", "label": "Pricing Rule"},
+        "link_to": "Address",        "label": "Address"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "UTM Source",     "label": "UTM Source"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Contact",        "label": "Contacts"},
 
     # ── BOTTOM DUMMIES ─────────────────────────────────────────────────────────
     {"type": "Card Break", "label": "More", "icon": "bar-chart"},
@@ -118,70 +115,66 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
 
     # Inventory
-    {"type": "Section Break", "label": "Inventory",           "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Inventory",  "icon": "archive",        "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry",
      "label": "Stock Entry",          "child": 1, "icon": "package-plus"},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Reconciliation",
      "label": "Stock Reconciliation", "child": 1, "icon": "clipboard-check"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt",
-     "label": "Purchase Receipt",     "child": 1, "icon": "package-check"},
 
-    # Catalog
-    {"type": "Section Break", "label": "Catalog",             "child": 0, "indent": 1},
+    # Catalog (pricing items included; no separate Pricing section)
+    {"type": "Section Break", "label": "Catalog",    "icon": "grid",           "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Item",
-     "label": "Products",     "child": 1, "icon": "package"},
+     "label": "Products",      "child": 1, "icon": "package"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Group",
-     "label": "Item Group",   "child": 1, "icon": "boxes"},
+     "label": "Item Group",    "child": 1, "icon": "boxes"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Attribute",
-     "label": "Item Attribute","child": 1, "icon": "list-filter"},
+     "label": "Item Attribute", "child": 1, "icon": "list-filter"},
     {"type": "Link", "link_type": "DocType", "link_to": "Brand",
-     "label": "Brand",        "child": 1, "icon": "badge"},
+     "label": "Brand",         "child": 1, "icon": "badge"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Item Price",
+     "label": "Item Price",    "child": 1, "icon": "tag"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Price List",
+     "label": "Price List",    "child": 1, "icon": "tags"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Pricing Rule",
+     "label": "Pricing Rule",  "child": 1, "icon": "badge-percent"},
 
     # Sales
-    {"type": "Section Break", "label": "Sales",               "child": 0, "indent": 1},
+    {"type": "Section Break", "label": "Sales",      "icon": "trending-up",    "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Order",
      "label": "Sales Order",   "child": 1, "icon": "shopping-cart"},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice",
      "label": "Sales Invoice", "child": 1, "icon": "receipt"},
 
-    # Customers
-    {"type": "Section Break", "label": "Customers",           "child": 0, "indent": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Customer",
-     "label": "Customers",        "child": 1, "icon": "users"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Customer Group",
-     "label": "Customer Groups",  "child": 1, "icon": "user-round"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Address",
-     "label": "Address",          "child": 1, "icon": "map-pinned"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Contact",
-     "label": "Contact",          "child": 1, "icon": "contact"},
-    {"type": "Link", "link_type": "DocType", "link_to": "UTM Source",
-     "label": "UTM Source",       "child": 1, "icon": "mouse-pointer-click"},
-
-    # Procurement
-    {"type": "Section Break", "label": "Procurement",         "child": 0, "indent": 1},
+    # Procurement (Purchase Receipt moved here from Inventory)
+    {"type": "Section Break", "label": "Procurement", "icon": "package-search", "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Order",
      "label": "Purchase Order",   "child": 1, "icon": "file-input"},
     {"type": "Link", "link_type": "DocType", "link_to": "Purchase Invoice",
      "label": "Purchase Invoice", "child": 1, "icon": "file-text"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Purchase Receipt",
+     "label": "Purchase Receipt", "child": 1, "icon": "package-check"},
     {"type": "Link", "link_type": "DocType", "link_to": "Supplier",
      "label": "Supplier",         "child": 1, "icon": "truck"},
     {"type": "Link", "link_type": "DocType", "link_to": "Supplier Group",
      "label": "Supplier Group",   "child": 1, "icon": "network"},
 
-    # Pricing
-    {"type": "Section Break", "label": "Pricing",             "child": 0, "indent": 1},
-    {"type": "Link", "link_type": "DocType", "link_to": "Item Price",
-     "label": "Item Price",   "child": 1, "icon": "tag"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Price List",
-     "label": "Price List",   "child": 1, "icon": "tags"},
-    {"type": "Link", "link_type": "DocType", "link_to": "Pricing Rule",
-     "label": "Pricing Rule", "child": 1, "icon": "badge-percent"},
+    # Customers (Contact removed; Contacts consolidated from bottom standalone)
+    # Label "Customer" (singular) avoids ALAIY_SKIP_LABELS collision with section "Customers".
+    {"type": "Section Break", "label": "Customers",  "icon": "users",          "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "Customer",
+     "label": "Customer",        "child": 1, "icon": "user"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Customer Group",
+     "label": "Customer Groups", "child": 1, "icon": "users-2"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Address",
+     "label": "Address",         "child": 1, "icon": "map-pinned"},
+    {"type": "Link", "link_type": "DocType", "link_to": "UTM Source",
+     "label": "UTM Source",      "child": 1, "icon": "mouse-pointer-click"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Contact",
+     "label": "Contacts",        "child": 1, "icon": "book-user"},
 
     # Bottom standalone actions
-    {"type": "Link", "link_type": "DocType", "link_to": "Contact",
-     "label": "Contacts",             "child": 0, "indent": 0, "icon": "book-user"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": "Reports & Analytics",  "child": 0, "indent": 0, "icon": "chart-column"},
+     "label": "Reports & Analytics", "child": 0, "indent": 0, "icon": "chart-column"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": "Settings",             "child": 0, "indent": 0, "icon": "settings"},
+     "label": "Settings",            "child": 0, "indent": 0, "icon": "settings"},
 ]

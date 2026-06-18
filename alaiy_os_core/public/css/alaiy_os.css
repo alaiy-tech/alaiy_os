@@ -26,24 +26,14 @@
 .layout-main-section h4,
 .layout-main-section h5,
 .layout-main-section h6,
-/* workspace sidebar left-panel */
+/* workspace sidebar left-panel — wildcard covers all descendants including
+ * the bottom user card regardless of which element tags Frappe uses */
 .layout-side-section,
-.layout-side-section input,
-.layout-side-section button,
-.layout-side-section span,
-.layout-side-section a,
+.layout-side-section *,
+.desk-sidebar,
+.desk-sidebar *,
 .workspace-sidebar,
-.workspace-sidebar span,
-.workspace-sidebar a,
-.workspace-sidebar button,
-.standard-sidebar-item,
-.standard-sidebar-item span,
-.standard-sidebar-item a,
-.sidebar-item-label,
-.sidebar-section-head,
-/* navbar user chip + avatar */
-.navbar-user,
-.navbar-user *,
+.workspace-sidebar *,
 /* top-navbar dropdowns */
 .dropdown-menu,
 .dropdown-menu li,
@@ -53,10 +43,7 @@
 /* onboarding / getting-started sidebar */
 .onboarding-sidebar,
 .onboarding-sidebar *,
-.modules-section,
-/* any .px-2 element within the desk layout */
-.layout-side-section .px-2,
-.layout-side-section .px-2 * {
+.modules-section {
     font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
 }
 

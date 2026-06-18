@@ -33,25 +33,27 @@ $(document).on("app_ready", function () {
     const route = (frappe.get_route_str && frappe.get_route_str()) || "";
     const path  = window.location.pathname;
 
-    // ── Sub-route: /app/os/<slug> ──────────────────────────────────────────
+    // ── Sub-route: /app/os/<slug> or /desk/os/<slug> ──────────────────────
     // Frappe might try to render "os/stock-entry" as an unknown page.
     // Intercept: store the slug, redirect to workspace root so Frappe renders
     // the workspace correctly.  alaiy_workspace.js picks up the slug on
     // the next page-change event.
-    const OS_PREFIX  = "/app/" + ALAIY_OS_ROUTE + "/";
-    const OS_ROOT    = "/app/" + ALAIY_OS_ROUTE;
+    // Support both /app/ and /desk/ URL bases (Frappe version dependent).
+    const OS_BASES = ["/app/" + ALAIY_OS_ROUTE, "/desk/" + ALAIY_OS_ROUTE];
 
-    if (path.startsWith(OS_PREFIX)) {
-      const slug = path.slice(OS_PREFIX.length);
-      if (slug) sessionStorage.setItem("alaiy_pending_subroute", slug);
-      frappe.set_route("Workspaces", ALAIY_OS_WORKSPACE);
-      return;
+    for (var i = 0; i < OS_BASES.length; i++) {
+      const base = OS_BASES[i];
+      if (path.startsWith(base + "/")) {
+        const slug = path.slice(base.length + 1);
+        if (slug) sessionStorage.setItem("alaiy_pending_subroute", slug);
+        frappe.set_route("Workspaces", ALAIY_OS_WORKSPACE);
+        return;
+      }
     }
 
     // ── Primary check: URL path (immune to title/name mismatches) ─────────
     const onAlaiyRoute =
-      path === OS_ROOT ||
-      path.startsWith(OS_ROOT + "/") ||   // catch any /app/os/* that slipped through
+      OS_BASES.some(function (base) { return path === base || path.startsWith(base + "/"); }) ||
       route === "Workspaces/" + ALAIY_OS_WORKSPACE;
 
     if (!onAlaiyRoute) {
