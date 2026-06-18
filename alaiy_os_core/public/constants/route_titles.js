@@ -10,7 +10,7 @@
 
 // eslint-disable-next-line no-unused-vars
 const ALAIY_ROUTE_TITLES = {
-  "alaiy-os": "Dashboard",
+  "os": "Dashboard",
 
   // Inventory
   "List/Stock Entry/List":          "Inventory · Stock Entry",
@@ -29,7 +29,7 @@ const ALAIY_ROUTE_TITLES = {
 
   // Customers
   "List/Customer/List":       "Customers",
-  "List/Customer Group/List": "Customers · Customer Groups",
+  "List/Customer Group/List": "Customers · Customer Group",
   "List/Address/List":        "Customers · Address",
   "List/Contact/List":        "Customers · Contact",
   "List/UTM Source/List":     "Customers · UTM Source",
@@ -57,7 +57,7 @@ const ALAIY_ROUTE_PREFIX_TITLES = [
   { prefix: "Form/Brand",                title: "Brand" },
   { prefix: "Form/Sales Order",          title: "Sales Order" },
   { prefix: "Form/Sales Invoice",        title: "Sales Invoice" },
-  { prefix: "Form/Customer Group",       title: "Customer Groups" },
+  { prefix: "Form/Customer Group",       title: "Customer Group" },
   { prefix: "Form/Customer",             title: "Customers" },
   { prefix: "Form/Address",              title: "Address" },
   { prefix: "Form/Contact",              title: "Contact" },

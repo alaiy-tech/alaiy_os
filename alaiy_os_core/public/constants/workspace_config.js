@@ -29,6 +29,7 @@ const ALAIY_SIDEBAR_CONFIG = [
   { label: "Products",             type: "link", doctype: "Item",                 icon: "package" },
   { label: "Item Group",           type: "link", doctype: "Item Group",           icon: "boxes" },
   { label: "Item Attribute",       type: "link", doctype: "Item Attribute",       icon: "list-filter" },
+  { label: "Item Variants",        type: "link", doctype: "Item Variant Settings", icon: "layers" },
   { label: "Brand",                type: "link", doctype: "Brand",                icon: "badge" },
   { label: "Item Price",           type: "link", doctype: "Item Price",           icon: "tag" },
   { label: "Price List",           type: "link", doctype: "Price List",           icon: "tags" },
@@ -52,7 +53,7 @@ const ALAIY_SIDEBAR_CONFIG = [
   // "Customers" (plural) which is added to ALAIY_SKIP_LABELS.
   { label: "Customers",            type: "section", icon: "users" },
   { label: "Customer",             type: "link", doctype: "Customer",             icon: "user" },
-  { label: "Customer Groups",      type: "link", doctype: "Customer Group",       icon: "users-2" },
+  { label: "Customer Group",      type: "link", doctype: "Customer Group",       icon: "users-2" },
   { label: "Address",              type: "link", doctype: "Address",              icon: "map-pinned" },
   { label: "UTM Source",           type: "link", doctype: "UTM Source",           icon: "mouse-pointer-click" },
   { label: "Contacts",             type: "link", doctype: "Contact",              icon: "book-user" },
