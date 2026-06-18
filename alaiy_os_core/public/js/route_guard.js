@@ -13,8 +13,12 @@ $(document).on("app_ready", function () {
 
   // ── Redirect bare /desk → /desk/os ────────────────────────────────────────
   var path = window.location.pathname;
-  if (path === "/desk" || path === "/desk/") {
-    window.location.href = "/desk/" + ALAIY_OS_ROUTE;
+  var hash = window.location.hash;
+  // Only redirect if there's no hash route already set (hash route means Frappe
+  // is already navigating to a specific page; overriding it causes a crash in
+  // store_last_show_sidebar_for_item before the sidebar is initialized).
+  if ((path === "/desk" || path === "/desk/") && (!hash || hash === "#" || hash === "")) {
+    frappe.set_route(ALAIY_OS_ROUTE);
     return;
   }
 
