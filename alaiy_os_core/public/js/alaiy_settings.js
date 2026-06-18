@@ -451,7 +451,7 @@ alaiy_os.settings = {
     const statusBadge = document.createElement("div");
     const statusVal = connector.connection_status || "untested";
     statusBadge.className = `alaiy-connector-status status-${statusVal}`;
-    statusBadge.textContent = statusVal.replace(/-/g, " ");
+    statusBadge.innerHTML = _alaiyStatusBadgeHtml(statusVal);
     header.appendChild(statusBadge);
 
     card.appendChild(header);
@@ -536,13 +536,13 @@ alaiy_os.settings = {
             resultMsg.textContent =
               "✓ " + (res.message || __("Connected successfully"));
             statusBadge.className = "alaiy-connector-status status-connected";
-            statusBadge.textContent = "connected";
+            statusBadge.innerHTML = _alaiyStatusBadgeHtml("connected");
           } else {
             resultMsg.className = "alaiy-connector-result error";
             resultMsg.textContent =
               "✗ " + (res.message || __("Connection failed"));
             statusBadge.className = "alaiy-connector-status status-failed";
-            statusBadge.textContent = "failed";
+            statusBadge.innerHTML = _alaiyStatusBadgeHtml("failed");
           }
         },
         error: () => {
@@ -641,3 +641,13 @@ alaiy_os.settings = {
     return values;
   },
 };
+
+function _alaiyStatusBadgeHtml(statusVal) {
+  const labels = {
+    untested: __("Not configured"),
+    connected: __("Connected"),
+    failed: __("Failed"),
+  };
+  const label = labels[statusVal] || statusVal;
+  return `<span class="alaiy-status-dot"></span><span>${label}</span>`;
+}
