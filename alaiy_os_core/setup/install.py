@@ -136,13 +136,13 @@ def _run_provisioning():
     _cleanup_legacy_workspace()  # delete stale records before re-creating
     create_module_def()
     create_roles()
+    assign_admin_alaiy_roles()
     create_or_update_user(config)
     create_or_update_workspace()
     create_or_update_workspace_sidebar()
     create_or_update_onboarding()
     reconcile_doctype_permissions()
     restrict_standard_workspaces()
-    configure_login_redirect(config)
     configure_branding()
     frappe.db.commit()
     frappe.clear_cache()
@@ -168,6 +168,19 @@ def create_module_def():
 
 # ── Roles ─────────────────────────────────────────────────────────────────────
 
+def assign_admin_alaiy_roles():
+    """Ensure Administrator user has all AlaiyOS roles (idempotent)."""
+    user = frappe.get_doc("User", "Administrator")
+    existing = {r.role for r in user.roles}
+    changed = False
+    for role in ROLES:
+        if role not in existing:
+            user.append("roles", {"role": role})
+            changed = True
+    if changed:
+        user.save(ignore_permissions=True)
+
+
 def create_roles():
     """
     Create both AlaiyOS roles with desk access and mark them as custom.
@@ -175,7 +188,7 @@ def create_roles():
     IMPORTANT — desk_access MUST be 1.
     These users live entirely inside the /app desk (the Alaiy OS workspace).
     Setting desk_access=0 makes Frappe v16 treat them as Website Users and
-    blocks every /app/* route, so home_page=/app/alaiy-os bounces to "/" and
+    blocks every /app/* route, so home_page=/app/os bounces to "/" and
     back — an infinite login redirect loop.
     """
     for role_name in ROLES:
@@ -224,9 +237,6 @@ def create_or_update_user(config):
                 changed = True
         if changed:
             user.save(ignore_permissions=True)
-
-    # Always ensure the default workspace is set for this user
-    set_user_landing(email)
 
 
 # ── Workspace ─────────────────────────────────────────────────────────────────
@@ -277,6 +287,8 @@ def create_or_update_workspace():
     content = _build_workspace_content()
     title   = _get_workspace_title()
 
+    workspace_roles = ROLES + ["System Manager"]
+
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype":  "Workspace",
@@ -289,7 +301,7 @@ def create_or_update_workspace():
             "module":   MODULE_NAME,
             "app":      "alaiy_os_core",
             "content":  content,
-            "roles":    [{"role": r} for r in ROLES],
+            "roles":    [{"role": r} for r in workspace_roles],
             "shortcuts": WORKSPACE_SHORTCUTS,
             "links":    WORKSPACE_LINKS,
         })
@@ -313,7 +325,7 @@ def create_or_update_workspace():
         ws.content = content
 
         existing_roles = {r.role for r in ws.roles}
-        for role_name in ROLES:
+        for role_name in workspace_roles:
             if role_name not in existing_roles:
                 ws.append("roles", {"role": role_name})
 
@@ -481,24 +493,3 @@ def configure_branding():
     _safe_set("Website Settings", "app_name",     branding.APP_NAME)
 
 
-# ── Login redirect ────────────────────────────────────────────────────────────
-
-def configure_login_redirect(config):
-    email = config["ALAIY_OS_ADMIN_EMAIL"]
-    if frappe.db.exists("User", email):
-        set_user_landing(email)
-
-
-def set_user_landing(user):
-    """
-    Point a user at the Alaiy OS workspace on login.
-
-    Frappe v16 uses `default_workspace` (Link to Workspace → stores "Alaiy OS").
-    Older versions used `home_page` (route string).
-    Set whichever field exists so this never crashes on migrate.
-    """
-    meta = frappe.get_meta("User")
-    if meta.has_field("default_workspace"):
-        frappe.db.set_value("User", user, "default_workspace", WORKSPACE_NAME)
-    elif meta.has_field("home_page"):
-        frappe.db.set_value("User", user, "home_page", "/app/os")
