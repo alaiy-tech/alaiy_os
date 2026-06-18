@@ -161,7 +161,7 @@
     {
       "hidden": 0,
       "is_query_report": 0,
-      "label": "Customer Groups",
+      "label": "Customer Group",
       "link_to": "Customer Group",
       "link_type": "DocType",
       "onboard": 0,
