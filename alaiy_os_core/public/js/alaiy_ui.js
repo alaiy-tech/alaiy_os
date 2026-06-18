@@ -75,39 +75,11 @@ function _showAboutModal() {
 
 // ── Custom Navbar Dropdown ────────────────────────────────────────────────────
 
-function _injectCustomNavbar() {
-  if (document.getElementById("alaiy-nav-btn")) return;
+// Module-level reference so the wrapper is built once and re-attached on each
+// navigation (Frappe v16 replaces page-head DOM on route changes).
+var _alaiyNavWrapper = null;
 
-  // Hide Frappe's existing user-menu / navbar-user trigger
-  // (server-rendered; CSS is the only reliable approach)
-  var style = document.createElement("style");
-  style.id = "alaiy-hide-frappe-nav";
-  style.textContent = [
-    // Hide the default user/avatar button in the top navbar
-    ".navbar .navbar-nav .nav-item.dropdown:has(.navbar-avatar),",
-    ".navbar .navbar-nav .nav-item.dropdown:has([data-toggle='dropdown']),",
-    ".navbar-right .dropdown { display: none !important; }",
-  ].join("\n");
-  document.head.appendChild(style);
-
-  // Build custom button + dropdown
-  var btn = document.createElement("button");
-  btn.id = "alaiy-nav-btn";
-  btn.title = "Menu";
-  btn.style.cssText = [
-    "background:none;border:none;cursor:pointer;padding:6px 10px",
-    "color:var(--text-color,#1c2126);display:flex;align-items:center",
-    "gap:6px;font-family:Poppins,sans-serif;font-size:13px;border-radius:6px",
-  ].join(";");
-  btn.innerHTML = [
-    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"',
-    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">',
-    '  <circle cx="12" cy="8" r="1.5" fill="currentColor"/>',
-    '  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
-    '  <circle cx="12" cy="16" r="1.5" fill="currentColor"/>',
-    '</svg>',
-  ].join("");
-
+function _buildNavWrapper() {
   var menu = document.createElement("div");
   menu.id = "alaiy-nav-menu";
   menu.style.cssText = [
@@ -161,41 +133,83 @@ function _injectCustomNavbar() {
     frappe.app.logout ? frappe.app.logout() : (window.location.href = "/logout");
   }));
 
-  var wrapper = document.createElement("div");
-  wrapper.id = "alaiy-nav-wrapper";
-  wrapper.style.cssText = "position:relative;display:flex;align-items:center";
-  wrapper.appendChild(btn);
-  wrapper.appendChild(menu);
+  var btn = document.createElement("button");
+  btn.id = "alaiy-nav-btn";
+  btn.title = "Menu";
+  btn.style.cssText = [
+    "background:none;border:none;cursor:pointer;padding:6px 10px",
+    "color:var(--text-color,#1c2126);display:flex;align-items:center",
+    "gap:6px;font-family:Poppins,sans-serif;font-size:13px;border-radius:6px",
+  ].join(";");
+  btn.innerHTML = [
+    '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"',
+    ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">',
+    '  <circle cx="12" cy="8" r="1.5" fill="currentColor"/>',
+    '  <circle cx="12" cy="12" r="1.5" fill="currentColor"/>',
+    '  <circle cx="12" cy="16" r="1.5" fill="currentColor"/>',
+    '</svg>',
+  ].join("");
 
-  // Toggle menu on button click
   btn.addEventListener("click", function (e) {
     e.stopPropagation();
     var visible = menu.style.display === "block";
     menu.style.display = visible ? "none" : "block";
   });
 
-  // Close on outside click
+  // Single outside-click listener registered once
   document.addEventListener("click", function () {
     menu.style.display = "none";
   });
 
-  // Inject into navbar — try common Frappe navbar selectors
+  var wrapper = document.createElement("div");
+  wrapper.id = "alaiy-nav-wrapper";
+  wrapper.style.cssText = "position:relative;display:flex;align-items:center";
+  wrapper.appendChild(btn);
+  wrapper.appendChild(menu);
+
+  _alaiyNavWrapper = wrapper;
+}
+
+function _injectCustomNavbar() {
+  // Inject the hide-style once
+  if (!document.getElementById("alaiy-hide-frappe-nav")) {
+    var style = document.createElement("style");
+    style.id = "alaiy-hide-frappe-nav";
+    style.textContent = [
+      ".navbar .navbar-nav .nav-item.dropdown:has(.navbar-avatar),",
+      ".navbar .navbar-nav .nav-item.dropdown:has([data-toggle='dropdown']),",
+      ".navbar-right .dropdown { display: none !important; }",
+    ].join("\n");
+    document.head.appendChild(style);
+  }
+
+  // Build the wrapper DOM exactly once
+  if (!_alaiyNavWrapper) {
+    _buildNavWrapper();
+  }
+
+  // If the wrapper is already in the live DOM, nothing to do
+  if (document.getElementById("alaiy-nav-btn")) return;
+
+  // Inject into the page-head right-side actions area (Frappe v16 layout).
+  // Falls back to legacy navbar selectors for compatibility.
   function _tryInject() {
     var target =
+      document.querySelector(".standard-items-section") ||
+      document.querySelector(".page-head-content") ||
       document.querySelector(".navbar-right") ||
-      document.querySelector(".navbar .navbar-nav.ml-auto") ||
-      document.querySelector(".navbar .container > .navbar-collapse");
+      document.querySelector(".navbar .navbar-nav.ml-auto");
     if (!target) return false;
-    target.appendChild(wrapper);
+    target.appendChild(_alaiyNavWrapper);
     return true;
   }
 
   if (!_tryInject()) {
-    // Retry after short delay in case Frappe renders navbar late
+    // Retry after short delay in case Frappe renders page-head late
     var attempts = 0;
     var iv = setInterval(function () {
       attempts++;
-      if (_tryInject() || attempts > 10) clearInterval(iv);
+      if (_tryInject() || attempts > 15) clearInterval(iv);
     }, 200);
   }
 }
