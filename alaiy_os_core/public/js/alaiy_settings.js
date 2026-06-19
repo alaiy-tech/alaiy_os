@@ -474,7 +474,7 @@ alaiy_os.settings = {
     if (connector.last_tested_at) {
       const testedEl = document.createElement("span");
       testedEl.className = "alaiy-connector-last-tested";
-      testedEl.textContent = __(
+      testedEl.innerHTML = __(
         "Last tested: {0}",
         [frappe.datetime.comment_when(connector.last_tested_at)],
       );
