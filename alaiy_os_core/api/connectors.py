@@ -57,6 +57,18 @@ def get_connector_config(connector_id):
 
 
 @frappe.whitelist()
+def get_connector_password(connector_id, fieldname):
+    """Return the decrypted value of a Password field for display."""
+    registry = frappe.get_doc("OS Connector Registry", connector_id)
+    meta = frappe.get_meta(registry.settings_doctype)
+    field_meta = meta.get_field(fieldname)
+    if not field_meta or field_meta.fieldtype != "Password":
+        frappe.throw("Invalid field")
+    doc = frappe.get_single(registry.settings_doctype)
+    return doc.get_password(fieldname, raise_exception=False) or ""
+
+
+@frappe.whitelist()
 def save_and_test(connector_id, values):
     """Save connector settings then run the connector's test method."""
     import json

@@ -371,6 +371,34 @@ input, textarea, select, button,
     color: var(--text-muted, #8d99a6);
 }
 
+.alaiy-connector-pwd-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.alaiy-connector-pwd-wrap .alaiy-connector-field-input {
+    flex: 1;
+    padding-right: 36px;
+}
+
+.alaiy-connector-pwd-eye {
+    position: absolute;
+    right: 8px;
+    background: none;
+    border: none;
+    padding: 0 2px;
+    cursor: pointer;
+    color: var(--text-muted, #8d99a6);
+    display: flex;
+    align-items: center;
+    line-height: 1;
+}
+
+.alaiy-connector-pwd-eye:hover {
+    color: var(--text-color, #333);
+}
+
 .alaiy-connector-footer {
     display: flex;
     align-items: center;

@@ -565,15 +565,66 @@ alaiy_os.settings = {
 
     let input;
     if (field.fieldtype === "Password") {
+      const isSaved = value && value._set;
+      const wrap = document.createElement("div");
+      wrap.className = "alaiy-connector-pwd-wrap";
+
       input = document.createElement("input");
       input.type = "password";
       input.className = "form-control alaiy-connector-field-input";
       input.dataset.fieldname = field.fieldname;
       input.dataset.fieldtype = "password";
-      input.placeholder =
-        value && value._set
-          ? __("(saved — type to replace)")
-          : __("Enter value");
+      input.placeholder = isSaved ? __("(saved — type to replace)") : __("Enter value");
+
+      if (isSaved) {
+        const eyeBtn = document.createElement("button");
+        eyeBtn.type = "button";
+        eyeBtn.className = "alaiy-connector-pwd-eye";
+        eyeBtn.title = __("Show / hide token");
+        eyeBtn.innerHTML = frappe.utils.icon("eye", "xs");
+
+        let revealed = false;
+        eyeBtn.addEventListener("click", () => {
+          if (!revealed) {
+            eyeBtn.innerHTML = frappe.utils.icon("eye-slash", "xs");
+            eyeBtn.disabled = true;
+            frappe.call({
+              method: "alaiy_os_core.api.connectors.get_connector_password",
+              args: { connector_id: container.closest("[data-connector-id]").dataset.connectorId, fieldname: field.fieldname },
+              callback: (r) => {
+                eyeBtn.disabled = false;
+                input.type = "text";
+                input.value = r.message || "";
+                input.focus();
+                revealed = true;
+              },
+              error: () => { eyeBtn.disabled = false; eyeBtn.innerHTML = frappe.utils.icon("eye", "xs"); },
+            });
+          } else {
+            input.type = "password";
+            input.value = "";
+            input.placeholder = __("(saved — type to replace)");
+            eyeBtn.innerHTML = frappe.utils.icon("eye", "xs");
+            revealed = false;
+          }
+        });
+
+        wrap.appendChild(input);
+        wrap.appendChild(eyeBtn);
+        row.appendChild(label);
+        row.appendChild(wrap);
+        container.appendChild(row);
+        if (field.description) {
+          const descRow = document.createElement("div");
+          descRow.className = "alaiy-connector-field-desc-row";
+          const desc = document.createElement("div");
+          desc.className = "alaiy-connector-field-desc";
+          desc.textContent = field.description;
+          descRow.appendChild(desc);
+          container.appendChild(descRow);
+        }
+        return;
+      }
     } else if (field.fieldtype === "Check") {
       const wrap = document.createElement("div");
       wrap.className = "alaiy-connector-field-check-wrap";
