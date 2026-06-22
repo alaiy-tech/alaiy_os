@@ -15,6 +15,8 @@
   "icon_url",
   "settings_doctype",
   "test_method",
+  "sync_categories_method",
+  "sync_items_method",
   "is_enabled",
   "connection_status",
   "last_tested_at"
@@ -72,6 +74,16 @@
    "fieldname": "test_method",
    "fieldtype": "Data",
    "label": "Test Method (Python dotted path)"
+  },
+  {
+   "fieldname": "sync_categories_method",
+   "fieldtype": "Data",
+   "label": "Sync Categories Method"
+  },
+  {
+   "fieldname": "sync_items_method",
+   "fieldtype": "Data",
+   "label": "Sync Items Method"
   },
   {
    "default": "0",

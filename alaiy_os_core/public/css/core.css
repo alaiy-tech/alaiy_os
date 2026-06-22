@@ -371,33 +371,6 @@ input, textarea, select, button,
     color: var(--text-muted, #8d99a6);
 }
 
-.alaiy-connector-pwd-wrap {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.alaiy-connector-pwd-wrap .alaiy-connector-field-input {
-    flex: 1;
-    padding-right: 36px;
-}
-
-.alaiy-connector-pwd-eye {
-    position: absolute;
-    right: 8px;
-    background: none;
-    border: none;
-    padding: 0 2px;
-    cursor: pointer;
-    color: var(--text-muted, #8d99a6);
-    display: flex;
-    align-items: center;
-    line-height: 1;
-}
-
-.alaiy-connector-pwd-eye:hover {
-    color: var(--text-color, #333);
-}
 
 .alaiy-connector-footer {
     display: flex;
@@ -425,6 +398,54 @@ input, textarea, select, button,
 
 .alaiy-connector-result.error {
     color: #991b1b;
+}
+
+.alaiy-connector-sync-section {
+    border-top: 1px solid var(--border-color, #e2e8f0);
+    padding: 12px 22px;
+    background: var(--control-bg, #f8fafc);
+}
+
+.alaiy-connector-sync-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted, #8d99a6);
+    margin-bottom: 8px;
+}
+
+.alaiy-connector-sync-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 6px;
+}
+
+.alaiy-connector-sync-row:last-child {
+    margin-bottom: 0;
+}
+
+.alaiy-connector-sync-btn {
+    white-space: nowrap;
+    min-width: 110px;
+}
+
+.alaiy-connector-sync-status {
+    font-size: 12px;
+    color: var(--text-muted, #8d99a6);
+}
+
+.alaiy-connector-sync-status.success {
+    color: #166534;
+}
+
+.alaiy-connector-sync-status.error {
+    color: #991b1b;
+}
+
+.alaiy-connector-sync-status.running {
+    color: #1e40af;
 }
 
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
