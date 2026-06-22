@@ -173,4 +173,9 @@ WORKSPACE_SIDEBAR_ITEMS = [
         "icon": "settings", "child": 0, "indent": 1},
     {"type": "Link", "link_type": "Page", "link_to": "connector-settings",
      "label": "Connectors", "child": 1, "icon": "plug"},
+
+    # Logs section — connector apps register their log links here at install/migrate
+    # time via the alaiy_os_sidebar_log_items hook.  No items are hard-coded here.
+    {"type": "Section Break", "label": "Logs",
+        "icon": "file-clock", "child": 0, "indent": 1},
 ]

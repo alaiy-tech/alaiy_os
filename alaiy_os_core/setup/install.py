@@ -51,15 +51,25 @@ def _cleanup_legacy_workspace():
 
 
 def _run_provisioning():
-    set_company_defaults()
-    configure_system_settings()
-    skip_erpnext_onboarding()
-    _cleanup_legacy_workspace()
-    create_module_def()
-    create_or_update_workspace()
-    create_or_update_workspace_sidebar()
-    create_or_update_onboarding()
-    configure_branding()
+    steps = [
+        set_company_defaults,
+        configure_system_settings,
+        skip_erpnext_onboarding,
+        _cleanup_legacy_workspace,
+        create_module_def,
+        create_or_update_workspace,
+        create_or_update_workspace_sidebar,
+        create_or_update_onboarding,
+        configure_branding,
+    ]
+    for step in steps:
+        try:
+            step()
+        except Exception:
+            frappe.log_error(
+                title=f"AlaiyOS: provisioning step {step.__name__} failed",
+                message=frappe.get_traceback(),
+            )
     frappe.db.commit()
     frappe.clear_cache()
 
@@ -249,13 +259,53 @@ def create_or_update_workspace():
 
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
+def _build_sidebar_items():
+    """
+    Return the full sidebar item list: base items from workspace.py plus any
+    items registered by connector apps via the alaiy_os_sidebar_log_items hook.
+
+    Hook format (in hooks.py of a connector app):
+        alaiy_os_sidebar_log_items = [
+            {"link_type": "DocType", "link_to": "Cloudstore Sync Log",
+             "label": "Cloudstore Logs", "icon": "activity"}
+        ]
+
+    Items whose target DocType/Page hasn't been installed yet are silently skipped.
+    """
+    items = list(WORKSPACE_SIDEBAR_ITEMS)
+
+    for hook_entries in frappe.get_hooks("alaiy_os_sidebar_log_items"):
+        for entry in (hook_entries if isinstance(hook_entries, list) else [hook_entries]):
+            link_type = entry.get("link_type", "DocType")
+            link_to = (entry.get("link_to") or "").strip()
+            if not link_to:
+                continue
+            if link_type == "DocType" and not frappe.db.exists("DocType", link_to):
+                continue
+            if link_type == "Page" and not frappe.db.exists("Page", link_to):
+                continue
+            items.append({
+                "type":      "Link",
+                "link_type": link_type,
+                "link_to":   link_to,
+                "label":     entry.get("label", link_to),
+                "child":     1,
+                "icon":      entry.get("icon", "activity"),
+            })
+
+    return items
+
+
 def create_or_update_workspace_sidebar():
+    items = _build_sidebar_items()
+
     if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
         sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
         sidebar.for_user = ""
         sidebar.set("items", [])
-        for item in WORKSPACE_SIDEBAR_ITEMS:
+        for item in items:
             sidebar.append("items", item)
+        sidebar.flags.ignore_links = True
         sidebar.save(ignore_permissions=True)
     else:
         sidebar = frappe.get_doc({
@@ -265,8 +315,9 @@ def create_or_update_workspace_sidebar():
             "for_user": "",
             "standard": 0,
             "app":      "alaiy_os_core",
-            "items":    WORKSPACE_SIDEBAR_ITEMS,
+            "items":    items,
         })
+        sidebar.flags.ignore_links = True
         sidebar.insert(ignore_permissions=True)
 
 
