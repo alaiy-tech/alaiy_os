@@ -692,11 +692,11 @@ alaiy_os.settings = {
             btn.disabled = true;
             setTimeout(refreshStatus, 3000);
           } else if (last.status === "success") {
-            statusEl.textContent = __("✓ {0} · {1} items", [when, last.items_processed || 0]);
+            statusEl.innerHTML = "✓ " + when + " · " + (last.items_processed || 0) + " items";
             statusEl.className = "alaiy-connector-sync-status success";
             btn.disabled = false;
           } else {
-            statusEl.textContent = __("✗ {0} · {1}", [when, last.error_message || "Failed"]);
+            statusEl.innerHTML = "✗ " + when + " · " + (last.error_message || __("Failed"));
             statusEl.className = "alaiy-connector-sync-status error";
             btn.disabled = false;
           }
