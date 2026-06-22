@@ -88,6 +88,8 @@ WORKSPACE_LINKS = [
     {"type": "Card Break", "label": "Settings", "icon": "settings"},
     {"type": "Link", "link_type": "Page",
         "link_to": "connector-settings", "label": "Connectors"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Cloudstore Sync Log", "label": "Sync Log"},
 ]
 
 # Sidebar items — mirrors ALAIY_SIDEBAR_CONFIG in public/constants/workspace_config.js.
@@ -173,4 +175,6 @@ WORKSPACE_SIDEBAR_ITEMS = [
         "icon": "settings", "child": 0, "indent": 1},
     {"type": "Link", "link_type": "Page", "link_to": "connector-settings",
      "label": "Connectors", "child": 1, "icon": "plug"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Cloudstore Sync Log",
+     "label": "Sync Log", "child": 1, "icon": "activity"},
 ]
