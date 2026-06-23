@@ -33,17 +33,12 @@ function _labelToSlug(str) {
 }
 
 function _osUrl(slug) {
-  return `/desk/${ALAIY_OS_ROUTE}${slug ? "/" + slug : ""}`;
+  return `${ALAIY_OS_ROUTE}${slug ? "/" + slug : ""}`;
 }
 function _isOsPath(path) {
   if (!path) return false;
 
-  return (
-    path === `/desk/${ALAIY_OS_ROUTE}` ||
-    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`) ||
-    path === `/desk/Workspaces/${ALAIY_OS_WORKSPACE}` ||
-    path.startsWith(`/desk/Workspaces/${ALAIY_OS_WORKSPACE}/`)
-  );
+  return path === `${ALAIY_OS_ROUTE}` || path.startsWith(`${ALAIY_OS_ROUTE}/`);
 }
 
 // Click interceptor applies to all desk users inside the OS workspace.
@@ -106,7 +101,7 @@ AW.close = function () {
 
   AW._doctype = null;
 
-  history.pushState({}, "", `/desk/${ALAIY_OS_ROUTE}`);
+  history.pushState({}, "", `${ALAIY_OS_ROUTE}`);
 
   if (typeof updateAlaiyTitle === "function") {
     updateAlaiyTitle("Dashboard");
