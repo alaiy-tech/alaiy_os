@@ -194,6 +194,7 @@ def _create_item_supplier_attribute():
         "doctype": "DocType",
         "name": "Item Supplier Attribute",
         "module": MODULE_NAME,
+        "custom": 1,
         "istable": 1,
         "editable_grid": 1,
         "fields": [
@@ -227,6 +228,7 @@ def _create_supplier_item_availability():
         "doctype": "DocType",
         "name": "Supplier Item Availability",
         "module": MODULE_NAME,
+        "custom": 1,
         "fields": [
             {"fieldname": "item_code", "fieldtype": "Link", "options": "Item",
              "label": "Item Code", "reqd": 1, "in_list_view": 1},
@@ -252,6 +254,7 @@ def _create_channel_listing():
         "doctype": "DocType",
         "name": "Channel Listing",
         "module": MODULE_NAME,
+        "custom": 1,
         "istable": 1,
         "editable_grid": 1,
         "fields": [
