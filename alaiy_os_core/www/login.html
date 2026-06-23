@@ -212,7 +212,7 @@
         .then(function (res) {
           if (res.status === 200 && res.json.message === "Logged In") {
             // Prefer server-supplied redirect, then query param, then default
-            window.location.href = res.json.home_page || getRedirectTo();
+            window.location.href = getRedirectTo();
           } else {
             var msg = (res.json && (res.json.message || res.json.exc_type)) || "Invalid credentials";
             err.textContent = msg;
