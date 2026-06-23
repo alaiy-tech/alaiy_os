@@ -49,7 +49,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Connector Type",
-   "options": "\nsupplier\nmarketplace\nlogistics\npayment\nother"
+   "options": "\nsupplier\nchannel\nintegration\nother"
   },
   {
    "fieldname": "description",

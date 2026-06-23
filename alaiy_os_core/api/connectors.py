@@ -30,7 +30,7 @@ def get_connector_config(connector_id):
     if not frappe.db.exists("DocType", settings_doctype):
         frappe.throw(f"Settings DocType '{settings_doctype}' not found.")
 
-    RENDERABLE = {"Data", "Password", "Int", "Link", "Select", "Check", "Text", "Small Text"}
+    RENDERABLE = {"Data", "Password", "Int", "Float", "Link", "Select", "Check", "Text", "Small Text", "Section Break"}
     meta = frappe.get_meta(settings_doctype)
     fields = []
     for f in meta.fields:

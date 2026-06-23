@@ -577,6 +577,26 @@ alaiy_os.settings = {
   },
 
   _renderConnectorField(container, field, value) {
+    // Section Break — render a styled divider with optional label
+    if (field.fieldtype === "Section Break") {
+      const divider = document.createElement("div");
+      divider.className = "alaiy-connector-section-break";
+      divider.style.cssText =
+        "display:flex;align-items:center;gap:10px;margin:18px 0 10px;";
+      if (field.label) {
+        const lbl = document.createElement("span");
+        lbl.style.cssText =
+          "font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-muted,#8d99a5);white-space:nowrap;";
+        lbl.textContent = field.label;
+        divider.appendChild(lbl);
+      }
+      const hr = document.createElement("div");
+      hr.style.cssText = "flex:1;height:1px;background:var(--border-color,#e2e6ea);";
+      divider.appendChild(hr);
+      container.appendChild(divider);
+      return;
+    }
+
     const row = document.createElement("div");
     row.className = "alaiy-connector-field-row";
 
@@ -633,6 +653,46 @@ alaiy_os.settings = {
         if (opt === value) option.selected = true;
         input.appendChild(option);
       });
+    } else if (field.fieldtype === "Float") {
+      input = document.createElement("input");
+      input.type = "number";
+      input.step = "any";
+      input.className = "form-control alaiy-connector-field-input";
+      input.dataset.fieldname = field.fieldname;
+      input.value = value !== null && value !== undefined ? value : "";
+    } else if (field.fieldtype === "Link") {
+      input = document.createElement("input");
+      input.type = "text";
+      input.className = "form-control alaiy-connector-field-input";
+      input.dataset.fieldname = field.fieldname;
+      input.placeholder = field.options ? __("Enter {0} name", [field.options]) : "";
+      input.value = value !== null && value !== undefined ? value : "";
+      if (field.options) {
+        const badge = document.createElement("span");
+        badge.style.cssText =
+          "position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:10px;font-weight:600;color:var(--text-muted,#8d99a5);text-transform:uppercase;letter-spacing:.04em;pointer-events:none;";
+        badge.textContent = field.options;
+        const wrap = document.createElement("div");
+        wrap.style.cssText = "position:relative;flex:1;";
+        wrap.appendChild(input);
+        wrap.appendChild(badge);
+        label.style.flexShrink = "0";
+        row.appendChild(label);
+        row.appendChild(wrap);
+        if (field.description) {
+          container.appendChild(row);
+          const descRow = document.createElement("div");
+          descRow.className = "alaiy-connector-field-desc-row";
+          const desc = document.createElement("div");
+          desc.className = "alaiy-connector-field-desc";
+          desc.textContent = field.description;
+          descRow.appendChild(desc);
+          container.appendChild(descRow);
+        } else {
+          container.appendChild(row);
+        }
+        return;
+      }
     } else {
       input = document.createElement("input");
       input.type = field.fieldtype === "Int" ? "number" : "text";

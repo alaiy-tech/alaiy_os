@@ -58,6 +58,7 @@ def _run_provisioning():
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
         create_module_def,
+        provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
         create_or_update_onboarding,
@@ -167,6 +168,120 @@ def skip_erpnext_onboarding():
     if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
         frappe.db.sql(
             "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
+
+
+# ── Shared Generic DocTypes ───────────────────────────────────────────────────
+
+def provision_shared_doctypes():
+    """
+    Create shared generic DocTypes used by all connector types.
+    Idempotent — skips creation if each DocType already exists.
+    """
+    _create_item_supplier_attribute()
+    _create_supplier_item_availability()
+    _create_channel_listing()
+    frappe.db.commit()
+
+
+def _shared_permissions():
+    return [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
+
+
+def _create_item_supplier_attribute():
+    if frappe.db.exists("DocType", "Item Supplier Attribute"):
+        return
+    frappe.get_doc({
+        "doctype": "DocType",
+        "name": "Item Supplier Attribute",
+        "module": MODULE_NAME,
+        "istable": 1,
+        "editable_grid": 1,
+        "fields": [
+            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
+             "label": "Supplier", "in_list_view": 1},
+            {"fieldname": "connector_name", "fieldtype": "Data",
+             "label": "Connector", "in_list_view": 1},
+            {"fieldname": "attribute_key", "fieldtype": "Data",
+             "label": "Key", "in_list_view": 1},
+            {"fieldname": "attribute_value", "fieldtype": "Small Text", "label": "Value"},
+        ],
+        "permissions": _shared_permissions(),
+    }).insert(ignore_permissions=True)
+    # Link the child table to Item via a Custom Field
+    if not frappe.db.exists("Custom Field", "Item-supplier_attributes"):
+        frappe.get_doc({
+            "doctype": "Custom Field",
+            "dt": "Item",
+            "fieldname": "supplier_attributes",
+            "label": "Supplier Attributes",
+            "fieldtype": "Table",
+            "options": "Item Supplier Attribute",
+            "insert_after": "description",
+        }).insert(ignore_permissions=True)
+
+
+def _create_supplier_item_availability():
+    if frappe.db.exists("DocType", "Supplier Item Availability"):
+        return
+    frappe.get_doc({
+        "doctype": "DocType",
+        "name": "Supplier Item Availability",
+        "module": MODULE_NAME,
+        "fields": [
+            {"fieldname": "item_code", "fieldtype": "Link", "options": "Item",
+             "label": "Item Code", "reqd": 1, "in_list_view": 1},
+            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
+             "label": "Supplier", "reqd": 1, "in_list_view": 1},
+            {"fieldname": "connector_name", "fieldtype": "Data",
+             "label": "Connector", "in_list_view": 1},
+            {"fieldname": "available_qty", "fieldtype": "Float",
+             "label": "Available Qty", "in_list_view": 1},
+            {"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse",
+             "label": "Warehouse"},
+            {"fieldname": "last_updated", "fieldtype": "Datetime",
+             "label": "Last Updated", "read_only": 1},
+        ],
+        "permissions": _shared_permissions(),
+    }).insert(ignore_permissions=True)
+
+
+def _create_channel_listing():
+    if frappe.db.exists("DocType", "Channel Listing"):
+        return
+    frappe.get_doc({
+        "doctype": "DocType",
+        "name": "Channel Listing",
+        "module": MODULE_NAME,
+        "istable": 1,
+        "editable_grid": 1,
+        "fields": [
+            {"fieldname": "connector_name", "fieldtype": "Data",
+             "label": "Connector", "in_list_view": 1},
+            {"fieldname": "channel", "fieldtype": "Data",
+             "label": "Channel", "in_list_view": 1},
+            {"fieldname": "listed", "fieldtype": "Check",
+             "label": "Listed", "default": "0"},
+            {"fieldname": "external_product_id", "fieldtype": "Data",
+             "label": "External Product ID"},
+            {"fieldname": "external_variant_id", "fieldtype": "Data",
+             "label": "External Variant ID"},
+            {"fieldname": "channel_url", "fieldtype": "Data", "label": "Channel URL"},
+            {"fieldname": "last_pushed_at", "fieldtype": "Datetime",
+             "label": "Last Pushed At", "read_only": 1},
+        ],
+        "permissions": _shared_permissions(),
+    }).insert(ignore_permissions=True)
+    # Link the child table to Item via a Custom Field
+    if not frappe.db.exists("Custom Field", "Item-channel_listings"):
+        frappe.get_doc({
+            "doctype": "Custom Field",
+            "dt": "Item",
+            "fieldname": "channel_listings",
+            "label": "Channel Listings",
+            "fieldtype": "Table",
+            "options": "Channel Listing",
+            "insert_after": "supplier_attributes",
+        }).insert(ignore_permissions=True)
 
 
 # ── Module Def ────────────────────────────────────────────────────────────────
