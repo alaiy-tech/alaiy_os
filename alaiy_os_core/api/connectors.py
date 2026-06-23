@@ -12,7 +12,7 @@ def get_all_connectors():
             "connector_id", "connector_name", "connector_app",
             "connector_type", "description", "icon", "icon_url",
             "settings_doctype", "test_method",
-            "sync_categories_method", "sync_items_method",
+            "sync_categories_method", "sync_items_method", "sync_status_method",
             "is_enabled", "connection_status", "last_tested_at",
         ],
         order_by="connector_name asc",
