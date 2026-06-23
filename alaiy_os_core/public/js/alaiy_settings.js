@@ -525,11 +525,11 @@ alaiy_os.settings = {
 
       if (connector.sync_categories_method) {
         this._buildSyncRow(syncSection, __("Category Tree"), connector.sync_categories_method,
-          "alaiy_os_cloudstore_connector.api.sync.get_sync_status", "categories");
+          connector.sync_status_method, "categories");
       }
       if (connector.sync_items_method) {
         this._buildSyncRow(syncSection, __("Items"), connector.sync_items_method,
-          "alaiy_os_cloudstore_connector.api.sync.get_sync_status", "items");
+          connector.sync_status_method, "items");
       }
       card.appendChild(syncSection);
     }
