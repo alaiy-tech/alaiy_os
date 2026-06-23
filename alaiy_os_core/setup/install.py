@@ -20,6 +20,7 @@ import frappe
 from alaiy_os_core.client.config import boot_config
 from alaiy_os_core.constants.workspace import (
     WORKSPACE_NAME,
+    WORKSPACE_ROUTE,
     WORKSPACE_SHORTCUTS,
     WORKSPACE_LINKS,
     WORKSPACE_SIDEBAR_ITEMS,
@@ -139,7 +140,8 @@ def skip_erpnext_onboarding():
         try:
             meta = frappe.get_meta("System Settings")
             if meta.has_field("setup_complete"):
-                frappe.db.set_single_value("System Settings", "setup_complete", 1)
+                frappe.db.set_single_value(
+                    "System Settings", "setup_complete", 1)
         except Exception:
             pass
 
@@ -163,7 +165,8 @@ def skip_erpnext_onboarding():
 
     # 4. Dismiss onboarding for all users by setting User.onboarding_status
     if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
-        frappe.db.sql("UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
+        frappe.db.sql(
+            "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
 
 
 # ── Module Def ────────────────────────────────────────────────────────────────
@@ -225,6 +228,7 @@ def create_or_update_workspace():
             "label":     WORKSPACE_NAME,
             "title":     title,
             "name":      WORKSPACE_NAME,
+            "route":     WORKSPACE_ROUTE,
             "type":      "Workspace",
             "public":    1,
             "icon":      "layout-dashboard",
@@ -250,6 +254,7 @@ def create_or_update_workspace():
         ws.module = MODULE_NAME
         ws.app = "alaiy_os_core"
         ws.type = "Workspace"
+        ws.route = WORKSPACE_ROUTE
         ws.public = 1
         ws.content = content
         ws.roles = []
