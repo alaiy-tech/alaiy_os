@@ -33,7 +33,7 @@ function _labelToSlug(str) {
 }
 
 function _osUrl(slug) {
-  return `${ALAIY_OS_ROUTE}${slug ? "/" + slug : ""}`;
+  return `/desk/${ALAIY_OS_ROUTE}${slug ? "/" + slug : ""}`;
 }
 function _isOsPath(path) {
   if (!path) return false;
@@ -101,7 +101,7 @@ AW.close = function () {
 
   AW._doctype = null;
 
-  history.pushState({}, "", `${ALAIY_OS_ROUTE}`);
+  history.pushState({}, "", `${ALAIY_OS_URL}`);
 
   if (typeof updateAlaiyTitle === "function") {
     updateAlaiyTitle("Dashboard");

@@ -12,4 +12,5 @@ const ALAIY_OS_ROLES = ["Alaiy OS Manager", "Alaiy OS User"];
 // eslint-disable-next-line no-unused-vars
 const ALAIY_OS_BYPASS = ["System Manager", "Administrator"];
 // eslint-disable-next-line no-unused-vars
-const ALAIY_OS_ROUTE = "/desk/os";
+const ALAIY_OS_ROUTE = "os";
+const ALAIY_OS_URL = "/desk/os";
