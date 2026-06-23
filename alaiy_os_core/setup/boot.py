@@ -28,14 +28,15 @@ def boot_session(bootinfo):
 
 
 def on_login(login_manager):
+    pass
     """
     Redirect browser logins to the OS workspace.
     Skips API/token logins so background jobs and REST calls are unaffected.
     """
     # Only redirect interactive browser logins (Content-Type form or no body).
     # API calls use application/json and must not be redirected.
-    content_type = frappe.request.content_type or ""
-    if "application/json" in content_type:
-        return
+    # content_type = frappe.request.content_type or ""
+    # if "application/json" in content_type:
+    #     return
 
-    frappe.local.response["redirect_to"] = f"/desk/os"
+    # frappe.local.response["redirect_to"] = f"/desk/os"

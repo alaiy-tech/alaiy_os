@@ -16,6 +16,12 @@ $(document).on("app_ready", function () {
   // Only redirect if there's no hash route already set (hash route means Frappe
   // is already navigating to a specific page; overriding it causes a crash in
   // store_last_show_sidebar_for_item before the sidebar is initialized).
+
+  console.log(
+    "[ROUTE_GUARD]",
+    window.location.pathname,
+    frappe.get_route_str(),
+  );
   if (
     (path === "/desk" || path === "/desk/") &&
     (!hash || hash === "#" || hash === "")

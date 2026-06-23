@@ -38,9 +38,11 @@ function _osUrl(slug) {
 function _isOsPath(path) {
   if (!path) return false;
 
-  return path === `${ALAIY_OS_ROUTE}` || path.startsWith(`${ALAIY_OS_ROUTE}/`);
+  return (
+    path === `/desk/${ALAIY_OS_ROUTE}` ||
+    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`)
+  );
 }
-
 // Click interceptor applies to all desk users inside the OS workspace.
 
 // ── Label extraction ──────────────────────────────────────────────────────────
@@ -262,6 +264,11 @@ AW._mountForm = function (host, doctype, docname) {
 
 // ── Capture-phase click interceptor ──────────────────────────────────────────
 AW._onCapture = function (e) {
+  console.log(
+    "[WORKSPACE]",
+    window.location.pathname,
+    _isOsPath(window.location.pathname),
+  );
   // (applies to all users on the OS workspace)
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
     return;
