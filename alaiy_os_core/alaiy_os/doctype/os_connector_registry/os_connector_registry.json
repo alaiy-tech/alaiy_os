@@ -17,6 +17,7 @@
   "test_method",
   "sync_categories_method",
   "sync_items_method",
+  "sync_status_method",
   "is_enabled",
   "connection_status",
   "last_tested_at"
@@ -84,6 +85,11 @@
    "fieldname": "sync_items_method",
    "fieldtype": "Data",
    "label": "Sync Items Method"
+  },
+  {
+   "fieldname": "sync_status_method",
+   "fieldtype": "Data",
+   "label": "Sync Status Method"
   },
   {
    "default": "0",
