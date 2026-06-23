@@ -1,34 +1,35 @@
 /**
  * AlaiyOS — Shared UI Utilities
  *
- * - Exposes updateAlaiyTitle() and resolveAlaiySection() for route_guard.js.
- *
- * Depends on (loaded before this file):
- *   constants/roles.js        — ALAIY_OS_ROUTE, ALAIY_OS_WORKSPACE
- *   constants/route_titles.js — ALAIY_ROUTE_TITLES, ALAIY_ROUTE_PREFIX_TITLES
+ * Depends on:
+ *   constants/roles.js
+ *   constants/route_titles.js
  */
 
 // ── Page-container failsafe ───────────────────────────────────────────────────
+
 function _ensurePageVisible() {
-  var attempts = 0;
-  var interval = setInterval(function () {
+  let attempts = 0;
+
+  const interval = setInterval(() => {
     attempts++;
-    var pc = document.querySelector(".page-container");
-    var splash = document.querySelector(".centered.splash");
+
+    const pc = document.querySelector(".page-container");
+    const splash = document.querySelector(".centered.splash");
+
     if (pc && getComputedStyle(pc).display === "none") {
       pc.style.removeProperty("display");
-      pc.style.display = "block";
     }
+
     if (splash && getComputedStyle(splash).display !== "none") {
       splash.style.display = "none";
     }
+
     if ((pc && pc.offsetHeight > 0) || attempts >= 10) {
       clearInterval(interval);
     }
   }, 500);
 }
-
-// ── Wire patches ──────────────────────────────────────────────────────────────
 
 $(document).on("app_ready", function () {
   _ensurePageVisible();
@@ -36,19 +37,30 @@ $(document).on("app_ready", function () {
 
 // ── Title helpers ─────────────────────────────────────────────────────────────
 
-// eslint-disable-next-line no-unused-vars
-function updateAlaiyTitle(section) {
-  document.title = (section || "Dashboard") + " | Alaiy OS";
-}
+window.updateAlaiyTitle = function (section) {
+  document.title = `${section || "Dashboard"} | Alaiy OS`;
+};
 
-// eslint-disable-next-line no-unused-vars
-function resolveAlaiySection(route) {
+window.resolveAlaiySection = function (route) {
   if (!route) return "Dashboard";
-  if (ALAIY_ROUTE_TITLES[route]) return ALAIY_ROUTE_TITLES[route];
-  for (const entry of ALAIY_ROUTE_PREFIX_TITLES) {
-    if (route.startsWith(entry.prefix)) return entry.title;
+
+  if (ALAIY_ROUTE_TITLES[route]) {
+    return ALAIY_ROUTE_TITLES[route];
   }
-  if (route.startsWith("os") || route === "Workspaces/" + ALAIY_OS_WORKSPACE)
+
+  for (const entry of ALAIY_ROUTE_PREFIX_TITLES) {
+    if (route.startsWith(entry.prefix)) {
+      return entry.title;
+    }
+  }
+
+  if (
+    route === ALAIY_OS_ROUTE ||
+    route.startsWith(ALAIY_OS_ROUTE + "/") ||
+    route === `Workspaces/${ALAIY_OS_WORKSPACE}`
+  ) {
     return "Dashboard";
+  }
+
   return "Alaiy OS";
-}
+};

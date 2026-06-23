@@ -5,9 +5,9 @@
  * users using a capture-phase listener (fires before Frappe's bubble-phase
  * jQuery handlers).  Instead of navigating to a DocType page, renders a
  * list → form view inside an overlay within the main-content area of the
- * workspace.  The sidebar stays visible; the URL updates to /app/os/<slug>.
+ * workspace.  The sidebar stays visible; the URL updates to /desk/os/<slug>.
  *
- * Route stays within /app/os throughout.  Direct loads at /app/os/<slug>
+ * Route stays within /desk/os throughout.  Direct loads at /desk/os/<slug>
  * are handled by route_guard.js (stores slug → redirect to workspace) and
  * then by the page-change listener below (opens the overlay).
  *
@@ -32,19 +32,17 @@ function _labelToSlug(str) {
     .replace(/[^a-z0-9-]/g, "");
 }
 
-// Always use /desk/ as the desk base.
-function _deskBase() {
-  return "/desk/";
-}
-
 function _osUrl(slug) {
-  return _deskBase() + ALAIY_OS_ROUTE + (slug ? "/" + slug : "");
+  return `/desk/${ALAIY_OS_ROUTE}${slug ? "/" + slug : ""}`;
 }
-
 function _isOsPath(path) {
+  if (!path) return false;
+
   return (
-    path.startsWith("/desk/" + ALAIY_OS_ROUTE) ||
-    path.startsWith("/desk/Workspaces/" + ALAIY_OS_WORKSPACE)
+    path === `/desk/${ALAIY_OS_ROUTE}` ||
+    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`) ||
+    path === `/desk/Workspaces/${ALAIY_OS_WORKSPACE}` ||
+    path.startsWith(`/desk/Workspaces/${ALAIY_OS_WORKSPACE}/`)
   );
 }
 
@@ -78,26 +76,44 @@ AW._ensureOverlay = function () {
   const ws = document.querySelector(
     ".layout-main-section, .layout-main-section-wrapper, .workspace-container, .page-content",
   );
+
   if (!ws) return null;
 
-  if (!AW._overlay || !document.body.contains(AW._overlay)) {
-    const el = document.createElement("div");
-    el.id = "alaiy-ws-content";
-    if (getComputedStyle(ws).position === "static")
-      ws.style.position = "relative";
-    ws.appendChild(el);
-    AW._overlay = el;
+  const existing = document.getElementById("alaiy-ws-content");
+
+  if (existing) {
+    AW._overlay = existing;
+    return existing;
   }
-  return AW._overlay;
+
+  const el = document.createElement("div");
+  el.id = "alaiy-ws-content";
+
+  if (getComputedStyle(ws).position === "static") {
+    ws.style.position = "relative";
+  }
+
+  ws.appendChild(el);
+  AW._overlay = el;
+
+  return el;
 };
 
 AW.close = function () {
-  if (AW._overlay) AW._overlay.classList.remove("visible");
+  if (AW._overlay) {
+    AW._overlay.classList.remove("visible");
+  }
+
   AW._doctype = null;
-  if (typeof updateAlaiyTitle === "function") updateAlaiyTitle("Dashboard");
+
+  history.pushState({}, "", `/desk/${ALAIY_OS_ROUTE}`);
+
+  if (typeof updateAlaiyTitle === "function") {
+    updateAlaiyTitle("Dashboard");
+  }
 };
 
-// ── Open by slug (used when resolving /app/os/<slug> deep links) ───────────
+// ── Open by slug (used when resolving /desk/os/<slug> deep links) ───────────
 AW.openBySlug = function (slug) {
   for (const label of Object.keys(ALAIY_LABEL_TO_DOCTYPE)) {
     if (_labelToSlug(label) === slug) {
@@ -116,6 +132,12 @@ AW.openBySlug = function (slug) {
 // ── List view ─────────────────────────────────────────────────────────────────
 AW.openList = function (doctype, label) {
   AW._doctype = doctype;
+
+  const slug = _labelToSlug(label || doctype);
+
+  if (window.location.pathname !== _osUrl(slug)) {
+    history.pushState({}, "", _osUrl(slug));
+  }
   const overlay = AW._ensureOverlay();
   if (!overlay) return;
 
@@ -212,12 +234,8 @@ AW._openForm = function (body, doctype, docname, label) {
   AW._mountForm(body.querySelector(".alaiy-ws-form-host"), doctype, docname);
 };
 
-AW._newForm = function (doctype, label) {
-  const body = AW._overlay && AW._overlay.querySelector(".alaiy-ws-body");
-  if (!body) return;
-  const tempName = "new-" + frappe.model.scrub(doctype) + "-1";
-  frappe.model.clear_doc(doctype, tempName);
-  AW._openForm(body, doctype, tempName, label);
+AW._newForm = function (doctype) {
+  frappe.new_doc(doctype);
 };
 
 AW._mountForm = function (host, doctype, docname) {
@@ -250,6 +268,9 @@ AW._mountForm = function (host, doctype, docname) {
 // ── Capture-phase click interceptor ──────────────────────────────────────────
 AW._onCapture = function (e) {
   // (applies to all users on the OS workspace)
+  if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+    return;
+  }
 
   const path = window.location.pathname;
   if (!_isOsPath(path)) return;
@@ -276,13 +297,13 @@ AW._onCapture = function (e) {
   if (!doctype) return;
 
   e.preventDefault();
-  e.stopImmediatePropagation();
+  e.stopPropagation();
   AW.openList(doctype, label);
 };
 
 // ── Sub-route recovery: open overlay after workspace loads ────────────────────
 // route_guard.js stores a pending slug in sessionStorage when Frappe fires
-// a route change for /app/os/<slug>.  We read it here once the workspace page
+// a route change for /desk/os/<slug>.  We read it here once the workspace page
 // has rendered and open the appropriate overlay.
 $(document).on("page-change", function () {
   const path = window.location.pathname;
