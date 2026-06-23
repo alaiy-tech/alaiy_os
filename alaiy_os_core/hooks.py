@@ -13,19 +13,16 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
-_V = "20260622b"
+_V = "20260623a"
 
 app_include_js = [
-    # constants — loaded first so all other files can reference these globals
     f"/assets/alaiy_os_core/constants/roles.js?v={_V}",
     f"/assets/alaiy_os_core/constants/workspace_config.js?v={_V}",
     f"/assets/alaiy_os_core/constants/route_titles.js?v={_V}",
     f"/assets/alaiy_os_core/constants/settings_tabs.js?v={_V}",
-    # shared title / UI utils
     f"/assets/alaiy_os_core/js/alaiy_ui.js?v={_V}",
-    # route guard: /desk redirect + title update
+    f"/assets/alaiy_os_core/js/alaiy_workspace.js?v={_V}",
     f"/assets/alaiy_os_core/js/route_guard.js?v={_V}",
-    # settings panel
     f"/assets/alaiy_os_core/js/alaiy_settings.js?v={_V}",
 ]
 app_include_css = [

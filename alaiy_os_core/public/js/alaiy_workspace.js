@@ -1,21 +1,4 @@
-/**
- * AlaiyOS Workspace Content Loader
- *
- * Intercepts workspace card, shortcut, AND sidebar link clicks for AlaiyOS
- * users using a capture-phase listener (fires before Frappe's bubble-phase
- * jQuery handlers).  Instead of navigating to a DocType page, renders a
- * list → form view inside an overlay within the main-content area of the
- * workspace.  The sidebar stays visible; the URL updates to /desk/os/<slug>.
- *
- * Route stays within /desk/os throughout.  Direct loads at /desk/os/<slug>
- * are handled by route_guard.js (stores slug → redirect to workspace) and
- * then by the page-change listener below (opens the overlay).
- *
- * Depends on (loaded before this file):
- *   constants/roles.js          — ALAIY_OS_ROUTE, ALAIY_OS_WORKSPACE
- *   constants/workspace_config.js — ALAIY_LABEL_TO_DOCTYPE, ALAIY_SKIP_LABELS
- *   alaiy_ui.js                 — updateAlaiyTitle()
- */
+// Intercepts workspace card/shortcut/sidebar clicks; renders list→form inside an overlay instead of navigating away.
 
 frappe.provide("alaiy_os.workspace");
 
@@ -43,7 +26,6 @@ function _isOsPath(path) {
     path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`)
   );
 }
-// Click interceptor applies to all desk users inside the OS workspace.
 
 // ── Label extraction ──────────────────────────────────────────────────────────
 function _labelFrom(el) {
@@ -67,7 +49,7 @@ function _labelFrom(el) {
   }
   return (el.textContent || "").trim().split("\n")[0].trim();
 }
-
+ 
 // ── Overlay management ────────────────────────────────────────────────────────
 AW._ensureOverlay = function () {
   const ws = document.querySelector(
@@ -103,7 +85,7 @@ AW.close = function () {
 
   AW._doctype = null;
 
-  history.pushState({}, "", `${ALAIY_OS_URL}`);
+  history.pushState({}, "", _osUrl(""));
 
   if (typeof updateAlaiyTitle === "function") {
     updateAlaiyTitle("Dashboard");
@@ -264,11 +246,6 @@ AW._mountForm = function (host, doctype, docname) {
 
 // ── Capture-phase click interceptor ──────────────────────────────────────────
 AW._onCapture = function (e) {
-  console.log(
-    "[WORKSPACE]",
-    window.location.pathname,
-    _isOsPath(window.location.pathname),
-  );
   // (applies to all users on the OS workspace)
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
     return;
@@ -303,10 +280,7 @@ AW._onCapture = function (e) {
   AW.openList(doctype, label);
 };
 
-// ── Sub-route recovery: open overlay after workspace loads ────────────────────
-// route_guard.js stores a pending slug in sessionStorage when Frappe fires
-// a route change for /desk/os/<slug>.  We read it here once the workspace page
-// has rendered and open the appropriate overlay.
+// ── Sub-route recovery ────────────────────────────────────────────────────────
 $(document).on("page-change", function () {
   const path = window.location.pathname;
   if (!_isOsPath(path)) return;
