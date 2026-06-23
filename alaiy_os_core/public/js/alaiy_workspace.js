@@ -20,10 +20,10 @@ function _osUrl(slug) {
 }
 function _isOsPath(path) {
   if (!path) return false;
-
   return (
     path === `/desk/${ALAIY_OS_ROUTE}` ||
-    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`)
+    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`) ||
+    path === `/desk/Workspace/${ALAIY_OS_WORKSPACE}`
   );
 }
 
@@ -82,11 +82,8 @@ AW.close = function () {
   if (AW._overlay) {
     AW._overlay.classList.remove("visible");
   }
-
   AW._doctype = null;
-
-  history.pushState({}, "", _osUrl(""));
-
+  frappe.set_route("Workspace", ALAIY_OS_WORKSPACE);
   if (typeof updateAlaiyTitle === "function") {
     updateAlaiyTitle("Dashboard");
   }
