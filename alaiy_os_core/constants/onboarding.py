@@ -1,19 +1,16 @@
 """
 AlaiyOS Module Onboarding configuration.
 
-Set ENABLE_MODULE_ONBOARDING = True in client/config/boot_config.py to activate
-Getting Started on the workspace sidebar.
-
-Edit ONBOARDING_STEPS to customise what the onboarding guide shows.
-Each step is a dict that maps to a Module Onboarding Step doctype record.
+ENABLE_MODULE_ONBOARDING in client/config/boot_config.py controls whether the
+"Getting Started" panel appears in the workspace sidebar.  The Module Onboarding
+and Onboarding Step records are always created in the DB regardless of that flag.
 """
 
 ONBOARDING_NAME = "Alaiy OS Onboarding"
 
-# Steps shown in the Getting Started sidebar panel.
-# Fields match the Module Onboarding Step doctype schema in Frappe v16.
 ONBOARDING_STEPS = [
     {
+        "name":         "AlaiyOS - Set up your Company",
         "title":        "Set up your Company",
         "description":  "Enter your company's name, address, and default currency.",
         "action":       "Update Settings",
@@ -22,6 +19,7 @@ ONBOARDING_STEPS = [
         "is_mandatory": 1,
     },
     {
+        "name":         "AlaiyOS - Add your first Product",
         "title":        "Add your first Product",
         "description":  "Create an Item to start tracking inventory.",
         "action":       "Create Entry",
@@ -30,6 +28,7 @@ ONBOARDING_STEPS = [
         "is_mandatory": 1,
     },
     {
+        "name":         "AlaiyOS - Create a Sales Order",
         "title":        "Create a Sales Order",
         "description":  "Record your first customer order.",
         "action":       "Create Entry",
@@ -38,6 +37,7 @@ ONBOARDING_STEPS = [
         "is_mandatory": 0,
     },
     {
+        "name":         "AlaiyOS - Add a Supplier",
         "title":        "Add a Supplier",
         "description":  "Register a supplier for procurement.",
         "action":       "Create Entry",
