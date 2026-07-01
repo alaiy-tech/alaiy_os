@@ -5,6 +5,7 @@ Runs on after_install (fresh install) and after_migrate (every deploy).
 Reconciles the site's workspace, branding and company to match this codebase.
 
 Data definitions:
+  constants/roles.py       — OS_MANAGER_ROLE
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
   constants/onboarding.py  — ONBOARDING_NAME, ONBOARDING_STEPS
 
@@ -18,6 +19,7 @@ import json
 import frappe
 
 from alaiy_os_core.client.config import boot_config
+from alaiy_os_core.constants.roles import OS_MANAGER_ROLE
 from alaiy_os_core.constants.workspace import (
     WORKSPACE_NAME,
     WORKSPACE_ROUTE,
@@ -58,6 +60,8 @@ def _run_provisioning():
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
         create_module_def,
+        create_or_update_role,
+        restrict_desktop_page,
         provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
@@ -131,12 +135,8 @@ def skip_erpnext_onboarding():
     Also marks all Module Onboarding records for ERPNext modules as complete
     so the Getting Started banners are suppressed.
     """
-    # 1. Mark the global setup wizard complete via DefaultValue
-    #    frappe.db.get_default("setup_complete") reads from tabDefaultValue —
-    #    this is the canonical Frappe mechanism used by the setup wizard.
     frappe.db.set_default("setup_complete", 1)
 
-    # Also set the System Settings field if it exists (ERPNext-specific)
     if frappe.db.exists("DocType", "System Settings"):
         try:
             meta = frappe.get_meta("System Settings")
@@ -146,7 +146,6 @@ def skip_erpnext_onboarding():
         except Exception:
             pass
 
-    # 2. Mark ERPNext's setup wizard step table complete if it exists
     for dt in ("Setup Progress", "ERPNext Settings"):
         if not frappe.db.exists("DocType", dt):
             continue
@@ -157,17 +156,49 @@ def skip_erpnext_onboarding():
         except Exception:
             pass
 
-    # 3. Mark all existing Module Onboarding records as complete
     for name in frappe.get_all("Module Onboarding", pluck="name"):
+        if name == ONBOARDING_NAME:
+            continue
         try:
             frappe.db.set_value("Module Onboarding", name, "is_complete", 1)
         except Exception:
             pass
 
-    # 4. Dismiss onboarding for all users by setting User.onboarding_status
     if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
         frappe.db.sql(
             "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
+
+
+# ── Role ─────────────────────────────────────────────────────────────────────
+
+def create_or_update_role():
+    """Create the OS Manager role as a standard role with the OS home page."""
+    role_data = {
+        "is_standard": 1,
+        "desk_access": 1,
+        "home_page":   "/desk/os",
+    }
+    if not frappe.db.exists("Role", OS_MANAGER_ROLE):
+        frappe.get_doc({
+            "doctype":   "Role",
+            "role_name": OS_MANAGER_ROLE,
+            **role_data,
+        }).insert(ignore_permissions=True)
+    else:
+        frappe.db.set_value("Role", OS_MANAGER_ROLE, role_data)
+
+
+# ── Desktop page restriction ──────────────────────────────────────────────────
+
+def restrict_desktop_page():
+    """Restrict the Frappe Desktop page to Administrator only."""
+    if not frappe.db.exists("Page", "desktop"):
+        return
+    page = frappe.get_doc("Page", "desktop")
+    page.set("roles", [{"role": "Administrator"}])
+    page.flags.ignore_validate = True
+    page.flags.ignore_links = True
+    page.save(ignore_permissions=True)
 
 
 # ── Shared Generic DocTypes ───────────────────────────────────────────────────
@@ -208,7 +239,6 @@ def _create_item_supplier_attribute():
         ],
         "permissions": _shared_permissions(),
     }).insert(ignore_permissions=True)
-    # Link the child table to Item via a Custom Field
     if not frappe.db.exists("Custom Field", "Item-supplier_attributes"):
         frappe.get_doc({
             "doctype": "Custom Field",
@@ -274,7 +304,6 @@ def _create_channel_listing():
         ],
         "permissions": _shared_permissions(),
     }).insert(ignore_permissions=True)
-    # Link the child table to Item via a Custom Field
     if not frappe.db.exists("Custom Field", "Item-channel_listings"):
         frappe.get_doc({
             "doctype": "Custom Field",
@@ -328,18 +357,19 @@ def _build_workspace_content():
     return json.dumps(blocks)
 
 
+def _get_default_company():
+    return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
+
+
 def _get_workspace_title():
-    default_company = frappe.db.get_single_value(
-        "Global Defaults", "default_company") or ""
-    return (default_company + " OS") if default_company else WORKSPACE_NAME
+    company = _get_default_company()
+    return (company + " Workspace") if company else WORKSPACE_NAME
 
 
 def create_or_update_workspace():
     content = _build_workspace_content()
     title = _get_workspace_title()
 
-    # Workspace is public — visible to all desk users without role restriction.
-    # System Manager has full access by default.
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype":   "Workspace",
@@ -382,6 +412,11 @@ def create_or_update_workspace():
 
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
+def _get_sidebar_title():
+    company = _get_default_company()
+    return (company + " OS") if company else "Alaiy OS"
+
+
 def _build_sidebar_items():
     """
     Return the full sidebar item list: base items from workspace.py plus any
@@ -421,10 +456,21 @@ def _build_sidebar_items():
 
 def create_or_update_workspace_sidebar():
     items = _build_sidebar_items()
+    title = _get_sidebar_title()
+    enable_onboarding = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
+
+    common_fields = {
+        "title":             title,
+        "for_user":          "",
+        "standard":          1,
+        "app":               "alaiy_os_core",
+        "module_onboarding": ONBOARDING_NAME if enable_onboarding else None,
+    }
 
     if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
         sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
-        sidebar.for_user = ""
+        for k, v in common_fields.items():
+            sidebar.set(k, v)
         sidebar.set("items", [])
         for item in items:
             sidebar.append("items", item)
@@ -432,13 +478,10 @@ def create_or_update_workspace_sidebar():
         sidebar.save(ignore_permissions=True)
     else:
         sidebar = frappe.get_doc({
-            "doctype":  "Workspace Sidebar",
-            "name":     WORKSPACE_NAME,
-            "title":    WORKSPACE_NAME,
-            "for_user": "",
-            "standard": 0,
-            "app":      "alaiy_os_core",
-            "items":    items,
+            "doctype": "Workspace Sidebar",
+            "name":    WORKSPACE_NAME,
+            **common_fields,
+            "items":   items,
         })
         sidebar.flags.ignore_links = True
         sidebar.insert(ignore_permissions=True)
@@ -446,39 +489,86 @@ def create_or_update_workspace_sidebar():
 
 # ── Module Onboarding ─────────────────────────────────────────────────────────
 
-def create_or_update_onboarding():
-    enable = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
+def _create_or_update_onboarding_steps():
+    """
+    Create or update standalone Onboarding Step records.
+    Returns a list of step names for referencing from Module Onboarding.
+    """
+    step_names = []
+    for step_def in ONBOARDING_STEPS:
+        step_name = step_def["name"]
+        fields = {k: v for k, v in step_def.items() if k != "name"}
+        if not frappe.db.exists("Onboarding Step", step_name):
+            try:
+                frappe.get_doc({
+                    "doctype": "Onboarding Step",
+                    "name":    step_name,
+                    **fields,
+                }).insert(ignore_permissions=True)
+            except Exception:
+                frappe.log_error(
+                    title=f"AlaiyOS: could not create Onboarding Step {step_name!r}",
+                    message=frappe.get_traceback(),
+                )
+        else:
+            frappe.db.set_value("Onboarding Step", step_name, fields)
+        step_names.append(step_name)
+    return step_names
 
-    if not enable:
-        if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
-            frappe.db.set_value("Workspace Sidebar", WORKSPACE_NAME,
-                                "module_onboarding", None)
-        return
+
+def create_or_update_onboarding():
+    """
+    Always create/update the Module Onboarding record and its Onboarding Steps.
+    Only link it to the sidebar when ENABLE_MODULE_ONBOARDING is True.
+    """
+    enable = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
+    step_names = _create_or_update_onboarding_steps()
+
+    onboarding_doc = {
+        "title":           "Get Started with Alaiy OS",
+        "subtitle":        "Get your workspace ready in a few steps.",
+        "success_message": "Great — your workspace is all set!",
+        "documentation_url": "",
+        "is_complete":     0,
+        "module":          MODULE_NAME,
+    }
 
     if not frappe.db.exists("Module Onboarding", ONBOARDING_NAME):
         doc = frappe.get_doc({
-            "doctype":          "Module Onboarding",
-            "name":             ONBOARDING_NAME,
-            "title":            ONBOARDING_NAME,
-            "subtitle":         "Get your workspace ready in a few steps.",
-            "success_message":  "Great — your workspace is all set!",
-            "documentation_url": "",
-            "is_complete":      0,
-            "steps":            [],
+            "doctype": "Module Onboarding",
+            "name":    ONBOARDING_NAME,
+            **onboarding_doc,
+            "steps":   [],
         })
-        for step in ONBOARDING_STEPS:
-            doc.append("steps", step)
+        for name in step_names:
+            doc.append("steps", {"step": name})
+        # allow_roles is a child table; set it if the field exists on this Frappe version
+        try:
+            doc.set("allow_roles", [{"role": OS_MANAGER_ROLE}])
+        except Exception:
+            pass
+        doc.flags.ignore_validate = True
         doc.insert(ignore_permissions=True)
     else:
         doc = frappe.get_doc("Module Onboarding", ONBOARDING_NAME)
+        for k, v in onboarding_doc.items():
+            doc.set(k, v)
         doc.set("steps", [])
-        for step in ONBOARDING_STEPS:
-            doc.append("steps", step)
+        for name in step_names:
+            doc.append("steps", {"step": name})
+        try:
+            doc.set("allow_roles", [{"role": OS_MANAGER_ROLE}])
+        except Exception:
+            pass
+        doc.flags.ignore_validate = True
         doc.save(ignore_permissions=True)
 
+    # Link or unlink from sidebar based on config flag
     if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
-        frappe.db.set_value("Workspace Sidebar", WORKSPACE_NAME,
-                            "module_onboarding", ONBOARDING_NAME)
+        frappe.db.set_value(
+            "Workspace Sidebar", WORKSPACE_NAME,
+            "module_onboarding", ONBOARDING_NAME if enable else None,
+        )
 
 
 # ── Branding ──────────────────────────────────────────────────────────────────
@@ -497,19 +587,7 @@ def configure_branding():
 
     _safe_set("Navbar Settings",  "app_logo",
               "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
-    _safe_set("Website Settings", "app_logo",
-              "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
-    _safe_set("Website Settings", "banner_image",
-              "/assets/alaiy_os_core/client/assets/client-logo-hor.png")
-    _safe_set("Website Settings", "brand_html",
-              f'<img src="/assets/alaiy_os_core/client/assets/client-logo-hor.png" alt="{boot_config.COMPANY_NAME} OS" style="height:32px">')
-    _safe_set("Website Settings", "splash_image",
-              "/assets/alaiy_os_core/client/assets/client-logo-square.png")
     _safe_set("System Settings",  "favicon",
-              "/assets/alaiy_os_core/client/assets/client-icon.png")
-    _safe_set("Website Settings", "favicon",
               "/assets/alaiy_os_core/client/assets/client-icon.png")
     _safe_set("System Settings",  "app_name",
               boot_config.COMPANY_NAME + " OS")
-    _safe_set("Website Settings", "app_name",
-              boot_config.COMPANY_NAME)
