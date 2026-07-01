@@ -1,0 +1,1 @@
+OS_MANAGER_ROLE = "OS Manager"
