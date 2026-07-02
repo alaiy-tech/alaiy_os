@@ -473,27 +473,23 @@ alaiy_os.settings = {
       const testBtn = document.createElement("button");
       testBtn.className = "btn btn-sm btn-primary alaiy-connector-test";
       testBtn.textContent = __("Test Connection");
+      footer.appendChild(testBtn);
 
-      const resultMsg = document.createElement("div");
-      resultMsg.className = "alaiy-connector-result";
-
+      // Timestamp anchored to the right via margin-left:auto (CSS)
       if (connector.last_tested_at) {
         const testedEl = document.createElement("span");
         testedEl.className = "alaiy-connector-last-tested";
-        testedEl.textContent = __(
+        // comment_when() returns an HTML <span> with tooltip — must use innerHTML
+        testedEl.innerHTML = __(
           "Tested: {0}",
           [frappe.datetime.comment_when(connector.last_tested_at)],
         );
         footer.appendChild(testedEl);
       }
 
-      footer.appendChild(testBtn);
-      footer.appendChild(resultMsg);
-
       testBtn.addEventListener("click", () => {
         testBtn.disabled = true;
         testBtn.textContent = __("Testing…");
-        resultMsg.textContent = "";
         frappe.call({
           method: "alaiy_os_core.api.connectors.test_connector",
           args: { connector_id: connector.connector_id },
@@ -502,13 +498,17 @@ alaiy_os.settings = {
             testBtn.textContent = __("Test Connection");
             const res = r.message || {};
             if (res.success) {
-              resultMsg.className = "alaiy-connector-result success";
-              resultMsg.textContent = "✓ " + (res.message || __("Connected successfully"));
+              frappe.show_alert({
+                message: res.message || __("Connected successfully"),
+                indicator: "green",
+              }, 5);
               statusBadge.className = "alaiy-connector-status status-connected";
               statusBadge.innerHTML = _alaiyStatusBadgeHtml("connected");
             } else {
-              resultMsg.className = "alaiy-connector-result error";
-              resultMsg.textContent = "✗ " + (res.message || __("Connection failed"));
+              frappe.show_alert({
+                message: res.message || __("Connection failed"),
+                indicator: "red",
+              }, 7);
               statusBadge.className = "alaiy-connector-status status-failed";
               statusBadge.innerHTML = _alaiyStatusBadgeHtml("failed");
             }
@@ -516,8 +516,10 @@ alaiy_os.settings = {
           error: () => {
             testBtn.disabled = false;
             testBtn.textContent = __("Test Connection");
-            resultMsg.className = "alaiy-connector-result error";
-            resultMsg.textContent = __("An error occurred. Check the console.");
+            frappe.show_alert({
+              message: __("Test failed — check the browser console."),
+              indicator: "red",
+            }, 7);
           },
         });
       });

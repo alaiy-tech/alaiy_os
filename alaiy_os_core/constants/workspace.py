@@ -51,7 +51,9 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Sales Order",   "label": "Sales Order"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Sales Invoice", "label": "Sales Invoice"},
+        "link_to": "Sales Invoice",  "label": "Sales Invoice"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "Delivery Note",  "label": "Delivery Note"},
 
     # ── PROCUREMENT (Purchase Receipt moved here from Inventory) ───────────────
     {"type": "Card Break", "label": "Procurement", "icon": "package-search"},
@@ -134,6 +136,8 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Sales Order",   "child": 1, "icon": "shopping-cart"},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Invoice",
      "label": "Sales Invoice", "child": 1, "icon": "receipt"},
+    {"type": "Link", "link_type": "DocType", "link_to": "Delivery Note",
+     "label": "Delivery Note", "child": 1, "icon": "package-open"},
 
     # Procurement (Purchase Receipt moved here from Inventory)
     {"type": "Section Break", "label": "Procurement",

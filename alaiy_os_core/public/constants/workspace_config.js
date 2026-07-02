@@ -68,6 +68,12 @@ const ALAIY_SIDEBAR_CONFIG = [
     doctype: "Sales Invoice",
     icon: "receipt",
   },
+  {
+    label: "Delivery Note",
+    type: "link",
+    doctype: "Delivery Note",
+    icon: "package-open",
+  },
 
   // ── Procurement (Purchase Receipt moved here from Inventory) ─────────────────
   { label: "Procurement", type: "section", icon: "package-search" },

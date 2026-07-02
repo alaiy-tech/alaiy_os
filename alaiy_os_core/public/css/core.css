@@ -231,6 +231,7 @@ input, textarea, select, button,
     margin-bottom: 24px;
     overflow: hidden;
     background: var(--bg-color, #fff);
+    font-family: inherit;
 }
 
 .alaiy-connector-header {
