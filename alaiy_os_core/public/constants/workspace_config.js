@@ -22,6 +22,7 @@ const ALAIY_SIDEBAR_CONFIG = [
 
   // ── Catalog ─────────────────────────────────────────────────────────────────
   { label: "Catalog", type: "section", icon: "grid" },
+  { label: "Products Catalog", type: "page", page: "product-catalog",  icon: "layout-grid" },
   { label: "Products",       type: "link", doctype: "Item",            icon: "package" },
   { label: "Item Group",     type: "link", doctype: "Item Group",      icon: "boxes" },
   { label: "Item Attribute", type: "link", doctype: "Item Attribute",  icon: "list-filter" },
@@ -127,7 +128,15 @@ ALAIY_SIDEBAR_CONFIG.forEach(function (item) {
   }
 });
 
-// Labels that should NOT open the overlay (actions + section headers)
+// label → desk Page route for every "page" entry
+const ALAIY_LABEL_TO_PAGE = {};
+ALAIY_SIDEBAR_CONFIG.forEach(function (item) {
+  if (item.type === "page" && item.page) {
+    ALAIY_LABEL_TO_PAGE[item.label] = item.page;
+  }
+});
+
+// Labels that should NOT open the DocType-list overlay (actions, sections, pages)
 const ALAIY_SKIP_LABELS = new Set(
   ALAIY_SIDEBAR_CONFIG.filter(function (item) {
     return item.type !== "link";

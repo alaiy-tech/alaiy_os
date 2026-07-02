@@ -60,7 +60,17 @@ AW._onCapture = function (e) {
   if (!target) return;
 
   const label = _labelFrom(target);
-  if (!label || ALAIY_SKIP_LABELS.has(label)) return;
+  if (!label) return;
+
+  // Page links (e.g. "Products Catalog") → route straight to the desk page.
+  if (typeof ALAIY_LABEL_TO_PAGE !== "undefined" && ALAIY_LABEL_TO_PAGE[label]) {
+    e.preventDefault();
+    e.stopPropagation();
+    frappe.set_route(ALAIY_LABEL_TO_PAGE[label]);
+    return;
+  }
+
+  if (ALAIY_SKIP_LABELS.has(label)) return;
 
   const doctype =
     ALAIY_LABEL_TO_DOCTYPE[label] ||

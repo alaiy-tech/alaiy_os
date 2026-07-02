@@ -172,6 +172,8 @@ WORKSPACE_SIDEBAR_ITEMS = [
     # ── Catalog ────────────────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Catalog",
         "icon": "grid",             "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "Page", "link_to": "product-catalog",
+     "label": "Products Catalog",   "child": 1, "icon": "layout-grid"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item",
      "label": "Products",           "child": 1, "icon": "package"},
     {"type": "Link", "link_type": "DocType", "link_to": "Item Group",

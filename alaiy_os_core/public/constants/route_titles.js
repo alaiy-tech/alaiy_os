@@ -18,6 +18,7 @@ const ALAIY_ROUTE_TITLES = {
   "List/Purchase Receipt/List":     "Inventory - Purchase Receipt",
 
   // Catalog
+  "product-catalog":           "Catalog - Products Catalog",
   "List/Item/List":            "Catalog - Products",
   "List/Item Group/List":      "Catalog - Item Group",
   "List/Item Attribute/List":  "Catalog - Item Attribute",

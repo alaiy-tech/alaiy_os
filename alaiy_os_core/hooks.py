@@ -13,7 +13,7 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
-_V = "20260702d"
+_V = "20260702f"
 
 app_include_js = [
     f"/assets/alaiy_os_core/constants/roles.js?v={_V}",

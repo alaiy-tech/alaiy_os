@@ -1,0 +1,13 @@
+{
+ "content": "1",
+ "doctype": "Page",
+ "module": "Alaiy OS",
+ "name": "product-catalog",
+ "page_name": "product-catalog",
+ "roles": [
+  {
+   "role": "System Manager"
+  }
+ ],
+ "title": "Product Catalog"
+}
