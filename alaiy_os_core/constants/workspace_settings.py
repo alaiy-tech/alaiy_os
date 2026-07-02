@@ -30,7 +30,7 @@ SETTINGS_WORKSPACE_LINKS = [
         "link_to": "Dunning Type",            "label": "Dunning Type"},
 
     # ── INVENTORY SETTINGS ─────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Inventory Settings", "icon": "sliders"},
+    {"type": "Card Break", "label": "Inventory Settings", "icon": "settings-2"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Stock Settings",              "label": "Stock Settings"},
     {"type": "Link", "link_type": "DocType",
@@ -165,7 +165,7 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Accounts Settings",
      "label": "Accounts Settings",     "child": 1, "icon": "settings-2"},
     {"type": "Link", "link_type": "DocType", "link_to": "Journal Entry Template",
-     "label": "Journal Entry Template","child": 1, "icon": "file-edit"},
+     "label": "Journal Entry Template","child": 1, "icon": "pencil"},
     {"type": "Link", "link_type": "DocType", "link_to": "Currency Exchange",
      "label": "Currency Exchange",     "child": 1, "icon": "dollar-sign"},
     {"type": "Link", "link_type": "DocType", "link_to": "Dunning Type",
@@ -173,9 +173,9 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
 
     # ── Inventory Settings ────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Inventory Settings",
-        "icon": "sliders",          "child": 0, "indent": 1},
+        "icon": "settings-2",       "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Settings",
-     "label": "Stock Settings",            "child": 1, "icon": "sliders"},
+     "label": "Stock Settings",            "child": 1, "icon": "settings-2"},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Reposting Settings",
      "label": "Stock Reposting Settings",  "child": 1, "icon": "rotate-ccw"},
     {"type": "Link", "link_type": "DocType", "link_to": "Customs Tariff Number",
@@ -271,7 +271,7 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Salutation",
      "label": "Salutation",            "child": 1, "icon": "user"},
     {"type": "Link", "link_type": "DocType", "link_to": "Authorization Rule",
-     "label": "Authorization Rule",    "child": 1, "icon": "check-circle"},
+     "label": "Authorization Rule",    "child": 1, "icon": "badge-check"},
     {"type": "Link", "link_type": "DocType", "link_to": "Global Defaults",
      "label": "Global Defaults",       "child": 1, "icon": "settings"},
     {"type": "Link", "link_type": "DocType", "link_to": "Party Type",

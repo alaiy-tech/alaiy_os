@@ -556,9 +556,15 @@ def create_or_update_os_settings_workspace():
         ws.save(ignore_permissions=True)
 
 
+def _get_os_settings_sidebar_title():
+    company = _get_default_company()
+    return (company + " OS Settings") if company else SETTINGS_WORKSPACE_NAME
+
+
 def create_or_update_os_settings_workspace_sidebar():
+    title = _get_os_settings_sidebar_title()
     common_fields = {
-        "title":             SETTINGS_WORKSPACE_NAME,
+        "title":             title,
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os_core",
