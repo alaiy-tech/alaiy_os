@@ -343,59 +343,30 @@ def create_module_def():
 
 # ── Workspace naming ──────────────────────────────────────────────────────────
 #
-# Frappe looks up a workspace's sidebar client-side via
-# frappe.boot.workspace_sidebar_item[Workspace.name.lower()] — keyed by the
-# WORKSPACE's own `name` field, not its title, and not the Workspace Sidebar's
-# title either. So Workspace.name and Workspace Sidebar.name must always be
-# identical for the lookup to succeed. Both are renamed together whenever the
-# company (and therefore the target name) changes. `route` is a separate,
-# stable field — renaming never changes the URL.
+# Frappe's URL for a Workspace is slug(Workspace.name) — there is no separate
+# "route" field (an earlier version of this file assumed there was one; there
+# isn't, so WORKSPACE_NAME/SETTINGS_WORKSPACE_NAME must stay exactly "OS" and
+# "OS Settings" forever, or /desk/os and /desk/os-settings break). Frappe also
+# looks up a workspace's sidebar via
+# frappe.boot.workspace_sidebar_item[Workspace.name.lower()] — keyed by name,
+# not title — so the Workspace Sidebar's name must equal the Workspace's name
+# too, which (since Workspace Sidebar autonames from its own title field)
+# means the sidebar's title must also stay "OS"/"OS Settings", not
+# company-prefixed. Company branding is only applied to the Workspace's own
+# `title` field, which is independent of its `name` and safe to vary.
 
 def _get_default_company():
     return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
 
 
-def _get_os_workspace_name():
+def _get_os_workspace_title():
     company = _get_default_company()
     return f"{company} OS" if company else WORKSPACE_NAME
 
 
-def _get_os_settings_workspace_name():
+def _get_os_settings_workspace_title():
     company = _get_default_company()
     return f"{company} OS Settings" if company else SETTINGS_WORKSPACE_NAME
-
-
-def _find_workspace_by_route(route):
-    """Find an existing Workspace by its route — the one identifier that's
-    stable across company (and therefore name) changes."""
-    return frappe.db.get_value("Workspace", {"route": route}, "name")
-
-
-def _rename_workspace_and_sidebar(old_name, new_name):
-    if old_name == new_name:
-        return
-    if frappe.db.exists("Workspace", old_name):
-        frappe.rename_doc("Workspace", old_name, new_name,
-                           force=True, ignore_permissions=True)
-    if frappe.db.exists("Workspace Sidebar", old_name):
-        frappe.rename_doc("Workspace Sidebar", old_name, new_name,
-                           force=True, ignore_permissions=True)
-
-
-def _patch_workspace_link_targets(items, name_map):
-    """
-    WORKSPACE_SIDEBAR_ITEMS / SETTINGS_WORKSPACE_SIDEBAR_ITEMS hard-code
-    "Workspace"-type link_to targets using the symbolic names ("OS",
-    "OS Settings"). Rewrite them to the current company-prefixed Workspace
-    names (name_map) so the links actually resolve.
-    """
-    patched = []
-    for item in items:
-        item = dict(item)
-        if item.get("link_type") == "Workspace" and item.get("link_to") in name_map:
-            item["link_to"] = name_map[item["link_to"]]
-        patched.append(item)
-    return patched
 
 
 def _connector_registry_rows():
@@ -505,19 +476,14 @@ def _build_workspace_content():
 
 def create_or_update_workspace():
     content = _build_workspace_content()
-    target_name = _get_os_workspace_name()
+    title = _get_os_workspace_title()
 
-    existing_name = _find_workspace_by_route(WORKSPACE_ROUTE)
-    if existing_name and existing_name != target_name:
-        _rename_workspace_and_sidebar(existing_name, target_name)
-
-    if not frappe.db.exists("Workspace", target_name):
+    if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype":   "Workspace",
-            "label":     target_name,
-            "title":     target_name,
-            "name":      target_name,
-            "route":     WORKSPACE_ROUTE,
+            "label":     WORKSPACE_NAME,
+            "title":     title,
+            "name":      WORKSPACE_NAME,
             "type":      "Workspace",
             "public":    1,
             "icon":      "layout-dashboard",
@@ -531,20 +497,18 @@ def create_or_update_workspace():
         ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
     else:
-        ws = frappe.get_doc("Workspace", target_name)
+        ws = frappe.get_doc("Workspace", WORKSPACE_NAME)
         ws.set("links", [])
         ws.set("shortcuts", [])
         for link in WORKSPACE_LINKS:
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
-        ws.label = target_name
-        ws.title = target_name
+        ws.title = title
         ws.icon = "layout-dashboard"
         ws.module = MODULE_NAME
         ws.app = "alaiy_os_core"
         ws.type = "Workspace"
-        ws.route = WORKSPACE_ROUTE
         ws.public = 1
         ws.content = content
         ws.roles = []
@@ -555,22 +519,22 @@ def create_or_update_workspace():
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
 def create_or_update_workspace_sidebar():
-    target_name = _get_os_workspace_name()
-    settings_name = _get_os_settings_workspace_name()
-    name_map = {WORKSPACE_NAME: target_name, SETTINGS_WORKSPACE_NAME: settings_name}
-    items = _patch_workspace_link_targets(WORKSPACE_SIDEBAR_ITEMS, name_map)
+    items = list(WORKSPACE_SIDEBAR_ITEMS)
     enable_onboarding = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
 
+    # Title must stay == WORKSPACE_NAME: Workspace Sidebar autonames from
+    # title, and that name must match the Workspace's own (fixed) name for
+    # Frappe's client-side sidebar lookup to find it.
     common_fields = {
-        "title":             target_name,
+        "title":             WORKSPACE_NAME,
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os_core",
         "module_onboarding": ONBOARDING_NAME if enable_onboarding else None,
     }
 
-    if frappe.db.exists("Workspace Sidebar", target_name):
-        sidebar = frappe.get_doc("Workspace Sidebar", target_name)
+    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+        sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
@@ -605,20 +569,15 @@ def _build_os_settings_content():
 
 def create_or_update_os_settings_workspace():
     content = _build_os_settings_content()
-    target_name = _get_os_settings_workspace_name()
+    title = _get_os_settings_workspace_title()
     links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_workspace_links()
 
-    existing_name = _find_workspace_by_route(SETTINGS_WORKSPACE_ROUTE)
-    if existing_name and existing_name != target_name:
-        _rename_workspace_and_sidebar(existing_name, target_name)
-
-    if not frappe.db.exists("Workspace", target_name):
+    if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype": "Workspace",
-            "label":   target_name,
-            "title":   target_name,
-            "name":    target_name,
-            "route":   SETTINGS_WORKSPACE_ROUTE,
+            "label":   SETTINGS_WORKSPACE_NAME,
+            "title":   title,
+            "name":    SETTINGS_WORKSPACE_NAME,
             "type":    "Workspace",
             "public":  1,
             "icon":    "settings",
@@ -632,18 +591,16 @@ def create_or_update_os_settings_workspace():
         ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
     else:
-        ws = frappe.get_doc("Workspace", target_name)
+        ws = frappe.get_doc("Workspace", SETTINGS_WORKSPACE_NAME)
         ws.set("links", [])
         ws.set("shortcuts", [])
         for link in links:
             ws.append("links", link)
-        ws.label = target_name
-        ws.title = target_name
+        ws.title = title
         ws.icon = "settings"
         ws.module = MODULE_NAME
         ws.app = "alaiy_os_core"
         ws.type = "Workspace"
-        ws.route = SETTINGS_WORKSPACE_ROUTE
         ws.public = 1
         ws.content = content
         ws.roles = []
@@ -652,24 +609,21 @@ def create_or_update_os_settings_workspace():
 
 
 def create_or_update_os_settings_workspace_sidebar():
-    target_name = _get_os_settings_workspace_name()
-    os_name = _get_os_workspace_name()
-    name_map = {WORKSPACE_NAME: os_name, SETTINGS_WORKSPACE_NAME: target_name}
-
-    items = _patch_workspace_link_targets(SETTINGS_WORKSPACE_SIDEBAR_ITEMS, name_map)
+    items = list(SETTINGS_WORKSPACE_SIDEBAR_ITEMS)
     items += _build_connector_sidebar_items()
     items += _build_log_items()
 
+    # Title must stay == SETTINGS_WORKSPACE_NAME — see create_or_update_workspace_sidebar().
     common_fields = {
-        "title":             target_name,
+        "title":             SETTINGS_WORKSPACE_NAME,
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os_core",
         "module_onboarding": None,
     }
 
-    if frappe.db.exists("Workspace Sidebar", target_name):
-        sidebar = frappe.get_doc("Workspace Sidebar", target_name)
+    if frappe.db.exists("Workspace Sidebar", SETTINGS_WORKSPACE_NAME):
+        sidebar = frappe.get_doc("Workspace Sidebar", SETTINGS_WORKSPACE_NAME)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
@@ -764,10 +718,9 @@ def create_or_update_onboarding():
         doc.save(ignore_permissions=True)
 
     # Link or unlink from sidebar based on config flag
-    os_sidebar_name = _get_os_workspace_name()
-    if frappe.db.exists("Workspace Sidebar", os_sidebar_name):
+    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
         frappe.db.set_value(
-            "Workspace Sidebar", os_sidebar_name,
+            "Workspace Sidebar", WORKSPACE_NAME,
             "module_onboarding", ONBOARDING_NAME if enable else None,
         )
 
