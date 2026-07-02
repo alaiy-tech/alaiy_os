@@ -2,7 +2,7 @@
 # Configure these values before installing the app.
 
 # ── Company ────────────────────────────────────────────────────────────────────
-COMPANY_NAME     = "Alto Moda"
+COMPANY_NAME     = "The Solist"
 COMPANY_CURRENCY = "INR"
 COMPANY_COUNTRY  = "India"
 
