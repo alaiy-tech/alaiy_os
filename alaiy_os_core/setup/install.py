@@ -341,6 +341,144 @@ def create_module_def():
         })
 
 
+# ── Workspace naming ──────────────────────────────────────────────────────────
+#
+# Frappe looks up a workspace's sidebar client-side via
+# frappe.boot.workspace_sidebar_item[Workspace.name.lower()] — keyed by the
+# WORKSPACE's own `name` field, not its title, and not the Workspace Sidebar's
+# title either. So Workspace.name and Workspace Sidebar.name must always be
+# identical for the lookup to succeed. Both are renamed together whenever the
+# company (and therefore the target name) changes. `route` is a separate,
+# stable field — renaming never changes the URL.
+
+def _get_default_company():
+    return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
+
+
+def _get_os_workspace_name():
+    company = _get_default_company()
+    return f"{company} OS" if company else WORKSPACE_NAME
+
+
+def _get_os_settings_workspace_name():
+    company = _get_default_company()
+    return f"{company} OS Settings" if company else SETTINGS_WORKSPACE_NAME
+
+
+def _find_workspace_by_route(route):
+    """Find an existing Workspace by its route — the one identifier that's
+    stable across company (and therefore name) changes."""
+    return frappe.db.get_value("Workspace", {"route": route}, "name")
+
+
+def _rename_workspace_and_sidebar(old_name, new_name):
+    if old_name == new_name:
+        return
+    if frappe.db.exists("Workspace", old_name):
+        frappe.rename_doc("Workspace", old_name, new_name,
+                           force=True, ignore_permissions=True)
+    if frappe.db.exists("Workspace Sidebar", old_name):
+        frappe.rename_doc("Workspace Sidebar", old_name, new_name,
+                           force=True, ignore_permissions=True)
+
+
+def _patch_workspace_link_targets(items, name_map):
+    """
+    WORKSPACE_SIDEBAR_ITEMS / SETTINGS_WORKSPACE_SIDEBAR_ITEMS hard-code
+    "Workspace"-type link_to targets using the symbolic names ("OS",
+    "OS Settings"). Rewrite them to the current company-prefixed Workspace
+    names (name_map) so the links actually resolve.
+    """
+    patched = []
+    for item in items:
+        item = dict(item)
+        if item.get("link_type") == "Workspace" and item.get("link_to") in name_map:
+            item["link_to"] = name_map[item["link_to"]]
+        patched.append(item)
+    return patched
+
+
+def _connector_registry_rows():
+    if not frappe.db.exists("DocType", "OS Connector Registry"):
+        return []
+    rows = frappe.get_all(
+        "OS Connector Registry",
+        fields=["connector_id", "connector_name", "settings_doctype", "icon"],
+        order_by="connector_name asc",
+    )
+    return [r for r in rows if r.get("settings_doctype")]
+
+
+def _build_connector_workspace_links():
+    """Connectors card on the OS Settings workspace body: one Link per
+    installed connector, pointing at its settings DocType."""
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    links = [{"type": "Card Break", "label": "Connectors", "icon": "plug"}]
+    for row in rows:
+        links.append({
+            "type": "Link", "link_type": "DocType",
+            "link_to": row.settings_doctype, "label": row.connector_name,
+        })
+    return links
+
+
+def _build_connector_sidebar_items():
+    """Connectors section in the OS Settings sidebar: one Link per installed
+    connector, pointing at its settings DocType."""
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    items = [{"type": "Section Break", "label": "Connectors",
+              "icon": "plug", "child": 0, "indent": 1}]
+    for row in rows:
+        items.append({
+            "type": "Link", "link_type": "DocType", "link_to": row.settings_doctype,
+            "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
+        })
+    return items
+
+
+def _build_log_items():
+    """
+    Logs section in the OS Settings sidebar. Connector apps register their
+    log links via the alaiy_os_sidebar_log_items hook:
+
+        alaiy_os_sidebar_log_items = [
+            {"link_type": "DocType", "link_to": "Cloudstore Sync Log",
+             "label": "Cloudstore Logs", "icon": "activity"}
+        ]
+
+    Items whose target DocType/Page hasn't been installed yet are skipped.
+    """
+    entries = []
+    for hook_entries in frappe.get_hooks("alaiy_os_sidebar_log_items"):
+        for entry in (hook_entries if isinstance(hook_entries, list) else [hook_entries]):
+            link_type = entry.get("link_type", "DocType")
+            link_to = (entry.get("link_to") or "").strip()
+            if not link_to:
+                continue
+            if link_type == "DocType" and not frappe.db.exists("DocType", link_to):
+                continue
+            if link_type == "Page" and not frappe.db.exists("Page", link_to):
+                continue
+            entries.append({
+                "type":      "Link",
+                "link_type": link_type,
+                "link_to":   link_to,
+                "label":     entry.get("label", link_to),
+                "child":     1,
+                "icon":      entry.get("icon", "activity"),
+            })
+    if not entries:
+        return []
+    return [{"type": "Section Break", "label": "Logs",
+              "icon": "file-clock", "child": 0, "indent": 1}] + entries
+
+
 # ── Workspace ─────────────────────────────────────────────────────────────────
 
 def _block_id(label):
@@ -365,25 +503,20 @@ def _build_workspace_content():
     return json.dumps(blocks)
 
 
-def _get_default_company():
-    return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
-
-
-def _get_workspace_title():
-    company = _get_default_company()
-    return (company + " Workspace") if company else WORKSPACE_NAME
-
-
 def create_or_update_workspace():
     content = _build_workspace_content()
-    title = _get_workspace_title()
+    target_name = _get_os_workspace_name()
 
-    if not frappe.db.exists("Workspace", WORKSPACE_NAME):
+    existing_name = _find_workspace_by_route(WORKSPACE_ROUTE)
+    if existing_name and existing_name != target_name:
+        _rename_workspace_and_sidebar(existing_name, target_name)
+
+    if not frappe.db.exists("Workspace", target_name):
         ws = frappe.get_doc({
             "doctype":   "Workspace",
-            "label":     WORKSPACE_NAME,
-            "title":     title,
-            "name":      WORKSPACE_NAME,
+            "label":     target_name,
+            "title":     target_name,
+            "name":      target_name,
             "route":     WORKSPACE_ROUTE,
             "type":      "Workspace",
             "public":    1,
@@ -398,14 +531,15 @@ def create_or_update_workspace():
         ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
     else:
-        ws = frappe.get_doc("Workspace", WORKSPACE_NAME)
+        ws = frappe.get_doc("Workspace", target_name)
         ws.set("links", [])
         ws.set("shortcuts", [])
         for link in WORKSPACE_LINKS:
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
-        ws.title = title
+        ws.label = target_name
+        ws.title = target_name
         ws.icon = "layout-dashboard"
         ws.module = MODULE_NAME
         ws.app = "alaiy_os_core"
@@ -420,63 +554,23 @@ def create_or_update_workspace():
 
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
-def _get_sidebar_title():
-    company = _get_default_company()
-    return (company + " OS") if company else "Alaiy OS"
-
-
-def _build_sidebar_items():
-    """
-    Return the full sidebar item list: base items from workspace.py plus any
-    items registered by connector apps via the alaiy_os_sidebar_log_items hook.
-
-    Hook format (in hooks.py of a connector app):
-        alaiy_os_sidebar_log_items = [
-            {"link_type": "DocType", "link_to": "Cloudstore Sync Log",
-             "label": "Cloudstore Logs", "icon": "activity"}
-        ]
-
-    Items whose target DocType/Page hasn't been installed yet are silently skipped.
-    """
-    items = list(WORKSPACE_SIDEBAR_ITEMS)
-
-    for hook_entries in frappe.get_hooks("alaiy_os_sidebar_log_items"):
-        for entry in (hook_entries if isinstance(hook_entries, list) else [hook_entries]):
-            link_type = entry.get("link_type", "DocType")
-            link_to = (entry.get("link_to") or "").strip()
-            if not link_to:
-                continue
-            if link_type == "DocType" and not frappe.db.exists("DocType", link_to):
-                continue
-            if link_type == "Page" and not frappe.db.exists("Page", link_to):
-                continue
-            items.append({
-                "type":      "Link",
-                "link_type": link_type,
-                "link_to":   link_to,
-                "label":     entry.get("label", link_to),
-                "child":     1,
-                "icon":      entry.get("icon", "activity"),
-            })
-
-    return items
-
-
 def create_or_update_workspace_sidebar():
-    items = _build_sidebar_items()
-    title = _get_sidebar_title()  # "Alto Moda OS" — also the doc name (autoname=field:title)
+    target_name = _get_os_workspace_name()
+    settings_name = _get_os_settings_workspace_name()
+    name_map = {WORKSPACE_NAME: target_name, SETTINGS_WORKSPACE_NAME: settings_name}
+    items = _patch_workspace_link_targets(WORKSPACE_SIDEBAR_ITEMS, name_map)
     enable_onboarding = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
 
     common_fields = {
-        "title":             title,
+        "title":             target_name,
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os_core",
         "module_onboarding": ONBOARDING_NAME if enable_onboarding else None,
     }
 
-    if frappe.db.exists("Workspace Sidebar", title):
-        sidebar = frappe.get_doc("Workspace Sidebar", title)
+    if frappe.db.exists("Workspace Sidebar", target_name):
+        sidebar = frappe.get_doc("Workspace Sidebar", target_name)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
@@ -498,7 +592,8 @@ def create_or_update_workspace_sidebar():
 
 def _build_os_settings_content():
     blocks = []
-    for link in SETTINGS_WORKSPACE_LINKS:
+    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_workspace_links()
+    for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
                 "id":   _block_id(f"settings-card:{link['label']}"),
@@ -508,21 +603,21 @@ def _build_os_settings_content():
     return json.dumps(blocks)
 
 
-def _get_os_settings_workspace_title():
-    company = _get_default_company()
-    return (company + " Settings") if company else SETTINGS_WORKSPACE_NAME
-
-
 def create_or_update_os_settings_workspace():
     content = _build_os_settings_content()
-    title = _get_os_settings_workspace_title()
+    target_name = _get_os_settings_workspace_name()
+    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_workspace_links()
 
-    if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
+    existing_name = _find_workspace_by_route(SETTINGS_WORKSPACE_ROUTE)
+    if existing_name and existing_name != target_name:
+        _rename_workspace_and_sidebar(existing_name, target_name)
+
+    if not frappe.db.exists("Workspace", target_name):
         ws = frappe.get_doc({
             "doctype": "Workspace",
-            "label":   SETTINGS_WORKSPACE_NAME,
-            "title":   title,
-            "name":    SETTINGS_WORKSPACE_NAME,
+            "label":   target_name,
+            "title":   target_name,
+            "name":    target_name,
             "route":   SETTINGS_WORKSPACE_ROUTE,
             "type":    "Workspace",
             "public":  1,
@@ -532,17 +627,18 @@ def create_or_update_os_settings_workspace():
             "content": content,
             "roles":   [],
             "shortcuts": [],
-            "links":   SETTINGS_WORKSPACE_LINKS,
+            "links":   links,
         })
         ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
     else:
-        ws = frappe.get_doc("Workspace", SETTINGS_WORKSPACE_NAME)
+        ws = frappe.get_doc("Workspace", target_name)
         ws.set("links", [])
         ws.set("shortcuts", [])
-        for link in SETTINGS_WORKSPACE_LINKS:
+        for link in links:
             ws.append("links", link)
-        ws.title = title
+        ws.label = target_name
+        ws.title = target_name
         ws.icon = "settings"
         ws.module = MODULE_NAME
         ws.app = "alaiy_os_core"
@@ -555,37 +651,29 @@ def create_or_update_os_settings_workspace():
         ws.save(ignore_permissions=True)
 
 
-def _get_os_settings_sidebar_title():
-    company = _get_default_company()
-    return (company + " OS Settings") if company else SETTINGS_WORKSPACE_NAME
-
-
 def create_or_update_os_settings_workspace_sidebar():
-    title = _get_os_settings_sidebar_title()  # "Alto Moda OS Settings" — also the doc name
+    target_name = _get_os_settings_workspace_name()
+    os_name = _get_os_workspace_name()
+    name_map = {WORKSPACE_NAME: os_name, SETTINGS_WORKSPACE_NAME: target_name}
+
+    items = _patch_workspace_link_targets(SETTINGS_WORKSPACE_SIDEBAR_ITEMS, name_map)
+    items += _build_connector_sidebar_items()
+    items += _build_log_items()
+
     common_fields = {
-        "title":             title,
+        "title":             target_name,
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os_core",
         "module_onboarding": None,
     }
 
-    # Migrate: rename the old "OS Settings" sidebar to the company-prefixed name
-    if title != SETTINGS_WORKSPACE_NAME and frappe.db.exists("Workspace Sidebar", SETTINGS_WORKSPACE_NAME):
-        try:
-            frappe.rename_doc("Workspace Sidebar", SETTINGS_WORKSPACE_NAME, title, force=True)
-        except Exception:
-            frappe.log_error(
-                title="Alaiy OS: could not rename OS Settings sidebar",
-                message=frappe.get_traceback(),
-            )
-
-    if frappe.db.exists("Workspace Sidebar", title):
-        sidebar = frappe.get_doc("Workspace Sidebar", title)
+    if frappe.db.exists("Workspace Sidebar", target_name):
+        sidebar = frappe.get_doc("Workspace Sidebar", target_name)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
-        for item in SETTINGS_WORKSPACE_SIDEBAR_ITEMS:
+        for item in items:
             sidebar.append("items", item)
         sidebar.flags.ignore_links = True
         sidebar.save(ignore_permissions=True)
@@ -593,7 +681,7 @@ def create_or_update_os_settings_workspace_sidebar():
         sidebar = frappe.get_doc({
             "doctype": "Workspace Sidebar",
             **common_fields,
-            "items":   SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
+            "items":   items,
         })
         sidebar.flags.ignore_links = True
         sidebar.insert(ignore_permissions=True)
@@ -676,9 +764,10 @@ def create_or_update_onboarding():
         doc.save(ignore_permissions=True)
 
     # Link or unlink from sidebar based on config flag
-    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+    os_sidebar_name = _get_os_workspace_name()
+    if frappe.db.exists("Workspace Sidebar", os_sidebar_name):
         frappe.db.set_value(
-            "Workspace Sidebar", WORKSPACE_NAME,
+            "Workspace Sidebar", os_sidebar_name,
             "module_onboarding", ONBOARDING_NAME if enable else None,
         )
 

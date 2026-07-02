@@ -166,8 +166,6 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Dashboard",  "child": 0, "indent": 0, "icon": "layout-dashboard"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
-    {"type": "Link", "link_type": "Workspace", "link_to": "OS Settings",
-     "label": "Settings",   "child": 0, "indent": 0, "icon": "settings"},
 
     # ── Catalog ────────────────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Catalog",
@@ -219,7 +217,7 @@ WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Section Break", "label": "Quality",
         "icon": "shield-check",     "child": 0, "indent": 1},
     {"type": "Link", "link_type": "DocType", "link_to": "Quality Inspection Template",
-     "label": "Inspection Templates",     "child": 1, "icon": "file-check-2"},
+     "label": "Inspection Templates",     "child": 1, "icon": "file-check"},
     {"type": "Link", "link_type": "DocType", "link_to": "Quality Inspection Parameter",
      "label": "Parameters",               "child": 1, "icon": "list-checks"},
     {"type": "Link", "link_type": "DocType", "link_to": "Quality Inspection Parameter Group",
@@ -247,7 +245,7 @@ WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Competitor",
      "label": "Competitor",               "child": 1, "icon": "swords"},
     {"type": "Link", "link_type": "DocType", "link_to": "Market Segment",
-     "label": "Market Segment",           "child": 1, "icon": "pie-chart"},
+     "label": "Market Segment",           "child": 1, "icon": "chart-pie"},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Stage",
      "label": "Sales Stage",              "child": 1, "icon": "git-branch"},
     {"type": "Link", "link_type": "DocType", "link_to": "Sales Person",
@@ -341,9 +339,9 @@ WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Currency Exchange",
      "label": "Currency Exchange",        "child": 1, "icon": "currency"},
 
-    # ── Logs ───────────────────────────────────────────────────────────────────
-    # Connector apps register their log links here at install/migrate time via
-    # the alaiy_os_sidebar_log_items hook.  No items are hard-coded here.
-    {"type": "Section Break", "label": "Logs",
-        "icon": "file-clock",       "child": 0, "indent": 1},
+    # ── Settings ───────────────────────────────────────────────────────────────
+    # Positioned last, right where "Logs" used to sit — Logs itself now lives
+    # in the OS Settings sidebar (see workspace_settings.py) instead of here.
+    {"type": "Link", "link_type": "Workspace", "link_to": "OS Settings",
+     "label": "Settings",   "child": 0, "indent": 0, "icon": "settings"},
 ]

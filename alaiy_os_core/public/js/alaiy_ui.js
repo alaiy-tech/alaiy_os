@@ -54,10 +54,11 @@ window.resolveAlaiySection = function (route) {
     }
   }
 
+  // Matched by route (stable), not workspace name — the Workspace doc is
+  // renamed to match the current company branding.
   if (
     route === ALAIY_OS_ROUTE ||
-    route.startsWith(ALAIY_OS_ROUTE + "/") ||
-    route === `Workspaces/${ALAIY_OS_WORKSPACE}`
+    route.startsWith(ALAIY_OS_ROUTE + "/")
   ) {
     return "Dashboard";
   }

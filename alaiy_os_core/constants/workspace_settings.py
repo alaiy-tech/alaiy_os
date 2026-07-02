@@ -139,9 +139,9 @@ SETTINGS_WORKSPACE_LINKS = [
         "link_to": "Notification",                "label": "Notification"},
 
     # ── CONNECTORS ─────────────────────────────────────────────────────────────
-    {"type": "Card Break", "label": "Connectors", "icon": "plug"},
-    {"type": "Link", "link_type": "Page",
-        "link_to": "connector-settings",          "label": "Connector Settings"},
+    # One Link per row in OS Connector Registry, injected at provisioning time
+    # by setup/install.py — see _build_connector_workspace_links(). No items
+    # are hard-coded here.
 ]
 
 SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
@@ -289,9 +289,10 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Notification",
      "label": "Notification",          "child": 1, "icon": "bell"},
 
-    # ── Connectors ────────────────────────────────────────────────────────────
-    {"type": "Section Break", "label": "Connectors",
-        "icon": "plug",             "child": 0, "indent": 1},
-    {"type": "Link", "link_type": "Page", "link_to": "connector-settings",
-     "label": "Connector Settings",    "child": 1, "icon": "plug"},
+    # ── Connectors + Logs ─────────────────────────────────────────────────────
+    # Both sections are built dynamically by setup/install.py:
+    #   - Connectors: one Link per row in OS Connector Registry
+    #   - Logs: connector apps' alaiy_os_sidebar_log_items hook entries
+    # See _build_connector_sidebar_items() / _build_log_items(). Nothing
+    # hard-coded here so newly installed connectors show up automatically.
 ]

@@ -47,7 +47,7 @@ const ALAIY_SIDEBAR_CONFIG = [
 
   // ── Quality ─────────────────────────────────────────────────────────────────
   { label: "Quality", type: "section", icon: "shield-check" },
-  { label: "Inspection Templates", type: "link", doctype: "Quality Inspection Template",        icon: "file-check-2" },
+  { label: "Inspection Templates", type: "link", doctype: "Quality Inspection Template",        icon: "file-check" },
   { label: "Parameters",           type: "link", doctype: "Quality Inspection Parameter",       icon: "list-checks" },
   { label: "Parameter Groups",     type: "link", doctype: "Quality Inspection Parameter Group", icon: "folder-open" },
   { label: "Item QC Parameters",   type: "link", doctype: "Item Quality Inspection Parameter",  icon: "package-check" },
@@ -62,7 +62,7 @@ const ALAIY_SIDEBAR_CONFIG = [
   { label: "Industry Type",       type: "link", doctype: "Industry Type",       icon: "building" },
   { label: "Party Specific Item", type: "link", doctype: "Party Specific Item", icon: "user-round-check" },
   { label: "Competitor",          type: "link", doctype: "Competitor",          icon: "swords" },
-  { label: "Market Segment",      type: "link", doctype: "Market Segment",      icon: "pie-chart" },
+  { label: "Market Segment",      type: "link", doctype: "Market Segment",      icon: "chart-pie" },
   { label: "Sales Stage",         type: "link", doctype: "Sales Stage",         icon: "git-branch" },
   { label: "Sales Person",        type: "link", doctype: "Sales Person",        icon: "user-round" },
   { label: "Sales Partner",       type: "link", doctype: "Sales Partner",       icon: "users-round" },

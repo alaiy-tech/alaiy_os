@@ -8,10 +8,11 @@ AW._inited = false;
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function _isOsPath(path) {
   if (!path) return false;
+  // Matched by route (stable), not workspace name — the Workspace doc is
+  // renamed to match the current company branding.
   return (
     path === `/desk/${ALAIY_OS_ROUTE}` ||
-    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`) ||
-    path === `/desk/Workspace/${ALAIY_OS_WORKSPACE}`
+    path.startsWith(`/desk/${ALAIY_OS_ROUTE}/`)
   );
 }
 
