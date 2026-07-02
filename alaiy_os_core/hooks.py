@@ -3,7 +3,7 @@ app_title = "Alaiy OS"
 app_publisher = "Alaiy"
 app_description = "Specialized E-commerce OS built on top of Frappe"
 app_version = "0.0.1"
-
+required_apps = ["erpnext"]
 # Provisioning hooks
 after_install = "alaiy_os_core.setup.install.after_install"
 after_migrate = "alaiy_os_core.setup.install.after_migrate"

@@ -481,7 +481,7 @@ def create_or_update_workspace():
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype":   "Workspace",
-            "label":     WORKSPACE_NAME,
+            "label":     title,
             "title":     title,
             "name":      WORKSPACE_NAME,
             "type":      "Workspace",
@@ -504,6 +504,7 @@ def create_or_update_workspace():
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
+        ws.label = title
         ws.title = title
         ws.icon = "layout-dashboard"
         ws.module = MODULE_NAME
@@ -575,7 +576,7 @@ def create_or_update_os_settings_workspace():
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype": "Workspace",
-            "label":   SETTINGS_WORKSPACE_NAME,
+            "label":   title,
             "title":   title,
             "name":    SETTINGS_WORKSPACE_NAME,
             "type":    "Workspace",
@@ -596,6 +597,7 @@ def create_or_update_os_settings_workspace():
         ws.set("shortcuts", [])
         for link in links:
             ws.append("links", link)
+        ws.label = title
         ws.title = title
         ws.icon = "settings"
         ws.module = MODULE_NAME

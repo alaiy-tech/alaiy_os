@@ -61,3 +61,36 @@ alaiy_os.connector_card._html = function (connector) {
 		</div>
 	`;
 };
+
+/**
+ * Reveal a Password field's real value while focused; mask it again on blur.
+ * Frappe never sends the real value to the client for a saved Password
+ * field, so this fetches it on demand via get_connector_password(). On
+ * blur, frm.refresh_field() re-renders the control from frm.doc (untouched
+ * placeholder), which also resets the input type back to "password" —
+ * cheaper and safer than manually restoring attributes.
+ */
+alaiy_os.connector_card.setup_password_reveal = function (frm, fieldname, connector_id) {
+	const field = frm.get_field(fieldname);
+	if (!field || !field.$input) return;
+	const $input = field.$input;
+
+	$input.off("focus.alaiy-reveal blur.alaiy-reveal");
+
+	$input.on("focus.alaiy-reveal", () => {
+		if (frm.doc.__unsaved || frm.is_new()) return;
+		frappe.call({
+			method: "alaiy_os_core.api.connectors.get_connector_password",
+			args: { connector_id, fieldname },
+			callback(r) {
+				if (r.message) {
+					$input.attr("type", "text").val(r.message);
+				}
+			},
+		});
+	});
+
+	$input.on("blur.alaiy-reveal", () => {
+		frm.refresh_field(fieldname);
+	});
+};
