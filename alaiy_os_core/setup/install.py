@@ -27,6 +27,12 @@ from alaiy_os_core.constants.workspace import (
     WORKSPACE_LINKS,
     WORKSPACE_SIDEBAR_ITEMS,
 )
+from alaiy_os_core.constants.workspace_settings import (
+    SETTINGS_WORKSPACE_NAME,
+    SETTINGS_WORKSPACE_ROUTE,
+    SETTINGS_WORKSPACE_LINKS,
+    SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
+)
 from alaiy_os_core.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
 
 MODULE_NAME = "Alaiy OS"
@@ -65,6 +71,8 @@ def _run_provisioning():
         provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
+        create_or_update_os_settings_workspace,
+        create_or_update_os_settings_workspace_sidebar,
         create_or_update_onboarding,
         configure_branding,
     ]
@@ -73,7 +81,7 @@ def _run_provisioning():
             step()
         except Exception:
             frappe.log_error(
-                title=f"AlaiyOS: provisioning step {step.__name__} failed",
+                title=f"Alaiy OS: provisioning step {step.__name__} failed",
                 message=frappe.get_traceback(),
             )
     frappe.db.commit()
@@ -100,7 +108,7 @@ def set_company_defaults():
             }).insert(ignore_permissions=True)
         except Exception:
             frappe.log_error(
-                title="AlaiyOS: could not create Company",
+                title="Alaiy OS: could not create Company",
                 message=frappe.get_traceback(),
             )
 
@@ -121,7 +129,7 @@ def configure_system_settings():
                 frappe.db.set_single_value("System Settings", field, value)
         except Exception:
             frappe.log_error(
-                title="AlaiyOS: configure_system_settings failed",
+                title="Alaiy OS: configure_system_settings failed",
                 message=frappe.get_traceback(),
             )
 
@@ -487,6 +495,96 @@ def create_or_update_workspace_sidebar():
         sidebar.insert(ignore_permissions=True)
 
 
+# ── OS Settings Workspace ─────────────────────────────────────────────────────
+
+def _build_os_settings_content():
+    blocks = []
+    for link in SETTINGS_WORKSPACE_LINKS:
+        if link.get("type") == "Card Break":
+            blocks.append({
+                "id":   _block_id(f"settings-card:{link['label']}"),
+                "type": "card",
+                "data": {"card_name": link["label"], "col": 4},
+            })
+    return json.dumps(blocks)
+
+
+def _get_os_settings_workspace_title():
+    company = _get_default_company()
+    return (company + " Settings") if company else SETTINGS_WORKSPACE_NAME
+
+
+def create_or_update_os_settings_workspace():
+    content = _build_os_settings_content()
+    title = _get_os_settings_workspace_title()
+
+    if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
+        ws = frappe.get_doc({
+            "doctype": "Workspace",
+            "label":   SETTINGS_WORKSPACE_NAME,
+            "title":   title,
+            "name":    SETTINGS_WORKSPACE_NAME,
+            "route":   SETTINGS_WORKSPACE_ROUTE,
+            "type":    "Workspace",
+            "public":  1,
+            "icon":    "settings",
+            "module":  MODULE_NAME,
+            "app":     "alaiy_os_core",
+            "content": content,
+            "roles":   [],
+            "shortcuts": [],
+            "links":   SETTINGS_WORKSPACE_LINKS,
+        })
+        ws.flags.ignore_validate = True
+        ws.insert(ignore_permissions=True)
+    else:
+        ws = frappe.get_doc("Workspace", SETTINGS_WORKSPACE_NAME)
+        ws.set("links", [])
+        ws.set("shortcuts", [])
+        for link in SETTINGS_WORKSPACE_LINKS:
+            ws.append("links", link)
+        ws.title = title
+        ws.icon = "settings"
+        ws.module = MODULE_NAME
+        ws.app = "alaiy_os_core"
+        ws.type = "Workspace"
+        ws.route = SETTINGS_WORKSPACE_ROUTE
+        ws.public = 1
+        ws.content = content
+        ws.roles = []
+        ws.flags.ignore_validate = True
+        ws.save(ignore_permissions=True)
+
+
+def create_or_update_os_settings_workspace_sidebar():
+    common_fields = {
+        "title":             SETTINGS_WORKSPACE_NAME,
+        "for_user":          "",
+        "standard":          1,
+        "app":               "alaiy_os_core",
+        "module_onboarding": None,
+    }
+
+    if frappe.db.exists("Workspace Sidebar", SETTINGS_WORKSPACE_NAME):
+        sidebar = frappe.get_doc("Workspace Sidebar", SETTINGS_WORKSPACE_NAME)
+        for k, v in common_fields.items():
+            sidebar.set(k, v)
+        sidebar.set("items", [])
+        for item in SETTINGS_WORKSPACE_SIDEBAR_ITEMS:
+            sidebar.append("items", item)
+        sidebar.flags.ignore_links = True
+        sidebar.save(ignore_permissions=True)
+    else:
+        sidebar = frappe.get_doc({
+            "doctype": "Workspace Sidebar",
+            "name":    SETTINGS_WORKSPACE_NAME,
+            **common_fields,
+            "items":   SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
+        })
+        sidebar.flags.ignore_links = True
+        sidebar.insert(ignore_permissions=True)
+
+
 # ── Module Onboarding ─────────────────────────────────────────────────────────
 
 def _create_or_update_onboarding_steps():
@@ -507,7 +605,7 @@ def _create_or_update_onboarding_steps():
                 }).insert(ignore_permissions=True)
             except Exception:
                 frappe.log_error(
-                    title=f"AlaiyOS: could not create Onboarding Step {step_name!r}",
+                    title=f"Alaiy OS: could not create Onboarding Step {step_name!r}",
                     message=frappe.get_traceback(),
                 )
         else:
@@ -581,7 +679,7 @@ def configure_branding():
                 frappe.db.set_single_value(doctype, field, value)
         except Exception:
             frappe.log_error(
-                title="AlaiyOS: configure_branding failed",
+                title="Alaiy OS: configure_branding failed",
                 message=frappe.get_traceback(),
             )
 
