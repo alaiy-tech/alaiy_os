@@ -18,6 +18,8 @@
   "sync_categories_method",
   "sync_items_method",
   "sync_status_method",
+  "sync_categories_label",
+  "sync_items_label",
   "is_enabled",
   "connection_status",
   "last_tested_at"
@@ -90,6 +92,18 @@
    "fieldname": "sync_status_method",
    "fieldtype": "Data",
    "label": "Sync Status Method"
+  },
+  {
+   "default": "Category Tree",
+   "fieldname": "sync_categories_label",
+   "fieldtype": "Data",
+   "label": "Sync Categories Button Label"
+  },
+  {
+   "default": "Items",
+   "fieldname": "sync_items_label",
+   "fieldtype": "Data",
+   "label": "Sync Items Button Label"
   },
   {
    "default": "0",

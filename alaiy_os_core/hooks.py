@@ -1,7 +1,7 @@
 app_name = "alaiy_os_core"
-app_title = "Alaiy OS Core"
-app_publisher = "AlaiyOS"
-app_description = "AlaiyOS core functionality and workspace"
+app_title = "Alaiy OS"
+app_publisher = "Alaiy"
+app_description = "Specialized E-commerce OS built on top of Frappe"
 app_version = "0.0.1"
 
 # Provisioning hooks
@@ -13,7 +13,7 @@ boot_session = "alaiy_os_core.setup.boot.boot_session"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
-_V = "20260623c"
+_V = "20260702a"
 
 app_include_js = [
     f"/assets/alaiy_os_core/constants/roles.js?v={_V}",

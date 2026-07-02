@@ -13,6 +13,7 @@ def get_all_connectors():
             "connector_type", "description", "icon", "icon_url",
             "settings_doctype", "test_method",
             "sync_categories_method", "sync_items_method", "sync_status_method",
+            "sync_categories_label", "sync_items_label",
             "is_enabled", "connection_status", "last_tested_at",
         ],
         order_by="connector_name asc",
@@ -108,4 +109,30 @@ def save_and_test(connector_id, values):
     registry.save(ignore_permissions=True)
     frappe.db.commit()
 
+    return result
+
+
+@frappe.whitelist()
+def test_connector(connector_id):
+    """Run the connector's test_method and update the registry connection status."""
+    if not frappe.db.exists("OS Connector Registry", connector_id):
+        return {"success": False, "message": "Connector not found"}
+
+    row = frappe.get_doc("OS Connector Registry", connector_id)
+    if not row.test_method:
+        return {"success": False, "message": "No test method configured"}
+
+    try:
+        fn = frappe.get_attr(row.test_method)
+        result = fn()
+        status = "connected" if result.get("success") else "failed"
+    except Exception as e:
+        result = {"success": False, "message": str(e)}
+        status = "failed"
+
+    frappe.db.set_value("OS Connector Registry", connector_id, {
+        "connection_status": status,
+        "last_tested_at": frappe.utils.now_datetime(),
+    })
+    frappe.db.commit()
     return result
