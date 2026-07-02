@@ -1,5 +1,5 @@
-"""
-AlaiyOS platform branding — used in the About modal and desk UI.
+""" 
+Alaiy OS platform branding — used in the About modal and desk UI.
 Served from public/images/alaiy/ after bench build.
 """
 
