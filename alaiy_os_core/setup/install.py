@@ -464,7 +464,7 @@ def _build_sidebar_items():
 
 def create_or_update_workspace_sidebar():
     items = _build_sidebar_items()
-    title = _get_sidebar_title()
+    title = _get_sidebar_title()  # "Alto Moda OS" — also the doc name (autoname=field:title)
     enable_onboarding = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
 
     common_fields = {
@@ -475,8 +475,8 @@ def create_or_update_workspace_sidebar():
         "module_onboarding": ONBOARDING_NAME if enable_onboarding else None,
     }
 
-    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
-        sidebar = frappe.get_doc("Workspace Sidebar", WORKSPACE_NAME)
+    if frappe.db.exists("Workspace Sidebar", title):
+        sidebar = frappe.get_doc("Workspace Sidebar", title)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
@@ -487,7 +487,6 @@ def create_or_update_workspace_sidebar():
     else:
         sidebar = frappe.get_doc({
             "doctype": "Workspace Sidebar",
-            "name":    WORKSPACE_NAME,
             **common_fields,
             "items":   items,
         })
@@ -562,7 +561,7 @@ def _get_os_settings_sidebar_title():
 
 
 def create_or_update_os_settings_workspace_sidebar():
-    title = _get_os_settings_sidebar_title()
+    title = _get_os_settings_sidebar_title()  # "Alto Moda OS Settings" — also the doc name
     common_fields = {
         "title":             title,
         "for_user":          "",
@@ -571,8 +570,18 @@ def create_or_update_os_settings_workspace_sidebar():
         "module_onboarding": None,
     }
 
-    if frappe.db.exists("Workspace Sidebar", SETTINGS_WORKSPACE_NAME):
-        sidebar = frappe.get_doc("Workspace Sidebar", SETTINGS_WORKSPACE_NAME)
+    # Migrate: rename the old "OS Settings" sidebar to the company-prefixed name
+    if title != SETTINGS_WORKSPACE_NAME and frappe.db.exists("Workspace Sidebar", SETTINGS_WORKSPACE_NAME):
+        try:
+            frappe.rename_doc("Workspace Sidebar", SETTINGS_WORKSPACE_NAME, title, force=True)
+        except Exception:
+            frappe.log_error(
+                title="Alaiy OS: could not rename OS Settings sidebar",
+                message=frappe.get_traceback(),
+            )
+
+    if frappe.db.exists("Workspace Sidebar", title):
+        sidebar = frappe.get_doc("Workspace Sidebar", title)
         for k, v in common_fields.items():
             sidebar.set(k, v)
         sidebar.set("items", [])
@@ -583,7 +592,6 @@ def create_or_update_os_settings_workspace_sidebar():
     else:
         sidebar = frappe.get_doc({
             "doctype": "Workspace Sidebar",
-            "name":    SETTINGS_WORKSPACE_NAME,
             **common_fields,
             "items":   SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
         })
