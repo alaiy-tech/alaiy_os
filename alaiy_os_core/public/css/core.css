@@ -376,10 +376,45 @@ input, textarea, select, button,
 .alaiy-connector-footer {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px 22px;
+    gap: 8px;
+    padding: 10px 22px;
     border-top: 1px solid var(--border-color, #e2e8f0);
     background: var(--control-bg, #f8fafc);
+}
+
+/* Configure button — subtle filled look */
+.alaiy-connector-configure {
+    background: var(--bg-color, #fff) !important;
+    border: 1px solid var(--border-color, #d1d5db) !important;
+    color: var(--text-color, #374151) !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    padding: 4px 14px !important;
+    font-size: 12px !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+.alaiy-connector-configure:hover {
+    background: var(--subtle-fg, #f3f4f6) !important;
+    border-color: var(--text-muted, #9ca3af) !important;
+}
+
+/* Test Connection button — solid dark */
+.alaiy-connector-test {
+    background: var(--text-color, #1c2126) !important;
+    border: 1px solid var(--text-color, #1c2126) !important;
+    color: #fff !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    padding: 4px 14px !important;
+    font-size: 12px !important;
+    transition: opacity 0.15s !important;
+}
+.alaiy-connector-test:hover:not(:disabled) {
+    opacity: 0.85 !important;
+}
+.alaiy-connector-test:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
 }
 
 .alaiy-connector-last-tested {
@@ -388,30 +423,17 @@ input, textarea, select, button,
     margin-left: auto;
 }
 
-.alaiy-connector-result {
-    font-size: 12px;
-    font-weight: 500;
-}
-
-.alaiy-connector-result.success {
-    color: #166534;
-}
-
-.alaiy-connector-result.error {
-    color: #991b1b;
-}
-
 .alaiy-connector-sync-section {
     border-top: 1px solid var(--border-color, #e2e8f0);
-    padding: 12px 22px;
-    background: var(--control-bg, #f8fafc);
+    padding: 10px 22px;
+    background: var(--bg-color, #fff);
 }
 
 .alaiy-connector-sync-title {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.07em;
     color: var(--text-muted, #8d99a6);
     margin-bottom: 8px;
 }
@@ -427,9 +449,26 @@ input, textarea, select, button,
     margin-bottom: 0;
 }
 
+/* Sync buttons — outlined secondary style */
 .alaiy-connector-sync-btn {
     white-space: nowrap;
-    min-width: 110px;
+    min-width: 120px;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    border-radius: 6px !important;
+    padding: 3px 12px !important;
+    border: 1px solid var(--border-color, #d1d5db) !important;
+    background: var(--bg-color, #fff) !important;
+    color: var(--text-color, #374151) !important;
+    transition: background 0.15s, border-color 0.15s !important;
+}
+.alaiy-connector-sync-btn:hover:not(:disabled) {
+    background: var(--subtle-fg, #f3f4f6) !important;
+    border-color: var(--text-muted, #9ca3af) !important;
+}
+.alaiy-connector-sync-btn:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
 }
 
 .alaiy-connector-sync-status {
@@ -448,6 +487,9 @@ input, textarea, select, button,
 .alaiy-connector-sync-status.running {
     color: #1e40af;
 }
+
+/* Remove unused result div styles (kept for compat) */
+.alaiy-connector-result { display: none; }
 
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
  * with the Client square logo. Hide the SVG text inside the icon-container. */
