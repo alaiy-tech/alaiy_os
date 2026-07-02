@@ -346,14 +346,20 @@ def create_module_def():
 # Frappe's URL for a Workspace is slug(Workspace.name) — there is no separate
 # "route" field (an earlier version of this file assumed there was one; there
 # isn't, so WORKSPACE_NAME/SETTINGS_WORKSPACE_NAME must stay exactly "OS" and
-# "OS Settings" forever, or /desk/os and /desk/os-settings break). Frappe also
-# looks up a workspace's sidebar via
-# frappe.boot.workspace_sidebar_item[Workspace.name.lower()] — keyed by name,
-# not title — so the Workspace Sidebar's name must equal the Workspace's name
-# too, which (since Workspace Sidebar autonames from its own title field)
-# means the sidebar's title must also stay "OS"/"OS Settings", not
-# company-prefixed. Company branding is only applied to the Workspace's own
-# `title` field, which is independent of its `name` and safe to vary.
+# "OS Settings" forever, or /desk/os and /desk/os-settings break). Workspace's
+# own autoname is "field:label" — changing `label` on an existing doc renames
+# it out from under WORKSPACE_NAME (this bit us once already), so `label`
+# must ALSO stay fixed, same as `name`. Frappe also looks up a workspace's
+# sidebar via frappe.boot.workspace_sidebar_item[Workspace.name.lower()] —
+# keyed by name, not title — so the Workspace Sidebar's name must equal the
+# Workspace's name too, which (since Workspace Sidebar autonames from its own
+# title field) means the sidebar's title must also stay "OS"/"OS Settings".
+#
+# Company branding can ONLY be applied to Workspace.title — the one field
+# that's genuinely independent of both docs' identity. In practice this means
+# it doesn't reach the sidebar header dropdown or the page breadcrumb (both
+# hardcoded by Frappe to Workspace.name specifically), only wherever else
+# `.title` happens to be read.
 
 def _get_default_company():
     return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
@@ -481,7 +487,10 @@ def create_or_update_workspace():
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype":   "Workspace",
-            "label":     title,
+            # label is Workspace's autoname source (autoname="field:label") —
+            # it MUST stay WORKSPACE_NAME, exactly like name, or Frappe
+            # renames the doc out from under WORKSPACE_NAME on every save.
+            "label":     WORKSPACE_NAME,
             "title":     title,
             "name":      WORKSPACE_NAME,
             "type":      "Workspace",
@@ -504,7 +513,7 @@ def create_or_update_workspace():
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
-        ws.label = title
+        ws.label = WORKSPACE_NAME
         ws.title = title
         ws.icon = "layout-dashboard"
         ws.module = MODULE_NAME
@@ -576,7 +585,9 @@ def create_or_update_os_settings_workspace():
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
             "doctype": "Workspace",
-            "label":   title,
+            # label is Workspace's autoname source — must stay
+            # SETTINGS_WORKSPACE_NAME, see create_or_update_workspace().
+            "label":   SETTINGS_WORKSPACE_NAME,
             "title":   title,
             "name":    SETTINGS_WORKSPACE_NAME,
             "type":    "Workspace",
@@ -597,7 +608,7 @@ def create_or_update_os_settings_workspace():
         ws.set("shortcuts", [])
         for link in links:
             ws.append("links", link)
-        ws.label = title
+        ws.label = SETTINGS_WORKSPACE_NAME
         ws.title = title
         ws.icon = "settings"
         ws.module = MODULE_NAME
