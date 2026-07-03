@@ -112,8 +112,14 @@ def set_company_defaults():
                 message=frappe.get_traceback(),
             )
 
-    frappe.db.set_single_value(
-        "Global Defaults", "default_company", company_name)
+    # Only seed Global Defaults if nothing is set yet — this hook re-runs on
+    # every after_migrate, and a site may have since been reconfigured to a
+    # different company than whatever boot_config.py says (e.g. via the
+    # ERPNext setup wizard, or a direct fix). Overwriting it unconditionally
+    # here would silently revert that on the next deploy.
+    if not frappe.db.get_single_value("Global Defaults", "default_company"):
+        frappe.db.set_single_value(
+            "Global Defaults", "default_company", company_name)
 
 
 # ── System Settings ──────────────────────────────────────────────────────────
