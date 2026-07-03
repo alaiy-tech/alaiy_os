@@ -206,8 +206,6 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Unit of Measure",          "child": 1, "icon": "ruler"},
     {"type": "Link", "link_type": "DocType", "link_to": "UOM Category",
      "label": "UOM Category",             "child": 1, "icon": "folder-tree"},
-    {"type": "Link", "link_type": "DocType", "link_to": "UOM Conversion Detail",
-     "label": "UOM Conversion Detail",    "child": 1, "icon": "arrow-left-right"},
     {"type": "Link", "link_type": "DocType", "link_to": "Stock Entry Type",
      "label": "Stock Entry Type",         "child": 1, "icon": "list-checks"},
     {"type": "Link", "link_type": "DocType", "link_to": "Putaway Rule",

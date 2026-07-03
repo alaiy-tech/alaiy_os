@@ -41,7 +41,6 @@ const ALAIY_SIDEBAR_CONFIG = [
   { label: "Warehouse Type",        type: "link", doctype: "Warehouse Type",        icon: "factory" },
   { label: "Unit of Measure",       type: "link", doctype: "UOM",                   icon: "ruler" },
   { label: "UOM Category",          type: "link", doctype: "UOM Category",          icon: "folder-tree" },
-  { label: "UOM Conversion Detail", type: "link", doctype: "UOM Conversion Detail", icon: "arrow-left-right" },
   { label: "Stock Entry Type",      type: "link", doctype: "Stock Entry Type",      icon: "list-checks" },
   { label: "Putaway Rule",          type: "link", doctype: "Putaway Rule",          icon: "arrow-down-to-line" },
 
