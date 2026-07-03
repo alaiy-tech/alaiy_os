@@ -12,7 +12,7 @@ after_migrate = "alaiy_os_core.setup.install.after_migrate"
 on_login = "alaiy_os_core.setup.boot.on_login"
 
 # Desk assets (loaded for logged-in desk users)
-_V = "20260703a"
+_V = "20260703b"
 
 app_include_js = [
     f"/assets/alaiy_os_core/constants/roles.js?v={_V}",
