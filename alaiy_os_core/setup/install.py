@@ -362,7 +362,15 @@ def create_module_def():
 # `.title` happens to be read.
 
 def _get_default_company():
-    return (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
+    company = (frappe.db.get_single_value("Global Defaults", "default_company") or "").strip()
+    if company:
+        return company
+    # Global Defaults can still be empty this early in a fresh install (e.g. if
+    # set_company_defaults() raised before reaching its own Global Defaults
+    # write) — boot_config.COMPANY_NAME is the same source set_company_defaults()
+    # itself provisions from, so falling back to it here keeps workspace naming
+    # correct even on that edge case.
+    return getattr(boot_config, "COMPANY_NAME", "").strip()
 
 
 def _get_os_workspace_title():
