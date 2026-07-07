@@ -73,6 +73,7 @@ def _run_provisioning():
         create_or_update_workspace_sidebar,
         create_or_update_os_settings_workspace,
         create_or_update_os_settings_workspace_sidebar,
+        restrict_foreign_workspaces,
         create_or_update_onboarding,
         configure_branding,
     ]
@@ -213,6 +214,42 @@ def restrict_desktop_page():
     page.flags.ignore_validate = True
     page.flags.ignore_links = True
     page.save(ignore_permissions=True)
+
+
+# ── Foreign workspace restriction ───────────────────────────────────────────────
+
+def restrict_foreign_workspaces():
+    """
+    Hide every public Workspace not owned by alaiy_os_core (ERPNext's and
+    Frappe's own Stock/Selling/Buying/HR/etc. workspaces, plus the default
+    Home/Welcome workspace) from the workspace switcher, Awesomebar search
+    and desktop icons, and lock them to Administrator only.
+
+    Mirrors restrict_desktop_page() above. Re-runs on every after_migrate so
+    new workspaces introduced by future app/ERPNext updates get caught too.
+    Our own workspaces (OS, OS Settings) are left untouched.
+    """
+    own_names = {WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME}
+    rows = frappe.get_all(
+        "Workspace",
+        filters={"public": 1},
+        fields=["name", "app"],
+    )
+    for row in rows:
+        if row.name in own_names or row.app == "alaiy_os_core":
+            continue
+        try:
+            doc = frappe.get_doc("Workspace", row.name)
+            doc.is_hidden = 1
+            doc.set("roles", [{"role": "Administrator"}])
+            doc.flags.ignore_validate = True
+            doc.flags.ignore_links = True
+            doc.save(ignore_permissions=True)
+        except Exception:
+            frappe.log_error(
+                title=f"Alaiy OS: could not restrict workspace {row.name!r}",
+                message=frappe.get_traceback(),
+            )
 
 
 # ── Shared Generic DocTypes ───────────────────────────────────────────────────
