@@ -25,9 +25,42 @@
   };
 })();
 
+// The very first sidebar resolution on a hard reload/direct URL load runs
+// before this file has even been fetched (it's an app_include_js script,
+// loaded after Frappe's own desk bundle, which resolves the initial route —
+// and therefore the initial sidebar — synchronously as soon as it loads).
+// That means the patch above, while correct, installs too late to affect
+// THAT first call; it only helps subsequent in-session navigations. Fix the
+// initial-load race directly: once the app has booted, if the sidebar isn't
+// showing one of our own workspaces but one of ours is a valid candidate for
+// the current doctype, switch to it.
+function alaiyReconcileSidebar() {
+  var sidebar = frappe.app && frappe.app.sidebar;
+  if (!sidebar || !sidebar.get_workspace_sidebars) return;
+
+  var route = frappe.get_route();
+  var doctype = (route[0] === "List" || route[0] === "Form") ? route[1] : null;
+  if (!doctype) return;
+
+  var current = sidebar.sidebar_title;
+  var currentMeta = current && frappe.boot.workspace_sidebar_item[current.toLowerCase()];
+  if (currentMeta && currentMeta.app === "alaiy_os_core") return; // already correct
+
+  var candidates = sidebar.get_workspace_sidebars(doctype) || [];
+  var own = candidates.find(function (name) {
+    var meta = frappe.boot.workspace_sidebar_item[name.toLowerCase()];
+    return meta && meta.app === "alaiy_os_core";
+  });
+  if (own && own !== current) sidebar.setup(own);
+}
+
 // Update page title on route change; fall back to OS workspace if desk loads bare.
 $(document).on("app_ready", function () {
+  alaiyReconcileSidebar();
+
   frappe.router.on("change", function () {
+    setTimeout(alaiyReconcileSidebar, 0);
+
     var route = frappe.get_route_str ? (frappe.get_route_str() || "") : "";
     if (typeof updateAlaiyTitle === "function") {
       updateAlaiyTitle(resolveAlaiySection(route));
