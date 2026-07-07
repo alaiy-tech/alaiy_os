@@ -244,6 +244,11 @@ def restrict_foreign_workspaces():
             doc.set("roles", [{"role": "Administrator"}])
             doc.flags.ignore_validate = True
             doc.flags.ignore_links = True
+            # Some stock ERPNext/Frappe workspaces (e.g. "Welcome Workspace")
+            # ship with legacy/partial records missing newer mandatory
+            # fields (e.g. `type`). We're only touching is_hidden/roles here,
+            # not fixing their data — ignore_mandatory keeps that out of scope.
+            doc.flags.ignore_mandatory = True
             doc.save(ignore_permissions=True)
         except Exception:
             frappe.log_error(
