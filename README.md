@@ -1,4 +1,4 @@
-# Alaiy OS Core
+# Alaiy OS
 
 A clean, minimal Frappe v16 / ERPNext v16 app that provisions a self-contained
 **Alaiy OS** workspace environment on install and keeps it reconciled on every
@@ -9,7 +9,7 @@ Frappe internals, fake the sidebar via the DOM, or inject global UI overrides.
 
 ## What it provisions
 
-On `after_install` and `after_migrate` (`alaiy_os_core/setup/install.py`):
+On `after_install` and `after_migrate` (`alaiy_os/setup/install.py`):
 
 1. **Roles** — `Alaiy OS Manager` and `Alaiy OS User`.
 2. **Admin user** — created from `boot_config.py`; password set once on install.
@@ -24,7 +24,7 @@ On `after_install` and `after_migrate` (`alaiy_os_core/setup/install.py`):
 ## Configuration
 
 All credentials live in a single file:
-`alaiy_os_core/client/config/boot_config.py`
+`alaiy_os/client/config/boot_config.py`
 
 ```python
 ALAIY_OS_ADMIN_USERNAME = "alaiyosadmin"
@@ -46,16 +46,16 @@ All three explicitly bypass `System Manager` and `Administrator`.
 ## Install
 
 ```bash
-bench get-app alaiy_os_core /path/to/alaiy-os-core
-bench --site <site> install-app alaiy_os_core
+bench get-app alaiy_os /path/to/alaiy_os
+bench --site <site> install-app alaiy_os
 bench --site <site> migrate
-bench build --app alaiy_os_core
+bench build --app alaiy_os
 ```
 
 ## Structure
 
 ```
-alaiy_os_core/
+alaiy_os/
 ├── hooks.py
 ├── client/config/boot_config.py     # credentials
 ├── setup/install.py                 # all provisioning logic

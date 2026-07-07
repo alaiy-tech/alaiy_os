@@ -1,4 +1,4 @@
-# Alaiy OS Core has no third-party Python dependencies of its own.
+# Alaiy OS has no third-party Python dependencies of its own.
 # NEVER list "frappe" here: frappe is the host framework, not a dependency.
 # Listing it makes `uv pip install` try to resolve frappe's own URL deps
 # (e.g. pypika @ git+...), which fails app installation.

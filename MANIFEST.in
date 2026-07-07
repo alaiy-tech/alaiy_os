@@ -2,5 +2,5 @@ include MANIFEST.in
 include README.md
 include license.txt
 include requirements.txt
-recursive-include alaiy_os_core *.json *.js *.css *.html *.py *.txt
-recursive-include alaiy_os_core *.png *.svg *.ico *.jpg *.jpeg
+recursive-include alaiy_os *.json *.js *.css *.html *.py *.txt
+recursive-include alaiy_os *.png *.svg *.ico *.jpg *.jpeg

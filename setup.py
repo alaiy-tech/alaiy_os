@@ -9,12 +9,12 @@ with open("requirements.txt") as f:
         if line.strip() and not line.strip().startswith("#")
     ]
 
-from alaiy_os_core import __version__ as version
+from alaiy_os import __version__ as version
 
 setup(
-    name="alaiy_os_core",
+    name="alaiy_os",
     version=version,
-    description="AlaiyOS Core — connector registry and branding layer",
+    description="Business OS providing a modular platform for AI, automation, workflows, integrations, and enterprise applications.",
     author="Alaiy",
     author_email="sarthak@alaiy.com",
     packages=find_packages(),

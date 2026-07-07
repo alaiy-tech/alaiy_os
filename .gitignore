@@ -4,6 +4,6 @@ __pycache__
 # Frappe auto-exports live "standard" doc fixtures here on every migrate
 # (Workspace/Workspace Sidebar/Desktop Icon are provisioned by setup/install.py,
 # not tracked as file-based fixtures).
-alaiy_os_core/workspace_sidebar/
-alaiy_os_core/desktop_icon/
-alaiy_os_core/workspace/
+alaiy_os/workspace_sidebar/
+alaiy_os/desktop_icon/
+alaiy_os/workspace/
