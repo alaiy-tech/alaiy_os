@@ -218,7 +218,7 @@ input, textarea, select, button,
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
  * with the Client square logo. Hide the SVG text inside the icon-container. */
 .sidebar-header .icon-container {
-    background-image: url('/assets/assets/images/client-logo-square.png') !important;
+    background-image: url('/assets/images/client-logo-square.png') !important;
     background-size: 80% !important;
     background-repeat: no-repeat !important;
     background-position: center !important;

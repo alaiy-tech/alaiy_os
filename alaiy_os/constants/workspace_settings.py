@@ -137,6 +137,8 @@ SETTINGS_WORKSPACE_LINKS = [
         "link_to": "Module Profile",              "label": "Module Profile"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Notification",                "label": "Notification"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "OS Theme Settings",           "label": "OS Theme Settings"},
 
     # ── CONNECTORS ─────────────────────────────────────────────────────────────
     # One Link per row in OS Connector Registry, injected at provisioning time
@@ -288,6 +290,8 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Module Profile",        "child": 1, "icon": "book"},
     {"type": "Link", "link_type": "DocType", "link_to": "Notification",
      "label": "Notification",          "child": 1, "icon": "bell"},
+    {"type": "Link", "link_type": "DocType", "link_to": "OS Theme Settings",
+     "label": "OS Theme Settings",     "child": 1, "icon": "palette"},
 
     # ── Connectors + Logs ─────────────────────────────────────────────────────
     # Both sections are built dynamically by setup/install.py:

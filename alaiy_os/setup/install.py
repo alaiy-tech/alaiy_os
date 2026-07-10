@@ -12,6 +12,7 @@ Data definitions:
 
 import hashlib
 import json
+import os
 
 import frappe
 
@@ -61,7 +62,7 @@ def _run_provisioning():
         _cleanup_legacy_workspace,
         create_module_def,
         create_or_update_role,
-        restrict_desktop_page,
+        delete_desktop_page,
         provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
@@ -69,6 +70,10 @@ def _run_provisioning():
         create_or_update_os_settings_workspace_sidebar,
         restrict_foreign_workspaces,
         create_or_update_onboarding,
+        ensure_default_logos,
+        configure_system_settings,
+        configure_navbar,
+        configure_portal_settings,
     ]
     for step in steps:
         try:
@@ -141,32 +146,53 @@ def create_or_update_role():
         frappe.db.set_value("Role", OS_MANAGER_ROLE, role_data)
 
 
-# ── Desktop page restriction ──────────────────────────────────────────────────
+# ── Desktop page removal ───────────────────────────────────────────────────────
 
-def restrict_desktop_page():
-    """Restrict the Frappe Desktop page to Administrator only."""
+def delete_desktop_page():
+    """
+    Delete the stock Frappe "desktop" Page outright. /desk itself keeps
+    landing on the OS workspace regardless (see setup/boot.py::on_login),
+    this just removes the old default-desktop route entirely.
+    """
     if not frappe.db.exists("Page", "desktop"):
         return
-    page = frappe.get_doc("Page", "desktop")
-    page.set("roles", [{"role": "Administrator"}])
-    page.flags.ignore_validate = True
-    page.flags.ignore_links = True
-    page.save(ignore_permissions=True)
+    # Page.on_trash() throws outside developer mode unless this flag is set —
+    # Frappe core's own drop_unused_pages patch relies on the same toggle.
+    frappe.flags.in_migrate = True
+    try:
+        frappe.delete_doc("Page", "desktop", ignore_permissions=True, force=True)
+    finally:
+        frappe.flags.in_migrate = False
 
 
 # ── Foreign workspace restriction ───────────────────────────────────────────────
 
+def _delete_welcome_workspace():
+    """Hard-delete the stock "Welcome Workspace" (and its sidebar row, if
+    any) — unlike every other foreign workspace, this one is removed
+    outright rather than just hidden."""
+    if frappe.db.exists("Workspace Sidebar", "Welcome Workspace"):
+        frappe.delete_doc("Workspace Sidebar", "Welcome Workspace",
+                           ignore_permissions=True, force=True)
+    if frappe.db.exists("Workspace", "Welcome Workspace"):
+        frappe.delete_doc("Workspace", "Welcome Workspace",
+                           ignore_permissions=True, force=True)
+
+
 def restrict_foreign_workspaces():
     """
     Hide every public Workspace not owned by alaiy_os (ERPNext's and
-    Frappe's own Stock/Selling/Buying/HR/etc. workspaces, plus the default
-    Home/Welcome workspace) from the workspace switcher, Awesomebar search
-    and desktop icons, and lock them to Administrator only.
+    Frappe's own Stock/Selling/Buying/HR/etc. workspaces) from the workspace
+    switcher, Awesomebar search and desktop icons, and lock them to
+    Administrator only. "Welcome Workspace" specifically is hard-deleted
+    instead (see _delete_welcome_workspace()), not just hidden.
 
-    Mirrors restrict_desktop_page() above. Re-runs on every after_migrate so
-    new workspaces introduced by future app/ERPNext updates get caught too.
-    Our own workspaces (OS, OS Settings) are left untouched.
+    Re-runs on every after_migrate so new workspaces introduced by future
+    app/ERPNext updates get caught too. Our own workspaces (OS, OS Settings)
+    are left untouched.
     """
+    _delete_welcome_workspace()
+
     own_names = {WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME}
     rows = frappe.get_all(
         "Workspace",
@@ -174,7 +200,7 @@ def restrict_foreign_workspaces():
         fields=["name", "app"],
     )
     for row in rows:
-        if row.name in own_names or row.app == "alaiy_os":
+        if row.name in own_names or row.app == "alaiy_os" or row.name == "Welcome Workspace":
             continue
         try:
             doc = frappe.get_doc("Workspace", row.name)
@@ -193,6 +219,73 @@ def restrict_foreign_workspaces():
                 title=f"Alaiy OS: could not restrict workspace {row.name!r}",
                 message=frappe.get_traceback(),
             )
+
+
+# ── Default logos ──────────────────────────────────────────────────────────────
+
+def ensure_default_logos():
+    """
+    Copy this app's bundled default logos into the site's shared (non-app-
+    namespaced) assets folder as client-logo-square.png / client-logo-hor.png
+    — only if those files don't already exist, so a fresh install gets sane
+    defaults immediately without ever clobbering an admin's own upload made
+    later via the OS Theme Settings page (alaiy_os/alaiy_os/doctype/os_theme_settings).
+    """
+    import shutil
+
+    images_dir = os.path.join(frappe.local.sites_path, "assets", "images")
+    os.makedirs(images_dir, exist_ok=True)
+
+    pairs = [
+        ("logo-square.png", "client-logo-square.png"),
+        ("logo-hor.png", "client-logo-hor.png"),
+    ]
+    for source_name, dest_name in pairs:
+        dest_path = os.path.join(images_dir, dest_name)
+        if os.path.exists(dest_path):
+            continue
+        source_path = frappe.get_app_path("alaiy_os", "public", "images", source_name)
+        if os.path.exists(source_path):
+            shutil.copyfile(source_path, dest_path)
+
+
+# ── System Settings ────────────────────────────────────────────────────────────
+
+def configure_system_settings():
+    frappe.db.set_single_value("System Settings", "disable_system_update_notification", 1)
+
+
+# ── Navbar Settings ─────────────────────────────────────────────────────────────
+
+def configure_navbar():
+    """
+    Point the navbar logo at the site's client-hor-logo, clear the Settings
+    dropdown entirely, and reset the Help dropdown to exactly two items
+    (About Alaiy OS, Keyboard Shortcuts) — dropping the stock System
+    Health / Frappe Support entries by simply not re-adding them.
+    """
+    navbar = frappe.get_single("Navbar Settings")
+    navbar.app_logo = "/assets/images/client-logo-hor.png"
+    navbar.set("settings_dropdown", [])
+    navbar.set("help_dropdown", [])
+    navbar.append("help_dropdown", {
+        "item_label": "About Alaiy OS",
+        "item_type": "Route",
+        "route": "https://os.alaiy.com",
+    })
+    navbar.append("help_dropdown", {
+        "item_label": "Keyboard Shortcuts",
+        "item_type": "Action",
+        "action": "frappe.ui.toolbar.show_shortcuts(event)",
+    })
+    navbar.flags.ignore_mandatory = True
+    navbar.save(ignore_permissions=True)
+
+
+# ── Portal Settings ─────────────────────────────────────────────────────────────
+
+def configure_portal_settings():
+    frappe.db.set_single_value("Portal Settings", "default_portal_home", "/desk/os")
 
 
 # ── Shared Generic DocTypes ───────────────────────────────────────────────────
