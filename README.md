@@ -16,16 +16,16 @@ On `after_install` and `after_migrate` (`alaiy_os/setup/install.py`):
    (the app is the source of truth — manual UI edits are overwritten on migrate).
 4. **DocType permissions** — `Custom DocPerm` records reconciled two-way (added
    for new target DocTypes, removed for ones dropped from the list).
-5. **Standard workspace restrictions** — AlaiyOS roles stripped from standard
-   ERPNext workspaces so they don't appear in the sidebar for AlaiyOS users.
+5. **Standard workspace restrictions** — Alaiy OS roles stripped from standard
+   ERPNext workspaces so they don't appear in the sidebar for Alaiy OS users.
 6. **Login redirect** — the admin user's `home_page` is set to `/app/os`.
 
 ## Access control — three layers
 
-1. `home_page` DB field — redirects AlaiyOS users on login.
+1. `home_page` DB field — redirects Alaiy OS users on login.
 2. `boot_session` hook — filters the sidebar boot data to only `Alaiy OS`.
 3. `public/js/route_guard.js` — intercepts client-side navigation and redirects
-   AlaiyOS users back to `/os`.
+   Alaiy OS users back to `/os`.
 
 All three explicitly bypass `System Manager` and `Administrator`.
 
