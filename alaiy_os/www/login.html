@@ -211,8 +211,11 @@
         })
         .then(function (res) {
           if (res.status === 200 && res.json.message === "Logged In") {
-            // Prefer server-supplied redirect, then query param, then default
-            window.location.href = getRedirectTo();
+            // Prefer server-supplied redirect (e.g. on_login hook routing to
+            // /os/onboarding pre-setup), then query param, then default.
+            var serverRedirect = res.json.redirect_to;
+            var safeServerRedirect = serverRedirect && serverRedirect.startsWith("/") && !serverRedirect.startsWith("//");
+            window.location.href = safeServerRedirect ? serverRedirect : getRedirectTo();
           } else {
             var msg = (res.json && (res.json.message || res.json.exc_type)) || "Invalid credentials";
             err.textContent = msg;

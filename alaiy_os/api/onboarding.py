@@ -34,10 +34,6 @@ def get_wizard_data():
         "already_complete": is_onboarding_complete(),
         "languages": load_languages(),
         "country_info": region.get("country_info"),
-        "uoms": frappe.get_all("UOM", pluck="name", order_by="name asc"),
-        "currencies": frappe.get_all(
-            "Currency", filters={"enabled": 1}, pluck="name", order_by="name asc"
-        ),
     }
 
 
@@ -63,8 +59,8 @@ def _require_admin():
 
 
 def _apply_logos(args):
-    square_url = args.get("square_logo_url")
-    hor_url = args.get("hor_logo_url")
+    square_url = args.get("square_logo")
+    hor_url = args.get("hor_logo")
 
     if square_url:
         company = frappe.db.get_value(
@@ -75,6 +71,12 @@ def _apply_logos(args):
         frappe.db.set_single_value("Website Settings", "favicon", square_url)
 
     if hor_url:
+        # Rename the underlying File doc so the stored asset is identifiable
+        # regardless of what the uploader originally named it.
+        file_name = frappe.db.get_value("File", {"file_url": hor_url}, "name")
+        if file_name:
+            ext = (hor_url.rsplit(".", 1)[-1] if "." in hor_url else "png")
+            frappe.db.set_value("File", file_name, "file_name", f"client-hor-logo.{ext}")
         frappe.db.set_single_value("Navbar Settings", "app_logo", hor_url)
 
 
@@ -163,10 +165,6 @@ def complete_onboarding(args):
     install_fixtures.install(args.get("country"))
     install_fixtures.install_company(args)
     install_fixtures.set_global_defaults(args)
-    if args.get("default_distance_unit"):
-        frappe.db.set_single_value(
-            "Global Defaults", "default_distance_unit", args.get("default_distance_unit")
-        )
 
     # Step 4 — Organizational assets (logos)
     _apply_logos(args)
