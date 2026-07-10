@@ -1,5 +1,5 @@
 """
-AlaiyOS — OS Settings workspace definition.
+Alaiy OS — OS Settings workspace definition.
 Provisioned by setup/install.py alongside the main OS workspace.
 """
 
@@ -96,7 +96,7 @@ SETTINGS_WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Contract Template",           "label": "Contract Template"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Appointment Booking Settings","label": "Appointment Booking Settings"},
+        "link_to": "Appointment Booking Settings", "label": "Appointment Booking Settings"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "CRM Settings",                "label": "CRM Settings"},
 
@@ -165,7 +165,7 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Accounts Settings",
      "label": "Accounts Settings",     "child": 1, "icon": "settings-2"},
     {"type": "Link", "link_type": "DocType", "link_to": "Journal Entry Template",
-     "label": "Journal Entry Template","child": 1, "icon": "pencil"},
+     "label": "Journal Entry Template", "child": 1, "icon": "pencil"},
     {"type": "Link", "link_type": "DocType", "link_to": "Currency Exchange",
      "label": "Currency Exchange",     "child": 1, "icon": "dollar-sign"},
     {"type": "Link", "link_type": "DocType", "link_to": "Dunning Type",
