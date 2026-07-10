@@ -43,7 +43,7 @@
     .brand::before { width: 300px; height: 300px; right: -80px; top: 20%; background: radial-gradient(circle, rgba(8,145,178,0.55), transparent 65%); }
     .brand::after  { width: 240px; height: 240px; left: -60px; bottom: 10%; background: radial-gradient(circle, rgba(45,212,191,0.35), transparent 65%); }
 
-    .brand-logo { position: relative; z-index: 1; align-self: flex-start; height: 52px; width: auto; }
+    .brand-logo { position: relative; z-index: 1; align-self: flex-start; height: 52px; width: auto; margin-left: -74px; }
 
     .brand-body { position: relative; z-index: 1; max-width: 440px; }
     .brand-body h2 { font-size: 36px; font-weight: 600; line-height: 1.18; letter-spacing: -0.015em; }
@@ -80,13 +80,12 @@
     .btn-login {
       width: 100%; height: 48px; margin-top: 4px; color: #fff; font-size: 14.5px; font-weight: 600; letter-spacing: .01em;
       border: none; border-radius: 10px; cursor: pointer;
-      background: linear-gradient(135deg, var(--accent-2), var(--accent));
-      box-shadow: 0 8px 20px rgba(8,145,178,0.32);
-      transition: transform .14s, box-shadow .14s, filter .14s; -webkit-appearance: none;
+      background: var(--accent);
+      transition: background .14s; -webkit-appearance: none;
     }
-    .btn-login:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(8,145,178,0.42); filter: brightness(1.04); }
-    .btn-login:active { transform: translateY(0); }
-    .btn-login:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
+    .btn-login:hover { background: #0a7c9c; }
+    .btn-login:active { background: #096f8a; }
+    .btn-login:disabled { opacity: .55; cursor: not-allowed; }
 
     .error-msg { color: #dc2626; font-size: 12.5px; margin-bottom: 14px; min-height: 16px; }
 
@@ -105,7 +104,7 @@
       <img class="brand-logo" src="/assets/alaiy_os/images/rectangle-logo.png" alt="Alaiy OS">
 
       <div class="brand-body">
-        <h2>Welcome back.</h2>
+        <h2>Welcome.</h2>
         <p>Your commerce operating system — inventory, catalog, orders and fulfilment, all in one place.</p>
         <ul class="features">
           <li>
@@ -128,8 +127,6 @@
 
     <main class="form-side">
       <div class="card">
-
-        <img class="brand-badge" src="/assets/alaiy_os/images/square-logo.png" alt="Alaiy OS">
 
         <h1 class="heading">Sign in</h1>
         <p class="subheading">Enter your email below to login to your account</p>
