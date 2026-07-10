@@ -1,7 +1,7 @@
 /*
- * AlaiyOS Workspace — Scoped Styles
+ * Alaiy OS Workspace — Scoped Styles
  *
- * Rules here are intentionally scoped to AlaiyOS contexts.
+ * Rules here are intentionally scoped to Alaiy OS contexts.
  * Do NOT add global ERPNext UI overrides here.
  * Global overrides affect all users including admins — that is not wanted.
  */
@@ -85,7 +85,7 @@ input, textarea, select, button,
 /* Workspace sidebar header logo */
 .desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
 .desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {
-    background-image: url('/assets/alaiy_os/client/assets/client-logo-square.png');
+    background-image: url('/assets/images/client-logo-square.png');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -218,7 +218,7 @@ input, textarea, select, button,
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
  * with the Client square logo. Hide the SVG text inside the icon-container. */
 .sidebar-header .icon-container {
-    background-image: url('/assets/alaiy_os/client/assets/client-logo-square.png') !important;
+    background-image: url('/assets/assets/images/client-logo-square.png') !important;
     background-size: 80% !important;
     background-repeat: no-repeat !important;
     background-position: center !important;
