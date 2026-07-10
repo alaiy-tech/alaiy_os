@@ -11,159 +11,147 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+    :root {
+      --navy:    #0a1b2a;
+      --navy-2:  #0d2739;
+      --accent:  #0891b2;
+      --accent-2:#22c9e6;
+      --ink:     #0f2233;
+      --muted:   #64748b;
+      --border:  #e6ebf1;
+    }
+
     html, body {
       font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
-      background: #ffffff;
-      min-height: 100vh;
-      color: #0b2a3f;
+      min-height: 100vh; color: var(--ink); background: #fff;
     }
-
-    /* Override any Frappe base styles that may leak in */
     * { font-family: inherit; }
 
-    .topbar {
-      position: fixed;
-      top: 24px;
-      left: 32px;
-      z-index: 100;
-    }
-    .topbar img { height: 34px; display: block; }
+    .auth { display: grid; grid-template-columns: 1.05fr 1fr; min-height: 100vh; }
 
-    .page {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      padding: 80px 20px 48px;
+    /* ── Left: brand panel ────────────────────────────────────────── */
+    .brand {
+      position: relative; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: space-between;
+      padding: 52px 60px; color: #eaf6fb;
+      background:
+        radial-gradient(720px 520px at 106% 112%, rgba(34,201,230,0.24), transparent 55%),
+        radial-gradient(620px 480px at -6% 118%, rgba(14,165,233,0.16), transparent 55%),
+        #003b67;
     }
+    .brand::before, .brand::after { content: ""; position: absolute; border-radius: 50%; filter: blur(14px); opacity: 0.45; pointer-events: none; }
+    .brand::before { width: 300px; height: 300px; right: -80px; top: 20%; background: radial-gradient(circle, rgba(8,145,178,0.55), transparent 65%); }
+    .brand::after  { width: 240px; height: 240px; left: -60px; bottom: 10%; background: radial-gradient(circle, rgba(45,212,191,0.35), transparent 65%); }
 
-    .card { width: 100%; max-width: 420px; }
+    .brand-logo { position: relative; z-index: 1; align-self: flex-start; height: 52px; width: auto; }
 
-    .client-logo {
-      display: block;
-      max-width: 240px;
-      height: auto;
-      margin: 0 auto 28px;
-    }
+    .brand-body { position: relative; z-index: 1; max-width: 440px; }
+    .brand-body h2 { font-size: 36px; font-weight: 600; line-height: 1.18; letter-spacing: -0.015em; }
+    .brand-body p  { margin-top: 16px; font-size: 15px; line-height: 1.7; color: #b9d7e4; font-weight: 300; }
+    .features { list-style: none; margin-top: 30px; display: flex; flex-direction: column; gap: 13px; }
+    .features li { display: flex; align-items: center; gap: 12px; font-size: 14px; color: #d6ebf3; font-weight: 400; }
+    .features li svg { flex: none; width: 20px; height: 20px; color: var(--accent-2); }
 
-    .heading {
-      font-size: 24px;
-      font-weight: 700;
-      text-align: center;
-      margin-bottom: 6px;
-      font-family: "Poppins", sans-serif;
-    }
-    .subheading {
-      font-size: 14px;
-      color: #64748b;
-      text-align: center;
-      margin-bottom: 18px;
-      font-family: "Poppins", sans-serif;
-    }
+    .brand-foot { position: relative; z-index: 1; font-size: 12.5px; color: #6f97aa; }
 
-    .label-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      margin-bottom: 6px;
-      width: 100%;
-    }
-    .label {
-      font-size: 14px;
-      font-weight: 500;
-      font-family: "Poppins", sans-serif;
-    }
-    .forgot {
-      font-size: 12px;
-      color: #0891b2;
-      text-decoration: none;
-      font-family: "Poppins", sans-serif;
-    }
-    .forgot:hover { text-decoration: underline; }
+    /* ── Right: form side ─────────────────────────────────────────── */
+    .form-side { display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+    .card { width: 100%; max-width: 380px; animation: rise .5s cubic-bezier(.2,.7,.2,1) both; }
+    @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-    input[type="email"],
-    input[type="password"],
-    input[type="text"] {
-      width: 100%;
-      padding: 10px 14px;
-      font-family: "Poppins", sans-serif !important;
-      font-size: 14px;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      outline: none;
-      color: #0b2a3f;
-      background: #fff;
-      transition: border-color 0.15s, box-shadow 0.15s;
-      margin-bottom: 16px;
-      -webkit-appearance: none;
+    .brand-badge { display: block; width: 58px; height: 58px; border-radius: 14px; margin: 0 0 26px; box-shadow: 0 6px 18px rgba(10,27,42,0.18); }
+
+    .heading { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; margin-bottom: 6px; }
+    .subheading { font-size: 14px; color: var(--muted); margin-bottom: 26px; }
+
+    .label-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 7px; }
+    .label { font-size: 13.5px; font-weight: 500; color: var(--ink); }
+    .forgot { font-size: 12.5px; color: var(--accent); text-decoration: none; font-weight: 500; }
+    .forgot:hover { color: var(--accent-2); text-decoration: underline; }
+
+    input[type="email"], input[type="password"], input[type="text"] {
+      width: 100%; height: 48px; padding: 10px 15px; font-size: 14px; color: var(--ink);
+      border: 1.5px solid var(--border); border-radius: 10px; background: #fbfcfe; outline: none; margin-bottom: 18px;
+      transition: border-color .15s, box-shadow .15s, background .15s; -webkit-appearance: none;
     }
-    input:focus {
-      border-color: #0891b2;
-      box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
-    }
-    input::placeholder { color: #94a3b8; font-family: "Poppins", sans-serif; }
+    input:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(8,145,178,0.13); }
+    input::placeholder { color: #9aa7b5; }
 
     .btn-login {
-      width: 100%;
-      padding: 11px;
-      background: #0b2a3f;
-      color: #fff;
-      font-family: "Poppins", sans-serif !important;
-      font-size: 14px;
-      font-weight: 600;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: opacity 0.15s;
-      margin-top: 4px;
-      -webkit-appearance: none;
+      width: 100%; height: 48px; margin-top: 4px; color: #fff; font-size: 14.5px; font-weight: 600; letter-spacing: .01em;
+      border: none; border-radius: 10px; cursor: pointer;
+      background: linear-gradient(135deg, var(--accent-2), var(--accent));
+      box-shadow: 0 8px 20px rgba(8,145,178,0.32);
+      transition: transform .14s, box-shadow .14s, filter .14s; -webkit-appearance: none;
     }
-    .btn-login:hover { opacity: 0.88; }
-    .btn-login:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-login:hover { transform: translateY(-1px); box-shadow: 0 12px 26px rgba(8,145,178,0.42); filter: brightness(1.04); }
+    .btn-login:active { transform: translateY(0); }
+    .btn-login:disabled { opacity: .55; cursor: not-allowed; transform: none; box-shadow: none; }
 
-    .error-msg {
-      color: #dc2626;
-      font-size: 12px;
-      font-family: "Poppins", sans-serif;
-      margin-bottom: 12px;
-      min-height: 16px;
+    .error-msg { color: #dc2626; font-size: 12.5px; margin-bottom: 14px; min-height: 16px; }
+
+    @media (max-width: 900px) {
+      .auth { grid-template-columns: 1fr; }
+      .brand { display: none; }
+      .form-side { padding: 40px 22px; }
     }
   </style>
 </head>
 <body>
 
-  <div class="topbar">
-    <img src="/assets/alaiy_os/images/logo-hor.png" alt="Alaiy OS">
-  </div>
+  <div class="auth">
 
-  <div class="page">
-    <div class="card">
+    <aside class="brand">
+      <img class="brand-logo" src="/assets/alaiy_os/images/rectangle-logo.png" alt="Alaiy OS">
 
-      <img
-        class="client-logo"
-        src="/assets/alaiy_os/client/assets/client-logo-hor.png"
-        alt="Alaiy OS"
-      >
+      <div class="brand-body">
+        <h2>Welcome back.</h2>
+        <p>Your commerce operating system — inventory, catalog, orders and fulfilment, all in one place.</p>
+        <ul class="features">
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            Real-time inventory &amp; catalog
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            Orders, fulfilment &amp; shipping
+          </li>
+          <li>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+            One dashboard for the whole business
+          </li>
+        </ul>
+      </div>
 
-      <h1 class="heading">Login</h1>
-      <p class="subheading">Enter your email below to login to your account</p>
+      <div class="brand-foot">&copy; Alaiy OS</div>
+    </aside>
 
-      <p class="error-msg" id="err"></p>
+    <main class="form-side">
+      <div class="card">
 
-      <form id="login-form" novalidate>
-        <div class="label-row">
-           <label class="label" for="usr">Email</label>
-        </div>
-        <input id="usr" name="usr" type="email" placeholder="admin@example.com" autocomplete="username" required>
-        <div class="label-row">
-          <label class="label" for="pwd">Password</label>
-          <a class="forgot" href="/update-password">Forgot your password?</a>
-        </div>
-        <input id="pwd" name="pwd" type="password" autocomplete="current-password" required>
-        <button class="btn-login" id="submit-btn" type="submit">Login</button>
-      </form>
+        <img class="brand-badge" src="/assets/alaiy_os/images/square-logo.png" alt="Alaiy OS">
 
-    </div>
+        <h1 class="heading">Sign in</h1>
+        <p class="subheading">Enter your email below to login to your account</p>
+
+        <p class="error-msg" id="err"></p>
+
+        <form id="login-form" novalidate>
+          <div class="label-row">
+            <label class="label" for="usr">Email</label>
+          </div>
+          <input id="usr" name="usr" type="text" placeholder="admin@example.com" autocomplete="username" required>
+          <div class="label-row">
+            <label class="label" for="pwd">Password</label>
+            <a class="forgot" href="/update-password">Forgot your password?</a>
+          </div>
+          <input id="pwd" name="pwd" type="password" placeholder="••••••••" autocomplete="current-password" required>
+          <button class="btn-login" id="submit-btn" type="submit">Login</button>
+        </form>
+
+      </div>
+    </main>
+
   </div>
 
   <script>
@@ -172,16 +160,13 @@
       var btn  = document.getElementById("submit-btn");
       var err  = document.getElementById("err");
 
-      // Read redirect-to from query string (Frappe passes this when session expires)
       function getRedirectTo() {
         var params = new URLSearchParams(window.location.search);
         var r = params.get("redirect-to") || params.get("redirect_to") || "";
-        // Safety: only allow relative paths to prevent open redirect
         if (r && r.startsWith("/") && !r.startsWith("//")) return r;
         return "/desk/os";
       }
 
-      // Read CSRF token from cookie
       function getCsrf() {
         var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
         return m ? decodeURIComponent(m[1]) : "";
@@ -191,7 +176,7 @@
         e.preventDefault();
         err.textContent = "";
         btn.disabled = true;
-        btn.textContent = "Logging in\u2026";
+        btn.textContent = "Logging in…";
 
         var body = new URLSearchParams({
           usr: document.getElementById("usr").value.trim(),
@@ -211,7 +196,6 @@
         })
         .then(function (res) {
           if (res.status === 200 && res.json.message === "Logged In") {
-            // Prefer server-supplied redirect, then query param, then default
             window.location.href = getRedirectTo();
           } else {
             var msg = (res.json && (res.json.message || res.json.exc_type)) || "Invalid credentials";
