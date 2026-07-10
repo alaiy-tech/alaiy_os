@@ -1,5 +1,5 @@
 """
-AlaiyOS — provisioning logic.
+Alaiy OS — provisioning logic.
 
 Runs on after_install (fresh install) and after_migrate (every deploy).
 Reconciles the site's workspace, branding and company to match this codebase.

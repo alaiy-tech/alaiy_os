@@ -1,5 +1,5 @@
 /**
- * AlaiyOS — Shared UI Utilities
+ * Alaiy OS — Shared UI Utilities
  *
  * Depends on:
  *   constants/roles.js
@@ -56,10 +56,7 @@ window.resolveAlaiySection = function (route) {
 
   // Matched by route (stable), not workspace name — the Workspace doc is
   // renamed to match the current company branding.
-  if (
-    route === ALAIY_OS_ROUTE ||
-    route.startsWith(ALAIY_OS_ROUTE + "/")
-  ) {
+  if (route === ALAIY_OS_ROUTE || route.startsWith(ALAIY_OS_ROUTE + "/")) {
     return "Dashboard";
   }
 
