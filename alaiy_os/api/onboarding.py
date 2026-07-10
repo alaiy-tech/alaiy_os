@@ -13,6 +13,7 @@ alaiy_os/www/os/onboarding.py for the page that serves this.
 import json
 
 import frappe
+from frappe import _
 
 
 def is_onboarding_complete():
@@ -21,7 +22,7 @@ def is_onboarding_complete():
     return bool(frappe.db.get_single_value("Alaiy OS Onboarding Settings", "is_complete"))
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_wizard_data():
     """Bootstrap data needed to render all 4 steps of the onboarding wizard."""
     from frappe.desk.page.setup_wizard.setup_wizard import load_languages
@@ -40,7 +41,7 @@ def get_wizard_data():
     }
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def get_chart_of_accounts_options(country):
     from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import (
         get_charts_for_country,
@@ -49,11 +50,16 @@ def get_chart_of_accounts_options(country):
     return get_charts_for_country(country, with_standard=True)
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def preview_chart_of_accounts(chart_template):
     from erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts import get_chart
 
     return get_chart(chart_template)
+
+
+def _require_admin():
+    if frappe.session.user != "Administrator" and "System Manager" not in frappe.get_roles():
+        frappe.throw(_("Not permitted"), frappe.PermissionError)
 
 
 def _apply_logos(args):
@@ -115,15 +121,12 @@ def _delete_desktop_page():
         frappe.flags.in_migrate = False
 
 
-@frappe.whitelist(allow_guest=True)
+@frappe.whitelist()
 def complete_onboarding(args):
     """
-    Single entrypoint that completes AlaiyOS's onboarding wizard. Callable as
-    Guest by design — there's no account to authenticate as on a fresh
-    install, and this is the one whitelisted method that's ever allowed to
-    create Administrator-equivalent state without an existing session. The
-    is_onboarding_complete() guard below is what makes that safe: once it's
-    run once, every subsequent call (Guest or otherwise) is a no-op forever.
+    Single entrypoint that completes AlaiyOS's onboarding wizard. Requires an
+    authenticated session (Administrator, set up during `bench new-site`) —
+    matches the native setup wizard's own model.
 
     Collects all 4 steps' data at once (matching the native wizard's own
     submit-at-the-end model) and, in order, applies it via the real
@@ -131,6 +134,8 @@ def complete_onboarding(args):
     then marks both the native wizard and our own flag complete, then logs
     the calling session in as the just-created user.
     """
+    _require_admin()
+
     if is_onboarding_complete():
         return {"status": "ok", "redirect_to": "/desk/os"}
 
@@ -190,8 +195,8 @@ def complete_onboarding(args):
     frappe.db.commit()
     frappe.clear_cache()
 
-    # Log the (Guest) request in as the account just created in Step 2, so the
-    # client's redirect to /desk/os lands in an already-authenticated session —
+    # Switch the session to the account just created in Step 2, so the
+    # client's redirect to /desk/os lands as that user, not Administrator —
     # mirrors frappe.desk.page.setup_wizard.setup_wizard.login_as_first_user().
     if args.get("email") and hasattr(frappe.local, "login_manager"):
         frappe.local.login_manager.login_as(args.get("email"))

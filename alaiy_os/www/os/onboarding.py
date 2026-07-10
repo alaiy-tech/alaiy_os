@@ -4,11 +4,12 @@ from alaiy_os.api.onboarding import is_onboarding_complete
 
 
 def get_context(context):
-    # No login required — this page is reachable as Guest on purpose. There's
-    # no account to log into yet on a fresh install; Step 2 of the wizard
-    # itself is what creates the first user, and complete_onboarding() logs
-    # that session in at the end. Once onboarding has actually run, this page
-    # is retired for good (both for Guest and any already-logged-in user).
+    # Matches native Frappe's own setup wizard: log in as Administrator first
+    # (credentials set during `bench new-site`), then land on the wizard.
+    if frappe.session.user == "Guest":
+        frappe.local.flags.redirect_location = "/login?redirect-to=/os/onboarding"
+        raise frappe.Redirect
+
     if is_onboarding_complete():
         frappe.local.flags.redirect_location = "/desk/os"
         raise frappe.Redirect
