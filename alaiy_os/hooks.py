@@ -25,6 +25,7 @@ app_include_js = [
 ]
 app_include_css = [
     f"/assets/alaiy_os/css/core.css?v={_V}",
+    f"/assets/alaiy_os/css/custom.css?v={_V}",
 ]
 
 # Website assets (login page only — NOT the desk)
