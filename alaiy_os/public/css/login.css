@@ -1,7 +1,7 @@
 /*
- * AlaiyOS — Login Page UI
- * Scoped to the login/website login routes (web_include_css).
- * Does NOT affect the ERPNext desk.
+ * Alaiy OS — Login Page Branding
+ * Applied only to website/login routes (web_include_css).
+ * Does NOT affect the ERPNext desk for any user.
  */
 
 @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap");
