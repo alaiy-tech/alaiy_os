@@ -1,9 +1,9 @@
 """
 AlaiyOS Module Onboarding configuration.
 
-ENABLE_MODULE_ONBOARDING in client/config/boot_config.py controls whether the
-"Getting Started" panel appears in the workspace sidebar.  The Module Onboarding
-and Onboarding Step records are always created in the DB regardless of that flag.
+ENABLE_MODULE_ONBOARDING in setup/install.py controls whether the "Getting
+Started" panel appears in the workspace sidebar. The Module Onboarding and
+Onboarding Step records are always created in the DB regardless of that flag.
 """
 
 ONBOARDING_NAME = "Alaiy OS Onboarding"

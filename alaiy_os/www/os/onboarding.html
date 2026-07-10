@@ -1,0 +1,669 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Setup | Alaiy OS</title>
+  <link rel="icon" type="image/png" href="/assets/alaiy_os/images/icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+      background: #f4f7f9;
+      min-height: 100vh;
+      color: #0b2a3f;
+    }
+    * { font-family: inherit; }
+
+    .topbar { position: fixed; top: 24px; left: 32px; z-index: 100; }
+    .topbar img { height: 34px; display: block; }
+
+    .page {
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 100px 20px 48px;
+    }
+
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 24px rgba(11, 42, 63, 0.08);
+      padding: 36px 40px 32px;
+    }
+
+    .steps-indicator {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 28px;
+    }
+    .steps-indicator .dot {
+      flex: 1;
+      height: 4px;
+      border-radius: 2px;
+      background: #e2e8f0;
+      transition: background 0.15s;
+    }
+    .steps-indicator .dot.done,
+    .steps-indicator .dot.active { background: #0891b2; }
+
+    .heading { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+    .subheading { font-size: 14px; color: #64748b; margin-bottom: 22px; }
+
+    .step { display: none; }
+    .step.active { display: block; }
+
+    .field { margin-bottom: 16px; }
+    .field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+    .field .hint { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+    input[type="text"], input[type="email"], input[type="password"],
+    input[type="date"], input[type="file"], select {
+      width: 100%;
+      padding: 10px 12px;
+      font-size: 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      outline: none;
+      color: #0b2a3f;
+      background: #fff;
+      transition: border-color 0.15s, box-shadow 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus {
+      border-color: #0891b2;
+      box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
+    }
+    input:read-only { background: #f8fafc; color: #64748b; }
+
+    .row-2 { display: flex; gap: 12px; }
+    .row-2 .field { flex: 1; }
+
+    .btn-link {
+      background: none;
+      border: none;
+      color: #0891b2;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 16px;
+      display: inline-block;
+    }
+    .btn-link:hover { text-decoration: underline; }
+
+    .upload-box {
+      border: 1.5px dashed #cbd5e1;
+      border-radius: 10px;
+      padding: 18px;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+    .upload-box img.preview {
+      max-width: 100%;
+      max-height: 90px;
+      display: block;
+      margin: 0 auto 10px;
+      border-radius: 6px;
+    }
+    .upload-box .placeholder {
+      font-size: 12px;
+      color: #94a3b8;
+      margin-bottom: 10px;
+    }
+
+    .actions {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 28px;
+    }
+    .actions .spacer { flex: 1; }
+
+    .btn {
+      padding: 11px 22px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: opacity 0.15s;
+      -webkit-appearance: none;
+    }
+    .btn-primary { background: #0b2a3f; color: #fff; }
+    .btn-primary:hover { opacity: 0.88; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-secondary { background: transparent; color: #64748b; }
+    .btn-secondary:hover { color: #0b2a3f; }
+
+    .error-msg {
+      color: #dc2626;
+      font-size: 12px;
+      margin-bottom: 12px;
+      min-height: 16px;
+    }
+
+    /* Chart of Accounts preview modal */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(11, 42, 63, 0.45);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal-box {
+      background: #fff;
+      border-radius: 12px;
+      width: 90%;
+      max-width: 480px;
+      max-height: 80vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .modal-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .modal-header h3 { font-size: 15px; font-weight: 600; }
+    .modal-header button {
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; color: #64748b; line-height: 1;
+    }
+    .modal-body { padding: 12px 20px; overflow-y: auto; font-size: 13px; }
+    .modal-body details { margin-left: 14px; }
+    .modal-body summary { cursor: pointer; padding: 3px 0; }
+  </style>
+</head>
+<body>
+
+  <div class="topbar">
+    <img src="/assets/alaiy_os/images/logo-hor.png" alt="Alaiy OS">
+  </div>
+
+  <div class="page">
+    <div class="card">
+
+      <div class="steps-indicator" id="steps-indicator">
+        <div class="dot" data-step="1"></div>
+        <div class="dot" data-step="2"></div>
+        <div class="dot" data-step="3"></div>
+        <div class="dot" data-step="4"></div>
+      </div>
+
+      <p class="error-msg" id="err"></p>
+
+      <!-- Step 1: Welcome -->
+      <section class="step" data-step="1">
+        <h1 class="heading">Welcome</h1>
+        <p class="subheading">Let's get your workspace ready. First, a few basics.</p>
+
+        <div class="field">
+          <label for="language">Your Language</label>
+          <select id="language"></select>
+        </div>
+        <div class="field">
+          <label for="country">Your Country</label>
+          <select id="country"></select>
+        </div>
+        <div class="field">
+          <label for="timezone">Time Zone</label>
+          <select id="timezone"></select>
+        </div>
+        <div class="field">
+          <label for="currency">Currency</label>
+          <select id="currency"></select>
+        </div>
+      </section>
+
+      <!-- Step 2: Account -->
+      <section class="step" data-step="2">
+        <h1 class="heading">Let's set up your account</h1>
+        <p class="subheading">This will be your login for Alaiy OS.</p>
+
+        <div class="field">
+          <label for="full_name">Full Name</label>
+          <input type="text" id="full_name" autocomplete="name">
+        </div>
+        <div class="field">
+          <label for="email">Email Address</label>
+          <input type="email" id="email" autocomplete="username">
+        </div>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="new-password">
+        </div>
+      </section>
+
+      <!-- Step 3: Organization -->
+      <section class="step" data-step="3">
+        <h1 class="heading">Setup your organization</h1>
+        <p class="subheading">Tell us about your company.</p>
+
+        <div class="field">
+          <label for="company_name">Company Name</label>
+          <input type="text" id="company_name">
+        </div>
+        <div class="field">
+          <label for="company_abbr">Company Abbreviation</label>
+          <input type="text" id="company_abbr" maxlength="10">
+        </div>
+        <div class="field">
+          <label for="chart_of_accounts">Chart of Accounts</label>
+          <select id="chart_of_accounts"></select>
+        </div>
+        <button type="button" class="btn-link" id="view-coa-btn">View Chart of Accounts</button>
+        <div class="row-2">
+          <div class="field">
+            <label for="fy_start_date">Financial Year Begins On</label>
+            <input type="date" id="fy_start_date">
+          </div>
+          <div class="field">
+            <label for="fy_end_date">Financial Year Ends On</label>
+            <input type="date" id="fy_end_date" readonly>
+          </div>
+        </div>
+        <div class="field">
+          <label for="default_distance_unit">Default Distance Unit</label>
+          <select id="default_distance_unit"></select>
+        </div>
+      </section>
+
+      <!-- Step 4: Organizational assets -->
+      <section class="step" data-step="4">
+        <h1 class="heading">Set up your organizational assets</h1>
+        <p class="subheading">Upload your brand logos.</p>
+
+        <div class="field">
+          <label>Square Logo (512&times;512px)</label>
+          <div class="upload-box" id="square-box">
+            <p class="placeholder" id="square-placeholder">PNG or JPG, square aspect ratio</p>
+            <img class="preview" id="square-preview" style="display:none;">
+            <input type="file" id="square_logo" accept="image/*">
+          </div>
+        </div>
+        <div class="field">
+          <label>Horizontal Logo (700&times;140px)</label>
+          <div class="upload-box" id="hor-box">
+            <p class="placeholder" id="hor-placeholder">PNG or JPG, wide aspect ratio</p>
+            <img class="preview" id="hor-preview" style="display:none;">
+            <input type="file" id="hor_logo" accept="image/*">
+          </div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button type="button" class="btn btn-secondary" id="back-btn" style="visibility:hidden;">Back</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn btn-primary" id="next-btn">Next</button>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="coa-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3 id="coa-modal-title">Chart of Accounts</h3>
+        <button type="button" id="coa-modal-close">&times;</button>
+      </div>
+      <div class="modal-body" id="coa-modal-body"></div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var TOTAL_STEPS = 4;
+      var current = 1;
+      var wizardData = null;
+      var values = {};
+      var uploadedFiles = { square: null, hor: null };
+
+      // Same fiscal-year-start table ERPNext's own setup wizard JS uses
+      // (erpnext/public/js/setup_wizard.js -> erpnext.setup.fiscal_years),
+      // duplicated here since this page intentionally avoids loading the
+      // full desk JS bundle.
+      var FISCAL_YEARS = {
+        "Afghanistan": ["12-21", "12-20"], "Australia": ["07-01", "06-30"],
+        "Bangladesh": ["07-01", "06-30"], "Costa Rica": ["10-01", "09-30"],
+        "Egypt": ["07-01", "06-30"], "Ethiopia": ["07-08", "07-07"],
+        "Hong Kong": ["04-01", "03-31"], "India": ["04-01", "03-31"],
+        "Iran": ["06-23", "06-22"], "Kenya": ["07-01", "06-30"],
+        "Malaysia": ["07-01", "06-30"], "Myanmar": ["04-01", "03-31"],
+        "Nepal": ["07-16", "07-15"], "New Zealand": ["04-01", "03-31"],
+        "Pakistan": ["07-01", "06-30"], "Singapore": ["04-01", "03-31"],
+        "South Africa": ["03-01", "02-28"], "United Kingdom": ["04-01", "03-31"]
+      };
+
+      // Meta keys erpnext.accounts.doctype.account.chart_of_accounts.chart_of_accounts
+      // .get_chart_metadata_fields() attaches alongside each account node — anything
+      // else is a child account name to recurse into.
+      var COA_META_FIELDS = [
+        "account_name", "account_number", "account_type", "account_category",
+        "root_type", "is_group", "tax_rate", "account_currency"
+      ];
+
+      var err = document.getElementById("err");
+      var backBtn = document.getElementById("back-btn");
+      var nextBtn = document.getElementById("next-btn");
+
+      function getCsrf() {
+        var m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : "";
+      }
+
+      function apiGet(method) {
+        return fetch("/api/method/" + method, {
+          method: "GET",
+          headers: { "X-Frappe-CSRF-Token": getCsrf() },
+        }).then(function (r) { return r.json(); }).then(function (j) { return j.message; });
+      }
+
+      function apiPost(method, args) {
+        return fetch("/api/method/" + method, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Frappe-CSRF-Token": getCsrf(),
+          },
+          body: JSON.stringify(args || {}),
+        }).then(function (r) {
+          return r.json().then(function (j) { return { status: r.status, json: j }; });
+        }).then(function (res) {
+          if (res.status >= 400) {
+            var msg = (res.json && (res.json.message || res.json._server_messages)) || "Request failed";
+            throw new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+          }
+          return res.json.message;
+        });
+      }
+
+      function uploadFile(file, filename) {
+        var renamed = new File([file], filename, { type: file.type });
+        var form = new FormData();
+        form.append("file", renamed, filename);
+        form.append("is_private", "0");
+        form.append("folder", "Home");
+        return fetch("/api/method/upload_file", {
+          method: "POST",
+          headers: { "X-Frappe-CSRF-Token": getCsrf() },
+          body: form,
+        }).then(function (r) { return r.json(); }).then(function (j) { return j.message; });
+      }
+
+      function setError(msg) { err.textContent = msg || ""; }
+
+      function showStep(n) {
+        current = n;
+        document.querySelectorAll(".step").forEach(function (s) {
+          s.classList.toggle("active", parseInt(s.dataset.step, 10) === n);
+        });
+        document.querySelectorAll(".steps-indicator .dot").forEach(function (d) {
+          var s = parseInt(d.dataset.step, 10);
+          d.classList.toggle("active", s === n);
+          d.classList.toggle("done", s < n);
+        });
+        backBtn.style.visibility = n === 1 ? "hidden" : "visible";
+        nextBtn.textContent = n === TOTAL_STEPS ? "Finish" : "Next";
+        setError("");
+        history.replaceState(null, "", "/os/onboarding?step=" + n);
+        if (n === 3) loadChartOfAccountsOptions();
+      }
+
+      function fillSelect(sel, options, selected) {
+        sel.innerHTML = "";
+        options.forEach(function (opt) {
+          var value = typeof opt === "string" ? opt : opt.value;
+          var label = typeof opt === "string" ? opt : opt.label;
+          var o = document.createElement("option");
+          o.value = value;
+          o.textContent = label;
+          if (value === selected) o.selected = true;
+          sel.appendChild(o);
+        });
+      }
+
+      function initStep1() {
+        var languageSel = document.getElementById("language");
+        var countrySel = document.getElementById("country");
+        var timezoneSel = document.getElementById("timezone");
+        var currencySel = document.getElementById("currency");
+
+        var langOptions = wizardData.languages.languages.map(function (l) {
+          return { value: l.value, label: l.label };
+        });
+        fillSelect(languageSel, langOptions, wizardData.languages.default_language);
+
+        var countries = Object.keys(wizardData.country_info).sort();
+        fillSelect(countrySel, countries, countrySel.value || "");
+
+        fillSelect(currencySel, wizardData.currencies, "");
+
+        function onCountryChange() {
+          var info = wizardData.country_info[countrySel.value] || {};
+          var timezones = info.timezones || [];
+          fillSelect(timezoneSel, timezones.length ? timezones : ["UTC"], timezones[0] || "UTC");
+          if (info.currency && wizardData.currencies.indexOf(info.currency) !== -1) {
+            currencySel.value = info.currency;
+          }
+        }
+        countrySel.addEventListener("change", onCountryChange);
+        onCountryChange();
+      }
+
+      function initStep3Statics() {
+        var uomSel = document.getElementById("default_distance_unit");
+        fillSelect(uomSel, wizardData.uoms, "Meter");
+
+        document.getElementById("company_name").addEventListener("input", function () {
+          var parts = this.value.trim().split(/\s+/).filter(Boolean);
+          var abbr = parts.map(function (p) { return p[0]; }).join("").slice(0, 10).toUpperCase();
+          document.getElementById("company_abbr").value = abbr;
+        });
+
+        document.getElementById("fy_start_date").addEventListener("change", function () {
+          var start = new Date(this.value);
+          if (isNaN(start.getTime())) return;
+          var end = new Date(start.getFullYear() + 1, start.getMonth(), start.getDate() - 1);
+          document.getElementById("fy_end_date").value = end.toISOString().slice(0, 10);
+        });
+      }
+
+      function suggestFiscalYear() {
+        var country = document.getElementById("country").value;
+        var fy = FISCAL_YEARS[country] || ["01-01", "12-31"];
+        var now = new Date();
+        var year = now.getFullYear();
+        var startStr = year + "-" + fy[0];
+        if (new Date(startStr) > now) year -= 1;
+        var startInput = document.getElementById("fy_start_date");
+        if (!startInput.value) {
+          startInput.value = year + "-" + fy[0];
+          startInput.dispatchEvent(new Event("change"));
+        }
+      }
+
+      function loadChartOfAccountsOptions() {
+        var country = document.getElementById("country").value;
+        if (!country) return;
+        apiPost("alaiy_os.api.onboarding.get_chart_of_accounts_options", { country: country })
+          .then(function (charts) {
+            var sel = document.getElementById("chart_of_accounts");
+            fillSelect(sel, charts || ["Standard"], "Standard");
+          })
+          .catch(function () {});
+        suggestFiscalYear();
+      }
+
+      function openCoaModal() {
+        var chartTemplate = document.getElementById("chart_of_accounts").value;
+        if (!chartTemplate) return;
+        var modal = document.getElementById("coa-modal");
+        var title = document.getElementById("coa-modal-title");
+        var body = document.getElementById("coa-modal-body");
+        title.textContent = chartTemplate;
+        body.innerHTML = "Loading…";
+        modal.classList.add("open");
+        apiPost("alaiy_os.api.onboarding.preview_chart_of_accounts", { chart_template: chartTemplate })
+          .then(function (tree) {
+            body.innerHTML = "";
+            body.appendChild(renderCoaNode(tree || {}));
+          })
+          .catch(function () { body.textContent = "Could not load preview."; });
+      }
+
+      function renderCoaNode(node) {
+        var ul = document.createElement("div");
+        Object.keys(node).forEach(function (key) {
+          if (COA_META_FIELDS.indexOf(key) !== -1) return;
+          var child = node[key];
+          if (!child || typeof child !== "object") return;
+          var details = document.createElement("details");
+          var summary = document.createElement("summary");
+          summary.textContent = key;
+          details.appendChild(summary);
+          details.appendChild(renderCoaNode(child));
+          ul.appendChild(details);
+        });
+        return ul;
+      }
+
+      function previewImage(input, imgEl, placeholderEl) {
+        var file = input.files && input.files[0];
+        if (!file) return;
+        var reader = new FileReader();
+        reader.onload = function (e) {
+          imgEl.src = e.target.result;
+          imgEl.style.display = "block";
+          placeholderEl.style.display = "none";
+        };
+        reader.readAsDataURL(file);
+      }
+
+      function collectStepValues(n) {
+        if (n === 1) {
+          values.language = document.getElementById("language").value;
+          values.country = document.getElementById("country").value;
+          values.timezone = document.getElementById("timezone").value;
+          values.currency = document.getElementById("currency").value;
+        } else if (n === 2) {
+          values.full_name = document.getElementById("full_name").value.trim();
+          values.email = document.getElementById("email").value.trim();
+          values.password = document.getElementById("password").value;
+        } else if (n === 3) {
+          values.company_name = document.getElementById("company_name").value.trim();
+          values.company_abbr = document.getElementById("company_abbr").value.trim();
+          values.chart_of_accounts = document.getElementById("chart_of_accounts").value;
+          values.fy_start_date = document.getElementById("fy_start_date").value;
+          values.fy_end_date = document.getElementById("fy_end_date").value;
+          values.default_distance_unit = document.getElementById("default_distance_unit").value;
+        }
+      }
+
+      function validateStep(n) {
+        if (n === 1) {
+          if (!values.language || !values.country || !values.timezone || !values.currency) {
+            setError("Please complete all fields.");
+            return false;
+          }
+        } else if (n === 2) {
+          if (!values.full_name || !values.email || !values.password) {
+            setError("Please complete all fields.");
+            return false;
+          }
+          if (values.email.indexOf("@") === -1) {
+            setError("Please enter a valid email address.");
+            return false;
+          }
+        } else if (n === 3) {
+          if (!values.company_name || !values.company_abbr || !values.fy_start_date || !values.fy_end_date) {
+            setError("Please complete all fields.");
+            return false;
+          }
+        }
+        return true;
+      }
+
+      function finish() {
+        nextBtn.disabled = true;
+        nextBtn.textContent = "Setting up…";
+        setError("");
+
+        var squareFile = document.getElementById("square_logo").files[0];
+        var horFile = document.getElementById("hor_logo").files[0];
+
+        var uploads = [];
+        uploads.push(squareFile ? uploadFile(squareFile, squareFile.name) : Promise.resolve(null));
+        uploads.push(horFile ? uploadFile(horFile, "client-hor-logo." + (horFile.name.split(".").pop() || "png")) : Promise.resolve(null));
+
+        Promise.all(uploads).then(function (results) {
+          if (results[0]) values.square_logo_url = results[0].file_url;
+          if (results[1]) values.hor_logo_url = results[1].file_url;
+
+          return apiPost("alaiy_os.api.onboarding.complete_onboarding", { args: JSON.stringify(values) });
+        }).then(function (res) {
+          window.location.href = (res && res.redirect_to) || "/desk/os";
+        }).catch(function (e) {
+          nextBtn.disabled = false;
+          nextBtn.textContent = "Finish";
+          setError(e.message || "Something went wrong. Please try again.");
+        });
+      }
+
+      nextBtn.addEventListener("click", function () {
+        collectStepValues(current);
+        if (!validateStep(current)) return;
+        if (current === TOTAL_STEPS) {
+          finish();
+        } else {
+          showStep(current + 1);
+        }
+      });
+
+      backBtn.addEventListener("click", function () {
+        if (current > 1) showStep(current - 1);
+      });
+
+      document.getElementById("view-coa-btn").addEventListener("click", openCoaModal);
+      document.getElementById("coa-modal-close").addEventListener("click", function () {
+        document.getElementById("coa-modal").classList.remove("open");
+      });
+      document.getElementById("square_logo").addEventListener("change", function () {
+        previewImage(this, document.getElementById("square-preview"), document.getElementById("square-placeholder"));
+      });
+      document.getElementById("hor_logo").addEventListener("change", function () {
+        previewImage(this, document.getElementById("hor-preview"), document.getElementById("hor-placeholder"));
+      });
+
+      apiGet("alaiy_os.api.onboarding.get_wizard_data").then(function (data) {
+        wizardData = data;
+        initStep1();
+        initStep3Statics();
+
+        var params = new URLSearchParams(window.location.search);
+        var stepParam = parseInt(params.get("step"), 10);
+        var startStep = (stepParam >= 1 && stepParam <= TOTAL_STEPS) ? stepParam : 1;
+        showStep(startStep);
+      }).catch(function () {
+        setError("Could not load setup data. Please refresh the page.");
+      });
+    })();
+  </script>
+</body>
+</html>
