@@ -8,9 +8,6 @@ Data definitions:
   constants/roles.py       — OS_MANAGER_ROLE
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
   constants/onboarding.py  — ONBOARDING_NAME, ONBOARDING_STEPS
-
-Client config:
-  client/config/boot_config.py    — COMPANY_NAME, COMPANY_CURRENCY, COMPANY_COUNTRY
 """
 
 import hashlib
@@ -18,7 +15,6 @@ import json
 
 import frappe
 
-from alaiy_os.client.config import boot_config
 from alaiy_os.constants.roles import OS_MANAGER_ROLE
 from alaiy_os.constants.workspace import (
     WORKSPACE_NAME,
@@ -61,8 +57,6 @@ def _cleanup_legacy_workspace():
 
 def _run_provisioning():
     steps = [
-        set_company_defaults,
-        configure_system_settings,
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
         create_module_def,
@@ -75,7 +69,6 @@ def _run_provisioning():
         create_or_update_os_settings_workspace_sidebar,
         restrict_foreign_workspaces,
         create_or_update_onboarding,
-        configure_branding,
     ]
     for step in steps:
         try:
@@ -87,61 +80,6 @@ def _run_provisioning():
             )
     frappe.db.commit()
     frappe.clear_cache()
-
-
-# ── Company defaults ──────────────────────────────────────────────────────────
-
-def set_company_defaults():
-    company_name = getattr(boot_config, "COMPANY_NAME", "").strip()
-    if not company_name:
-        return
-
-    if not frappe.db.exists("Company", company_name):
-        try:
-            abbr = "".join(w[0].upper() for w in company_name.split()[
-                           :3]) or company_name[:3].upper()
-            frappe.get_doc({
-                "doctype":          "Company",
-                "company_name":     company_name,
-                "abbr":             abbr,
-                "default_currency": getattr(boot_config, "COMPANY_CURRENCY", "USD"),
-                "country":          getattr(boot_config, "COMPANY_COUNTRY", "India"),
-            }).insert(ignore_permissions=True)
-        except Exception:
-            frappe.log_error(
-                title="Alaiy OS: could not create Company",
-                message=frappe.get_traceback(),
-            )
-
-    # Only seed Global Defaults if nothing is set yet — this hook re-runs on
-    # every after_migrate, and a site may have since been reconfigured to a
-    # different company than whatever boot_config.py says (e.g. via the
-    # ERPNext setup wizard, or a direct fix). Overwriting it unconditionally
-    # here would silently revert that on the next deploy.
-    if not frappe.db.get_single_value("Global Defaults", "default_company"):
-        frappe.db.set_single_value(
-            "Global Defaults", "default_company", company_name)
-
-
-# ── System Settings ──────────────────────────────────────────────────────────
-
-def configure_system_settings():
-    """Sync language and timezone from boot_config into System Settings."""
-    def _safe_set(field, value):
-        if not value:
-            return
-        try:
-            meta = frappe.get_meta("System Settings")
-            if meta.has_field(field):
-                frappe.db.set_single_value("System Settings", field, value)
-        except Exception:
-            frappe.log_error(
-                title="Alaiy OS: configure_system_settings failed",
-                message=frappe.get_traceback(),
-            )
-
-    _safe_set("language", getattr(boot_config, "LANGUAGE", ""))
-    _safe_set("time_zone", getattr(boot_config, "TIMEZONE", ""))
 
 
 def skip_erpnext_onboarding():
@@ -415,12 +353,6 @@ def _get_default_company():
         "Global Defaults", "default_company") or "").strip()
     if company:
         return company
-    # Global Defaults can still be empty this early in a fresh install (e.g. if
-    # set_company_defaults() raised before reaching its own Global Defaults
-    # write) — boot_config.COMPANY_NAME is the same source set_company_defaults()
-    # itself provisions from, so falling back to it here keeps workspace naming
-    # correct even on that edge case.
-    return getattr(boot_config, "COMPANY_NAME", "").strip()
 
 
 def _get_os_workspace_title():
@@ -588,8 +520,6 @@ def create_or_update_workspace():
 
 def create_or_update_workspace_sidebar():
     items = list(WORKSPACE_SIDEBAR_ITEMS)
-    enable_onboarding = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
-
     # Title must stay == WORKSPACE_NAME: Workspace Sidebar autonames from
     # title, and that name must match the Workspace's own (fixed) name for
     # Frappe's client-side sidebar lookup to find it.
@@ -598,7 +528,7 @@ def create_or_update_workspace_sidebar():
         "for_user":          "",
         "standard":          1,
         "app":               "alaiy_os",
-        "module_onboarding": ONBOARDING_NAME if enable_onboarding else None,
+        "module_onboarding": ONBOARDING_NAME,
     }
 
     if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
@@ -744,9 +674,7 @@ def _create_or_update_onboarding_steps():
 def create_or_update_onboarding():
     """
     Always create/update the Module Onboarding record and its Onboarding Steps.
-    Only link it to the sidebar when ENABLE_MODULE_ONBOARDING is True.
     """
-    enable = getattr(boot_config, "ENABLE_MODULE_ONBOARDING", False)
     step_names = _create_or_update_onboarding_steps()
 
     onboarding_doc = {
@@ -792,27 +720,5 @@ def create_or_update_onboarding():
     if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
         frappe.db.set_value(
             "Workspace Sidebar", WORKSPACE_NAME,
-            "module_onboarding", ONBOARDING_NAME if enable else None,
+            "module_onboarding", ONBOARDING_NAME
         )
-
-
-# ── Branding ──────────────────────────────────────────────────────────────────
-
-def configure_branding():
-    def _safe_set(doctype, field, value):
-        try:
-            meta = frappe.get_meta(doctype)
-            if meta.has_field(field):
-                frappe.db.set_single_value(doctype, field, value)
-        except Exception:
-            frappe.log_error(
-                title="Alaiy OS: configure_branding failed",
-                message=frappe.get_traceback(),
-            )
-
-    _safe_set("Navbar Settings",  "app_logo",
-              "/assets/alaiy_os/client/assets/client-logo-hor.png")
-    _safe_set("System Settings",  "favicon",
-              "/assets/alaiy_os/client/assets/client-icon.png")
-    _safe_set("System Settings",  "app_name",
-              boot_config.COMPANY_NAME + " OS")
