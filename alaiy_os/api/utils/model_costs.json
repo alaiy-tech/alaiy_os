@@ -107,7 +107,7 @@
   },
   "deepseek": {
     "deepseek-v4-pro": {
-      "text_gen": { "input_usd_per_1m": 1.74, "output_usd_per_1m": 3.48 }
+      "text_gen": { "input_usd_per_1m": 0.435, "output_usd_per_1m": 0.87 }
     },
     "deepseek-v4-flash": {
       "text_gen": { "input_usd_per_1m": 0.14, "output_usd_per_1m": 0.28 }
