@@ -71,6 +71,7 @@ def _run_provisioning():
         restrict_foreign_workspaces,
         create_or_update_onboarding,
         ensure_default_logos,
+        ensure_desktop_icon_logos,
         configure_system_settings,
         configure_navbar,
         configure_portal_settings,
@@ -247,6 +248,19 @@ def ensure_default_logos():
         source_path = frappe.get_app_path("alaiy_os", "public", "images", source_name)
         if os.path.exists(source_path):
             shutil.copyfile(source_path, dest_path)
+
+
+def ensure_desktop_icon_logos():
+    """
+    Point the OS / OS Settings app-switcher icons at the square logo instead
+    of the lucide "layout-dashboard" glyph — that's what the sidebar header
+    and the Getting Started popup fall back to (a plain grey letter avatar)
+    when a Desktop Icon has no logo_url of its own.
+    """
+    logo_url = "/assets/images/client-logo-square.png"
+    for workspace_name in (WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME):
+        if frappe.db.exists("Desktop Icon", workspace_name):
+            frappe.db.set_value("Desktop Icon", workspace_name, "logo_url", logo_url)
 
 
 # ── System Settings ────────────────────────────────────────────────────────────

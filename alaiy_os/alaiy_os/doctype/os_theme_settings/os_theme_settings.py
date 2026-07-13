@@ -18,14 +18,14 @@ HOR_LOGO_FILENAME = "client-logo-hor.png"
 # Ported verbatim from Alaiy-os-theme-generator/solist_theme.css's ENGINE +
 # component-rule sections (everything from "ENGINE — wires the control panel
 # into Frappe" through its generic fixes at the end), with two exclusions:
-#   - its own hardcoded [data-theme="dark"] {...} control-panel values (that's
-#     the "CONTROL PANEL" half this doctype's dark_* fields replace — see
-#     _build_root_and_dark_blocks() below, not this static template)
+#   - its own hardcoded [data-theme="dark"] {...} control-panel values — this
+#     app only ships one colour theme (light), applied unconditionally via
+#     the ":root, [data-theme=light], [data-theme=dark]" selector below, so
+#     Frappe's own system dark-mode toggle doesn't change anything here
 #   - its "BUSINESS DASHBOARD PAGE" block (styles a page that doesn't exist
 #     in this app)
 # Every selector here reads var(--s-*) — never a literal color/size — so it
-# re-skins correctly from whatever :root/[data-theme="dark"] values get
-# prepended to it.
+# re-skins correctly from whatever :root values get prepended to it.
 _ENGINE_AND_COMPONENTS_CSS = r"""
 /* ╔══════════════════════════════════════════════════════════════════════╗
  * ║  ENGINE — wires the control panel into Frappe. No need to edit.        ║
@@ -66,19 +66,20 @@ _ENGINE_AND_COMPONENTS_CSS = r"""
 	--card-shadow: var(--s-shadow-sm, 0 1px 3px rgba(0,0,0,.1)); --modal-shadow: var(--s-shadow-lg, 0 16px 40px rgba(0,0,0,.12)); --btn-shadow: none;
 }
 
-[data-theme="dark"] {
-	--s-shadow-xs:  0 1px 2px rgba(0,0,0,.30);
-	--s-shadow-sm:  0 1px 3px rgba(0,0,0,.40);
-	--s-shadow-md:  0 6px 20px rgba(0,0,0,.45);
-	--s-shadow-lg:  0 16px 40px rgba(0,0,0,.55);
-	--scrollbar-thumb-color: #4A473F;
-}
-
 /* Global radius baseline — token-driven so each theme controls it (sharp theme
  * sets --s-radius-sm:0; rounded theme sets it >0). Components with their own
  * radius rule still win via higher specificity. */
 * {
     border-radius: var(--s-radius-sm) !important;
+}
+/* Count/tag pill badges Frappe always draws fully round (22px, 100px, or a
+ * "full radius" token) regardless of the active box-radius setting — the
+ * blanket reset above has no class to lose to on these specific elements,
+ * so without this they get flattened to --s-radius-sm (0 on sharp themes)
+ * instead of staying round. .indicator-pill/.badge already have their own
+ * explicit --s-pill rule elsewhere and are unaffected by this gap. */
+.filter-label, .form-sidebar .count, .kanban-tags .tag-pill {
+	border-radius: var(--s-pill) !important;
 }
 /* ── Typography: sans body, serif headings & brand ─────────────────────── */
 body, .page-body, input, select, textarea, .form-control, .btn, .list-row, .navbar, button {
@@ -162,13 +163,36 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 	border-radius: var(--s-radius-sm) !important;
 	border: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
 	background: var(--s-white) !important; color: var(--s-ink) !important;
+}
+/* .input-xs/.input-sm (list-view filter boxes, compact dropdowns, etc.) set
+ * their OWN deliberately smaller padding/height below — this generic rule
+ * must not touch them, or its :not() chain's specificity (which counts each
+ * :not() argument same as the class it excludes) quietly outranks their
+ * 2-class selector and constrains them back up to the regular control size,
+ * making a compact input look tall/misaligned next to its own xs buttons. */
+.form-control:not(textarea):not([type="checkbox"]):not([type="radio"]):not(.input-xs):not(.input-sm),
+.input-with-feedback:not(textarea):not([type="checkbox"]):not([type="radio"]):not(.input-xs):not(.input-sm) {
+	min-height: var(--s-control-height) !important;
 	padding-left: var(--s-control-pad-x) !important; padding-right: var(--s-control-pad-x) !important;
 }
-.form-control:not(textarea):not([type="checkbox"]):not([type="radio"]),
-.input-with-feedback:not(textarea):not([type="checkbox"]):not([type="radio"]) { min-height: var(--s-control-height) !important; }
 .form-control:focus, .input-with-feedback:focus, textarea.form-control:focus, .ql-container.ql-focused,
 .awesomplete input:focus, .search-bar .form-control:focus {
 	border-color: var(--s-black) !important; box-shadow: 0 0 0 3px rgba(17,17,17,.10) !important; outline: none !important;
+}
+
+/* The Ctrl+K / Ctrl+G command-palette search bar is deliberately borderless
+ * and transparent — Frappe marks it "bg-transparent shadow-none" itself so
+ * it blends into the modal instead of looking like a form field. Pin it to
+ * Frappe's own stock padding/height/border here so no theme edit — now or
+ * later — can push the generic .form-control rule above onto it again.
+ * (Selector needs 3 classes + the element type to actually outrank that
+ * rule's :not([type=...]) chain, which counts as 3 classes on its own —
+ * a plain 2-class override loses the specificity fight silently.) */
+.awesomebar-input-row input.form-control.bg-transparent,
+.modal input.form-control.search-input {
+	background: transparent !important; border: none !important; border-radius: 0 !important;
+	box-shadow: none !important; min-height: 28px !important; height: 28px !important;
+	padding: 6px 8px !important;
 }
 
 /* ── Surfaces ───────────────────────────────────────────────────────────── */
@@ -184,7 +208,14 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 .dropdown-item:hover, .dropdown-item:focus { background: var(--s-hover) !important; color: var(--s-black) !important; }
 .modal-content { border: var(--s-border-width) var(--s-border-style) var(--s-border) !important; border-radius: var(--s-radius-xl) !important; box-shadow: var(--s-shadow-lg) !important; overflow: hidden; }
 .modal-header, .modal-footer { padding: var(--s-card-pad) var(--s-section-pad) !important; }
-.modal-body { padding: var(--s-section-pad) !important; }
+/* Pinned to a literal 0, not a --s-* token — do not theme this. Fixed by
+ * request; a themed padding here previously misaligned the Ctrl+K/Ctrl+G
+ * command-palette modal, which reuses .modal-body with no padding of its
+ * own design. */
+.modal-body { padding: 0 !important; }
+/* Same pin, literal 0 forever — the Ctrl+K command palette's own wrapper
+ * (.navbar-modal-wrapper, see frappe/public/js/frappe/ui/toolbar/awesome_bar.js). */
+.navbar-modal-wrapper { margin: 0 !important; }
 .layout-main-section { padding: var(--s-page-pad) !important; }
 .frappe-control { margin-bottom: var(--s-field-gap) !important; }
 
@@ -242,11 +273,15 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 	background: transparent !important; border: 1px solid currentColor !important; border-radius: var(--s-pill) !important;
 	font-weight: var(--s-medium-weight) !important; padding: 3px 10px !important;
 }
+/* Every indicator colour Frappe ships (see $indicator-colors in its own
+ * indicator.scss) — not just the 5 our own fields have a token for, so
+ * e.g. .purple / .pink / .light-blue don't silently fall through to
+ * Frappe's stock colour instead of the theme. */
 .indicator-pill.green, .indicator-pill-green { color: var(--s-green) !important; }
-.indicator-pill.blue, .indicator-pill.cyan { color: var(--s-blue) !important; }
+.indicator-pill.blue, .indicator-pill.cyan, .indicator-pill.light-blue, .indicator-pill.purple { color: var(--s-blue) !important; }
 .indicator-pill.orange, .indicator-pill.yellow { color: var(--s-amber) !important; }
 .indicator-pill.gray, .indicator-pill.grey, .indicator-pill.darkgrey { color: var(--s-gray) !important; }
-.indicator-pill.red { color: var(--s-red) !important; }
+.indicator-pill.red, .indicator-pill.pink { color: var(--s-red) !important; }
 .indicator-pill:empty, .page-indicator-pill:empty { display: none !important; border: none !important; padding: 0 !important; }
 .badge { background: transparent !important; border: 1px solid var(--s-border) !important; color: var(--s-ink) !important; border-radius: var(--s-radius-sm) !important; }
 
@@ -292,6 +327,35 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 .navbar { background: var(--s-nav) !important; height: var(--s-navbar-height) !important; border-bottom: var(--s-border-width) var(--s-border-style) var(--s-nav-border) !important; }
 .navbar .navbar-brand, .navbar .nav-link, .navbar a { color: var(--s-nav-text) !important; }
 .page-head { border-bottom: var(--s-border-width) var(--s-border-style) var(--s-border) !important; }
+
+/* ╔══════════════════════════════════════════════════════════════════════╗
+ * ║  GETTING STARTED / ONBOARDING POPUP                                     ║
+ * ║  This widget's own styles are hardcoded Vue-component CSS, not wired    ║
+ * ║  to any Frappe CSS variable at all (verified: overriding every likely  ║
+ * ║  candidate var left it unaffected) — so, unlike the rest of the desk,   ║
+ * ║  it needs direct class overrides rather than a variable remap.          ║
+ * ╚══════════════════════════════════════════════════════════════════════╝ */
+.onb-panel {
+	background: var(--s-white) !important; color: var(--s-ink) !important;
+	border: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
+	border-radius: var(--s-radius-lg) !important; box-shadow: var(--s-shadow-lg) !important;
+	font-family: var(--s-font) !important;
+}
+.onb-header-main, .onb-panel .header {
+	background: var(--s-white) !important; border-bottom: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
+	color: var(--s-ink) !important;
+}
+.onb-header-actions button { color: var(--s-muted) !important; }
+.onb-header-actions button:hover { color: var(--s-black) !important; }
+.onb-title-icon .icon-container { background: var(--s-black) !important; }
+.onb-title-steps { color: var(--s-muted) !important; }
+.onb-progress-badge { background: var(--s-hover) !important; color: var(--s-muted) !important; border-radius: var(--s-pill) !important; }
+.onb-progress-badge-complete { background: var(--s-green) !important; color: var(--s-on-black) !important; border-radius: var(--s-pill) !important; }
+.onb-skip { color: var(--s-black) !important; }
+.onb-skip:hover { color: var(--s-black-hover) !important; }
+.onb-group:hover { background: var(--s-hover) !important; border-radius: var(--s-radius-sm) !important; }
+.onb-step-icon { color: var(--s-green) !important; }
+.onb-step-text { color: var(--s-ink) !important; }
 
 /* ╔══════════════════════════════════════════════════════════════════════╗
  * ║  COMPACT / DENSE CONTROLS + ICON BUTTONS                                ║
@@ -372,7 +436,6 @@ _LIGHT_COLOR_FIELDS = [
     ("color_heading", "--s-heading"), ("color_green", "--s-green"), ("color_blue", "--s-blue"),
     ("color_amber", "--s-amber"), ("color_gray", "--s-gray"), ("color_red", "--s-red"),
 ]
-_DARK_COLOR_FIELDS = [(f"dark_{name[6:]}", token) for name, token in _LIGHT_COLOR_FIELDS]
 
 _FONT_FIELDS = [
     ("font_sans", "--s-font"), ("font_serif", "--s-font-serif"), ("font_mono", "--s-font-mono"),
@@ -438,7 +501,10 @@ class OSThemeSettings(Document):
         family_param = "|".join(f.replace(" ", "+") + _FONT_WEIGHTS for f in families)
         return f"@import url('https://fonts.googleapis.com/css?family={family_param}&display=swap');"
 
-    def _build_root_and_dark_blocks(self):
+    def _build_root_block(self):
+        # One color theme only (light) — these values apply regardless of
+        # Frappe's own system dark-mode toggle; see the ENGINE block's
+        # ":root, [data-theme=light], [data-theme=dark]" selector below.
         font_fallbacks = {
             "--s-font": '-apple-system, "Segoe UI", Roboto, system-ui, sans-serif',
             "--s-font-serif": '"Georgia", "Times New Roman", serif',
@@ -457,22 +523,20 @@ class OSThemeSettings(Document):
                 root_lines.append(f"  {token}: {value};")
         root_lines.append("}")
 
-        dark_lines = ['[data-theme="dark"] {']
-        for fieldname, token in _DARK_COLOR_FIELDS:
-            dark_lines.append(f"  {token}: {self.get(fieldname) or '#000000'};")
-        dark_lines.append("}")
-
-        return "\n".join(root_lines), "\n".join(dark_lines)
+        return "\n".join(root_lines)
 
     def build_css(self):
         """Full, self-contained stylesheet text for the current field values."""
         font_import = self._build_font_import()
-        root_block, dark_block = self._build_root_and_dark_blocks()
-        parts = [p for p in (font_import, root_block, dark_block, _ENGINE_AND_COMPONENTS_CSS) if p]
+        root_block = self._build_root_block()
+        parts = [p for p in (font_import, root_block, _ENGINE_AND_COMPONENTS_CSS) if p]
         return "\n\n".join(parts) + "\n"
 
     def _custom_css_path(self):
-        return frappe.get_app_path("alaiy_os", "public", "css", "custom.css")
+        # Site-specific, not app-specific: this is per-site generated output
+        # (and the app source tree is shared across every site on the bench),
+        # not something that belongs in the git-tracked app package.
+        return frappe.get_site_path("custom_theme.css")
 
     def _write_custom_css(self):
         content = self.build_css() if self.enable_custom_theme else ""

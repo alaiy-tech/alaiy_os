@@ -34,28 +34,6 @@
   "color_amber",
   "color_gray",
   "color_red",
-  "section_break_colors_dark",
-  "dark_ink",
-  "dark_black",
-  "dark_white",
-  "dark_cream",
-  "dark_muted",
-  "dark_border",
-  "dark_hover",
-  "dark_active",
-  "dark_on_black",
-  "dark_black_hover",
-  "column_break_dark",
-  "dark_grid_line",
-  "dark_scroll_hover",
-  "dark_nav",
-  "dark_nav_text",
-  "dark_heading",
-  "dark_green",
-  "dark_blue",
-  "dark_amber",
-  "dark_gray",
-  "dark_red",
   "section_break_fonts",
   "font_sans",
   "font_serif",
@@ -102,114 +80,435 @@
   "border_style"
  ],
  "fields": [
-  {"fieldname": "enable_custom_theme", "fieldtype": "Check", "label": "Enable Custom Theme", "default": "0",
-   "description": "When off, none of the settings below are applied — the Desk looks exactly as it does out of the box."},
-
-  {"fieldname": "section_break_assets", "fieldtype": "Section Break", "label": "Organizational Assets"},
-  {"fieldname": "square_logo", "fieldtype": "Attach Image", "label": "Square Logo (512x512px)"},
-  {"fieldname": "column_break_assets", "fieldtype": "Column Break"},
-  {"fieldname": "horizontal_logo", "fieldtype": "Attach Image", "label": "Horizontal Logo (700x140px)"},
-
-  {"fieldname": "section_break_presets", "fieldtype": "Section Break", "label": "Theme Presets"},
-  {"fieldname": "last_preset", "fieldtype": "Data", "label": "Last Preset Used", "read_only": 1},
-  {"fieldname": "theme_preview", "fieldtype": "HTML", "label": "Live Preview"},
-
-  {"fieldname": "section_break_colors_light", "fieldtype": "Section Break", "label": "Colors — Light", "collapsible": 1},
-  {"fieldname": "color_ink", "fieldtype": "Color", "label": "Body text (ink)", "default": "#1A1A1A"},
-  {"fieldname": "color_black", "fieldtype": "Color", "label": "Primary / brand / headings", "default": "#111111"},
-  {"fieldname": "color_white", "fieldtype": "Color", "label": "Surfaces / cards", "default": "#FFFFFF"},
-  {"fieldname": "color_cream", "fieldtype": "Color", "label": "Page background", "default": "#FAF9F6"},
-  {"fieldname": "color_muted", "fieldtype": "Color", "label": "Secondary text", "default": "#8A8A8A"},
-  {"fieldname": "color_border", "fieldtype": "Color", "label": "Borders / hairlines", "default": "#D9D5C9"},
-  {"fieldname": "color_hover", "fieldtype": "Color", "label": "Row / nav hover", "default": "#F4F4F4"},
-  {"fieldname": "color_active", "fieldtype": "Color", "label": "Active nav background", "default": "#EAEAEA"},
-  {"fieldname": "color_on_black", "fieldtype": "Color", "label": "Text on primary", "default": "#FFFFFF"},
-  {"fieldname": "color_black_hover", "fieldtype": "Color", "label": "Primary button hover", "default": "#0C0C0C"},
-  {"fieldname": "column_break_light", "fieldtype": "Column Break"},
-  {"fieldname": "color_grid_line", "fieldtype": "Color", "label": "Table grid lines", "default": "#ECEAE4"},
-  {"fieldname": "color_scroll_hover", "fieldtype": "Color", "label": "Scrollbar hover", "default": "#A9A69D"},
-  {"fieldname": "color_nav", "fieldtype": "Color", "label": "Nav / sidebar bg", "default": "#FFFFFF"},
-  {"fieldname": "color_nav_text", "fieldtype": "Color", "label": "Nav text / icons", "default": "#1A1A1A"},
-  {"fieldname": "color_heading", "fieldtype": "Color", "label": "Headings", "default": "#111111"},
-  {"fieldname": "color_green", "fieldtype": "Color", "label": "Status · green", "default": "#2E7D5B"},
-  {"fieldname": "color_blue", "fieldtype": "Color", "label": "Status · blue", "default": "#3B5BB5"},
-  {"fieldname": "color_amber", "fieldtype": "Color", "label": "Status · amber", "default": "#B7791F"},
-  {"fieldname": "color_gray", "fieldtype": "Color", "label": "Status · gray", "default": "#8A8A8A"},
-  {"fieldname": "color_red", "fieldtype": "Color", "label": "Status · red", "default": "#B23A3A"},
-
-  {"fieldname": "section_break_colors_dark", "fieldtype": "Section Break", "label": "Colors — Dark", "collapsible": 1},
-  {"fieldname": "dark_ink", "fieldtype": "Color", "label": "Body text (ink)", "default": "#EDEBE4"},
-  {"fieldname": "dark_black", "fieldtype": "Color", "label": "Primary / brand / headings", "default": "#F3F1EA"},
-  {"fieldname": "dark_white", "fieldtype": "Color", "label": "Surfaces / cards", "default": "#1C1B18"},
-  {"fieldname": "dark_cream", "fieldtype": "Color", "label": "Page background", "default": "#121210"},
-  {"fieldname": "dark_muted", "fieldtype": "Color", "label": "Secondary text", "default": "#9C978C"},
-  {"fieldname": "dark_border", "fieldtype": "Color", "label": "Borders / hairlines", "default": "#35322C"},
-  {"fieldname": "dark_hover", "fieldtype": "Color", "label": "Row / nav hover", "default": "#2F2E2A"},
-  {"fieldname": "dark_active", "fieldtype": "Color", "label": "Active nav background", "default": "#3B3A37"},
-  {"fieldname": "dark_on_black", "fieldtype": "Color", "label": "Text on primary", "default": "#16150F"},
-  {"fieldname": "dark_black_hover", "fieldtype": "Color", "label": "Primary button hover", "default": "#F5F4EE"},
-  {"fieldname": "column_break_dark", "fieldtype": "Column Break"},
-  {"fieldname": "dark_grid_line", "fieldtype": "Color", "label": "Table grid lines", "default": "#292722"},
-  {"fieldname": "dark_scroll_hover", "fieldtype": "Color", "label": "Scrollbar hover", "default": "#63605A"},
-  {"fieldname": "dark_nav", "fieldtype": "Color", "label": "Nav / sidebar bg", "default": "#1C1B18"},
-  {"fieldname": "dark_nav_text", "fieldtype": "Color", "label": "Nav text / icons", "default": "#EDEBE4"},
-  {"fieldname": "dark_heading", "fieldtype": "Color", "label": "Headings", "default": "#F3F1EA"},
-  {"fieldname": "dark_green", "fieldtype": "Color", "label": "Status · green", "default": "#4FB98A"},
-  {"fieldname": "dark_blue", "fieldtype": "Color", "label": "Status · blue", "default": "#8098DA"},
-  {"fieldname": "dark_amber", "fieldtype": "Color", "label": "Status · amber", "default": "#D8A24A"},
-  {"fieldname": "dark_gray", "fieldtype": "Color", "label": "Status · gray", "default": "#9C978C"},
-  {"fieldname": "dark_red", "fieldtype": "Color", "label": "Status · red", "default": "#E06C6C"},
-
-  {"fieldname": "section_break_fonts", "fieldtype": "Section Break", "label": "Fonts (Google Fonts)", "collapsible": 1},
-  {"fieldname": "font_sans", "fieldtype": "Data", "label": "Sans (body / UI)", "default": "Inter"},
-  {"fieldname": "font_serif", "fieldtype": "Data", "label": "Serif (headings / brand)", "default": "Playfair Display"},
-  {"fieldname": "font_mono", "fieldtype": "Data", "label": "Mono (code)", "default": "JetBrains Mono"},
-
-  {"fieldname": "section_break_typography", "fieldtype": "Section Break", "label": "Typography", "collapsible": 1},
-  {"fieldname": "font_size", "fieldtype": "Data", "label": "Base font size", "default": "14px"},
-  {"fieldname": "font_size_sm", "fieldtype": "Data", "label": "Small font size", "default": "12.5px"},
-  {"fieldname": "line_height", "fieldtype": "Data", "label": "Line height", "default": "1.5"},
-  {"fieldname": "column_break_typography", "fieldtype": "Column Break"},
-  {"fieldname": "body_weight", "fieldtype": "Int", "label": "Body weight", "default": "450"},
-  {"fieldname": "medium_weight", "fieldtype": "Int", "label": "Medium weight", "default": "550"},
-  {"fieldname": "heading_weight", "fieldtype": "Int", "label": "Heading weight", "default": "600"},
-  {"fieldname": "column_break_typography2", "fieldtype": "Column Break"},
-  {"fieldname": "heading_tracking", "fieldtype": "Data", "label": "Heading tracking", "default": "0.005em"},
-  {"fieldname": "brand_tracking", "fieldtype": "Data", "label": "Brand tracking", "default": "0.14em"},
-  {"fieldname": "label_tracking", "fieldtype": "Data", "label": "Label tracking", "default": "0.07em"},
-
-  {"fieldname": "section_break_buttons", "fieldtype": "Section Break", "label": "Buttons", "collapsible": 1},
-  {"fieldname": "btn_radius", "fieldtype": "Data", "label": "Button radius", "default": "5px"},
-  {"fieldname": "btn_pad_y", "fieldtype": "Data", "label": "Button pad · Y", "default": "8px"},
-  {"fieldname": "btn_pad_x", "fieldtype": "Data", "label": "Button pad · X", "default": "16px"},
-
-  {"fieldname": "section_break_sizing", "fieldtype": "Section Break", "label": "Sizing", "collapsible": 1},
-  {"fieldname": "sidebar_width", "fieldtype": "Data", "label": "Sidebar width", "default": "252px"},
-  {"fieldname": "navbar_height", "fieldtype": "Data", "label": "Navbar height", "default": "56px"},
-  {"fieldname": "control_height", "fieldtype": "Data", "label": "Input height", "default": "36px"},
-  {"fieldname": "page_max_width", "fieldtype": "Data", "label": "Page max width", "default": "1200px"},
-
-  {"fieldname": "section_break_spacing", "fieldtype": "Section Break", "label": "Spacing", "collapsible": 1},
-  {"fieldname": "page_pad", "fieldtype": "Data", "label": "Page padding", "default": "28px"},
-  {"fieldname": "card_pad", "fieldtype": "Data", "label": "Card padding", "default": "20px"},
-  {"fieldname": "section_pad", "fieldtype": "Data", "label": "Section padding", "default": "22px"},
-  {"fieldname": "gap", "fieldtype": "Data", "label": "Gap", "default": "16px"},
-  {"fieldname": "column_break_spacing", "fieldtype": "Column Break"},
-  {"fieldname": "field_gap", "fieldtype": "Data", "label": "Field gap", "default": "13px"},
-  {"fieldname": "btn_gap", "fieldtype": "Data", "label": "Button gap", "default": "8px"},
-  {"fieldname": "control_pad_x", "fieldtype": "Data", "label": "Input pad · X", "default": "12px"},
-
-  {"fieldname": "section_break_radii", "fieldtype": "Section Break", "label": "Radii", "collapsible": 1},
-  {"fieldname": "radius", "fieldtype": "Data", "label": "Radius", "default": "4px"},
-  {"fieldname": "radius_sm", "fieldtype": "Data", "label": "Radius · small", "default": "0px"},
-  {"fieldname": "radius_lg", "fieldtype": "Data", "label": "Radius · large", "default": "6px"},
-  {"fieldname": "column_break_radii", "fieldtype": "Column Break"},
-  {"fieldname": "radius_xl", "fieldtype": "Data", "label": "Radius · xl", "default": "8px"},
-  {"fieldname": "pill", "fieldtype": "Data", "label": "Pill radius", "default": "999px"},
-
-  {"fieldname": "section_break_borders", "fieldtype": "Section Break", "label": "Borders", "collapsible": 1},
-  {"fieldname": "border_width", "fieldtype": "Data", "label": "Border width", "default": "1px"},
-  {"fieldname": "border_style", "fieldtype": "Select", "label": "Border style", "options": "solid\ndashed\ndotted\ndouble", "default": "solid"}
+  {
+   "default": "0",
+   "description": "When off, none of the settings below are applied \u2014 the Desk looks exactly as it does out of the box.",
+   "fieldname": "enable_custom_theme",
+   "fieldtype": "Check",
+   "label": "Enable Custom Theme"
+  },
+  {
+   "fieldname": "section_break_assets",
+   "fieldtype": "Section Break",
+   "label": "Organizational Assets"
+  },
+  {
+   "fieldname": "square_logo",
+   "fieldtype": "Attach Image",
+   "label": "Square Logo (512x512px)"
+  },
+  {
+   "fieldname": "column_break_assets",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "horizontal_logo",
+   "fieldtype": "Attach Image",
+   "label": "Horizontal Logo (700x140px)"
+  },
+  {
+   "fieldname": "section_break_presets",
+   "fieldtype": "Section Break",
+   "label": "Theme Presets"
+  },
+  {
+   "fieldname": "last_preset",
+   "fieldtype": "Data",
+   "label": "Last Preset Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "theme_preview",
+   "fieldtype": "HTML",
+   "label": "Live Preview"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_colors_light",
+   "fieldtype": "Section Break",
+   "label": "Colors"
+  },
+  {
+   "default": "#1A1A1A",
+   "fieldname": "color_ink",
+   "fieldtype": "Color",
+   "label": "Body text (ink)"
+  },
+  {
+   "default": "#111111",
+   "fieldname": "color_black",
+   "fieldtype": "Color",
+   "label": "Primary / brand / headings"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_white",
+   "fieldtype": "Color",
+   "label": "Surfaces / cards"
+  },
+  {
+   "default": "#FAF9F6",
+   "fieldname": "color_cream",
+   "fieldtype": "Color",
+   "label": "Page background"
+  },
+  {
+   "default": "#8A8A8A",
+   "fieldname": "color_muted",
+   "fieldtype": "Color",
+   "label": "Secondary text"
+  },
+  {
+   "default": "#D9D5C9",
+   "fieldname": "color_border",
+   "fieldtype": "Color",
+   "label": "Borders / hairlines"
+  },
+  {
+   "default": "#F4F4F4",
+   "fieldname": "color_hover",
+   "fieldtype": "Color",
+   "label": "Row / nav hover"
+  },
+  {
+   "default": "#EAEAEA",
+   "fieldname": "color_active",
+   "fieldtype": "Color",
+   "label": "Active nav background"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_on_black",
+   "fieldtype": "Color",
+   "label": "Text on primary"
+  },
+  {
+   "default": "#0C0C0C",
+   "fieldname": "color_black_hover",
+   "fieldtype": "Color",
+   "label": "Primary button hover"
+  },
+  {
+   "fieldname": "column_break_light",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "#ECEAE4",
+   "fieldname": "color_grid_line",
+   "fieldtype": "Color",
+   "label": "Table grid lines"
+  },
+  {
+   "default": "#A9A69D",
+   "fieldname": "color_scroll_hover",
+   "fieldtype": "Color",
+   "label": "Scrollbar hover"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_nav",
+   "fieldtype": "Color",
+   "label": "Nav / sidebar bg"
+  },
+  {
+   "default": "#1A1A1A",
+   "fieldname": "color_nav_text",
+   "fieldtype": "Color",
+   "label": "Nav text / icons"
+  },
+  {
+   "default": "#111111",
+   "fieldname": "color_heading",
+   "fieldtype": "Color",
+   "label": "Headings"
+  },
+  {
+   "default": "#2E7D5B",
+   "fieldname": "color_green",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 green"
+  },
+  {
+   "default": "#3B5BB5",
+   "fieldname": "color_blue",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 blue"
+  },
+  {
+   "default": "#B7791F",
+   "fieldname": "color_amber",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 amber"
+  },
+  {
+   "default": "#8A8A8A",
+   "fieldname": "color_gray",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 gray"
+  },
+  {
+   "default": "#B23A3A",
+   "fieldname": "color_red",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 red"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_fonts",
+   "fieldtype": "Section Break",
+   "label": "Fonts (Google Fonts)"
+  },
+  {
+   "default": "Inter",
+   "fieldname": "font_sans",
+   "fieldtype": "Data",
+   "label": "Sans (body / UI)"
+  },
+  {
+   "default": "Playfair Display",
+   "fieldname": "font_serif",
+   "fieldtype": "Data",
+   "label": "Serif (headings / brand)"
+  },
+  {
+   "default": "JetBrains Mono",
+   "fieldname": "font_mono",
+   "fieldtype": "Data",
+   "label": "Mono (code)"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_typography",
+   "fieldtype": "Section Break",
+   "label": "Typography"
+  },
+  {
+   "default": "14px",
+   "fieldname": "font_size",
+   "fieldtype": "Data",
+   "label": "Base font size"
+  },
+  {
+   "default": "12.5px",
+   "fieldname": "font_size_sm",
+   "fieldtype": "Data",
+   "label": "Small font size"
+  },
+  {
+   "default": "1.5",
+   "fieldname": "line_height",
+   "fieldtype": "Data",
+   "label": "Line height"
+  },
+  {
+   "fieldname": "column_break_typography",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "450",
+   "fieldname": "body_weight",
+   "fieldtype": "Int",
+   "label": "Body weight"
+  },
+  {
+   "default": "550",
+   "fieldname": "medium_weight",
+   "fieldtype": "Int",
+   "label": "Medium weight"
+  },
+  {
+   "default": "600",
+   "fieldname": "heading_weight",
+   "fieldtype": "Int",
+   "label": "Heading weight"
+  },
+  {
+   "fieldname": "column_break_typography2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.005em",
+   "fieldname": "heading_tracking",
+   "fieldtype": "Data",
+   "label": "Heading tracking"
+  },
+  {
+   "default": "0.14em",
+   "fieldname": "brand_tracking",
+   "fieldtype": "Data",
+   "label": "Brand tracking"
+  },
+  {
+   "default": "0.07em",
+   "fieldname": "label_tracking",
+   "fieldtype": "Data",
+   "label": "Label tracking"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_buttons",
+   "fieldtype": "Section Break",
+   "label": "Buttons"
+  },
+  {
+   "default": "5px",
+   "fieldname": "btn_radius",
+   "fieldtype": "Data",
+   "label": "Button radius"
+  },
+  {
+   "default": "8px",
+   "fieldname": "btn_pad_y",
+   "fieldtype": "Data",
+   "label": "Button pad \u00b7 Y"
+  },
+  {
+   "default": "16px",
+   "fieldname": "btn_pad_x",
+   "fieldtype": "Data",
+   "label": "Button pad \u00b7 X"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_sizing",
+   "fieldtype": "Section Break",
+   "label": "Sizing"
+  },
+  {
+   "default": "252px",
+   "fieldname": "sidebar_width",
+   "fieldtype": "Data",
+   "label": "Sidebar width"
+  },
+  {
+   "default": "56px",
+   "fieldname": "navbar_height",
+   "fieldtype": "Data",
+   "label": "Navbar height"
+  },
+  {
+   "default": "36px",
+   "fieldname": "control_height",
+   "fieldtype": "Data",
+   "label": "Input height"
+  },
+  {
+   "default": "1200px",
+   "fieldname": "page_max_width",
+   "fieldtype": "Data",
+   "label": "Page max width"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_spacing",
+   "fieldtype": "Section Break",
+   "label": "Spacing"
+  },
+  {
+   "default": "28px",
+   "fieldname": "page_pad",
+   "fieldtype": "Data",
+   "label": "Page padding"
+  },
+  {
+   "default": "20px",
+   "fieldname": "card_pad",
+   "fieldtype": "Data",
+   "label": "Card padding"
+  },
+  {
+   "default": "22px",
+   "fieldname": "section_pad",
+   "fieldtype": "Data",
+   "label": "Section padding"
+  },
+  {
+   "default": "16px",
+   "fieldname": "gap",
+   "fieldtype": "Data",
+   "label": "Gap"
+  },
+  {
+   "fieldname": "column_break_spacing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "13px",
+   "fieldname": "field_gap",
+   "fieldtype": "Data",
+   "label": "Field gap"
+  },
+  {
+   "default": "8px",
+   "fieldname": "btn_gap",
+   "fieldtype": "Data",
+   "label": "Button gap"
+  },
+  {
+   "default": "12px",
+   "fieldname": "control_pad_x",
+   "fieldtype": "Data",
+   "label": "Input pad \u00b7 X"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_radii",
+   "fieldtype": "Section Break",
+   "label": "Radii"
+  },
+  {
+   "default": "4px",
+   "fieldname": "radius",
+   "fieldtype": "Data",
+   "label": "Radius"
+  },
+  {
+   "default": "0px",
+   "fieldname": "radius_sm",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 small"
+  },
+  {
+   "default": "6px",
+   "fieldname": "radius_lg",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 large"
+  },
+  {
+   "fieldname": "column_break_radii",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8px",
+   "fieldname": "radius_xl",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 xl"
+  },
+  {
+   "default": "999px",
+   "fieldname": "pill",
+   "fieldtype": "Data",
+   "label": "Pill radius"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_borders",
+   "fieldtype": "Section Break",
+   "label": "Borders"
+  },
+  {
+   "default": "1px",
+   "fieldname": "border_width",
+   "fieldtype": "Data",
+   "label": "Border width"
+  },
+  {
+   "default": "solid",
+   "fieldname": "border_style",
+   "fieldtype": "Select",
+   "label": "Border style",
+   "options": "solid\ndashed\ndotted\ndouble"
+  }
  ],
  "issingle": 1,
  "links": [],
