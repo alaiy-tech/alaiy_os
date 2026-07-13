@@ -284,4 +284,12 @@ frappe.ui.form.on("OS Theme Settings", {
 	refresh(frm) {
 		alaiy_os.theme_settings.render_theme_ui(frm);
 	},
+	after_save(frm) {
+		// The Desk's own CSS/bootinfo is cached client- and server-side, so a
+		// saved theme only shows up after the same clear-cache + hard reload
+		// the navbar's "Reload" button does. Delay slightly so the "Saved"
+		// toast is visible before the page reloads out from under it.
+		frappe.show_alert({ message: __("Applying theme…"), indicator: "blue" });
+		setTimeout(() => frappe.ui.toolbar.clear_cache(), 800);
+	},
 });
