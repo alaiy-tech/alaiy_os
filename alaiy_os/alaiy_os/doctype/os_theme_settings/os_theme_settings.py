@@ -117,7 +117,6 @@ input[type="checkbox"], input[type="radio"] {
 	vertical-align: middle !important;
 }
 input[type="checkbox"]:checked, input[type="radio"]:checked {
-	background-color: var(--s-black) !important;
 	border-color: var(--s-black) !important;
 }
 input[type="checkbox"]:focus, input[type="radio"]:focus {
@@ -153,13 +152,20 @@ input[type="checkbox"]:disabled, input[type="checkbox"].disabled-deselected {
 .btn:focus, .btn:focus-visible { box-shadow: 0 0 0 3px rgba(17,17,17,.12) !important; }
 
 /* ── Inputs ─────────────────────────────────────────────────────────────── */
-.form-control, .input-with-feedback, textarea.form-control, .like-disabled-input, .ql-editor {
+/* Check/Radio share the .input-with-feedback class with text inputs, but
+ * need their own tiny native square (sized by the browser) rather than a
+ * text-field's box+background — otherwise they stretch into a tall
+ * rectangle and the flat background paints over the checked-state tick. */
+.form-control:not([type="checkbox"]):not([type="radio"]),
+.input-with-feedback:not([type="checkbox"]):not([type="radio"]),
+textarea.form-control, .like-disabled-input, .ql-editor {
 	border-radius: var(--s-radius-sm) !important;
 	border: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
 	background: var(--s-white) !important; color: var(--s-ink) !important;
 	padding-left: var(--s-control-pad-x) !important; padding-right: var(--s-control-pad-x) !important;
 }
-.form-control:not(textarea), .input-with-feedback:not(textarea) { min-height: var(--s-control-height) !important; }
+.form-control:not(textarea):not([type="checkbox"]):not([type="radio"]),
+.input-with-feedback:not(textarea):not([type="checkbox"]):not([type="radio"]) { min-height: var(--s-control-height) !important; }
 .form-control:focus, .input-with-feedback:focus, textarea.form-control:focus, .ql-container.ql-focused,
 .awesomplete input:focus, .search-bar .form-control:focus {
 	border-color: var(--s-black) !important; box-shadow: 0 0 0 3px rgba(17,17,17,.10) !important; outline: none !important;
@@ -256,21 +262,29 @@ input[type="checkbox"]:disabled, input[type="checkbox"].disabled-deselected {
  * ╚══════════════════════════════════════════════════════════════════════╝ */
 .body-sidebar, .body-sidebar .sidebar-header, .body-sidebar .body-sidebar-bottom { background-color: var(--s-nav) !important; }
 .body-sidebar { border-right: var(--s-border-width) var(--s-border-style) var(--s-nav-border) !important; }
-.body-sidebar .sidebar-header { padding: 10px 8px 10px 12px !important; }
+/* Same fixed-padding-vs-collapsed-rail problem as .standard-sidebar-item
+ * below: only give the header this inset once the rail has room for it. */
+.body-sidebar-container.expanded .sidebar-header { padding: 10px 8px 10px 12px !important; }
 .body-sidebar .header-title {
-	font-family: var(--s-font-serif) !important; font-size: 20px !important; line-height: 1.15 !important;
-	text-transform: uppercase !important; letter-spacing: 0.14em !important;
+	font-family: var(--s-font-serif) !important; font-size: 15px !important; line-height: 1.2 !important;
+	text-transform: uppercase !important; letter-spacing: 0.04em !important;
 	font-weight: var(--s-heading-weight) !important; color: var(--s-nav-text) !important;
 }
-.body-sidebar .standard-sidebar-item { border-radius: var(--s-radius) !important; margin: 2px 10px !important; transition: background .14s !important; }
+/* The 2px/10px inset only makes sense once the rail is wide enough to have
+ * room to spare (expanded, ~220px+) — in the default 50px icon-only rail it
+ * eats most of the width and clips the icons down to unreadable slivers. */
+.body-sidebar-container.expanded .standard-sidebar-item { border-radius: var(--s-radius) !important; margin: 2px 10px !important; transition: background .14s !important; }
+.body-sidebar-container:not(.expanded) .standard-sidebar-item { border-radius: var(--s-radius) !important; transition: background .14s !important; }
 .body-sidebar .standard-sidebar-item .item-anchor, .body-sidebar .standard-sidebar-item .sidebar-item-label { color: var(--s-nav-text) !important; }
 .body-sidebar .standard-sidebar-item .text-muted, .body-sidebar .standard-sidebar-item .text-secondary { color: var(--s-nav-muted) !important; }
 .body-sidebar .standard-sidebar-item:hover { background: var(--s-nav-hover) !important; }
 .body-sidebar .standard-sidebar-item.active-sidebar, .body-sidebar .standard-sidebar-item.selected { background: var(--s-nav-active) !important; box-shadow: none !important; }
 .body-sidebar .standard-sidebar-item.active-sidebar .sidebar-item-label, .body-sidebar .standard-sidebar-item.active-sidebar .item-anchor { color: var(--s-nav-text) !important; font-weight: var(--s-medium-weight) !important; }
 .body-sidebar .sidebar-item-icon svg, .body-sidebar .icon, .body-sidebar .es-icon { color: var(--s-nav-text) !important; }
+.body-sidebar .collapse-sidebar-link.sidebar-toggle-btn { display: none !important; }
 .body-sidebar .standard-sidebar-item.active-sidebar .sidebar-item-icon svg { color: var(--s-nav-text) !important; fill: none !important; }
-.body-sidebar .sidebar-user-button, .body-sidebar .dropdown-navbar-user .nav-link { color: var(--s-nav-text) !important; border-radius: var(--s-radius) !important; padding: 8px 10px !important; }
+.body-sidebar .sidebar-user-button, .body-sidebar .dropdown-navbar-user .nav-link { color: var(--s-nav-text) !important; border-radius: var(--s-radius) !important; }
+.body-sidebar-container.expanded .sidebar-user-button, .body-sidebar-container.expanded .dropdown-navbar-user .nav-link { padding: 8px 10px !important; }
 .body-sidebar .sidebar-user-button:hover, .body-sidebar .dropdown-navbar-user .nav-link:hover { background: var(--s-nav-hover) !important; }
 .body-sidebar .sidebar-user-button .avatar-name-email > span:first-child { color: var(--s-nav-text) !important; font-weight: var(--s-medium-weight) !important; }
 .body-sidebar .sidebar-user-button .text-secondary { color: var(--s-nav-muted) !important; }
@@ -391,6 +405,13 @@ class OSThemeSettings(Document):
             self._copy_attached_file(self.square_logo, os.path.join(images_dir, SQUARE_LOGO_FILENAME))
         if self.horizontal_logo:
             self._copy_attached_file(self.horizontal_logo, os.path.join(images_dir, HOR_LOGO_FILENAME))
+
+        # Point the browser tab favicon + the reload/loading splash at the
+        # same square logo instead of the stock Frappe mark.
+        square_logo_url = f"/assets/images/{SQUARE_LOGO_FILENAME}"
+        if os.path.exists(os.path.join(images_dir, SQUARE_LOGO_FILENAME)):
+            frappe.db.set_single_value("Website Settings", "favicon", square_logo_url)
+            frappe.db.set_single_value("Website Settings", "splash_image", square_logo_url)
 
     def _copy_attached_file(self, file_url, dest_path):
         file_name = frappe.db.get_value("File", {"file_url": file_url}, "name")

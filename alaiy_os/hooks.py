@@ -25,7 +25,9 @@ app_include_js = [
 ]
 app_include_css = [
     f"/assets/alaiy_os/css/core.css?v={_V}",
-    f"/assets/alaiy_os/css/custom.css?v={_V}",
+    # Served by a whitelisted method (not a static file) so every OS Theme
+    # Settings save reflects on the next reload — see alaiy_os/api/theme.py.
+    "/api/method/alaiy_os.api.theme.custom_theme_css",
 ]
 
 # Website assets (login page only — NOT the desk)
