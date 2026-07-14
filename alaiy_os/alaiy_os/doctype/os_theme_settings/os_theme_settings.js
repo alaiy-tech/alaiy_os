@@ -29,15 +29,16 @@ frappe.provide("alaiy_os.theme_settings");
 		return r2h([255 * f(0), 255 * f(8), 255 * f(4)]);
 	}
 
-	// Expand a compact palette spec into every --s-* colour token.
-	function pal(s, dark) {
+	// Expand a compact palette spec into every --s-* colour token. One colour
+	// theme only (light) — see os_theme_settings.py's build_css().
+	function pal(s) {
 		return {
 			ink: s.ink, black: s.primary, white: s.surface, cream: s.page,
 			muted: s.muted, border: s.border,
-			hover: mix(s.surface, s.ink, dark ? 0.09 : 0.05),
-			active: mix(s.surface, s.ink, dark ? 0.15 : 0.09),
+			hover: mix(s.surface, s.ink, 0.05),
+			active: mix(s.surface, s.ink, 0.09),
 			on_black: s.onPrimary,
-			black_hover: dark ? mix(s.primary, "#FFFFFF", 0.18) : mix(s.primary, "#000000", 0.30),
+			black_hover: mix(s.primary, "#000000", 0.30),
 			grid_line: mix(s.surface, s.border, 0.5),
 			scroll_hover: mix(s.border, s.ink, 0.25),
 			nav: s.nav || s.surface,
@@ -50,38 +51,27 @@ frappe.provide("alaiy_os.theme_settings");
 	var F = (sans, serif, mono) => ({ sans: sans, serif: serif, mono: mono });
 	var THEMES = [
 		{ name: "The Solist", fonts: F("Inter", "Playfair Display", "JetBrains Mono"),
-			light: { ink: "#1A1A1A", primary: "#111111", surface: "#FFFFFF", page: "#FAF9F6", muted: "#8A8A8A", border: "#D9D5C9", green: "#2E7D5B", blue: "#3B5BB5", amber: "#B7791F", gray: "#8A8A8A", red: "#B23A3A", onPrimary: "#FFFFFF" },
-			dark: { ink: "#EDEBE4", primary: "#F3F1EA", surface: "#1C1B18", page: "#121210", muted: "#9C978C", border: "#35322C", green: "#4FB98A", blue: "#8098DA", amber: "#D8A24A", gray: "#9C978C", red: "#E06C6C", onPrimary: "#16150F" } },
+			light: { ink: "#1A1A1A", primary: "#111111", surface: "#FFFFFF", page: "#FAF9F6", muted: "#8A8A8A", border: "#D9D5C9", green: "#2E7D5B", blue: "#3B5BB5", amber: "#B7791F", gray: "#8A8A8A", red: "#B23A3A", onPrimary: "#FFFFFF" } },
 		{ name: "Zinc (Minimal)", fonts: F("Inter", "Inter", "Roboto Mono"),
-			light: { ink: "#18181B", primary: "#18181B", surface: "#FFFFFF", page: "#FAFAFA", muted: "#71717A", border: "#E4E4E7", green: "#16A34A", blue: "#2563EB", amber: "#D97706", gray: "#71717A", red: "#DC2626", onPrimary: "#FFFFFF" },
-			dark: { ink: "#FAFAFA", primary: "#FAFAFA", surface: "#18181B", page: "#09090B", muted: "#A1A1AA", border: "#27272A", green: "#22C55E", blue: "#3B82F6", amber: "#F59E0B", gray: "#A1A1AA", red: "#EF4444", onPrimary: "#18181B" } },
+			light: { ink: "#18181B", primary: "#18181B", surface: "#FFFFFF", page: "#FAFAFA", muted: "#71717A", border: "#E4E4E7", green: "#16A34A", blue: "#2563EB", amber: "#D97706", gray: "#71717A", red: "#DC2626", onPrimary: "#FFFFFF" } },
 		{ name: "GitHub", fonts: F("Inter", "Inter", "Roboto Mono"),
-			light: { ink: "#1F2328", primary: "#0969DA", surface: "#FFFFFF", page: "#F6F8FA", muted: "#656D76", border: "#D0D7DE", green: "#1A7F37", blue: "#0969DA", amber: "#9A6700", gray: "#656D76", red: "#CF222E", onPrimary: "#FFFFFF" },
-			dark: { ink: "#E6EDF3", primary: "#2F81F7", surface: "#161B22", page: "#0D1117", muted: "#8B949E", border: "#30363D", green: "#3FB950", blue: "#2F81F7", amber: "#D29922", gray: "#8B949E", red: "#F85149", onPrimary: "#0D1117" } },
+			light: { ink: "#1F2328", primary: "#0969DA", surface: "#FFFFFF", page: "#F6F8FA", muted: "#656D76", border: "#D0D7DE", green: "#1A7F37", blue: "#0969DA", amber: "#9A6700", gray: "#656D76", red: "#CF222E", onPrimary: "#FFFFFF" } },
 		{ name: "Nord", fonts: F("Inter", "Space Grotesk", "JetBrains Mono"),
-			light: { ink: "#2E3440", primary: "#5E81AC", surface: "#FFFFFF", page: "#ECEFF4", muted: "#4C566A", border: "#D8DEE9", green: "#A3BE8C", blue: "#5E81AC", amber: "#EBCB8B", gray: "#4C566A", red: "#BF616A", onPrimary: "#FFFFFF" },
-			dark: { ink: "#ECEFF4", primary: "#88C0D0", surface: "#3B4252", page: "#2E3440", muted: "#D8DEE9", border: "#434C5E", green: "#A3BE8C", blue: "#81A1C1", amber: "#EBCB8B", gray: "#D8DEE9", red: "#BF616A", onPrimary: "#2E3440" } },
+			light: { ink: "#2E3440", primary: "#5E81AC", surface: "#FFFFFF", page: "#ECEFF4", muted: "#4C566A", border: "#D8DEE9", green: "#A3BE8C", blue: "#5E81AC", amber: "#EBCB8B", gray: "#4C566A", red: "#BF616A", onPrimary: "#FFFFFF" } },
 		{ name: "Catppuccin", fonts: F("DM Sans", "Fraunces", "JetBrains Mono"),
-			light: { ink: "#4C4F69", primary: "#8839EF", surface: "#FFFFFF", page: "#EFF1F5", muted: "#6C6F85", border: "#CCD0DA", green: "#40A02B", blue: "#1E66F5", amber: "#DF8E1D", gray: "#6C6F85", red: "#D20F39", onPrimary: "#FFFFFF" },
-			dark: { ink: "#CDD6F4", primary: "#CBA6F7", surface: "#1E1E2E", page: "#181825", muted: "#9399B2", border: "#313244", green: "#A6E3A1", blue: "#89B4FA", amber: "#F9E2AF", gray: "#9399B2", red: "#F38BA8", onPrimary: "#1E1E2E" } },
+			light: { ink: "#4C4F69", primary: "#8839EF", surface: "#FFFFFF", page: "#EFF1F5", muted: "#6C6F85", border: "#CCD0DA", green: "#40A02B", blue: "#1E66F5", amber: "#DF8E1D", gray: "#6C6F85", red: "#D20F39", onPrimary: "#FFFFFF" } },
 		{ name: "Dracula", fonts: F("Inter", "Space Grotesk", "Fira Code"),
-			light: { ink: "#282A36", primary: "#7C4DFF", surface: "#FFFFFF", page: "#F5F4FB", muted: "#6C6F85", border: "#E3E0F0", green: "#2FA96A", blue: "#3BA5C4", amber: "#B7891F", gray: "#6C6F85", red: "#E5484D", onPrimary: "#FFFFFF" },
-			dark: { ink: "#F8F8F2", primary: "#BD93F9", surface: "#282A36", page: "#1E1F29", muted: "#6272A4", border: "#44475A", green: "#50FA7B", blue: "#8BE9FD", amber: "#F1FA8C", gray: "#6272A4", red: "#FF5555", onPrimary: "#282A36" } },
+			light: { ink: "#282A36", primary: "#7C4DFF", surface: "#FFFFFF", page: "#F5F4FB", muted: "#6C6F85", border: "#E3E0F0", green: "#2FA96A", blue: "#3BA5C4", amber: "#B7891F", gray: "#6C6F85", red: "#E5484D", onPrimary: "#FFFFFF" } },
 		{ name: "Tokyo Night", fonts: F("Inter", "Space Grotesk", "JetBrains Mono"),
-			light: { ink: "#343B58", primary: "#2E7DE9", surface: "#FFFFFF", page: "#E1E2E7", muted: "#6172B0", border: "#C4C8DA", green: "#587539", blue: "#2E7DE9", amber: "#8C6C3E", gray: "#6172B0", red: "#F52A65", onPrimary: "#FFFFFF" },
-			dark: { ink: "#C0CAF5", primary: "#7AA2F7", surface: "#1A1B26", page: "#16161E", muted: "#565F89", border: "#292E42", green: "#9ECE6A", blue: "#7AA2F7", amber: "#E0AF68", gray: "#565F89", red: "#F7768E", onPrimary: "#16161E" } },
+			light: { ink: "#343B58", primary: "#2E7DE9", surface: "#FFFFFF", page: "#E1E2E7", muted: "#6172B0", border: "#C4C8DA", green: "#587539", blue: "#2E7DE9", amber: "#8C6C3E", gray: "#6172B0", red: "#F52A65", onPrimary: "#FFFFFF" } },
 		{ name: "Rosé Pine", fonts: F("DM Sans", "Fraunces", "Space Mono"),
-			light: { ink: "#575279", primary: "#907AA9", surface: "#FFFAF3", page: "#FAF4ED", muted: "#797593", border: "#DFDAD9", green: "#56949F", blue: "#286983", amber: "#EA9D34", gray: "#797593", red: "#B4637A", onPrimary: "#FFFFFF" },
-			dark: { ink: "#E0DEF4", primary: "#C4A7E7", surface: "#1F1D2E", page: "#191724", muted: "#908CAA", border: "#26233A", green: "#9CCFD8", blue: "#31748F", amber: "#F6C177", gray: "#908CAA", red: "#EB6F92", onPrimary: "#191724" } },
+			light: { ink: "#575279", primary: "#907AA9", surface: "#FFFAF3", page: "#FAF4ED", muted: "#797593", border: "#DFDAD9", green: "#56949F", blue: "#286983", amber: "#EA9D34", gray: "#797593", red: "#B4637A", onPrimary: "#FFFFFF" } },
 		{ name: "Solarized", fonts: F("IBM Plex Sans", "Lora", "IBM Plex Mono"),
-			light: { ink: "#586E75", primary: "#268BD2", surface: "#FDF6E3", page: "#EEE8D5", muted: "#93A1A1", border: "#DDD6C1", green: "#859900", blue: "#268BD2", amber: "#B58900", gray: "#93A1A1", red: "#DC322F", onPrimary: "#FDF6E3" },
-			dark: { ink: "#93A1A1", primary: "#268BD2", surface: "#073642", page: "#002B36", muted: "#586E75", border: "#0A4351", green: "#859900", blue: "#268BD2", amber: "#B58900", gray: "#586E75", red: "#DC322F", onPrimary: "#FDF6E3" } },
+			light: { ink: "#586E75", primary: "#268BD2", surface: "#FDF6E3", page: "#EEE8D5", muted: "#93A1A1", border: "#DDD6C1", green: "#859900", blue: "#268BD2", amber: "#B58900", gray: "#93A1A1", red: "#DC322F", onPrimary: "#FDF6E3" } },
 		{ name: "Gruvbox", fonts: F("Work Sans", "Bitter", "JetBrains Mono"),
-			light: { ink: "#3C3836", primary: "#B57614", surface: "#FBF1C7", page: "#F2E5BC", muted: "#7C6F64", border: "#D5C4A1", green: "#79740E", blue: "#076678", amber: "#B57614", gray: "#7C6F64", red: "#9D0006", onPrimary: "#FBF1C7" },
-			dark: { ink: "#EBDBB2", primary: "#FABD2F", surface: "#3C3836", page: "#282828", muted: "#A89984", border: "#504945", green: "#B8BB26", blue: "#83A598", amber: "#FABD2F", gray: "#A89984", red: "#FB4934", onPrimary: "#282828" } },
+			light: { ink: "#3C3836", primary: "#B57614", surface: "#FBF1C7", page: "#F2E5BC", muted: "#7C6F64", border: "#D5C4A1", green: "#79740E", blue: "#076678", amber: "#B57614", gray: "#7C6F64", red: "#9D0006", onPrimary: "#FBF1C7" } },
 		{ name: "Sepia Paper", fonts: F("Lora", "Playfair Display", "JetBrains Mono"),
-			light: { ink: "#433422", primary: "#7A5C3E", surface: "#FBF7EF", page: "#F3EAD9", muted: "#8A7B63", border: "#DED3BD", green: "#5C7A3E", blue: "#3E5C7A", amber: "#A9791F", gray: "#8A7B63", red: "#A6402F", onPrimary: "#FBF7EF" },
-			dark: { ink: "#EADFC9", primary: "#D9B382", surface: "#2A241B", page: "#1E1A13", muted: "#A99B80", border: "#3D3527", green: "#9FB37A", blue: "#7A93B3", amber: "#D9B382", gray: "#A99B80", red: "#D98C7A", onPrimary: "#1E1A13" } },
+			light: { ink: "#433422", primary: "#7A5C3E", surface: "#FBF7EF", page: "#F3EAD9", muted: "#8A7B63", border: "#DED3BD", green: "#5C7A3E", blue: "#3E5C7A", amber: "#A9791F", gray: "#8A7B63", red: "#A6402F", onPrimary: "#FBF7EF" } },
 	];
 
 	var DIM_DEFAULTS = {
@@ -123,13 +113,46 @@ frappe.provide("alaiy_os.theme_settings");
 	var LIGHT_FIELDS = ["ink", "black", "white", "cream", "muted", "border", "hover", "active", "on_black",
 		"black_hover", "grid_line", "scroll_hover", "nav", "nav_text", "heading", "green", "blue", "amber", "gray", "red"];
 
+	// Every field the live preview reacts to — built once, reused both to wire
+	// per-field triggers (see bottom of file) and to repaint the preview.
+	var WATCHED_FIELDS = [];
+	LIGHT_FIELDS.forEach((k) => WATCHED_FIELDS.push("color_" + k));
+	WATCHED_FIELDS.push("font_sans", "font_serif", "font_mono");
+	Object.keys(DIM_DEFAULTS).forEach((k) => WATCHED_FIELDS.push(k));
+	ns.WATCHED_FIELDS = WATCHED_FIELDS;
+	ns.update_preview = function (frm) { update_preview(frm); };
+
+	// Accepts either a bare family name ("Playfair Display") or a pasted
+	// Google Fonts link — the CSS2 embed link
+	// (fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700) or a
+	// specimen page link (fonts.google.com/specimen/Playfair+Display) — and
+	// returns just the family name so the field always ends up holding what
+	// the backend's own @import builder expects.
+	function extractFontFamily(value) {
+		value = (value || "").trim();
+		if (!value) return null;
+
+		var family = null;
+		if (/fonts\.googleapis\.com/.test(value)) {
+			var m = value.match(/family=([^&]+)/);
+			if (m) family = decodeURIComponent(m[1]).split(":")[0];
+		} else if (/fonts\.google\.com\/specimen\//.test(value)) {
+			var m2 = value.match(/specimen\/([^/?&]+)/);
+			if (m2) family = decodeURIComponent(m2[1]);
+		} else {
+			return null; // not a link — leave typed-in family names untouched
+		}
+
+		return family ? family.replace(/\+/g, " ").trim() : null;
+	}
+
 	function applyPreset(frm, name) {
 		var t = THEMES.find((x) => x.name === name);
 		if (!t) return;
-		var light = pal(t.light, false), dark = pal(t.dark, true);
+		var light = pal(t.light);
 		var dims = Object.assign({}, DIM_DEFAULTS, THEME_DIMS[name] || {});
 		var values = { last_preset: name, font_sans: t.fonts.sans, font_serif: t.fonts.serif, font_mono: t.fonts.mono };
-		LIGHT_FIELDS.forEach((key) => { values["color_" + key] = light[key]; values["dark_" + key] = dark[key]; });
+		LIGHT_FIELDS.forEach((key) => { values["color_" + key] = light[key]; });
 		Object.keys(dims).forEach((key) => { values[key] = dims[key]; });
 		frappe.run_serially(Object.keys(values).map((k) => () => frm.set_value(k, values[k]))).then(() => {
 			frm.dirty();
@@ -139,12 +162,10 @@ frappe.provide("alaiy_os.theme_settings");
 
 	function generateTheme(frm) {
 		var hue = Math.floor(Math.random() * 360);
-		var ac = hsl2hex(hue, 55, 45), acD = hsl2hex(hue, 60, 68);
+		var ac = hsl2hex(hue, 55, 45);
 		var L = { ink: "#1c1c1e", primary: ac, surface: "#ffffff", page: hsl2hex(hue, 22, 97), muted: "#77767b",
 			border: hsl2hex(hue, 16, 88), green: "#2E7D5B", blue: "#3B5BB5", amber: "#B7791F", gray: "#8A8A8A", red: "#B23A3A", onPrimary: "#ffffff" };
-		var D = { ink: "#ececec", primary: acD, surface: hsl2hex(hue, 12, 12), page: hsl2hex(hue, 14, 8), muted: "#9a9a9a",
-			border: hsl2hex(hue, 10, 22), green: "#4FB98A", blue: "#8098DA", amber: "#D8A24A", gray: "#9C978C", red: "#E06C6C", onPrimary: hsl2hex(hue, 14, 8) };
-		var light = pal(L, false), dark = pal(D, true);
+		var light = pal(L);
 		var chars = [{ sm: 0, r: 2, lg: 3, xl: 4, bt: 2 }, { sm: 4, r: 6, lg: 8, xl: 12, bt: 6 },
 			{ sm: 6, r: 9, lg: 12, xl: 16, bt: 9 }, { sm: 8, r: 12, lg: 16, xl: 20, bt: 12 }];
 		var ch = chars[Math.floor(Math.random() * chars.length)];
@@ -152,7 +173,7 @@ frappe.provide("alaiy_os.theme_settings");
 			radius_sm: ch.sm + "px", radius: ch.r + "px", radius_lg: ch.lg + "px", radius_xl: ch.xl + "px", btn_radius: ch.bt + "px",
 		});
 		var values = { last_preset: "Generated (hue " + hue + ")" };
-		LIGHT_FIELDS.forEach((key) => { values["color_" + key] = light[key]; values["dark_" + key] = dark[key]; });
+		LIGHT_FIELDS.forEach((key) => { values["color_" + key] = light[key]; });
 		Object.keys(dims).forEach((key) => { values[key] = dims[key]; });
 		frappe.run_serially(Object.keys(values).map((k) => () => frm.set_value(k, values[k]))).then(() => {
 			frm.dirty();
@@ -258,38 +279,51 @@ frappe.provide("alaiy_os.theme_settings");
 		$previewHost.html(render_preview_markup());
 		frm.$theme_preview_el = $previewHost.find("#alaiy-theme-preview");
 
-		// Google Fonts datalist + autocomplete on the 3 font fields.
+		// Google Fonts datalist + autocomplete on the 3 font fields, plus:
+		// paste a Google Fonts link straight in and it resolves to just the
+		// family name (see extractFontFamily above) instead of requiring the
+		// exact family name to be typed out.
 		var $datalist = $('<datalist id="alaiy-google-fonts"></datalist>').appendTo($wrapper);
 		GOOGLE_FONTS.forEach(function (f) { $datalist.append('<option value="' + f + '">'); });
 		["font_sans", "font_serif", "font_mono"].forEach(function (fieldname) {
 			var field = frm.fields_dict[fieldname];
-			if (field && field.$input) field.$input.attr("list", "alaiy-google-fonts");
-		});
-
-		// Live-update the preview whenever any relevant field changes.
-		var watched = [];
-		LIGHT_FIELDS.forEach((k) => watched.push("color_" + k));
-		watched.push("font_sans", "font_serif", "font_mono");
-		Object.keys(DIM_DEFAULTS).forEach((k) => watched.push(k));
-		watched.forEach(function (fieldname) {
-			var field = frm.fields_dict[fieldname];
-			if (field) field.df.onchange = function () { update_preview(frm); };
+			if (!field || !field.$input) return;
+			field.$input.attr("list", "alaiy-google-fonts");
+			field.$input.attr("placeholder", "Font name, or paste a Google Fonts link");
+			field.$input.on("paste", function () {
+				setTimeout(function () {
+					var family = extractFontFamily(field.$input.val());
+					if (family) frm.set_value(fieldname, family);
+				}, 0); // run after the paste actually lands in the input
+			});
 		});
 
 		update_preview(frm);
 	};
 })(alaiy_os.theme_settings);
 
-frappe.ui.form.on("OS Theme Settings", {
-	refresh(frm) {
-		alaiy_os.theme_settings.render_theme_ui(frm);
-	},
-	after_save(frm) {
-		// The Desk's own CSS/bootinfo is cached client- and server-side, so a
-		// saved theme only shows up after the same clear-cache + hard reload
-		// the navbar's "Reload" button does. Delay slightly so the "Saved"
-		// toast is visible before the page reloads out from under it.
-		frappe.show_alert({ message: __("Applying theme…"), indicator: "blue" });
-		setTimeout(() => frappe.ui.toolbar.clear_cache(), 800);
-	},
-});
+// Real per-field triggers (not a df.onchange patched on after render, which
+// only fires from the initial control setup and never on live typing/blur/
+// picker changes) — this is what makes every field, including colour
+// pickers, repaint the live preview immediately.
+(function () {
+	var events = {
+		refresh(frm) {
+			alaiy_os.theme_settings.render_theme_ui(frm);
+		},
+		after_save(frm) {
+			// The Desk's own CSS/bootinfo is cached client- and server-side, so a
+			// saved theme only shows up after the same clear-cache + hard reload
+			// the navbar's "Reload" button does. Delay slightly so the "Saved"
+			// toast is visible before the page reloads out from under it.
+			frappe.show_alert({ message: __("Applying theme…"), indicator: "blue" });
+			setTimeout(() => frappe.ui.toolbar.clear_cache(), 800);
+		},
+	};
+	alaiy_os.theme_settings.WATCHED_FIELDS.forEach(function (fieldname) {
+		events[fieldname] = function (frm) {
+			if (frm.$theme_preview_el) alaiy_os.theme_settings.update_preview(frm);
+		};
+	});
+	frappe.ui.form.on("OS Theme Settings", events);
+})();

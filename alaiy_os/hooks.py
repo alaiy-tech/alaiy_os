@@ -11,6 +11,10 @@ after_migrate = "alaiy_os.setup.install.after_migrate"
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
+# App-switcher / desk-loading identity — otherwise Frappe falls back to the
+# stock Frappe Framework logo wherever an app doesn't set its own.
+app_logo_url = "/assets/images/client-logo-square.png"
+
 # Desk assets (loaded for logged-in desk users)
 _V = "20260710a"
 
