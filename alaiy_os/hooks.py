@@ -15,8 +15,14 @@ on_login = "alaiy_os.setup.boot.on_login"
 # stock Frappe Framework logo wherever an app doesn't set its own.
 app_logo_url = "/assets/images/client-logo-square.png"
 
-# Desk assets (loaded for logged-in desk users)
-_V = "20260710a"
+# Desk assets (loaded for logged-in desk users). Cache-busting version for
+# these static files — computed from the current time rather than a
+# hand-maintained string, so it changes on every server restart automatically.
+# A stale hand-bumped value here is exactly how a content edit to core.css/
+# login.css/the JS files below can silently keep serving out of every
+# browser's 12-hour asset cache after a deploy — this makes that impossible.
+import time as _time
+_V = str(int(_time.time()))
 
 app_include_js = [
     f"/assets/alaiy_os/constants/roles.js?v={_V}",
