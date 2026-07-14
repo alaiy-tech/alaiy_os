@@ -1,5 +1,5 @@
 /**
- * AlaiyOS — Route & Workspace Constants
+ * Alaiy OS — Route & Workspace Constants
  * Loaded first in app_include_js; all other files depend on these globals.
  */
 /* eslint-disable no-unused-vars */

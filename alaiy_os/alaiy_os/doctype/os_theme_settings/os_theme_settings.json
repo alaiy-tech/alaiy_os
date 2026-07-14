@@ -1,0 +1,540 @@
+{
+ "actions": [],
+ "creation": "2026-07-10 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enable_custom_theme",
+  "section_break_assets",
+  "square_logo",
+  "column_break_assets",
+  "horizontal_logo",
+  "section_break_presets",
+  "last_preset",
+  "theme_preview",
+  "section_break_colors_light",
+  "color_ink",
+  "color_black",
+  "color_white",
+  "color_cream",
+  "color_muted",
+  "color_border",
+  "color_hover",
+  "color_active",
+  "color_on_black",
+  "color_black_hover",
+  "column_break_light",
+  "color_grid_line",
+  "color_scroll_hover",
+  "color_nav",
+  "color_nav_text",
+  "color_heading",
+  "color_green",
+  "color_blue",
+  "color_amber",
+  "color_gray",
+  "color_red",
+  "section_break_fonts",
+  "font_sans",
+  "font_serif",
+  "font_mono",
+  "section_break_typography",
+  "font_size",
+  "font_size_sm",
+  "line_height",
+  "column_break_typography",
+  "body_weight",
+  "medium_weight",
+  "heading_weight",
+  "column_break_typography2",
+  "heading_tracking",
+  "brand_tracking",
+  "label_tracking",
+  "section_break_buttons",
+  "btn_radius",
+  "btn_pad_y",
+  "btn_pad_x",
+  "section_break_sizing",
+  "sidebar_width",
+  "navbar_height",
+  "control_height",
+  "page_max_width",
+  "section_break_spacing",
+  "page_pad",
+  "card_pad",
+  "section_pad",
+  "gap",
+  "column_break_spacing",
+  "field_gap",
+  "btn_gap",
+  "control_pad_x",
+  "section_break_radii",
+  "radius",
+  "radius_sm",
+  "radius_lg",
+  "column_break_radii",
+  "radius_xl",
+  "pill",
+  "section_break_borders",
+  "border_width",
+  "border_style"
+ ],
+ "fields": [
+  {
+   "default": "0",
+   "description": "When off, none of the settings below are applied \u2014 the Desk looks exactly as it does out of the box.",
+   "fieldname": "enable_custom_theme",
+   "fieldtype": "Check",
+   "label": "Enable Custom Theme"
+  },
+  {
+   "fieldname": "section_break_assets",
+   "fieldtype": "Section Break",
+   "label": "Organizational Assets"
+  },
+  {
+   "fieldname": "square_logo",
+   "fieldtype": "Attach Image",
+   "label": "Square Logo (512x512px)"
+  },
+  {
+   "fieldname": "column_break_assets",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "horizontal_logo",
+   "fieldtype": "Attach Image",
+   "label": "Horizontal Logo (700x140px)"
+  },
+  {
+   "fieldname": "section_break_presets",
+   "fieldtype": "Section Break",
+   "label": "Theme Presets"
+  },
+  {
+   "fieldname": "last_preset",
+   "fieldtype": "Data",
+   "label": "Last Preset Used",
+   "read_only": 1
+  },
+  {
+   "fieldname": "theme_preview",
+   "fieldtype": "HTML",
+   "label": "Live Preview"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_colors_light",
+   "fieldtype": "Section Break",
+   "label": "Colors"
+  },
+  {
+   "default": "#1A1A1A",
+   "fieldname": "color_ink",
+   "fieldtype": "Color",
+   "label": "Body text (ink)"
+  },
+  {
+   "default": "#111111",
+   "fieldname": "color_black",
+   "fieldtype": "Color",
+   "label": "Primary / brand / headings"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_white",
+   "fieldtype": "Color",
+   "label": "Surfaces / cards"
+  },
+  {
+   "default": "#FAF9F6",
+   "fieldname": "color_cream",
+   "fieldtype": "Color",
+   "label": "Page background"
+  },
+  {
+   "default": "#8A8A8A",
+   "fieldname": "color_muted",
+   "fieldtype": "Color",
+   "label": "Secondary text"
+  },
+  {
+   "default": "#D9D5C9",
+   "fieldname": "color_border",
+   "fieldtype": "Color",
+   "label": "Borders / hairlines"
+  },
+  {
+   "default": "#F4F4F4",
+   "fieldname": "color_hover",
+   "fieldtype": "Color",
+   "label": "Row / nav hover"
+  },
+  {
+   "default": "#EAEAEA",
+   "fieldname": "color_active",
+   "fieldtype": "Color",
+   "label": "Active nav background"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_on_black",
+   "fieldtype": "Color",
+   "label": "Text on primary"
+  },
+  {
+   "default": "#0C0C0C",
+   "fieldname": "color_black_hover",
+   "fieldtype": "Color",
+   "label": "Primary button hover"
+  },
+  {
+   "fieldname": "column_break_light",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "#ECEAE4",
+   "fieldname": "color_grid_line",
+   "fieldtype": "Color",
+   "label": "Table grid lines"
+  },
+  {
+   "default": "#A9A69D",
+   "fieldname": "color_scroll_hover",
+   "fieldtype": "Color",
+   "label": "Scrollbar hover"
+  },
+  {
+   "default": "#FFFFFF",
+   "fieldname": "color_nav",
+   "fieldtype": "Color",
+   "label": "Nav / sidebar bg"
+  },
+  {
+   "default": "#1A1A1A",
+   "fieldname": "color_nav_text",
+   "fieldtype": "Color",
+   "label": "Nav text / icons"
+  },
+  {
+   "default": "#111111",
+   "fieldname": "color_heading",
+   "fieldtype": "Color",
+   "label": "Headings"
+  },
+  {
+   "default": "#2E7D5B",
+   "fieldname": "color_green",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 green"
+  },
+  {
+   "default": "#3B5BB5",
+   "fieldname": "color_blue",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 blue"
+  },
+  {
+   "default": "#B7791F",
+   "fieldname": "color_amber",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 amber"
+  },
+  {
+   "default": "#8A8A8A",
+   "fieldname": "color_gray",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 gray"
+  },
+  {
+   "default": "#B23A3A",
+   "fieldname": "color_red",
+   "fieldtype": "Color",
+   "label": "Status \u00b7 red"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_fonts",
+   "fieldtype": "Section Break",
+   "label": "Fonts (Google Fonts)"
+  },
+  {
+   "default": "Inter",
+   "fieldname": "font_sans",
+   "fieldtype": "Data",
+   "label": "Sans (body / UI)"
+  },
+  {
+   "default": "Playfair Display",
+   "fieldname": "font_serif",
+   "fieldtype": "Data",
+   "label": "Serif (headings / brand)"
+  },
+  {
+   "default": "JetBrains Mono",
+   "fieldname": "font_mono",
+   "fieldtype": "Data",
+   "label": "Mono (code)"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_typography",
+   "fieldtype": "Section Break",
+   "label": "Typography"
+  },
+  {
+   "default": "14px",
+   "fieldname": "font_size",
+   "fieldtype": "Data",
+   "label": "Base font size"
+  },
+  {
+   "default": "12.5px",
+   "fieldname": "font_size_sm",
+   "fieldtype": "Data",
+   "label": "Small font size"
+  },
+  {
+   "default": "1.5",
+   "fieldname": "line_height",
+   "fieldtype": "Data",
+   "label": "Line height"
+  },
+  {
+   "fieldname": "column_break_typography",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "450",
+   "fieldname": "body_weight",
+   "fieldtype": "Int",
+   "label": "Body weight"
+  },
+  {
+   "default": "550",
+   "fieldname": "medium_weight",
+   "fieldtype": "Int",
+   "label": "Medium weight"
+  },
+  {
+   "default": "600",
+   "fieldname": "heading_weight",
+   "fieldtype": "Int",
+   "label": "Heading weight"
+  },
+  {
+   "fieldname": "column_break_typography2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0.005em",
+   "fieldname": "heading_tracking",
+   "fieldtype": "Data",
+   "label": "Heading tracking"
+  },
+  {
+   "default": "0.14em",
+   "fieldname": "brand_tracking",
+   "fieldtype": "Data",
+   "label": "Brand tracking"
+  },
+  {
+   "default": "0.07em",
+   "fieldname": "label_tracking",
+   "fieldtype": "Data",
+   "label": "Label tracking"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_buttons",
+   "fieldtype": "Section Break",
+   "label": "Buttons"
+  },
+  {
+   "default": "5px",
+   "fieldname": "btn_radius",
+   "fieldtype": "Data",
+   "label": "Button radius"
+  },
+  {
+   "default": "8px",
+   "fieldname": "btn_pad_y",
+   "fieldtype": "Data",
+   "label": "Button pad \u00b7 Y"
+  },
+  {
+   "default": "16px",
+   "fieldname": "btn_pad_x",
+   "fieldtype": "Data",
+   "label": "Button pad \u00b7 X"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_sizing",
+   "fieldtype": "Section Break",
+   "label": "Sizing"
+  },
+  {
+   "default": "252px",
+   "fieldname": "sidebar_width",
+   "fieldtype": "Data",
+   "label": "Sidebar width"
+  },
+  {
+   "default": "56px",
+   "fieldname": "navbar_height",
+   "fieldtype": "Data",
+   "label": "Navbar height"
+  },
+  {
+   "default": "36px",
+   "fieldname": "control_height",
+   "fieldtype": "Data",
+   "label": "Input height"
+  },
+  {
+   "default": "1200px",
+   "fieldname": "page_max_width",
+   "fieldtype": "Data",
+   "label": "Page max width"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_spacing",
+   "fieldtype": "Section Break",
+   "label": "Spacing"
+  },
+  {
+   "default": "28px",
+   "fieldname": "page_pad",
+   "fieldtype": "Data",
+   "label": "Page padding"
+  },
+  {
+   "default": "20px",
+   "fieldname": "card_pad",
+   "fieldtype": "Data",
+   "label": "Card padding"
+  },
+  {
+   "default": "22px",
+   "fieldname": "section_pad",
+   "fieldtype": "Data",
+   "label": "Section padding"
+  },
+  {
+   "default": "16px",
+   "fieldname": "gap",
+   "fieldtype": "Data",
+   "label": "Gap"
+  },
+  {
+   "fieldname": "column_break_spacing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "13px",
+   "fieldname": "field_gap",
+   "fieldtype": "Data",
+   "label": "Field gap"
+  },
+  {
+   "default": "8px",
+   "fieldname": "btn_gap",
+   "fieldtype": "Data",
+   "label": "Button gap"
+  },
+  {
+   "default": "12px",
+   "fieldname": "control_pad_x",
+   "fieldtype": "Data",
+   "label": "Input pad \u00b7 X"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_radii",
+   "fieldtype": "Section Break",
+   "label": "Radii"
+  },
+  {
+   "default": "4px",
+   "fieldname": "radius",
+   "fieldtype": "Data",
+   "label": "Radius"
+  },
+  {
+   "default": "0px",
+   "fieldname": "radius_sm",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 small"
+  },
+  {
+   "default": "6px",
+   "fieldname": "radius_lg",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 large"
+  },
+  {
+   "fieldname": "column_break_radii",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8px",
+   "fieldname": "radius_xl",
+   "fieldtype": "Data",
+   "label": "Radius \u00b7 xl"
+  },
+  {
+   "default": "999px",
+   "fieldname": "pill",
+   "fieldtype": "Data",
+   "label": "Pill radius"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_borders",
+   "fieldtype": "Section Break",
+   "label": "Borders"
+  },
+  {
+   "default": "1px",
+   "fieldname": "border_width",
+   "fieldtype": "Data",
+   "label": "Border width"
+  },
+  {
+   "default": "solid",
+   "fieldname": "border_style",
+   "fieldtype": "Select",
+   "label": "Border style",
+   "options": "solid\ndashed\ndotted\ndouble"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-07-10 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "OS Theme Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Administrator"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

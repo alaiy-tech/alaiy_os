@@ -1,66 +1,16 @@
 /*
- * AlaiyOS Workspace — Scoped Styles
+ * Alaiy OS Workspace — Scoped Styles
  *
- * Rules here are intentionally scoped to AlaiyOS contexts.
+ * Rules here are intentionally scoped to Alaiy OS contexts.
  * Do NOT add global ERPNext UI overrides here.
  * Global overrides affect all users including admins — that is not wanted.
  */
 
-/* ── Poppins font ───────────────────────────────────────────────────────────────────────────────────── */
-@import url("https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap");
-
-/* Apply Poppins across the entire desk UI — body, navbar, workspace, forms,
- * lists, dropdowns, and all ERPNext panels the user interacts with. */
-body,
-body *,
-input, textarea, select, button,
-.navbar,
-.navbar *,
-.page-head,
-.page-head *,
-.layout-main-section,
-.layout-main-section *,
-.layout-side-section,
-.layout-side-section *,
-.desk-sidebar,
-.desk-sidebar *,
-.workspace-sidebar,
-.workspace-sidebar *,
-.body-sidebar-bottom,
-.body-sidebar-bottom *,
-.sidebar-bottom-area,
-.sidebar-bottom-area *,
-.dropdown-menu,
-.dropdown-menu li,
-.dropdown-menu a,
-.dropdown-menu button,
-.dropdown-item,
-.onboarding-sidebar,
-.onboarding-sidebar *,
-.modules-section {
-    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-}
-
-/* ── Sidebar item labels — override Frappe's per-element font rules ──────── */
-/* Frappe sets font-family on .standard-sidebar-item and its children via
- * inline styles or highly-specific rules. These selectors beat those. */
-.standard-sidebar-item,
-.standard-sidebar-item .sidebar-item-label,
-.standard-sidebar-item .sidebar-item-icon,
-.standard-sidebar-item span,
-.standard-sidebar-item a,
-.sidebar-item-container,
-.sidebar-item-container .sidebar-item-label,
-.sidebar-item-container span,
-.sidebar-menu-item,
-.sidebar-menu-item .sidebar-item-label,
-.sidebar-section-label,
-.sidebar-section .sidebar-item-label,
-.desk-sidebar .item-anchor,
-.desk-sidebar .item-anchor span,
-.desk-sidebar .sidebar-label {
-    font-family: "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-}
+/* Font is controlled entirely by OS Theme Settings (font_sans/serif/mono ->
+ * var(--s-font)) now — this file must never hardcode a font-family, or an
+ * uploaded Google Font silently stops applying wherever this file's
+ * selectors are more specific than the theme's. See os_theme_settings.py's
+ * sidebar font-family coverage for the equivalent of what used to be here. */
 
 /* ── Sidebar width ─────────────────────────────────────────────────────────── */
 
@@ -85,7 +35,7 @@ input, textarea, select, button,
 /* Workspace sidebar header logo */
 .desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
 .desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {
-    background-image: url('/assets/alaiy_os/client/assets/client-logo-square.png');
+    background-image: url('/assets/images/client-logo-square.png');
     background-size: contain;
     background-repeat: no-repeat;
     background-position: center;
@@ -218,7 +168,7 @@ input, textarea, select, button,
 /* Sidebar header logo — replace the Frappe-generated "OS" letter circle
  * with the Client square logo. Hide the SVG text inside the icon-container. */
 .sidebar-header .icon-container {
-    background-image: url('/assets/alaiy_os/client/assets/client-logo-square.png') !important;
+    background-image: url('/assets/images/client-logo-square.png') !important;
     background-size: 80% !important;
     background-repeat: no-repeat !important;
     background-position: center !important;

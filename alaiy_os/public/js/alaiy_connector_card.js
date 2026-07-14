@@ -1,5 +1,5 @@
 /**
- * AlaiyOS — Shared connector status card.
+ * Alaiy OS — Shared connector status card.
  *
  * Mounted at the top of each connector's own Settings DocType form (via
  * frm.dashboard) to show its icon, name, and live connection status.

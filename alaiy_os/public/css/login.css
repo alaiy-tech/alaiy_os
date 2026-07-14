@@ -1,104 +1,188 @@
 /*
- * AlaiyOS — Login Page Branding
+ * Alaiy OS — Login Page Branding
  * Applied only to website/login routes (web_include_css).
  * Does NOT affect the ERPNext desk for any user.
  */
 
-@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap");
 
-/* ── Variables ───────────────────────────────────────────────────────────── */
+/* ── Palette ─────────────────────────────────────────────────────────────── */
 :root {
-    --alaiy-login-primary:  #0b2a3f;   /* Deep navy */
-    --alaiy-login-accent:   #0891b2;   /* Cyan-600 — matches desk theme */
-    --alaiy-login-bg:       #f5f9fb;
-    --alaiy-login-card-bg:  #ffffff;
-    --alaiy-login-radius:   12px;
-    --alaiy-login-shadow:   0 4px 24px rgba(0, 0, 0, 0.08);
+  --a-navy:      #0b1a2b;
+  --a-navy-2:    #0e2a3f;
+  --a-accent:    #0891b2;   /* cyan-600 */
+  --a-accent-2:  #06b6d4;   /* cyan-500 */
+  --a-ink:       #0f172a;
+  --a-muted:     #64748b;
+  --a-border:    #e6ebf1;
+  --a-card:      #ffffff;
+  --a-radius:    16px;
+  --a-input-h:   48px;
 }
 
-/* ── Page Background ─────────────────────────────────────────────────────── */
+/* ── Background ──────────────────────────────────────────────────────────── */
 body.login-page {
-    background: var(--alaiy-login-bg);
-    font-family: "Poppins", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", "Poppins", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--a-ink);
+  min-height: 100vh;
+  background:
+    radial-gradient(1100px 700px at 12% -10%, rgba(8,145,178,0.28), transparent 55%),
+    radial-gradient(900px 600px at 100% 110%, rgba(14,165,233,0.22), transparent 55%),
+    linear-gradient(135deg, var(--a-navy) 0%, var(--a-navy-2) 60%, #0a2233 100%);
+  background-attachment: fixed;
 }
 
-/* ── App logo (real <img> rendered by login.html template) ──────────────── */
-.page-card-head .app-logo {
-    width: 72px;
-    height: 72px;
-    object-fit: contain;
-    display: block;
-    margin: 0 auto 16px;
+/* soft page padding so the card breathes on all sizes */
+body.login-page .for-login,
+body.login-page .page-card-container,
+body.login-page main {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
 }
 
-/* ── Login card ──────────────────────────────────────────────────────────── */
-.login-content {
-    background: var(--alaiy-login-card-bg) !important;
-    border-radius: var(--alaiy-login-radius) !important;
-    box-shadow: var(--alaiy-login-shadow) !important;
-    border: none !important;
-    padding: 40px !important;
-    max-width: 420px;
-    width: 100%;
+/* ── Card ────────────────────────────────────────────────────────────────── */
+body.login-page .login-content.page-card,
+body.login-page .login-content {
+  position: relative;
+  background: var(--a-card) !important;
+  border: none !important;
+  border-radius: var(--a-radius) !important;
+  box-shadow: 0 24px 70px rgba(3, 12, 24, 0.45), 0 2px 8px rgba(3, 12, 24, 0.20) !important;
+  padding: 44px 40px 36px !important;
+  max-width: 416px;
+  width: 100%;
+  overflow: hidden;
+  animation: a-rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+/* brand accent bar across the top of the card */
+body.login-page .login-content.page-card::before {
+  content: "";
+  position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: linear-gradient(90deg, var(--a-accent), var(--a-accent-2));
+}
+@keyframes a-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+/* ── Logo + heading ──────────────────────────────────────────────────────── */
+body.login-page .page-card-head { text-align: center; margin-bottom: 26px; }
+body.login-page .page-card-head .app-logo {
+  width: auto; height: 54px; max-width: 200px; object-fit: contain;
+  display: block; margin: 4px auto 0;
+}
+body.login-page .page-card-head h4,
+body.login-page .page-card-head .indicator-pill { display: none; }   /* hide default "Login" text pill if present */
+body.login-page .page-card-head::after {
+  content: "Sign in to your account";
+  display: block; margin-top: 14px;
+  font-size: 14px; color: var(--a-muted); font-weight: 500;
 }
 
-/* ── App name / title below logo ─────────────────────────────────────────── */
-.login-content h4.login-title,
-.login-content .application-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--alaiy-login-primary);
-    margin-bottom: 24px;
-    text-align: center;
+/* ── Fields ──────────────────────────────────────────────────────────────── */
+body.login-page .form-group { margin-bottom: 16px; }
+body.login-page .email-field,
+body.login-page .password-field { position: relative; }
+
+body.login-page .login-content input.form-control {
+  height: var(--a-input-h) !important;
+  border-radius: 10px !important;
+  border: 1.5px solid var(--a-border) !important;
+  background: #fbfcfe !important;
+  color: var(--a-ink) !important;
+  font-size: 14px !important;
+  padding: 10px 70px 10px 42px !important;   /* room for left icon + right "Show" */
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  box-shadow: none !important;
+}
+body.login-page .login-content input.form-control::placeholder { color: #9aa7b5; }
+body.login-page .login-content input.form-control:focus {
+  border-color: var(--a-accent) !important;
+  background: #fff !important;
+  box-shadow: 0 0 0 4px rgba(8, 145, 178, 0.14) !important;
+  outline: none !important;
 }
 
-/* ── Form inputs ─────────────────────────────────────────────────────────── */
-.login-form .form-control,
-.login-form input[type="email"],
-.login-form input[type="password"],
-.login-form input[type="text"] {
-    border-radius: 8px !important;
-    border: 1px solid #e2e8f0 !important;
-    padding: 10px 14px !important;
-    font-size: 14px !important;
-    transition: border-color 0.15s, box-shadow 0.15s;
+/* left field icons (email / lock svg) */
+body.login-page .field-icon {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--a-muted); opacity: 0.9; pointer-events: none;
 }
 
-.login-form .form-control:focus,
-.login-form input:focus {
-    border-color: var(--alaiy-login-accent) !important;
-    box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.15) !important;
-    outline: none;
+/* "Show" password toggle */
+body.login-page .toggle-password {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  font-size: 12px; font-weight: 600; color: var(--a-accent) !important;
+  cursor: pointer; text-transform: uppercase; letter-spacing: 0.03em;
 }
+body.login-page .toggle-password:hover { color: var(--a-accent-2) !important; }
 
-/* ── Sign in button ──────────────────────────────────────────────────────── */
-.login-form .btn-login,
-.login-form button[type="submit"],
-.login-form .btn-primary {
-    background: var(--alaiy-login-primary) !important;
-    border-color: var(--alaiy-login-primary) !important;
-    border-radius: 8px !important;
-    font-weight: 600 !important;
-    font-size: 14px !important;
-    padding: 10px 0 !important;
-    width: 100%;
-    transition: opacity 0.15s;
+/* forgot-password link row */
+body.login-page .forgot-password-message { text-align: right; margin: -4px 0 18px; }
+body.login-page .forgot-password-message a { font-size: 13px; color: var(--a-muted) !important; font-weight: 500; }
+body.login-page .forgot-password-message a:hover { color: var(--a-accent) !important; text-decoration: none; }
+
+/* ── Sign-in button ──────────────────────────────────────────────────────── */
+body.login-page .btn-login,
+body.login-page .page-card-actions .btn-primary {
+  height: var(--a-input-h) !important;
+  width: 100%;
+  border: none !important;
+  border-radius: 10px !important;
+  font-weight: 600 !important;
+  font-size: 14.5px !important;
+  letter-spacing: 0.01em;
+  color: #fff !important;
+  background: linear-gradient(135deg, var(--a-accent-2), var(--a-accent)) !important;
+  box-shadow: 0 8px 20px rgba(8, 145, 178, 0.35) !important;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
 }
-
-.login-form .btn-login:hover,
-.login-form button[type="submit"]:hover {
-    opacity: 0.9;
+body.login-page .btn-login:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px rgba(8, 145, 178, 0.45) !important;
+  filter: brightness(1.03);
 }
+body.login-page .btn-login:active { transform: translateY(0); }
 
-/* ── Secondary links ─────────────────────────────────────────────────────── */
-.login-content .sign-up-message a,
-.login-content a {
-    color: var(--alaiy-login-accent) !important;
-    font-size: 13px;
+/* secondary / ldap login button */
+body.login-page .btn-ldap-login,
+body.login-page .btn-login-option {
+  height: 46px !important; width: 100%;
+  border-radius: 10px !important;
+  border: 1.5px solid var(--a-border) !important;
+  background: #fff !important; color: var(--a-ink) !important;
+  font-weight: 600 !important; font-size: 14px !important;
+  transition: border-color 0.14s, background 0.14s;
 }
+body.login-page .btn-login-option:hover { border-color: #cbd5e1 !important; background: #f8fafc !important; }
 
-/* ── Footer / powered-by strip ───────────────────────────────────────────── */
-.login-footer,
-.powered-by {
-    display: none !important;
+/* ── Social logins / divider ─────────────────────────────────────────────── */
+body.login-page .login-divider {
+  position: relative; text-align: center; font-size: 12px; color: var(--a-muted);
+  margin: 22px 0 16px; text-transform: uppercase; letter-spacing: 0.08em;
+}
+body.login-page .login-divider::before,
+body.login-page .login-divider::after {
+  content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--a-border);
+}
+body.login-page .login-divider::before { left: 0; }
+body.login-page .login-divider::after { right: 0; }
+body.login-page .social-login-buttons { display: flex; flex-direction: column; gap: 10px; }
+
+/* ── Sign-up message ─────────────────────────────────────────────────────── */
+body.login-page .sign-up-message {
+  margin-top: 22px !important; font-size: 13px; color: var(--a-muted); text-align: center;
+}
+body.login-page .sign-up-message a { color: var(--a-accent) !important; font-weight: 600; }
+body.login-page .sign-up-message a:hover { color: var(--a-accent-2) !important; text-decoration: none; }
+
+/* ── Cleanup ─────────────────────────────────────────────────────────────── */
+body.login-page .login-footer,
+body.login-page .powered-by,
+body.login-page footer { display: none !important; }
+
+/* ── Small screens ───────────────────────────────────────────────────────── */
+@media (max-width: 480px) {
+  body.login-page .login-content.page-card { padding: 34px 24px 28px !important; border-radius: 14px !important; }
+  body.login-page .page-card-head .app-logo { height: 46px; }
 }

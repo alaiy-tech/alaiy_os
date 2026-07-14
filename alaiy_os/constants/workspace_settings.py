@@ -1,5 +1,5 @@
 """
-AlaiyOS — OS Settings workspace definition.
+Alaiy OS — OS Settings workspace definition.
 Provisioned by setup/install.py alongside the main OS workspace.
 """
 
@@ -96,7 +96,7 @@ SETTINGS_WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Contract Template",           "label": "Contract Template"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Appointment Booking Settings","label": "Appointment Booking Settings"},
+        "link_to": "Appointment Booking Settings", "label": "Appointment Booking Settings"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "CRM Settings",                "label": "CRM Settings"},
 
@@ -137,6 +137,8 @@ SETTINGS_WORKSPACE_LINKS = [
         "link_to": "Module Profile",              "label": "Module Profile"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Notification",                "label": "Notification"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "OS Theme Settings",           "label": "OS Theme Settings"},
 
     # ── CONNECTORS ─────────────────────────────────────────────────────────────
     # One Link per row in OS Connector Registry, injected at provisioning time
@@ -165,7 +167,7 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Accounts Settings",
      "label": "Accounts Settings",     "child": 1, "icon": "settings-2"},
     {"type": "Link", "link_type": "DocType", "link_to": "Journal Entry Template",
-     "label": "Journal Entry Template","child": 1, "icon": "pencil"},
+     "label": "Journal Entry Template", "child": 1, "icon": "pencil"},
     {"type": "Link", "link_type": "DocType", "link_to": "Currency Exchange",
      "label": "Currency Exchange",     "child": 1, "icon": "dollar-sign"},
     {"type": "Link", "link_type": "DocType", "link_to": "Dunning Type",
@@ -288,6 +290,8 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Module Profile",        "child": 1, "icon": "book"},
     {"type": "Link", "link_type": "DocType", "link_to": "Notification",
      "label": "Notification",          "child": 1, "icon": "bell"},
+    {"type": "Link", "link_type": "DocType", "link_to": "OS Theme Settings",
+     "label": "OS Theme Settings",     "child": 1, "icon": "palette"},
 
     # ── Connectors + Logs ─────────────────────────────────────────────────────
     # Both sections are built dynamically by setup/install.py:

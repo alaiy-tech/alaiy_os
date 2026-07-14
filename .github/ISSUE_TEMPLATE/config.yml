@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation
+    url: https://os.alaiy.com
+    about: Check the documentation before filing an issue.
+  - name: Report a security vulnerability
+    url: mailto:sarthak@alaiy.com
+    about: Please do NOT open public issues for security vulnerabilities. Email us privately instead.

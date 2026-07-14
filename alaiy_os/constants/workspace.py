@@ -1,5 +1,5 @@
 """
-AlaiyOS workspace definition — single source of truth for the Alaiy OS
+Alaiy OS workspace definition — single source of truth for the Alaiy OS
 workspace layout (shortcuts + link cards + sidebar).
 
 Consumed by setup/install.py:create_or_update_workspace() and
@@ -136,7 +136,7 @@ WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "Payment Term",            "label": "Payment Term"},
     {"type": "Link", "link_type": "DocType",
-        "link_to": "Bank Reconciliation Tool","label": "Bank Reconciliation"},
+        "link_to": "Bank Reconciliation Tool", "label": "Bank Reconciliation"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Tax Category",            "label": "Tax Category"},
     {"type": "Link", "link_type": "DocType",
