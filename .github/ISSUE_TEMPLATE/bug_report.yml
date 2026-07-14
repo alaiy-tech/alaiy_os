@@ -1,4 +1,4 @@
-name: 🐞 Bug Report
+name: Bug Report
 description: Report a problem with Alaiy OS to help us fix it
 title: "[Bug]: "
 labels: ["bug", "triage"]
