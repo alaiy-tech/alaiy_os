@@ -6,7 +6,7 @@ from frappe.model.document import Document
 
 # Google Fonts loaded for whichever font names are configured. Deduplicated
 # and formatted into a single @import at the top of the generated CSS.
-_FONT_WEIGHTS = ":400,500,600,700"
+_FONT_WEIGHTS = ":wght@400;500;600;700"
 
 # Fixed filenames the site's shared (non-app-namespaced) assets folder always
 # uses for the org's logos — both the install-time defaults (setup/install.py)
@@ -310,7 +310,9 @@ textarea.form-control, .like-disabled-input, .ql-editor {
  * eats most of the width and clips the icons down to unreadable slivers. */
 .body-sidebar-container.expanded .standard-sidebar-item { border-radius: var(--s-radius) !important; margin: 2px 10px !important; transition: background .14s !important; }
 .body-sidebar-container:not(.expanded) .standard-sidebar-item { border-radius: var(--s-radius) !important; transition: background .14s !important; }
-.body-sidebar .standard-sidebar-item .item-anchor, .body-sidebar .standard-sidebar-item .sidebar-item-label { color: var(--s-nav-text) !important; }
+.body-sidebar .standard-sidebar-item .item-anchor, .body-sidebar .standard-sidebar-item .sidebar-item-label {
+	color: var(--s-nav-text) !important; font-family: var(--s-font) !important;
+}
 .body-sidebar .standard-sidebar-item .text-muted, .body-sidebar .standard-sidebar-item .text-secondary { color: var(--s-nav-muted) !important; }
 .body-sidebar .standard-sidebar-item:hover { background: var(--s-nav-hover) !important; }
 .body-sidebar .standard-sidebar-item.active-sidebar, .body-sidebar .standard-sidebar-item.selected { background: var(--s-nav-active) !important; box-shadow: none !important; }
@@ -491,6 +493,12 @@ class OSThemeSettings(Document):
         return f'"{name}", {fallback}'
 
     def _build_font_import(self):
+        # The legacy v1 endpoint (fonts.googleapis.com/css?family=...) this
+        # used to hit doesn't serve many newer/variable fonts at all (fails
+        # silently — the @import just resolves to nothing, so every family
+        # falls back everywhere with no visible error). The v2 endpoint
+        # covers the full current Google Fonts catalog and needs each family
+        # as its own family= param rather than pipe-separated.
         families = []
         for fieldname, _ in _FONT_FIELDS:
             value = (self.get(fieldname) or "").strip()
@@ -498,8 +506,8 @@ class OSThemeSettings(Document):
                 families.append(value)
         if not families:
             return ""
-        family_param = "|".join(f.replace(" ", "+") + _FONT_WEIGHTS for f in families)
-        return f"@import url('https://fonts.googleapis.com/css?family={family_param}&display=swap');"
+        family_param = "&family=".join(f.replace(" ", "+") + _FONT_WEIGHTS for f in families)
+        return f"@import url('https://fonts.googleapis.com/css2?family={family_param}&display=swap');"
 
     def _build_root_block(self):
         # One color theme only (light) — these values apply regardless of
