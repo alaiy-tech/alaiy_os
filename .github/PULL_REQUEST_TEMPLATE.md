@@ -17,12 +17,12 @@
 
 <!-- Put an "x" in the boxes that apply. -->
 
-- [ ] 🐞 Bug fix (non-breaking change that fixes an issue)
-- [ ] ✨ New feature (non-breaking change that adds functionality)
-- [ ] 💥 Breaking change (fix or feature that changes existing behaviour)
-- [ ] 🧹 Refactor / code cleanup (no functional change)
-- [ ] 📖 Documentation update
-- [ ] 🔧 Build / CI / tooling
+- [ ] Bug fix (non-breaking change that fixes an issue)
+- [ ] New feature (non-breaking change that adds functionality)
+- [ ] Breaking change (fix or feature that changes existing behaviour)
+- [ ] Refactor / code cleanup (no functional change)
+- [ ] Documentation update
+- [ ] Build / CI / tooling
 
 ## How has this been tested?
 
