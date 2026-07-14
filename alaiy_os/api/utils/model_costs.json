@@ -1,6 +1,6 @@
 {
   "_meta": {
-    "base_unit_usd": 0.001,
+    "base_unit_usd": 0.0001,
     "markup": 4,
     "last_updated": "2026-07-13",
     "note": "All prices in USD. Text ops use input_usd_per_1m + output_usd_per_1m per million tokens. Image ops use usd_per_image. Verify at provider pricing pages before updating."
