@@ -12,8 +12,16 @@ def get_context(context):
     Mirrors frappe/www/login.py: only a provider with a client id + secret + valid
     base URL is offered, and its per-request authorize URL is generated here.
     """
-    context.provider_logins = []
     redirect_to = frappe.form_dict.get("redirect-to") or "/desk/os"
+
+    # Already logged in — mirror frappe/www/login.py so hitting /login directly
+    # (bookmark, typed URL, etc.) lands you back on the desk instead of
+    # showing the login form again.
+    if frappe.session.user != "Guest":
+        frappe.local.flags.redirect_location = redirect_to
+        raise frappe.Redirect
+
+    context.provider_logins = []
 
     try:
         providers = frappe.get_all(
