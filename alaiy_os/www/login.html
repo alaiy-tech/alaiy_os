@@ -77,6 +77,20 @@
     input:focus { border-color: var(--accent); background: #fff; box-shadow: 0 0 0 4px rgba(8,145,178,0.13); }
     input::placeholder { color: #9aa7b5; }
 
+    .password-wrap { position: relative; margin-bottom: 18px; }
+    .password-wrap input { padding-right: 44px; margin-bottom: 0; }
+    .toggle-pwd {
+      position: absolute; right: 0; top: 0; height: 48px; width: 44px;
+      display: flex; align-items: center; justify-content: center;
+      background: none; border: none; padding: 0; margin: 0; cursor: pointer; color: #9aa7b5;
+      -webkit-appearance: none;
+    }
+    .toggle-pwd:hover { color: var(--muted); }
+    .toggle-pwd svg { width: 19px; height: 19px; display: block; }
+    .toggle-pwd .icon-eye-off { display: none; }
+    .toggle-pwd.is-visible .icon-eye { display: none; }
+    .toggle-pwd.is-visible .icon-eye-off { display: block; }
+
     .btn-login {
       width: 100%; height: 48px; margin-top: 4px; color: #fff; font-size: 14.5px; font-weight: 600; letter-spacing: .01em;
       border: none; border-radius: 10px; cursor: pointer;
@@ -165,7 +179,13 @@
             <label class="label" for="pwd">Password</label>
             <a class="forgot" href="/update-password">Forgot your password?</a>
           </div>
-          <input id="pwd" name="pwd" type="password" placeholder="••••••••" autocomplete="current-password" required>
+          <div class="password-wrap">
+            <input id="pwd" name="pwd" type="password" placeholder="••••••••" autocomplete="current-password" required>
+            <button type="button" class="toggle-pwd" id="toggle-pwd" aria-label="Show password">
+              <svg class="icon-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+              <svg class="icon-eye-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 19c-7 0-11-7-11-7a18.5 18.5 0 0 1 4.22-5.06M9.9 4.24A10.4 10.4 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></svg>
+            </button>
+          </div>
           <button class="btn-login" id="submit-btn" type="submit">Login</button>
         </form>
 
@@ -192,6 +212,17 @@
   </div>
 
   <script>
+    (function () {
+      var pwdInput  = document.getElementById("pwd");
+      var pwdToggle = document.getElementById("toggle-pwd");
+      pwdToggle.addEventListener("click", function () {
+        var showing = pwdInput.type === "text";
+        pwdInput.type = showing ? "password" : "text";
+        pwdToggle.classList.toggle("is-visible", !showing);
+        pwdToggle.setAttribute("aria-label", showing ? "Show password" : "Hide password");
+      });
+    })();
+
     (function () {
       var form = document.getElementById("login-form");
       var btn  = document.getElementById("submit-btn");
