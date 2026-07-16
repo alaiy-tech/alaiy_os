@@ -147,6 +147,10 @@ The handler contract:
 - **Return value** must be JSON-serializable (it's `json.dumps`-ed with
   `default=str`, so dates and Decimals survive). Return structured data, not
   prose — the LLM reads it.
+- **Rich results (vision):** return `{"_content_blocks": [...]}` and the list
+  is passed to the LLM verbatim as Anthropic content blocks (`text` / `image`)
+  instead of JSON text — this is how a tool shows the model images. Base64
+  image data is redacted from the stored transcript automatically.
 - **Exceptions are recoverable.** A raising handler does *not* fail the run;
   the traceback is sent back to the LLM as an `is_error` tool result and it
   may retry or route around. Raise for real failures; return
