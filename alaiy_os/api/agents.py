@@ -1,7 +1,7 @@
 """REST surface for the agent engine.
 
-POST /api/method/alaiy_os.agent_core.api.run_agent   -> {"run": "RUN-..."}
-GET  /api/method/alaiy_os.agent_core.api.get_run     -> status/output/error
+POST /api/method/alaiy_os.api.agents.run_agent   -> {"run": "RUN-..."}
+GET  /api/method/alaiy_os.api.agents.get_run     -> status/output/error
 """
 
 import json
