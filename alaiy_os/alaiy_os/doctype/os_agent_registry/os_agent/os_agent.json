@@ -8,6 +8,8 @@
  "field_order": [
   "agent_id",
   "is_enabled",
+  "description",
+  "icon",
   "model",
   "max_turns",
   "system_prompt",
