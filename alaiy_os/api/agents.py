@@ -8,7 +8,7 @@ import json
 
 import frappe
 
-from alaiy_os.agent_core.engine.executor import execute_agent
+from alaiy_os.engine.executor import execute_agent
 
 
 @frappe.whitelist()
