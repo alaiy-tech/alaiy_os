@@ -68,7 +68,7 @@ def run_queued(run):
 		{
 			"status": "Success",
 			"output": result["output"],
-			"transcript": json.dumps(result["messages"], indent=1, default=str),
+			"transcript": json.dumps(_redact_media(result["messages"]), indent=1, default=str),
 			"input_tokens": result["input_tokens"],
 			"output_tokens": result["output_tokens"],
 			"ended_at": now_datetime(),
@@ -114,11 +114,35 @@ def _dispatch_tools(agent, content):
 			continue
 		try:
 			value = agent.handlers[block["name"]](**(block["input"] or {}))
-			results.append(_tool_result(block["id"], json.dumps(value, default=str)))
+			if isinstance(value, dict) and "_content_blocks" in value:
+				# Rich tool result: the handler supplies ready-made Anthropic
+				# content blocks (e.g. image blocks for vision) instead of JSON.
+				results.append(
+					{"type": "tool_result", "tool_use_id": block["id"], "content": value["_content_blocks"]}
+				)
+			else:
+				results.append(_tool_result(block["id"], json.dumps(value, default=str)))
 		except Exception:
 			# Tool failures go back to the LLM, not up the stack — it may recover.
 			results.append(_tool_result(block["id"], traceback.format_exc(limit=3), is_error=True))
 	return results
+
+
+def _redact_media(messages):
+	"""Strip base64 payloads (images) out of the stored transcript — they are
+	megabytes of noise per run; keep a size stub so the tool call stays auditable."""
+	for message in messages:
+		content = message.get("content")
+		if not isinstance(content, list):
+			continue
+		for block in content:
+			if block.get("type") != "tool_result" or not isinstance(block.get("content"), list):
+				continue
+			for sub in block["content"]:
+				source = sub.get("source") if sub.get("type") == "image" else None
+				if isinstance(source, dict) and "data" in source:
+					sub["source"] = {**source, "data": f"<{len(source['data'])} base64 chars redacted>"}
+	return messages
 
 
 def _tool_result(tool_use_id, content, is_error=False):
