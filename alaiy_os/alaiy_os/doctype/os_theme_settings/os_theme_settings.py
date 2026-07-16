@@ -440,6 +440,25 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 	border-radius: var(--s-radius-lg) !important;
 	margin: 10px !important;
 }
+
+/* ── Image (grid) list view ────────────────────────────────────────────── */
+.image-view-container { padding: var(--s-page-pad) !important; }
+.image-view-item {
+	border: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
+	border-radius: var(--s-radius-lg) !important; background: var(--s-white) !important;
+	box-shadow: var(--s-card-shadow) !important; overflow: hidden !important;
+	transition: box-shadow .16s, border-color .16s !important;
+}
+.image-view-item:hover { border-color: var(--s-black) !important; box-shadow: var(--s-shadow-md) !important; }
+.image-view-header { padding: var(--s-btn-gap) var(--s-control-pad-x) !important; cursor: pointer; }
+.image-view-body { padding: var(--s-control-pad-x) !important; }
+.image-view-body .image-field {
+	border-radius: var(--s-radius) !important; min-height: 120px !important;
+}
+.image-view-body .placeholder-text {
+	font-family: var(--s-font-serif) !important; font-weight: var(--s-heading-weight) !important;
+	color: var(--s-white) !important; font-size: 32px !important;
+}
 """.strip("\n")
 
 # Every --s-* token this doctype's fields cover, in the order the reference

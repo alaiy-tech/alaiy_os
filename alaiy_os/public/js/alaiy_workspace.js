@@ -44,6 +44,9 @@ AW.openList = function (doctype) {
 };
 
 // ── Capture-phase click interceptor ──────────────────────────────────────────
+// "Ask Alaiy" needs no special-casing here anymore: its Workspace Shortcut
+// record is correctly configured (type: Page, link_to: ask-alaiy), so it
+// navigates to /app/ask-alaiy natively, same as any other shortcut.
 AW._onCapture = function (e) {
   if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
 
@@ -61,7 +64,9 @@ AW._onCapture = function (e) {
   if (!target) return;
 
   const label = _labelFrom(target);
-  if (!label || ALAIY_SKIP_LABELS.has(label)) return;
+  if (!label) return;
+
+  if (ALAIY_SKIP_LABELS.has(label)) return;
 
   const doctype =
     ALAIY_LABEL_TO_DOCTYPE[label] ||
@@ -74,11 +79,30 @@ AW._onCapture = function (e) {
   AW.openList(doctype);
 };
 
+// ── "Ask Alaiy" active-tab state — reuses .active-sidebar, the exact class
+// Frappe's own link-type sidebar items get when selected (already themed:
+// see .standard-sidebar-item.active-sidebar in OS Theme Settings' CSS). Our
+// item is a JS-handled "action", not a real link, so nothing gives it this
+// automatically — set it ourselves on every route change. ──────────────────
+AW._syncAskAlaiyActiveState = function () {
+  const items = document.querySelectorAll(
+    ".standard-sidebar-item, .sidebar-item-container",
+  );
+  for (const el of items) {
+    if (_labelFrom(el) === "Ask Alaiy") {
+      el.classList.toggle("active-sidebar", frappe.get_route_str() === "ask-alaiy");
+      break;
+    }
+  }
+};
+
 // ── Init ──────────────────────────────────────────────────────────────────────
 AW.init = function () {
   if (AW._inited) return;
   AW._inited = true;
   document.addEventListener("click", AW._onCapture, true);
+  frappe.router.on("change", AW._syncAskAlaiyActiveState);
+  AW._syncAskAlaiyActiveState();
 };
 
 $(document).on("app_ready", function () {
