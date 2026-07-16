@@ -483,25 +483,35 @@ def _connector_registry_rows():
     return [r for r in rows if r.get("settings_doctype")]
 
 
+def _connector_link_target(row):
+    """A connector with its own Page (e.g. Shopify's custom dashboard page,
+    named == connector_id) links there instead of straight to its settings
+    DocType form."""
+    if frappe.db.exists("Page", row.connector_id):
+        return "Page", row.connector_id
+    return "DocType", row.settings_doctype
+
+
 def _build_connector_workspace_links():
-    """Connectors card on the OS Settings workspace body: one Link per
-    installed connector, pointing at its settings DocType."""
+    """Connectors card on the main OS workspace body: one Link per
+    installed connector."""
     rows = [r for r in _connector_registry_rows()
             if frappe.db.exists("DocType", r.settings_doctype)]
     if not rows:
         return []
     links = [{"type": "Card Break", "label": "Connectors", "icon": "plug"}]
     for row in rows:
+        link_type, link_to = _connector_link_target(row)
         links.append({
-            "type": "Link", "link_type": "DocType",
-            "link_to": row.settings_doctype, "label": row.connector_name,
+            "type": "Link", "link_type": link_type,
+            "link_to": link_to, "label": row.connector_name,
         })
     return links
 
 
 def _build_connector_sidebar_items():
-    """Connectors section in the OS Settings sidebar: one Link per installed
-    connector, pointing at its settings DocType."""
+    """Connectors section in the main OS sidebar: one Link per installed
+    connector."""
     rows = [r for r in _connector_registry_rows()
             if frappe.db.exists("DocType", r.settings_doctype)]
     if not rows:
@@ -509,8 +519,9 @@ def _build_connector_sidebar_items():
     items = [{"type": "Section Break", "label": "Connectors",
               "icon": "plug", "child": 0, "indent": 1}]
     for row in rows:
+        link_type, link_to = _connector_link_target(row)
         items.append({
-            "type": "Link", "link_type": "DocType", "link_to": row.settings_doctype,
+            "type": "Link", "link_type": link_type, "link_to": link_to,
             "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
         })
     return items
@@ -559,7 +570,7 @@ def _block_id(label):
     return hashlib.md5(f"alaiy-block-{label}".encode()).hexdigest()[:10]
 
 
-def _build_workspace_content():
+def _build_workspace_content(links):
     blocks = []
     for s in WORKSPACE_SHORTCUTS:
         blocks.append({
@@ -567,7 +578,7 @@ def _build_workspace_content():
             "type": "shortcut",
             "data": {"shortcut_name": s["label"], "col": 3},
         })
-    for link in WORKSPACE_LINKS:
+    for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
                 "id":   _block_id(f"card:{link['label']}"),
@@ -578,7 +589,8 @@ def _build_workspace_content():
 
 
 def create_or_update_workspace():
-    content = _build_workspace_content()
+    links = list(WORKSPACE_LINKS) + _build_connector_workspace_links()
+    content = _build_workspace_content(links)
     title = _get_os_workspace_title()
 
     if not frappe.db.exists("Workspace", WORKSPACE_NAME):
@@ -598,7 +610,7 @@ def create_or_update_workspace():
             "content":   content,
             "roles":     [],
             "shortcuts": WORKSPACE_SHORTCUTS,
-            "links":     WORKSPACE_LINKS,
+            "links":     links,
         })
         ws.flags.ignore_validate = True
         ws.insert(ignore_permissions=True)
@@ -606,7 +618,7 @@ def create_or_update_workspace():
         ws = frappe.get_doc("Workspace", WORKSPACE_NAME)
         ws.set("links", [])
         ws.set("shortcuts", [])
-        for link in WORKSPACE_LINKS:
+        for link in links:
             ws.append("links", link)
         for shortcut in WORKSPACE_SHORTCUTS:
             ws.append("shortcuts", shortcut)
@@ -626,7 +638,7 @@ def create_or_update_workspace():
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
 def create_or_update_workspace_sidebar():
-    items = list(WORKSPACE_SIDEBAR_ITEMS)
+    items = list(WORKSPACE_SIDEBAR_ITEMS) + _build_connector_sidebar_items()
     # Title must stay == WORKSPACE_NAME: Workspace Sidebar autonames from
     # title, and that name must match the Workspace's own (fixed) name for
     # Frappe's client-side sidebar lookup to find it.
@@ -661,7 +673,7 @@ def create_or_update_workspace_sidebar():
 
 def _build_os_settings_content():
     blocks = []
-    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_workspace_links()
+    links = list(SETTINGS_WORKSPACE_LINKS)
     for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
@@ -675,7 +687,7 @@ def _build_os_settings_content():
 def create_or_update_os_settings_workspace():
     content = _build_os_settings_content()
     title = _get_os_settings_workspace_title()
-    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_workspace_links()
+    links = list(SETTINGS_WORKSPACE_LINKS)
 
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
@@ -718,7 +730,6 @@ def create_or_update_os_settings_workspace():
 
 def create_or_update_os_settings_workspace_sidebar():
     items = list(SETTINGS_WORKSPACE_SIDEBAR_ITEMS)
-    items += _build_connector_sidebar_items()
     items += _build_log_items()
 
     # Title must stay == SETTINGS_WORKSPACE_NAME — see create_or_update_workspace_sidebar().
