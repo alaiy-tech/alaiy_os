@@ -206,6 +206,21 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 .dropdown-menu { border: var(--s-border-width) var(--s-border-style) var(--s-border) !important; border-radius: var(--s-radius) !important; box-shadow: var(--s-shadow-lg) !important; padding: 6px !important; }
 .dropdown-item { border-radius: var(--s-radius-sm) !important; padding: var(--s-btn-gap) var(--s-control-pad-x) !important; }
 .dropdown-item:hover, .dropdown-item:focus { background: var(--s-hover) !important; color: var(--s-black) !important; }
+/* Link/Select field autocomplete popup (Frappe's "awesomplete" widget) — it
+ * inherits Frappe's generic --bg-color token, which we remap to --s-cream
+ * for PAGE backgrounds, so this popup was rendering the exact same colour
+ * as the page behind it and looking nearly invisible. Give it the same
+ * card-surface treatment as .dropdown-menu instead. */
+.awesomplete > ul, ul[role="listbox"] {
+	background: var(--s-white) !important; border: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
+	border-radius: var(--s-radius) !important; box-shadow: var(--s-shadow-lg) !important;
+}
+.awesomplete > ul > li, ul[role="listbox"] > div[role="option"] {
+	border-radius: var(--s-radius-sm) !important;
+}
+.awesomplete > ul > li[aria-selected="true"], ul[role="listbox"] > div[aria-selected="true"] {
+	background: var(--s-hover) !important;
+}
 .modal-content { border: var(--s-border-width) var(--s-border-style) var(--s-border) !important; border-radius: var(--s-radius-xl) !important; box-shadow: var(--s-shadow-lg) !important; overflow: hidden; }
 .modal-header, .modal-footer { padding: var(--s-card-pad) var(--s-section-pad) !important; }
 /* Pinned to a literal 0, not a --s-* token — do not theme this. Fixed by

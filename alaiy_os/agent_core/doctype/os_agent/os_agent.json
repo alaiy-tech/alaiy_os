@@ -1,0 +1,116 @@
+{
+ "autoname": "field:agent_id",
+ "creation": "2026-07-13 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "agent_id",
+  "is_enabled",
+  "model",
+  "max_turns",
+  "system_prompt",
+  "tools_section",
+  "tools",
+  "output_section",
+  "output_format",
+  "output_schema"
+ ],
+ "fields": [
+  {
+   "bold": 1,
+   "fieldname": "agent_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Agent ID",
+   "reqd": 1,
+   "unique": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "is_enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "claude-sonnet-5",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Model",
+   "reqd": 1
+  },
+  {
+   "default": "8",
+   "description": "Safety cap on LLM ↔ tool round-trips per run.",
+   "fieldname": "max_turns",
+   "fieldtype": "Int",
+   "label": "Max Turns"
+  },
+  {
+   "fieldname": "system_prompt",
+   "fieldtype": "Text",
+   "label": "System Prompt",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tools_section",
+   "fieldtype": "Section Break",
+   "label": "Tools"
+  },
+  {
+   "fieldname": "tools",
+   "fieldtype": "Table",
+   "label": "Tools",
+   "options": "OS Agent Tool Link"
+  },
+  {
+   "fieldname": "output_section",
+   "fieldtype": "Section Break",
+   "label": "Output"
+  },
+  {
+   "default": "Text",
+   "fieldname": "output_format",
+   "fieldtype": "Select",
+   "label": "Output Format",
+   "options": "Text\nJSON"
+  },
+  {
+   "depends_on": "eval:doc.output_format=='JSON'",
+   "description": "JSON Schema the final output must satisfy.",
+   "fieldname": "output_schema",
+   "fieldtype": "Code",
+   "label": "Output Schema (JSON)",
+   "mandatory_depends_on": "eval:doc.output_format=='JSON'",
+   "options": "JSON"
+  }
+ ],
+ "links": [],
+ "modified": "2026-07-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Agent Core",
+ "name": "OS Agent",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

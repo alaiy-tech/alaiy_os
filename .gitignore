@@ -7,3 +7,4 @@ __pycache__
 alaiy_os/workspace_sidebar/
 alaiy_os/desktop_icon/
 alaiy_os/workspace/
+.DS_Store
