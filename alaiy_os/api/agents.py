@@ -3,26 +3,41 @@ import frappe
 
 @frappe.whitelist()
 def get_all_agents():
-    """Return all OS Agent Registry rows for the settings panel."""
-    if not frappe.db.exists("DocType", "OS Agent Registry"):
-        return []
-    return frappe.get_all(
-        "OS Agent Registry",
-        fields=[
-            "agent_id", "agent_name", "agent_app",
-            "agent_type", "description", "icon", "icon_url",
-            "settings_doctype", "capabilities",
-            "invoke_method", "test_method",
-            "is_enabled", "health_status", "last_tested_at", "last_invoked_at",
-        ],
-        order_by="agent_name asc",
+    """Return every OS Agent, joined with its OS Agent Registry metadata, for the settings panel."""
+    agents = frappe.get_all(
+        "OS Agent",
+        fields=["agent_id", "is_enabled"],
+        order_by="agent_id asc",
     )
+    if not agents:
+        return []
+
+    registry_rows = frappe.get_all(
+        "OS Agent Registry",
+        filters={"agent": ["in", [a["agent_id"] for a in agents]]},
+        fields=[
+            "agent", "description", "icon", "icon_url",
+            "settings_doctype", "test_method",
+            "health_status", "last_tested_at",
+        ],
+    )
+    registry_by_agent = {row["agent"]: row for row in registry_rows}
+
+    result = []
+    for agent in agents:
+        registry = registry_by_agent.get(agent["agent_id"], {})
+        result.append({**agent, **{k: v for k, v in registry.items() if k != "agent"}})
+    return result
 
 
 @frappe.whitelist()
-def get_agent_config(agent_id):
+def get_agent_config(agent):
     """Return field metadata + current values for an agent's settings DocType."""
-    registry = frappe.get_doc("OS Agent Registry", agent_id)
+    frappe.get_doc("OS Agent", agent).check_permission("read")
+
+    if not frappe.db.exists("OS Agent Registry", agent):
+        frappe.throw(f"No registry entry found for agent '{agent}'.")
+    registry = frappe.get_doc("OS Agent Registry", agent)
     settings_doctype = registry.settings_doctype
 
     if not settings_doctype:
@@ -58,26 +73,18 @@ def get_agent_config(agent_id):
 
 
 @frappe.whitelist()
-def get_agent_password(agent_id, fieldname):
-    """Return the decrypted value of a Password field for display."""
-    registry = frappe.get_doc("OS Agent Registry", agent_id)
-    meta = frappe.get_meta(registry.settings_doctype)
-    field_meta = meta.get_field(fieldname)
-    if not field_meta or field_meta.fieldtype != "Password":
-        frappe.throw("Invalid field")
-    doc = frappe.get_single(registry.settings_doctype)
-    return doc.get_password(fieldname, raise_exception=False) or ""
-
-
-@frappe.whitelist()
-def save_and_test(agent_id, values):
+def save_and_test(agent, values):
     """Save agent settings then run the agent's test/health-check method."""
     import json
 
     if isinstance(values, str):
         values = json.loads(values)
 
-    registry = frappe.get_doc("OS Agent Registry", agent_id)
+    frappe.get_doc("OS Agent", agent).check_permission("write")
+
+    if not frappe.db.exists("OS Agent Registry", agent):
+        frappe.throw(f"No registry entry found for agent '{agent}'.")
+    registry = frappe.get_doc("OS Agent Registry", agent)
     settings_doctype = registry.settings_doctype
     test_method = registry.test_method
 
@@ -114,12 +121,14 @@ def save_and_test(agent_id, values):
 
 
 @frappe.whitelist()
-def test_agent(agent_id):
+def test_agent(agent):
     """Run the agent's test_method and update the registry health status."""
-    if not frappe.db.exists("OS Agent Registry", agent_id):
-        return {"success": False, "message": "Agent not found"}
+    frappe.get_doc("OS Agent", agent).check_permission("write")
 
-    row = frappe.get_doc("OS Agent Registry", agent_id)
+    if not frappe.db.exists("OS Agent Registry", agent):
+        return {"success": False, "message": "No registry entry for this agent"}
+
+    row = frappe.get_doc("OS Agent Registry", agent)
     if not row.test_method:
         return {"success": False, "message": "No test method configured"}
 
@@ -131,34 +140,9 @@ def test_agent(agent_id):
         result = {"success": False, "message": str(e)}
         status = "failed"
 
-    frappe.db.set_value("OS Agent Registry", agent_id, {
+    frappe.db.set_value("OS Agent Registry", agent, {
         "health_status": status,
         "last_tested_at": frappe.utils.now_datetime(),
-    })
-    frappe.db.commit()
-    return result
-
-
-@frappe.whitelist()
-def invoke_agent(agent_id, **kwargs):
-    """Run the agent's invoke_method with the given kwargs and record the run."""
-    if not frappe.db.exists("OS Agent Registry", agent_id):
-        return {"success": False, "message": "Agent not found"}
-
-    row = frappe.get_doc("OS Agent Registry", agent_id)
-    if not row.is_enabled:
-        return {"success": False, "message": "Agent is disabled"}
-    if not row.invoke_method:
-        return {"success": False, "message": "No invoke method configured"}
-
-    try:
-        fn = frappe.get_attr(row.invoke_method)
-        result = fn(**kwargs)
-    except Exception as e:
-        result = {"success": False, "message": str(e)}
-
-    frappe.db.set_value("OS Agent Registry", agent_id, {
-        "last_invoked_at": frappe.utils.now_datetime(),
     })
     frappe.db.commit()
     return result

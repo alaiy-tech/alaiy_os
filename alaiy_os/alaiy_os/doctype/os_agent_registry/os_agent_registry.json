@@ -1,55 +1,30 @@
 {
- "autoname": "field:agent_id",
+ "autoname": "field:agent",
  "creation": "2026-07-14 00:00:00.000000",
  "docstatus": 0,
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "agent_id",
-  "agent_name",
-  "agent_app",
-  "agent_type",
+  "agent",
   "description",
   "icon",
   "icon_url",
   "settings_doctype",
-  "capabilities",
-  "invoke_method",
   "test_method",
-  "is_enabled",
   "health_status",
-  "last_tested_at",
-  "last_invoked_at"
+  "last_tested_at"
  ],
  "fields": [
   {
    "bold": 1,
-   "fieldname": "agent_id",
-   "fieldtype": "Data",
+   "fieldname": "agent",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Agent ID",
+   "label": "Agent",
+   "options": "OS Agent",
    "reqd": 1,
    "unique": 1
-  },
-  {
-   "fieldname": "agent_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Agent Name",
-   "reqd": 1
-  },
-  {
-   "fieldname": "agent_app",
-   "fieldtype": "Data",
-   "label": "Frappe App Name"
-  },
-  {
-   "fieldname": "agent_type",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Agent Type",
-   "options": "\nworker\nassistant\nmonitor\nother"
   },
   {
    "fieldname": "description",
@@ -72,25 +47,9 @@
    "label": "Settings DocType Name"
   },
   {
-   "fieldname": "capabilities",
-   "fieldtype": "Small Text",
-   "label": "Capabilities (comma-separated tags)"
-  },
-  {
-   "fieldname": "invoke_method",
-   "fieldtype": "Data",
-   "label": "Invoke Method (Python dotted path)"
-  },
-  {
    "fieldname": "test_method",
    "fieldtype": "Data",
    "label": "Test / Health-Check Method (Python dotted path)"
-  },
-  {
-   "default": "0",
-   "fieldname": "is_enabled",
-   "fieldtype": "Check",
-   "label": "Enabled"
   },
   {
    "default": "untested",
@@ -105,12 +64,6 @@
    "fieldname": "last_tested_at",
    "fieldtype": "Datetime",
    "label": "Last Tested At",
-   "read_only": 1
-  },
-  {
-   "fieldname": "last_invoked_at",
-   "fieldtype": "Datetime",
-   "label": "Last Invoked At",
    "read_only": 1
   }
  ],
