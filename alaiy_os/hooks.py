@@ -11,6 +11,19 @@ after_migrate = "alaiy_os.setup.install.after_migrate"
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
+# Site root ("/"). get_website_user_home_page alone isn't enough here: the
+# path resolver has a hardcoded fast path that only triggers for a URL
+# literally starting with "desk" (frappe/website/path_resolver.py) — the
+# home-page hook just substitutes the *template* rendered at "/" without
+# changing the browser's actual URL, so the desk SPA boots seeing path "/"
+# and falls back to its own default ("Dashboard") instead of "os". A real
+# redirect sends the browser to an actual /desk/os request, which does hit
+# that fast path — exactly how /app already behaves (301 -> /desk).
+website_redirects = [
+    {"source": "/", "target": "/desk/os"},
+]
+get_website_user_home_page = "alaiy_os.setup.boot.get_home_page"
+
 # App-switcher / desk-loading identity — otherwise Frappe falls back to the
 # stock Frappe Framework logo wherever an app doesn't set its own.
 app_logo_url = "/assets/images/client-logo-square.png"
