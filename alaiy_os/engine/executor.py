@@ -11,8 +11,8 @@ import traceback
 import frappe
 from frappe.utils import now_datetime
 
-from alaiy_os.agent_core.engine import llm
-from alaiy_os.agent_core.engine.factory import build_runnable
+from alaiy_os.engine import llm
+from alaiy_os.engine.factory import build_runnable
 
 
 def execute_agent(agent, payload=None, trigger_type="Manual"):
@@ -34,7 +34,7 @@ def execute_agent(agent, payload=None, trigger_type="Manual"):
 	).insert(ignore_permissions=True)
 
 	frappe.enqueue(
-		"alaiy_os.agent_core.engine.executor.run_queued",
+		"alaiy_os.engine.executor.run_queued",
 		queue="long",
 		run=run.name,
 		enqueue_after_commit=True,

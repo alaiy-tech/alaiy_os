@@ -10,6 +10,8 @@
   "agent_id",
   "agent_avatar",
   "is_enabled",
+  "description",
+  "icon",
   "model",
   "max_turns",
   "system_prompt",
@@ -52,7 +54,7 @@
   },
   {
    "default": "8",
-   "description": "Safety cap on LLM ↔ tool round-trips per run.",
+   "description": "Safety cap on LLM \u2194 tool round-trips per run.",
    "fieldname": "max_turns",
    "fieldtype": "Int",
    "label": "Max Turns"
@@ -99,7 +101,7 @@
  "links": [],
  "modified": "2026-07-13 00:00:00.000000",
  "modified_by": "Administrator",
- "module": "Agent Core",
+ "module": "Alaiy OS",
  "name": "OS Agent",
  "naming_rule": "By fieldname",
  "owner": "Administrator",

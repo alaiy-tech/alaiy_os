@@ -38,7 +38,7 @@
    "options": "OS Connector Registry"
   },
   {
-   "description": "Python dotted path, e.g. alaiy_os.agent_core.tools.pricing.fetch_competitor_prices",
+   "description": "Python dotted path, e.g. alaiy_os.tools.pricing.fetch_competitor_prices",
    "fieldname": "handler",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -63,7 +63,7 @@
  "links": [],
  "modified": "2026-07-13 00:00:00.000000",
  "modified_by": "Administrator",
- "module": "Agent Core",
+ "module": "Alaiy OS",
  "name": "OS Agent Tool",
  "naming_rule": "By fieldname",
  "owner": "Administrator",

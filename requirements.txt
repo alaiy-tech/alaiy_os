@@ -2,3 +2,5 @@
 # Listing it makes `uv pip install` try to resolve frappe's own URL deps
 # (e.g. pypika @ git+...), which fails app installation.
 anthropic
+# executor.py validates JSON agent output against the agent's output schema
+jsonschema
