@@ -71,6 +71,7 @@ def run_queued(run):
 			"transcript": json.dumps(_redact_media(result["messages"]), indent=1, default=str),
 			"input_tokens": result["input_tokens"],
 			"output_tokens": result["output_tokens"],
+			"image_tokens": result["image_tokens"],
 			"ended_at": now_datetime(),
 		},
 		commit=True,
@@ -80,7 +81,7 @@ def run_queued(run):
 def _run_loop(run_doc):
 	agent = build_runnable(run_doc.agent)
 	messages = [{"role": "user", "content": run_doc.input or "Run."}]
-	usage = {"input_tokens": 0, "output_tokens": 0}
+	usage = {"input_tokens": 0, "output_tokens": 0, "image_tokens": 0}
 
 	response = None
 	for _ in range(agent.max_turns):
@@ -88,7 +89,7 @@ def _run_loop(run_doc):
 		messages.append({"role": "assistant", "content": response["content"]})
 		if response["stop_reason"] != "tool_use":
 			break
-		messages.append({"role": "user", "content": _dispatch_tools(agent, response["content"])})
+		messages.append({"role": "user", "content": _dispatch_tools(agent, response["content"], usage)})
 	else:
 		frappe.throw(f"Agent {agent.agent_id} exceeded max_turns ({agent.max_turns}).")
 
@@ -107,13 +108,16 @@ def _call(agent, messages, usage):
 	return response
 
 
-def _dispatch_tools(agent, content):
+def _dispatch_tools(agent, content, usage):
 	results = []
 	for block in content:
 		if block["type"] != "tool_use":
 			continue
 		try:
 			value = agent.handlers[block["name"]](**(block["input"] or {}))
+			if isinstance(value, dict) and "_usage" in value:
+				tool_usage = value.pop("_usage")
+				usage["image_tokens"] += tool_usage.get("image_tokens", 0)
 			if isinstance(value, dict) and "_content_blocks" in value:
 				# Rich tool result: the handler supplies ready-made Anthropic
 				# content blocks (e.g. image blocks for vision) instead of JSON.
