@@ -17,7 +17,7 @@ from alaiy_os.engine.factory import build_runnable
 
 def execute_agent(agent, payload=None, trigger_type="Manual"):
 	"""Create a Run for `agent` and enqueue it. Returns the Run name."""
-	enabled = frappe.db.get_value("OS Agent", agent, "is_enabled")
+	enabled = frappe.db.get_value("OS Agent Registry", agent, "is_enabled")
 	if enabled is None:
 		frappe.throw(f"Agent {agent} does not exist.")
 	if not enabled:

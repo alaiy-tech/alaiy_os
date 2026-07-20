@@ -140,6 +140,13 @@ SETTINGS_WORKSPACE_LINKS = [
     {"type": "Link", "link_type": "DocType",
         "link_to": "OS Theme Settings",           "label": "OS Theme Settings"},
 
+    # ── AGENTS ─────────────────────────────────────────────────────────────────
+    # Single hub card: every installed agent app registers a row in OS Agent
+    # Registry; this links to that list rather than one card per agent.
+    {"type": "Card Break", "label": "Agents", "icon": "cpu"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "OS Agent Registry",       "label": "All Agents"},
+
     # ── CONNECTORS ─────────────────────────────────────────────────────────────
     # One Link per row in OS Connector Registry, injected at provisioning time
     # by setup/install.py — see _build_connector_workspace_links(). No items
@@ -292,6 +299,13 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Notification",          "child": 1, "icon": "bell"},
     {"type": "Link", "link_type": "DocType", "link_to": "OS Theme Settings",
      "label": "OS Theme Settings",     "child": 1, "icon": "palette"},
+
+    # ── Agents ────────────────────────────────────────────────────────────────
+    # Agent hub: one link for all agents, opening the OS Agent Registry list.
+    {"type": "Section Break", "label": "Agents",
+        "icon": "cpu",              "child": 0, "indent": 1},
+    {"type": "Link", "link_type": "DocType", "link_to": "OS Agent Registry",
+     "label": "All Agents",        "child": 1, "icon": "cpu"},
 
     # ── Connectors + Logs ─────────────────────────────────────────────────────
     # Both sections are built dynamically by setup/install.py:

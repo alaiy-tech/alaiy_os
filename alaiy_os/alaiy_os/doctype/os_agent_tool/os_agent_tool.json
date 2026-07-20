@@ -1,5 +1,4 @@
 {
- "autoname": "field:tool_id",
  "creation": "2026-07-13 00:00:00.000000",
  "docstatus": 0,
  "doctype": "DocType",
@@ -8,10 +7,9 @@
  "field_order": [
   "tool_id",
   "description",
-  "connector",
   "handler",
   "parameters_schema",
-  "is_enabled"
+  "connector"
  ],
  "fields": [
   {
@@ -20,8 +18,7 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Tool ID",
-   "reqd": 1,
-   "unique": 1
+   "reqd": 1
   },
   {
    "description": "Shown to the LLM. Say what the tool does and when to use it.",
@@ -32,13 +29,7 @@
    "reqd": 1
   },
   {
-   "fieldname": "connector",
-   "fieldtype": "Link",
-   "label": "Connector",
-   "options": "OS Connector Registry"
-  },
-  {
-   "description": "Python dotted path, e.g. alaiy_os.tools.pricing.fetch_competitor_prices",
+   "description": "Python dotted path, e.g. solist_agent.tools.handlers.generate_product_images",
    "fieldname": "handler",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -53,36 +44,23 @@
    "options": "JSON"
   },
   {
-   "default": "1",
-   "fieldname": "is_enabled",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Enabled"
+   "description": "Connector this tool depends on; runs fail fast when it is missing or disabled.",
+   "fieldname": "connector",
+   "fieldtype": "Link",
+   "label": "Connector",
+   "options": "OS Connector Registry"
   }
  ],
+ "istable": 1,
  "links": [],
- "modified": "2026-07-13 00:00:00.000000",
+ "modified": "2026-07-20 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Agent Tool",
- "naming_rule": "By fieldname",
  "owner": "Administrator",
- "permissions": [
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
-  }
- ],
+ "permissions": [],
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 0
 }

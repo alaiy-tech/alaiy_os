@@ -1,6 +1,6 @@
 {
  "autoname": "field:agent_id",
- "creation": "2026-07-13 00:00:00.000000",
+ "creation": "2026-07-20 00:00:00.000000",
  "docstatus": 0,
  "doctype": "DocType",
  "editable_grid": 1,
@@ -8,10 +8,15 @@
  "image_field": "agent_avatar",
  "field_order": [
   "agent_id",
+  "agent_name",
   "agent_avatar",
   "is_enabled",
   "description",
   "icon",
+  "surface_section",
+  "settings_doctype",
+  "page",
+  "engine_section",
   "model",
   "max_turns",
   "system_prompt",
@@ -32,6 +37,13 @@
    "unique": 1
   },
   {
+   "fieldname": "agent_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Agent Name",
+   "reqd": 1
+  },
+  {
    "description": "Optional — shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",
    "fieldname": "agent_avatar",
    "fieldtype": "Attach Image",
@@ -45,6 +57,40 @@
    "label": "Enabled"
   },
   {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "description": "Feather icon name shown in workspace and sidebar links.",
+   "fieldname": "icon",
+   "fieldtype": "Data",
+   "label": "Icon"
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "surface_section",
+   "fieldtype": "Section Break",
+   "label": "Surface"
+  },
+  {
+   "description": "Settings DocType shipped by the agent app (API keys, toggles).",
+   "fieldname": "settings_doctype",
+   "fieldtype": "Data",
+   "label": "Settings DocType"
+  },
+  {
+   "description": "Custom UI Page shipped by the agent app; sidebar links here when set.",
+   "fieldname": "page",
+   "fieldtype": "Data",
+   "label": "Page"
+  },
+  {
+   "fieldname": "engine_section",
+   "fieldtype": "Section Break",
+   "label": "Engine"
+  },
+  {
    "default": "claude-sonnet-5",
    "fieldname": "model",
    "fieldtype": "Data",
@@ -54,7 +100,7 @@
   },
   {
    "default": "8",
-   "description": "Safety cap on LLM \u2194 tool round-trips per run.",
+   "description": "Safety cap on LLM ↔ tool round-trips per run.",
    "fieldname": "max_turns",
    "fieldtype": "Int",
    "label": "Max Turns"
@@ -74,7 +120,7 @@
    "fieldname": "tools",
    "fieldtype": "Table",
    "label": "Tools",
-   "options": "OS Agent Tool Link"
+   "options": "OS Agent Tool"
   },
   {
    "fieldname": "output_section",
@@ -99,10 +145,10 @@
   }
  ],
  "links": [],
- "modified": "2026-07-13 00:00:00.000000",
+ "modified": "2026-07-20 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
- "name": "OS Agent",
+ "name": "OS Agent Registry",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
