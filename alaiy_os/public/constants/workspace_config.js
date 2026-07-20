@@ -18,6 +18,7 @@ const ALAIY_SIDEBAR_CONFIG = [
   { label: "Ask Alaiy", type: "action", icon: "sparkles" },
   { label: "Dashboard", type: "action", icon: "layout-dashboard" },
   { label: "My Pinned", type: "action", icon: "pin" },
+  { label: "Agents", type: "link", doctype: "OS Agent Registry", icon: "cpu" },
   { label: "Settings", type: "action", icon: "settings" },
 
   // ── Catalog ─────────────────────────────────────────────────────────────────

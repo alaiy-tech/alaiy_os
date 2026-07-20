@@ -31,7 +31,6 @@ from alaiy_os.constants.workspace_settings import (
     SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
 )
 from alaiy_os.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
-from alaiy_os.setup.agents import provision_agents
 
 MODULE_NAME = "Alaiy OS"
 
@@ -65,7 +64,6 @@ def _run_provisioning():
         create_or_update_role,
         delete_desktop_page,
         provision_shared_doctypes,
-        provision_agents,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
         create_or_update_os_settings_workspace,

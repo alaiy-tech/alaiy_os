@@ -1,8 +1,10 @@
-"""Hydrates an OS Agent record into something the executor can run.
+"""Hydrates an OS Agent Registry record into something the executor can run.
 
 This is the "agent factory": agents vary as data (prompt, tools, output
-format), so building one is reading a record and resolving its tool handlers
-to Python callables — the same dotted-path trick OS Connector Registry uses.
+format), so building one is reading the registry record and resolving its
+tool handlers to Python callables — the same dotted-path trick OS Connector
+Registry uses. The record itself is written by each agent app's own install
+hook (see the agent app template), not authored here.
 """
 
 import json
@@ -26,21 +28,23 @@ class RunnableAgent:
 
 
 def build_runnable(agent_id):
-	agent = frappe.get_doc("OS Agent", agent_id)
+	agent = frappe.get_doc("OS Agent Registry", agent_id)
 	if not agent.is_enabled:
 		frappe.throw(f"Agent {agent_id} is disabled.")
 
 	tools, handlers = [], {}
 	for row in agent.tools:
-		tool = frappe.get_doc("OS Agent Tool", row.tool)
-		if not tool.is_enabled:
-			frappe.throw(f"Agent {agent_id} references disabled tool {tool.tool_id}.")
-		handlers[tool.tool_id] = frappe.get_attr(tool.handler)
+		if row.connector and not frappe.db.get_value("OS Connector Registry", row.connector, "is_enabled"):
+			frappe.throw(
+				f"Agent {agent_id} tool {row.tool_id} requires connector {row.connector},"
+				" which is not installed or not enabled."
+			)
+		handlers[row.tool_id] = frappe.get_attr(row.handler)
 		tools.append(
 			{
-				"name": tool.tool_id,
-				"description": tool.description,
-				"input_schema": json.loads(tool.parameters_schema) if tool.parameters_schema else EMPTY_SCHEMA,
+				"name": row.tool_id,
+				"description": row.description,
+				"input_schema": json.loads(row.parameters_schema) if row.parameters_schema else EMPTY_SCHEMA,
 			}
 		)
 

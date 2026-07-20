@@ -27,7 +27,7 @@
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Agent",
-   "options": "OS Agent",
+   "options": "OS Agent Registry",
    "reqd": 1
   },
   {

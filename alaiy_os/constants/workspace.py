@@ -154,6 +154,13 @@ WORKSPACE_LINKS = [
         "link_to": "Fiscal Year",             "label": "Fiscal Year"},
     {"type": "Link", "link_type": "DocType",
         "link_to": "Currency Exchange",       "label": "Currency Exchange"},
+
+    # ── AGENTS ───────────────────────────────────────────────────────────────
+    # Single hub card: every installed agent app registers a row in OS Agent
+    # Registry; this links to that list rather than one card per agent.
+    {"type": "Card Break", "label": "Agents", "icon": "cpu"},
+    {"type": "Link", "link_type": "DocType",
+        "link_to": "OS Agent Registry",       "label": "All Agents"},
 ]
 
 # Sidebar items — mirrors ALAIY_SIDEBAR_CONFIG in public/constants/workspace_config.js.
@@ -166,6 +173,9 @@ WORKSPACE_SIDEBAR_ITEMS = [
      "label": "Dashboard",  "child": 0, "indent": 0, "icon": "layout-dashboard"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
+    # Agent hub: one link for all agents, opening the OS Agent Registry list.
+    {"type": "Link", "link_type": "DocType", "link_to": "OS Agent Registry",
+     "label": "Agents",     "child": 0, "indent": 0, "icon": "cpu"},
 
     # ── Catalog ────────────────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Catalog",

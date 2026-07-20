@@ -5,12 +5,15 @@ from frappe.model.document import Document
 
 
 class OSAgentTool(Document):
+	"""Child table of OS Agent Registry — one row per tool the agent exposes."""
+
 	def validate(self):
 		self._validate_handler()
 		self._validate_parameters_schema()
 
 	def _validate_handler(self):
-		# Fail at save time, not mid-run: the dotted path must import and be callable.
+		# Fail at registration time, not mid-run: the dotted path must import
+		# and be callable.
 		try:
 			fn = frappe.get_attr(self.handler)
 		except Exception:
