@@ -72,6 +72,7 @@ def _run_provisioning():
         create_or_update_onboarding,
         ensure_default_logos,
         ensure_desktop_icon_logos,
+        sync_custom_pages,
         configure_system_settings,
         configure_navbar,
         configure_portal_settings,
@@ -261,6 +262,16 @@ def ensure_desktop_icon_logos():
     for workspace_name in (WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME):
         if frappe.db.exists("Desktop Icon", workspace_name):
             frappe.db.set_value("Desktop Icon", workspace_name, "logo_url", logo_url)
+
+
+def sync_custom_pages():
+    """
+    Page records (unlike DocType) aren't picked up by bench migrate's own
+    "Updating DocTypes" sync just because the .json/.js files exist on disk —
+    they need an explicit reload_doc, same as a core migration patch would do.
+    """
+    for page_name in ("ask_alaiy",):
+        frappe.reload_doc("alaiy_os", "page", page_name)
 
 
 # ── System Settings ────────────────────────────────────────────────────────────

@@ -5,9 +5,11 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
+ "image_field": "agent_avatar",
  "field_order": [
   "agent_id",
   "agent_name",
+  "agent_avatar",
   "is_enabled",
   "description",
   "icon",
@@ -40,6 +42,12 @@
    "in_list_view": 1,
    "label": "Agent Name",
    "reqd": 1
+  },
+  {
+   "description": "Optional — shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",
+   "fieldname": "agent_avatar",
+   "fieldtype": "Attach Image",
+   "label": "Avatar"
   },
   {
    "default": "1",
