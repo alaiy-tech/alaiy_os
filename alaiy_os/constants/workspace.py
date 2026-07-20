@@ -13,7 +13,7 @@ WORKSPACE_NAME = "OS"
 WORKSPACE_ROUTE = "os"  # URL slug: /desk/os
 
 WORKSPACE_SHORTCUTS = [
-    {"type": "DocType", "link_to": "Stock Entry",
+    {"type": "Page", "link_to": "ask-alaiy",
         "label": "Ask Alaiy",   "color": "purple"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Dashboard",   "color": "blue"},
