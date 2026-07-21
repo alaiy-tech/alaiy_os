@@ -2,7 +2,8 @@
  * Alaiy OS — Route-to-Section Title Mappings
  *
  * Loaded via app_include_js before alaiy_ui.js and route_guard.js.
- * Sections match the new sidebar structure in workspace_config.js.
+ * Sections match the sidebar structure in constants/workspace.py
+ * (WORKSPACE_SIDEBAR_ITEMS).
  *
  * ALAIY_ROUTE_TITLES        — exact frappe.get_route_str() → section label
  * ALAIY_ROUTE_PREFIX_TITLES — prefix matches for Form/<DocType>/... routes

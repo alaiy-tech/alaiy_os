@@ -2,11 +2,13 @@
 Alaiy OS workspace definition — single source of truth for the Alaiy OS
 workspace layout (shortcuts + link cards + sidebar).
 
-Consumed by setup/install.py:create_or_update_workspace() and
-create_or_update_workspace_sidebar().
-
-Keep sidebar section labels and DocType links in sync with
-public/constants/workspace_config.js (the JS counterpart).
+Consumed by:
+  - setup/install.py:create_or_update_workspace() and
+    create_or_update_workspace_sidebar() (writes the DB records)
+  - alaiy_os.api.workspace.sidebar_config_js() (derives the JS click-router's
+    ALAIY_SIDEBAR_CONFIG from WORKSPACE_SIDEBAR_ITEMS on every request —
+    there is no separate JS file to keep in sync; edit WORKSPACE_SIDEBAR_ITEMS
+    below and both consumers pick it up automatically)
 """
 
 WORKSPACE_NAME = "OS"
@@ -156,8 +158,9 @@ WORKSPACE_LINKS = [
         "link_to": "Currency Exchange",       "label": "Currency Exchange"},
 ]
 
-# Sidebar items — mirrors ALAIY_SIDEBAR_CONFIG in public/constants/workspace_config.js.
-# Keep both in sync.  icon names are Lucide/Frappe icon names.
+# Sidebar items — the JS click-router's ALAIY_SIDEBAR_CONFIG is generated
+# from this list (see alaiy_os.api.workspace.sidebar_config_js); nothing
+# else needs updating here. icon names are Lucide/Frappe icon names.
 WORKSPACE_SIDEBAR_ITEMS = [
     # ── Top standalone actions ─────────────────────────────────────────────────
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
