@@ -14,9 +14,11 @@
   "ended_at",
   "input_tokens",
   "output_tokens",
+  "image_tokens",
   "io_section",
   "input",
   "output",
+  "image_preview",
   "error",
   "debug_section",
   "transcript"
@@ -76,6 +78,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "image_tokens",
+   "fieldtype": "Int",
+   "label": "Image Tokens",
+   "read_only": 1
+  },
+  {
    "fieldname": "io_section",
    "fieldtype": "Section Break",
    "label": "Input / Output"
@@ -91,6 +99,12 @@
    "fieldname": "output",
    "fieldtype": "Long Text",
    "label": "Output",
+   "read_only": 1
+  },
+  {
+   "fieldname": "image_preview",
+   "fieldtype": "HTML",
+   "label": "Generated Images",
    "read_only": 1
   },
   {
