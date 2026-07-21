@@ -7,16 +7,16 @@
 // without calling `this.settings.onload()` (see frappe/public/js/frappe/
 // views/image/image_view.js) — onload simply never fires there. These are
 // document-level listeners that outlive this one list view, so every check
-// re-confirms "OS Agent" is the doctype actually in play before doing anything,
+// re-confirms "OS Agent Registry" is the doctype actually in play before doing anything,
 // to avoid leaking this behaviour onto other doctypes' lists later in the SPA
 // session.
-frappe.listview_settings["OS Agent"] = {};
+frappe.listview_settings["OS Agent Registry"] = {};
 
 const OS_AGENT_HIDDEN_VIEWS = ["Kanban View", "Dashboard View", "Calendar View", "Gantt View"];
 
 if (!frappe._osAgentSwitcherObserver) {
 	const pruneSwitcher = () => {
-		if (frappe.get_route()?.[1] !== "OS Agent") return;
+		if (frappe.get_route()?.[1] !== "OS Agent Registry") return;
 		document.querySelectorAll(".dropdown-menu.show .dropdown-item").forEach((el) => {
 			if (OS_AGENT_HIDDEN_VIEWS.includes(el.textContent.trim())) {
 				el.style.display = "none";
@@ -46,7 +46,7 @@ if (!frappe._osAgentImageCardNav) {
 		const item = e.target.closest(".image-view-item");
 		if (!item || !item.closest(".image-view-container")) return;
 		if (e.target.closest("input, .like-action, a")) return;
-		const link = item.querySelector('a[data-doctype="OS Agent"][data-name]');
-		if (link) frappe.set_route("Form", "OS Agent", link.getAttribute("data-name"));
+		const link = item.querySelector('a[data-doctype="OS Agent Registry"][data-name]');
+		if (link) frappe.set_route("Form", "OS Agent Registry", link.getAttribute("data-name"));
 	});
 }

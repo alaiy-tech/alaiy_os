@@ -4,7 +4,7 @@
 // normal, fully-editable field layout. New/unsaved agents skip straight to
 // the normal form since there's nothing yet to summarise.
 
-frappe.ui.form.on("OS Agent", {
+frappe.ui.form.on("OS Agent Registry", {
 	refresh(frm) {
 		if (frm.is_new() || frm.__os_agent_edit_mode) return;
 		render_details_view(frm);
