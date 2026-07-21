@@ -28,9 +28,23 @@ frappe.listview_settings["OS Agent Registry"] = {
 	// base_list.js calls settings.refresh(listview) after every data render
 	// (filter/sort/paginate/reload all pass through here).
 	refresh(listview) {
+		relabel_add_button(listview);
 		render_agent_cards(listview);
 	},
 };
+
+// The primary action is auto-labelled "Add {doctype}" — "Add OS Agent
+// Registry" here. Users think of these as "OS Agents", so relabel just the
+// button (not the doctype) to "Add OS Agent". Done on every refresh because
+// ListView.set_primary_action() runs during view setup, before this hook.
+function relabel_add_button(listview) {
+	const btn = listview.page && listview.page.btn_primary;
+	if (!btn || !btn.length) return;
+	const label = __("Add OS Agent");
+	const $span = btn.find("span"); // the single .hidden-xs label span
+	$span.length ? $span.text(label) : btn.text(label);
+	btn.attr("title", label).attr("data-label", label);
+}
 
 // parent name -> [tool_id, ...]; undefined means "not fetched yet". Tools are
 // immutable per render pass, so caching avoids re-querying on every redraw.
