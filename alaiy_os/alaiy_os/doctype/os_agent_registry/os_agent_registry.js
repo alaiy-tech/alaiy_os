@@ -3,16 +3,22 @@
 // .btn-primary primitives), with an Edit button that reveals the normal,
 // fully-editable field layout and a "View summary" toolbar button to switch
 // back without a reload. New/unsaved agents skip straight to the normal form
-// since there's nothing yet to summarise.
+// since there's nothing yet to summarise. Every entry point (List cards, Grid
+// tiles, direct links) lands here the same way.
 
 frappe.ui.form.on("OS Agent Registry", {
 	refresh(frm) {
-		// Arriving from a list card: open straight in the editable layout,
-		// skipping the read-only summary (flag set in os_agent_registry_list.js).
-		if (frappe._osAgentOpenInEdit && frappe._osAgentOpenInEdit === frm.doc.name) {
-			frappe._osAgentOpenInEdit = null;
-			frm.__os_agent_edit_mode = true;
+		// frm is the SAME instance reused for every OS Agent Registry record
+		// opened this session (Frappe caches one form controller per doctype,
+		// swapping frm.doc underneath it) -- so __os_agent_edit_mode set while
+		// viewing one agent would otherwise leak into every other agent
+		// opened afterwards. Reset it back to summary whenever the doc this
+		// flag was last set for doesn't match the one now loaded.
+		if (frm.__os_agent_edit_mode_for !== frm.doc.name) {
+			frm.__os_agent_edit_mode = false;
+			frm.__os_agent_edit_mode_for = frm.doc.name;
 		}
+
 		// New docs have nothing to summarise — stay in the editable layout.
 		if (frm.is_new()) {
 			frm.__os_agent_edit_mode = true;
@@ -73,39 +79,44 @@ function render_details_view(frm) {
 		: "";
 
 	const $details = $(`
-		<div class="frappe-card os-agent-details" style="margin-bottom: var(--s-gap);">
-			<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:var(--s-gap);">
-				<div style="display:flex; align-items:center; gap:14px;">
-					<img src="${avatar}" style="width:48px; height:48px; border-radius:var(--s-radius); object-fit:cover; box-shadow:var(--s-shadow-sm);">
-					<div>
-						<div style="font-family:var(--s-font-serif); font-weight:var(--s-heading-weight); font-size:20px; color:var(--s-heading);">
-							${frappe.utils.escape_html(title)}
-						</div>
-						<div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
-							${statusPill}
-							<code class="text-muted" style="font-size:12px;">${frappe.utils.escape_html(frm.doc.agent_id || "")}</code>
+		<div class="os-agent-details-wrapper">
+			<div class="frappe-card os-agent-details" style="margin-bottom: var(--s-gap);">
+				<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:var(--s-gap);">
+					<div style="display:flex; align-items:center; gap:14px;">
+						<img src="${avatar}" style="width:48px; height:48px; border-radius:var(--s-radius); object-fit:cover; box-shadow:var(--s-shadow-sm);">
+						<div>
+							<div style="font-family:var(--s-font-serif); font-weight:var(--s-heading-weight); font-size:20px; color:var(--s-heading);">
+								${frappe.utils.escape_html(title)}
+							</div>
+							<div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
+								${statusPill}
+								<code class="text-muted" style="font-size:12px;">${frappe.utils.escape_html(frm.doc.agent_id || "")}</code>
+							</div>
 						</div>
 					</div>
+					<button class="btn btn-primary btn-sm os-agent-edit-btn">${__("Edit")}</button>
 				</div>
-				<button class="btn btn-primary btn-sm os-agent-edit-btn">${__("Edit")}</button>
+
+				${descHtml}
+
+				<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:var(--s-gap); margin-bottom:var(--s-gap);">
+					<div><div class="control-label">${__("Model")}</div><div>${frappe.utils.escape_html(frm.doc.model || "")}</div></div>
+					<div><div class="control-label">${__("Max Turns")}</div><div>${frm.doc.max_turns || 0}</div></div>
+					<div><div class="control-label">${__("Output Format")}</div><div>${frappe.utils.escape_html(frm.doc.output_format || "")}</div></div>
+				</div>
+
+				<div>
+					<div class="control-label">${__("Tools it can use")}</div>
+					<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${toolsHtml}</div>
+				</div>
 			</div>
 
-			${descHtml}
-
-			<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:var(--s-gap); margin-bottom:var(--s-gap);">
-				<div><div class="control-label">${__("Model")}</div><div>${frappe.utils.escape_html(frm.doc.model || "")}</div></div>
-				<div><div class="control-label">${__("Max Turns")}</div><div>${frm.doc.max_turns || 0}</div></div>
-				<div><div class="control-label">${__("Output Format")}</div><div>${frappe.utils.escape_html(frm.doc.output_format || "")}</div></div>
-			</div>
-
-			<div style="margin-bottom:var(--s-gap);">
-				<div class="control-label">${__("Tools it can use")}</div>
-				<div style="margin-top:6px; display:flex; gap:6px; flex-wrap:wrap;">${toolsHtml}</div>
-			</div>
-
-			<div>
-				<div class="control-label">${__("System prompt")}</div>
-				<div class="os-agent-prompt" style="margin-top:6px; max-height:340px; overflow:auto; padding:12px 16px; border:1px solid var(--border-color); border-radius:var(--s-radius); background:var(--control-bg);">
+			<div class="frappe-card os-agent-prompt-card">
+				<div style="display:flex; align-items:center; gap:10px; margin-bottom:var(--s-gap);">
+					<span style="display:flex; color:var(--s-muted, var(--text-muted));">${frappe.utils.icon("file-text", "sm")}</span>
+					<div class="control-label" style="font-size:13px; margin:0;">${__("System Prompt")}</div>
+				</div>
+				<div class="os-agent-prompt" style="padding:16px 20px; border:1px solid var(--border-color); border-radius:var(--s-radius); background:var(--control-bg); line-height:1.65;">
 					${promptHtml}
 				</div>
 			</div>
