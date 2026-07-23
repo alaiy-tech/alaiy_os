@@ -147,9 +147,16 @@ def skip_erpnext_onboarding():
 # ── Role ─────────────────────────────────────────────────────────────────────
 
 def create_or_update_role():
-    """Create the OS Manager role as a standard role with the OS home page."""
+    """Create the OS Manager role with the OS home page.
+
+    "is_standard" was never a real field on Role (frappe/core/doctype/role)
+    — it only exists on frappe.get_doc({...}).insert(), which silently drops
+    unknown keys when building the INSERT; frappe.db.set_value(dt, name, {...})
+    below builds a raw UPDATE from the dict's keys as-is, so on every re-run
+    after the first (bench migrate, once the Role already exists) it failed
+    with "Unknown column 'is_standard'".
+    """
     role_data = {
-        "is_standard": 1,
         "desk_access": 1,
         "home_page":   "/desk/os",
     }
