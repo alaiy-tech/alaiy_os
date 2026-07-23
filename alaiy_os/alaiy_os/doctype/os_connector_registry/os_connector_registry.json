@@ -14,6 +14,7 @@
   "icon",
   "icon_url",
   "settings_doctype",
+  "listing_doctype",
   "test_method",
   "sync_categories_method",
   "sync_items_method",
@@ -72,6 +73,12 @@
    "fieldname": "settings_doctype",
    "fieldtype": "Data",
    "label": "Settings DocType Name"
+  },
+  {
+   "description": "Per-connector DocType holding marketplace-specific product listing overrides (title/description/images/price/variants). Lets a generic listing/enrichment agent discover which DocType to write to for a given connector, without connector-specific code.",
+   "fieldname": "listing_doctype",
+   "fieldtype": "Data",
+   "label": "Listing DocType Name"
   },
   {
    "fieldname": "test_method",
