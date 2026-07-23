@@ -11,7 +11,7 @@ def get_all_connectors():
         fields=[
             "connector_id", "connector_name", "connector_app",
             "connector_type", "description", "icon", "icon_url",
-            "settings_doctype", "test_method",
+            "settings_doctype", "listing_doctype", "test_method",
             "sync_categories_method", "sync_items_method", "sync_status_method",
             "sync_categories_label", "sync_items_label",
             "is_enabled", "connection_status", "last_tested_at",
