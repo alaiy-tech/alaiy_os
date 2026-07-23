@@ -394,8 +394,7 @@ textarea.form-control, .like-disabled-input, .ql-editor {
 	border-top: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
 	border-bottom: var(--s-border-width) var(--s-border-style) var(--s-border) !important;
 	padding: 12px 16px !important;
-	align-items: center !important; flex-wrap: nowrap !important;
-	overflow-x:scroll !important;
+	align-items: center !important;
 }
 .page-form .standard-filter-section, .page-form .filter-selector, .page-form .sort-selector {
 	display: flex !important; align-items: center !important; margin: 0 !important; align-self: center !important;
