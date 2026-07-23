@@ -8,6 +8,13 @@ required_apps = ["erpnext"]
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
 
+# AI client seam. Agents call llm.complete(), which resolves this scalar hook
+# and delegates. The default is a BYOK client (customer-supplied Anthropic key).
+# A managed bench installs a private app *after* alaiy_os that re-registers this
+# hook to route through our LiteLLM proxy — install order decides the winner, so
+# no conditional logic is needed anywhere in agent or executor code.
+ai_client = "alaiy_os.engine.ai_client.get_ai_client"
+
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
