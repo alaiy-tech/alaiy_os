@@ -490,7 +490,6 @@ _DIM_FIELD_TOKENS = {f: f"--s-{f.replace('_', '-')}" for f in _DIM_FIELDS}
 class OSThemeSettings(Document):
     def on_update(self):
         self._apply_logos()
-        self._write_custom_css()
         frappe.clear_cache()
 
     def _sites_assets_images_dir(self):
@@ -573,14 +572,3 @@ class OSThemeSettings(Document):
         root_block = self._build_root_block()
         parts = [p for p in (font_import, root_block, _ENGINE_AND_COMPONENTS_CSS) if p]
         return "\n\n".join(parts) + "\n"
-
-    def _custom_css_path(self):
-        # Site-specific, not app-specific: this is per-site generated output
-        # (and the app source tree is shared across every site on the bench),
-        # not something that belongs in the git-tracked app package.
-        return frappe.get_site_path("custom_theme.css")
-
-    def _write_custom_css(self):
-        content = self.build_css() if self.enable_custom_theme else ""
-        with open(self._custom_css_path(), "w", encoding="utf-8") as f:
-            f.write(content)
