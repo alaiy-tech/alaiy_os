@@ -77,16 +77,31 @@ def _run_provisioning():
         configure_navbar,
         configure_portal_settings,
     ]
+    failed = []
     for step in steps:
         try:
             step()
         except Exception:
+            failed.append(step.__name__)
             frappe.log_error(
                 title=f"Alaiy OS: provisioning step {step.__name__} failed",
                 message=frappe.get_traceback(),
             )
     frappe.db.commit()
     frappe.clear_cache()
+
+    # Each step is independently try/except-wrapped above so one broken step
+    # (e.g. a schema mismatch on an upgrade) never blocks the rest — but that
+    # also means a failure is otherwise invisible outside the Error Log.
+    # Print a summary so whoever ran bench migrate/install-app sees it.
+    succeeded = len(steps) - len(failed)
+    if failed:
+        print(
+            f"Alaiy OS: {succeeded}/{len(steps)} provisioning steps succeeded; "
+            f"see Error Log for: {', '.join(failed)}"
+        )
+    else:
+        print(f"Alaiy OS: {succeeded}/{len(steps)} provisioning steps succeeded.")
 
 
 def skip_erpnext_onboarding():

@@ -37,9 +37,27 @@ app_logo_url = "/assets/images/client-logo-square.png"
 import time as _time
 _V = str(int(_time.time()))
 
+# Load order below is dependency order, not stylistic — each file reads
+# globals only earlier files define, and none of them use frappe.provide()
+# for these shared constants/helpers, so nothing enforces this at build time
+# beyond this comment:
+#   roles.js             defines ALAIY_OS_ROUTE
+#   workspace_config.js  defines ALAIY_SIDEBAR_CONFIG, ALAIY_LABEL_TO_DOCTYPE,
+#                        ALAIY_SKIP_LABELS (generated server-side — see
+#                        alaiy_os.api.workspace.sidebar_config_js; there is no
+#                        public/constants/workspace_config.js file)
+#   route_titles.js      defines ALAIY_ROUTE_TITLES, ALAIY_ROUTE_PREFIX_TITLES
+#   alaiy_ui.js          reads ALAIY_ROUTE_TITLES/ALAIY_ROUTE_PREFIX_TITLES;
+#                        defines window.updateAlaiyTitle/window.resolveAlaiySection
+#   alaiy_workspace.js   reads ALAIY_OS_ROUTE, ALAIY_SIDEBAR_CONFIG,
+#                        ALAIY_LABEL_TO_DOCTYPE, ALAIY_SKIP_LABELS
+#   route_guard.js       reads window.resolveAlaiySection/updateAlaiyTitle
+#   alaiy_connector_card.js  no dependency on the above; order-independent
+# Reordering this list will silently break with a ReferenceError at runtime —
+# there is no compiler or bundler here to catch it.
 app_include_js = [
     f"/assets/alaiy_os/constants/roles.js?v={_V}",
-    f"/assets/alaiy_os/constants/workspace_config.js?v={_V}",
+    f"/api/method/alaiy_os.api.workspace.sidebar_config_js?v={_V}",
     f"/assets/alaiy_os/constants/route_titles.js?v={_V}",
     f"/assets/alaiy_os/js/alaiy_ui.js?v={_V}",
     f"/assets/alaiy_os/js/alaiy_workspace.js?v={_V}",
