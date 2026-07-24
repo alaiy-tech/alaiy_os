@@ -345,6 +345,7 @@ def provision_shared_doctypes():
     _create_item_supplier_attribute()
     _create_supplier_item_availability()
     _create_channel_listing()
+    _create_item_dimension_fields()
     frappe.db.commit()
 
 
@@ -448,6 +449,61 @@ def _create_channel_listing():
             "fieldtype": "Table",
             "options": "Channel Listing",
             "insert_after": "supplier_attributes",
+        }).insert(ignore_permissions=True)
+
+
+def _create_item_dimension_fields():
+    """
+    Add physical dimension fields (Width / Length / Height + a shared
+    Dimension UOM) to Item, grouped next to ERPNext's native weight fields.
+    Each Custom Field is guarded independently so this stays idempotent and
+    can backfill fields added after an earlier deploy.
+    """
+    dimension_fields = [
+        {
+            "fieldname": "dimensions_section",
+            "label": "Dimensions",
+            "fieldtype": "Section Break",
+            "insert_after": "weight_uom",
+        },
+        {
+            "fieldname": "width",
+            "label": "Width",
+            "fieldtype": "Float",
+            "insert_after": "dimensions_section",
+            "description": "Physical width, expressed in the Dimension UOM.",
+        },
+        {
+            "fieldname": "length",
+            "label": "Length",
+            "fieldtype": "Float",
+            "insert_after": "width",
+            "description": "Physical length, expressed in the Dimension UOM.",
+        },
+        {
+            "fieldname": "height",
+            "label": "Height",
+            "fieldtype": "Float",
+            "insert_after": "length",
+            "description": "Physical height, expressed in the Dimension UOM.",
+        },
+        {
+            "fieldname": "dimension_uom",
+            "label": "Dimension UOM",
+            "fieldtype": "Link",
+            "options": "UOM",
+            "insert_after": "height",
+            "description": "Unit of measure for Width / Length / Height (e.g. Centimeter, Inch).",
+        },
+    ]
+    for field in dimension_fields:
+        name = f"Item-{field['fieldname']}"
+        if frappe.db.exists("Custom Field", name):
+            continue
+        frappe.get_doc({
+            "doctype": "Custom Field",
+            "dt": "Item",
+            **field,
         }).insert(ignore_permissions=True)
 
 
