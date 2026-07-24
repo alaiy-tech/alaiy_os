@@ -17,10 +17,10 @@ on_login = "alaiy_os.setup.boot.on_login"
 # home-page hook just substitutes the *template* rendered at "/" without
 # changing the browser's actual URL, so the desk SPA boots seeing path "/"
 # and falls back to its own default ("Dashboard") instead of "os". A real
-# redirect sends the browser to an actual /desk/os request, which does hit
+# redirect sends the browser to an actual /desk/ask-alaiy request, which does hit
 # that fast path — exactly how /app already behaves (301 -> /desk).
 website_redirects = [
-    {"source": "/", "target": "/desk/os"},
+    {"source": "/", "target": "/desk/ask-alaiy"},
 ]
 get_website_user_home_page = "alaiy_os.setup.boot.get_home_page"
 

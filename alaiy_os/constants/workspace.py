@@ -19,8 +19,6 @@ WORKSPACE_SHORTCUTS = [
         "label": "Ask Alaiy",   "color": "purple"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Dashboard",   "color": "blue"},
-    {"type": "DocType", "link_to": "Stock Entry",
-        "label": "My Pinned",   "color": "green"},
 ]
 
 WORKSPACE_LINKS = [
@@ -163,12 +161,10 @@ WORKSPACE_LINKS = [
 # else needs updating here. icon names are Lucide/Frappe icon names.
 WORKSPACE_SIDEBAR_ITEMS = [
     # ── Top standalone actions ─────────────────────────────────────────────────
-    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+    {"type": "Link", "link_type": "Page", "link_to": "ask-alaiy",
      "label": "Ask Alaiy",  "child": 0, "indent": 0, "icon": "sparkles"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "Dashboard",  "child": 0, "indent": 0, "icon": "layout-dashboard"},
-    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
 
     # ── Catalog ────────────────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Catalog",

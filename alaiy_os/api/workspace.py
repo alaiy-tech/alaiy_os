@@ -13,7 +13,7 @@ def _to_sidebar_config(items):
 	interceptor (public/js/alaiy_workspace.js) only needs to know, per label,
 	whether it's a section header, a DocType link (and if so which DocType),
 	or anything else it should leave alone (a Workspace link, e.g. "Settings"
-	or the top "Ask Alaiy"/"Dashboard"/"My Pinned" actions) — so this is a
+	or the top "Ask Alaiy"/"Dashboard" actions) — so this is a
 	pure, deterministic reshaping of the one list of items, not a second copy
 	of the data itself.
 	"""

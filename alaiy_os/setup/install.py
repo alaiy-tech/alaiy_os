@@ -158,7 +158,7 @@ def create_or_update_role():
     """
     role_data = {
         "desk_access": 1,
-        "home_page":   "/desk/os",
+        "home_page":   "/desk/ask-alaiy",
     }
     if not frappe.db.exists("Role", OS_MANAGER_ROLE):
         frappe.get_doc({
