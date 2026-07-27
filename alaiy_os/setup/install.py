@@ -598,6 +598,40 @@ def _build_connector_workspace_links():
     return links
 
 
+def _build_connector_settings_workspace_links():
+    """Connectors card on the OS Settings workspace body: one Link per
+    installed connector, straight to its settings DocType (not the Page
+    dashboard -- this is the settings hub, not the operational one)."""
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    links = [{"type": "Card Break", "label": "Connectors", "icon": "plug"}]
+    for row in rows:
+        links.append({
+            "type": "Link", "link_type": "DocType",
+            "link_to": row.settings_doctype, "label": row.connector_name,
+        })
+    return links
+
+
+def _build_connector_settings_sidebar_items():
+    """Connectors section in the OS Settings sidebar: one Link per
+    installed connector, straight to its settings DocType."""
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    items = [{"type": "Section Break", "label": "Connectors",
+              "icon": "plug", "child": 0, "indent": 1}]
+    for row in rows:
+        items.append({
+            "type": "Link", "link_type": "DocType", "link_to": row.settings_doctype,
+            "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
+        })
+    return items
+
+
 def _connector_extra_sidebar_items(connector_id):
     """
     Extra sidebar rows (e.g. "Listings") a connector app wants under its own
@@ -808,7 +842,7 @@ def create_or_update_workspace_sidebar():
 
 def _build_os_settings_content():
     blocks = []
-    links = list(SETTINGS_WORKSPACE_LINKS)
+    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
     for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
@@ -822,7 +856,7 @@ def _build_os_settings_content():
 def create_or_update_os_settings_workspace():
     content = _build_os_settings_content()
     title = _get_os_settings_workspace_title()
-    links = list(SETTINGS_WORKSPACE_LINKS)
+    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
 
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
@@ -865,6 +899,7 @@ def create_or_update_os_settings_workspace():
 
 def create_or_update_os_settings_workspace_sidebar():
     items = list(SETTINGS_WORKSPACE_SIDEBAR_ITEMS)
+    items += _build_connector_settings_sidebar_items()
     items += _build_log_items()
 
     # Title must stay == SETTINGS_WORKSPACE_NAME — see create_or_update_workspace_sidebar().
