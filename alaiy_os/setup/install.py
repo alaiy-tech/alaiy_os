@@ -23,6 +23,7 @@ from alaiy_os.constants.workspace import (
     WORKSPACE_SHORTCUTS,
     WORKSPACE_LINKS,
     WORKSPACE_SIDEBAR_ITEMS,
+    WORKSPACE_SIDEBAR_SETTINGS_ITEM,
 )
 from alaiy_os.constants.workspace_settings import (
     SETTINGS_WORKSPACE_NAME,
@@ -807,7 +808,11 @@ def create_or_update_workspace():
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
 def create_or_update_workspace_sidebar():
-    items = list(WORKSPACE_SIDEBAR_ITEMS) + _build_connector_sidebar_items()
+    items = (
+        list(WORKSPACE_SIDEBAR_ITEMS)
+        + _build_connector_sidebar_items()
+        + [WORKSPACE_SIDEBAR_SETTINGS_ITEM]
+    )
     # Title must stay == WORKSPACE_NAME: Workspace Sidebar autonames from
     # title, and that name must match the Workspace's own (fixed) name for
     # Frappe's client-side sidebar lookup to find it.
