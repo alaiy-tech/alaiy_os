@@ -598,21 +598,67 @@ def _build_connector_workspace_links():
     return links
 
 
+def _connector_extra_sidebar_items(connector_id):
+    """
+    Extra sidebar rows (e.g. "Listings") a connector app wants under its own
+    top-level section, beyond the automatic Dashboard link. Declared via:
+
+        alaiy_os_sidebar_connector_items = [
+            {"connector_id": "shopify", "label": "Listings",
+             "link_type": "DocType", "link_to": "Shopify Product Listing",
+             "icon": "list"},
+        ]
+
+    Nothing connector-specific lives in alaiy_os itself -- each connector
+    app registers its own rows, filtered here by connector_id and by
+    whether the target actually exists.
+    """
+    entries = []
+    for hook_entries in frappe.get_hooks("alaiy_os_sidebar_connector_items"):
+        for entry in (hook_entries if isinstance(hook_entries, list) else [hook_entries]):
+            if entry.get("connector_id") != connector_id:
+                continue
+            link_type = entry.get("link_type", "DocType")
+            link_to = (entry.get("link_to") or "").strip()
+            if not link_to:
+                continue
+            if link_type == "DocType" and not frappe.db.exists("DocType", link_to):
+                continue
+            if link_type == "Page" and not frappe.db.exists("Page", link_to):
+                continue
+            entries.append({
+                "type": "Link", "link_type": link_type, "link_to": link_to,
+                "label": entry.get("label", link_to), "child": 1,
+                "icon": entry.get("icon", "chevron-right"),
+            })
+    return entries
+
+
 def _build_connector_sidebar_items():
-    """Connectors section in the main OS sidebar: one Link per installed
-    connector."""
+    """
+    Each installed connector gets its OWN top-level section in the main OS
+    sidebar (sibling to Catalog, Inventory, Sales, ...) instead of being
+    nested one level deeper under a shared "Connectors" heading. Every
+    section always has a Dashboard link (the connector's Page if it has
+    one, else its settings DocType); connector apps can add more rows
+    (e.g. Listings) via the alaiy_os_sidebar_connector_items hook. No
+    connector name is hard-coded here -- rows come from OS Connector
+    Registry and each app's own hook.
+    """
     rows = [r for r in _connector_registry_rows()
             if frappe.db.exists("DocType", r.settings_doctype)]
     if not rows:
         return []
-    items = [{"type": "Section Break", "label": "Connectors",
-              "icon": "plug", "child": 0, "indent": 1}]
+    items = []
     for row in rows:
+        items.append({"type": "Section Break", "label": row.connector_name,
+                       "icon": row.icon or "plug", "child": 0, "indent": 1})
         link_type, link_to = _connector_link_target(row)
         items.append({
             "type": "Link", "link_type": link_type, "link_to": link_to,
-            "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
+            "label": "Dashboard", "child": 1, "icon": "layout-dashboard",
         })
+        items.extend(_connector_extra_sidebar_items(row.connector_id))
     return items
 
 

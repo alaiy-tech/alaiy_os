@@ -309,7 +309,9 @@ SETTINGS_WORKSPACE_SIDEBAR_ITEMS = [
 
     # ── Connectors + Logs ─────────────────────────────────────────────────────
     # Both sections are built dynamically by setup/install.py:
-    #   - Connectors: one Link per row in OS Connector Registry
+    #   - Connectors: one top-level section per row in OS Connector Registry
+    #     (Dashboard + whatever the connector adds via
+    #     alaiy_os_sidebar_connector_items, e.g. Listings)
     #   - Logs: connector apps' alaiy_os_sidebar_log_items hook entries
     # See _build_connector_sidebar_items() / _build_log_items(). Nothing
     # hard-coded here so newly installed connectors show up automatically.
