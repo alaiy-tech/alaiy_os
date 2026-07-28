@@ -1,0 +1,72 @@
+[
+ {
+  "doctype": "Custom Field",
+  "name": "Item-supplier_attributes",
+  "dt": "Item",
+  "fieldname": "supplier_attributes",
+  "label": "Supplier Attributes",
+  "fieldtype": "Table",
+  "options": "Item Supplier Attribute",
+  "insert_after": "description"
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-channel_listings",
+  "dt": "Item",
+  "fieldname": "channel_listings",
+  "label": "Channel Listings",
+  "fieldtype": "Table",
+  "options": "Channel Listing",
+  "insert_after": "supplier_attributes"
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-dimensions_section",
+  "dt": "Item",
+  "fieldname": "dimensions_section",
+  "label": "Dimensions",
+  "fieldtype": "Section Break",
+  "insert_after": "weight_uom"
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-width",
+  "dt": "Item",
+  "fieldname": "width",
+  "label": "Width",
+  "fieldtype": "Float",
+  "insert_after": "dimensions_section",
+  "description": "Physical width, expressed in the Dimension UOM."
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-length",
+  "dt": "Item",
+  "fieldname": "length",
+  "label": "Length",
+  "fieldtype": "Float",
+  "insert_after": "width",
+  "description": "Physical length, expressed in the Dimension UOM."
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-height",
+  "dt": "Item",
+  "fieldname": "height",
+  "label": "Height",
+  "fieldtype": "Float",
+  "insert_after": "length",
+  "description": "Physical height, expressed in the Dimension UOM."
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Item-dimension_uom",
+  "dt": "Item",
+  "fieldname": "dimension_uom",
+  "label": "Dimension UOM",
+  "fieldtype": "Link",
+  "options": "UOM",
+  "insert_after": "height",
+  "description": "Unit of measure for Width / Length / Height (e.g. Centimeter, Inch)."
+ }
+]
