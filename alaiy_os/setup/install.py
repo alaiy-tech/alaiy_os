@@ -22,6 +22,7 @@ Data definitions:
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 
 import frappe
 
