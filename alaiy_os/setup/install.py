@@ -4,6 +4,15 @@ Alaiy OS — provisioning logic.
 Runs on after_install (fresh install) and after_migrate (every deploy).
 Reconciles the site's workspace, branding and company to match this codebase.
 
+Only genuinely dynamic reconciliation lives here — state that depends on
+runtime DB content (which connectors are registered, the site's company
+name) or on other apps' hooks. Static, one-time seed data (the OS Manager
+role, the Item custom fields backing the shared connector doctypes) is
+declared in hooks.py's `fixtures` list instead and synced automatically by
+Frappe's own fixtures mechanism on every bench migrate — see
+alaiy_os/fixtures/*.json. Module Def needs no provisioning code at all:
+Frappe creates it automatically from modules.txt.
+
 Data definitions:
   constants/roles.py       — OS_MANAGER_ROLE
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
@@ -67,7 +76,6 @@ def _run_provisioning():
     steps = [
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
-        create_module_def,
         delete_desktop_page,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
@@ -356,23 +364,6 @@ def configure_navbar():
 
 def configure_portal_settings():
     frappe.db.set_single_value("Portal Settings", "default_portal_home", "/desk/os")
-
-
-# ── Module Def ────────────────────────────────────────────────────────────────
-
-def create_module_def():
-    if not frappe.db.exists("Module Def", MODULE_NAME):
-        frappe.get_doc({
-            "doctype":     "Module Def",
-            "module_name": MODULE_NAME,
-            "app_name":    "alaiy_os",
-            "custom":      1,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Module Def", MODULE_NAME, {
-            "app_name": "alaiy_os",
-            "custom":   1,
-        })
 
 
 # ── Workspace naming ──────────────────────────────────────────────────────────
