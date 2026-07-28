@@ -199,6 +199,28 @@ def delete_desktop_page():
 
 # ── Foreign workspace restriction ───────────────────────────────────────────────
 
+def _foreign_workspace_allowlist():
+    """
+    Workspace names and/or owning-app names that restrict_foreign_workspaces()
+    (and the Welcome Workspace hard-delete alongside it) should leave alone —
+    entries aren't distinguished as "name" vs "app"; a Workspace is skipped if
+    either its own name or its owning app matches any entry. Populated from:
+
+      - site_config.json's "alaiy_os_foreign_workspace_allowlist" — a list,
+        for a specific site's own exception (e.g. ["Welcome Workspace"] to
+        keep the stock one on this site only).
+      - the alaiy_os_foreign_workspace_allowlist hook, e.g. in another app's
+        own hooks.py:
+            alaiy_os_foreign_workspace_allowlist = ["some_app"]
+        so an app can protect its own workspace regardless of which site
+        it's installed on, without every site admin having to configure it.
+    """
+    entries = list(frappe.conf.get("alaiy_os_foreign_workspace_allowlist", []) or [])
+    for hook_entries in frappe.get_hooks("alaiy_os_foreign_workspace_allowlist"):
+        entries.extend(hook_entries if isinstance(hook_entries, list) else [hook_entries])
+    return set(entries)
+
+
 def _delete_welcome_workspace():
     """Hard-delete the stock "Welcome Workspace" (and its sidebar row, if
     any) — unlike every other foreign workspace, this one is removed
@@ -222,8 +244,20 @@ def restrict_foreign_workspaces():
     Re-runs on every after_migrate so new workspaces introduced by future
     app/ERPNext updates get caught too. Our own workspaces (OS, OS Settings)
     are left untouched.
+
+    Set "alaiy_os_restrict_foreign_workspaces": false in site_config.json to
+    disable this step entirely on a given site — e.g. a site that genuinely
+    wants another installed app's workspace to stay visible/editable by
+    non-Administrator roles. For a narrower opt-out, see
+    _foreign_workspace_allowlist().
     """
-    _delete_welcome_workspace()
+    if not frappe.conf.get("alaiy_os_restrict_foreign_workspaces", True):
+        return
+
+    allowlist = _foreign_workspace_allowlist()
+
+    if "Welcome Workspace" not in allowlist:
+        _delete_welcome_workspace()
 
     own_names = {WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME}
     rows = frappe.get_all(
@@ -232,7 +266,13 @@ def restrict_foreign_workspaces():
         fields=["name", "app"],
     )
     for row in rows:
-        if row.name in own_names or row.app == "alaiy_os" or row.name == "Welcome Workspace":
+        if (
+            row.name in own_names
+            or row.app == "alaiy_os"
+            or row.name == "Welcome Workspace"
+            or row.name in allowlist
+            or (row.app and row.app in allowlist)
+        ):
             continue
         try:
             doc = frappe.get_doc("Workspace", row.name)
@@ -240,11 +280,14 @@ def restrict_foreign_workspaces():
             doc.set("roles", [{"role": "Administrator"}])
             doc.flags.ignore_validate = True
             doc.flags.ignore_links = True
-            # Some stock ERPNext/Frappe workspaces (e.g. "Welcome Workspace")
-            # ship with legacy/partial records missing newer mandatory
-            # fields (e.g. `type`). We're only touching is_hidden/roles here,
-            # not fixing their data — ignore_mandatory keeps that out of scope.
-            doc.flags.ignore_mandatory = True
+            # No ignore_mandatory here: the one stock workspace known to ship
+            # with legacy missing-mandatory-field data ("Welcome Workspace")
+            # is hard-deleted above, before this loop ever sees it — nothing
+            # left in this loop is a known-bad record, so this app shouldn't
+            # blanket-bypass mandatory-field guarantees on documents it
+            # doesn't own. If some other foreign workspace genuinely can't
+            # save without it, that surfaces in the Error Log below instead
+            # of being silently skipped.
             doc.save(ignore_permissions=True)
         except Exception:
             frappe.log_error(
