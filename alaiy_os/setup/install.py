@@ -58,6 +58,11 @@ def _cleanup_legacy_workspace():
 
 
 def _run_provisioning():
+    # Reset once per run so _connector_registry_rows() below fetches fresh
+    # data on the first call this run, then reuses it for every other step.
+    global _connector_registry_rows_cache
+    _connector_registry_rows_cache = None
+
     steps = [
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
@@ -562,15 +567,28 @@ def _get_os_settings_workspace_title():
     return f"{company} OS Settings" if company else SETTINGS_WORKSPACE_NAME
 
 
+_connector_registry_rows_cache = None
+
+
 def _connector_registry_rows():
+    # Called independently by several _build_connector_* helpers within one
+    # provisioning run; cache so that only costs one query per run instead of
+    # one per caller. _run_provisioning() resets the cache before each run.
+    global _connector_registry_rows_cache
+    if _connector_registry_rows_cache is not None:
+        return _connector_registry_rows_cache
+
     if not frappe.db.exists("DocType", "OS Connector Registry"):
-        return []
+        _connector_registry_rows_cache = []
+        return _connector_registry_rows_cache
+
     rows = frappe.get_all(
         "OS Connector Registry",
         fields=["connector_id", "connector_name", "settings_doctype", "icon"],
         order_by="connector_name asc",
     )
-    return [r for r in rows if r.get("settings_doctype")]
+    _connector_registry_rows_cache = [r for r in rows if r.get("settings_doctype")]
+    return _connector_registry_rows_cache
 
 
 def _connector_link_target(row):
@@ -845,9 +863,8 @@ def create_or_update_workspace_sidebar():
 
 # ── OS Settings Workspace ─────────────────────────────────────────────────────
 
-def _build_os_settings_content():
+def _build_os_settings_content(links):
     blocks = []
-    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
     for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
@@ -859,9 +876,9 @@ def _build_os_settings_content():
 
 
 def create_or_update_os_settings_workspace():
-    content = _build_os_settings_content()
-    title = _get_os_settings_workspace_title()
     links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
+    content = _build_os_settings_content(links)
+    title = _get_os_settings_workspace_title()
 
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
@@ -1008,10 +1025,3 @@ def create_or_update_onboarding():
             pass
         doc.flags.ignore_validate = True
         doc.save(ignore_permissions=True)
-
-    # Link or unlink from sidebar based on config flag
-    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
-        frappe.db.set_value(
-            "Workspace Sidebar", WORKSPACE_NAME,
-            "module_onboarding", ONBOARDING_NAME
-        )
