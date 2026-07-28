@@ -22,7 +22,9 @@
   "sync_items_label",
   "is_enabled",
   "connection_status",
-  "last_tested_at"
+  "last_tested_at",
+  "handlers_ok",
+  "handlers_health_detail"
  ],
  "fields": [
   {
@@ -124,6 +126,22 @@
    "fieldname": "last_tested_at",
    "fieldtype": "Datetime",
    "label": "Last Tested At",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "Set by the after_migrate health check. Unchecked means one or more of the dotted-path fields above no longer import or aren't callable — see Handlers Health Detail.",
+   "fieldname": "handlers_ok",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Handlers OK",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:!doc.handlers_ok",
+   "fieldname": "handlers_health_detail",
+   "fieldtype": "Small Text",
+   "label": "Handlers Health Detail",
    "read_only": 1
   }
  ],
