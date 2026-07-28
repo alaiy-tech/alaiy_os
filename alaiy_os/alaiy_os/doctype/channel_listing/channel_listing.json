@@ -1,0 +1,76 @@
+{
+ "creation": "2026-07-28 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "connector_name",
+  "channel",
+  "listed",
+  "external_product_id",
+  "external_variant_id",
+  "channel_url",
+  "last_pushed_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "connector_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Connector"
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Channel"
+  },
+  {
+   "default": "0",
+   "fieldname": "listed",
+   "fieldtype": "Check",
+   "label": "Listed"
+  },
+  {
+   "fieldname": "external_product_id",
+   "fieldtype": "Data",
+   "label": "External Product ID"
+  },
+  {
+   "fieldname": "external_variant_id",
+   "fieldtype": "Data",
+   "label": "External Variant ID"
+  },
+  {
+   "fieldname": "channel_url",
+   "fieldtype": "Data",
+   "label": "Channel URL"
+  },
+  {
+   "fieldname": "last_pushed_at",
+   "fieldtype": "Datetime",
+   "label": "Last Pushed At",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-07-28 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "Channel Listing",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

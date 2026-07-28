@@ -4,6 +4,15 @@ Alaiy OS — provisioning logic.
 Runs on after_install (fresh install) and after_migrate (every deploy).
 Reconciles the site's workspace, branding and company to match this codebase.
 
+Only genuinely dynamic reconciliation lives here — state that depends on
+runtime DB content (which connectors are registered, the site's company
+name) or on other apps' hooks. Static, one-time seed data (the OS Manager
+role, the Item custom fields backing the shared connector doctypes) is
+declared in hooks.py's `fixtures` list instead and synced automatically by
+Frappe's own fixtures mechanism on every bench migrate — see
+alaiy_os/fixtures/*.json. Module Def needs no provisioning code at all:
+Frappe creates it automatically from modules.txt.
+
 Data definitions:
   constants/roles.py       — OS_MANAGER_ROLE
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
@@ -67,10 +76,7 @@ def _run_provisioning():
     steps = [
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
-        create_module_def,
-        create_or_update_role,
         delete_desktop_page,
-        provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
         create_or_update_os_settings_workspace,
@@ -150,32 +156,6 @@ def skip_erpnext_onboarding():
     if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
         frappe.db.sql(
             "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
-
-
-# ── Role ─────────────────────────────────────────────────────────────────────
-
-def create_or_update_role():
-    """Create the OS Manager role with the OS home page.
-
-    "is_standard" was never a real field on Role (frappe/core/doctype/role)
-    — it only exists on frappe.get_doc({...}).insert(), which silently drops
-    unknown keys when building the INSERT; frappe.db.set_value(dt, name, {...})
-    below builds a raw UPDATE from the dict's keys as-is, so on every re-run
-    after the first (bench migrate, once the Role already exists) it failed
-    with "Unknown column 'is_standard'".
-    """
-    role_data = {
-        "desk_access": 1,
-        "home_page":   "/desk/ask-alaiy",
-    }
-    if not frappe.db.exists("Role", OS_MANAGER_ROLE):
-        frappe.get_doc({
-            "doctype":   "Role",
-            "role_name": OS_MANAGER_ROLE,
-            **role_data,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Role", OS_MANAGER_ROLE, role_data)
 
 
 # ── Desktop page removal ───────────────────────────────────────────────────────
@@ -384,195 +364,6 @@ def configure_navbar():
 
 def configure_portal_settings():
     frappe.db.set_single_value("Portal Settings", "default_portal_home", "/desk/os")
-
-
-# ── Shared Generic DocTypes ───────────────────────────────────────────────────
-
-def provision_shared_doctypes():
-    """
-    Create shared generic DocTypes used by all connector types.
-    Idempotent — skips creation if each DocType already exists.
-    """
-    _create_item_supplier_attribute()
-    _create_supplier_item_availability()
-    _create_channel_listing()
-    _create_item_dimension_fields()
-    frappe.db.commit()
-
-
-def _shared_permissions():
-    return [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
-
-
-def _create_item_supplier_attribute():
-    if frappe.db.exists("DocType", "Item Supplier Attribute"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Item Supplier Attribute",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "istable": 1,
-        "editable_grid": 1,
-        "fields": [
-            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
-             "label": "Supplier", "in_list_view": 1},
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "attribute_key", "fieldtype": "Data",
-             "label": "Key", "in_list_view": 1},
-            {"fieldname": "attribute_value",
-                "fieldtype": "Small Text", "label": "Value"},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-    if not frappe.db.exists("Custom Field", "Item-supplier_attributes"):
-        frappe.get_doc({
-            "doctype": "Custom Field",
-            "dt": "Item",
-            "fieldname": "supplier_attributes",
-            "label": "Supplier Attributes",
-            "fieldtype": "Table",
-            "options": "Item Supplier Attribute",
-            "insert_after": "description",
-        }).insert(ignore_permissions=True)
-
-
-def _create_supplier_item_availability():
-    if frappe.db.exists("DocType", "Supplier Item Availability"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Supplier Item Availability",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "fields": [
-            {"fieldname": "item_code", "fieldtype": "Link", "options": "Item",
-             "label": "Item Code", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
-             "label": "Supplier", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "available_qty", "fieldtype": "Float",
-             "label": "Available Qty", "in_list_view": 1},
-            {"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse",
-             "label": "Warehouse"},
-            {"fieldname": "last_updated", "fieldtype": "Datetime",
-             "label": "Last Updated", "read_only": 1},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-
-
-def _create_channel_listing():
-    if frappe.db.exists("DocType", "Channel Listing"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Channel Listing",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "istable": 1,
-        "editable_grid": 1,
-        "fields": [
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "channel", "fieldtype": "Data",
-             "label": "Channel", "in_list_view": 1},
-            {"fieldname": "listed", "fieldtype": "Check",
-             "label": "Listed", "default": "0"},
-            {"fieldname": "external_product_id", "fieldtype": "Data",
-             "label": "External Product ID"},
-            {"fieldname": "external_variant_id", "fieldtype": "Data",
-             "label": "External Variant ID"},
-            {"fieldname": "channel_url", "fieldtype": "Data", "label": "Channel URL"},
-            {"fieldname": "last_pushed_at", "fieldtype": "Datetime",
-             "label": "Last Pushed At", "read_only": 1},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-    if not frappe.db.exists("Custom Field", "Item-channel_listings"):
-        frappe.get_doc({
-            "doctype": "Custom Field",
-            "dt": "Item",
-            "fieldname": "channel_listings",
-            "label": "Channel Listings",
-            "fieldtype": "Table",
-            "options": "Channel Listing",
-            "insert_after": "supplier_attributes",
-        }).insert(ignore_permissions=True)
-
-
-def _create_item_dimension_fields():
-    """
-    Add physical dimension fields (Width / Length / Height + a shared
-    Dimension UOM) to Item, grouped next to ERPNext's native weight fields.
-    Each Custom Field is guarded independently so this stays idempotent and
-    can backfill fields added after an earlier deploy.
-    """
-    dimension_fields = [
-        {
-            "fieldname": "dimensions_section",
-            "label": "Dimensions",
-            "fieldtype": "Section Break",
-            "insert_after": "weight_uom",
-        },
-        {
-            "fieldname": "width",
-            "label": "Width",
-            "fieldtype": "Float",
-            "insert_after": "dimensions_section",
-            "description": "Physical width, expressed in the Dimension UOM.",
-        },
-        {
-            "fieldname": "length",
-            "label": "Length",
-            "fieldtype": "Float",
-            "insert_after": "width",
-            "description": "Physical length, expressed in the Dimension UOM.",
-        },
-        {
-            "fieldname": "height",
-            "label": "Height",
-            "fieldtype": "Float",
-            "insert_after": "length",
-            "description": "Physical height, expressed in the Dimension UOM.",
-        },
-        {
-            "fieldname": "dimension_uom",
-            "label": "Dimension UOM",
-            "fieldtype": "Link",
-            "options": "UOM",
-            "insert_after": "height",
-            "description": "Unit of measure for Width / Length / Height (e.g. Centimeter, Inch).",
-        },
-    ]
-    for field in dimension_fields:
-        name = f"Item-{field['fieldname']}"
-        if frappe.db.exists("Custom Field", name):
-            continue
-        frappe.get_doc({
-            "doctype": "Custom Field",
-            "dt": "Item",
-            **field,
-        }).insert(ignore_permissions=True)
-
-
-# ── Module Def ────────────────────────────────────────────────────────────────
-
-def create_module_def():
-    if not frappe.db.exists("Module Def", MODULE_NAME):
-        frappe.get_doc({
-            "doctype":     "Module Def",
-            "module_name": MODULE_NAME,
-            "app_name":    "alaiy_os",
-            "custom":      1,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Module Def", MODULE_NAME, {
-            "app_name": "alaiy_os",
-            "custom":   1,
-        })
 
 
 # ── Workspace naming ──────────────────────────────────────────────────────────
