@@ -8,6 +8,8 @@
   "tool_id",
   "description",
   "handler",
+  "handler_ok",
+  "handler_health_detail",
   "parameters_schema",
   "connector"
  ],
@@ -35,6 +37,22 @@
    "in_list_view": 1,
    "label": "Handler (Python dotted path)",
    "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Set by the after_migrate health check. Unchecked means this handler no longer imports or isn't callable — see Handler Health Detail.",
+   "fieldname": "handler_ok",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Handler OK",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:!doc.handler_ok",
+   "fieldname": "handler_health_detail",
+   "fieldtype": "Small Text",
+   "label": "Handler Health Detail",
+   "read_only": 1
   },
   {
    "description": "JSON Schema for the tool's arguments. Empty = tool takes no arguments.",

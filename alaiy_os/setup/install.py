@@ -32,6 +32,7 @@ from alaiy_os.constants.workspace_settings import (
     SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
 )
 from alaiy_os.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
+from alaiy_os.alaiy_os.doctype.os_connector_registry.os_connector_registry import _HANDLER_FIELDS
 
 MODULE_NAME = "Alaiy OS"
 
@@ -82,6 +83,7 @@ def _run_provisioning():
         configure_system_settings,
         configure_navbar,
         configure_portal_settings,
+        check_dotted_path_handlers,
     ]
     failed = []
     for step in steps:
@@ -1025,3 +1027,69 @@ def create_or_update_onboarding():
             pass
         doc.flags.ignore_validate = True
         doc.save(ignore_permissions=True)
+
+
+# ── Dotted-path handler health check ─────────────────────────────────────────
+#
+# OS Agent Tool.handler and OS Connector Registry's test_method/sync_*_method
+# fields are only validated once, at save time (OSAgentTool._validate_handler(),
+# OSConnectorRegistry._validate_handlers()). If the app providing one is later
+# uninstalled, or refactors the target function away, that's otherwise only
+# discovered the next time something actually calls it — engine/factory.py's
+# build_runnable() had no try/except around its frappe.get_attr() at all
+# before this, and api/connectors.py's test/sync calls just report a generic
+# {"success": False} either way. Re-check every registered path on every
+# migrate instead, and record the result on the row itself so it's visible
+# without waiting for a live failure.
+
+def _resolve_handler(path):
+    """(ok, detail) for a dotted path — ok only if it imports and is callable."""
+    try:
+        fn = frappe.get_attr(path)
+    except Exception:
+        return False, f"{path} could not be imported"
+    if not callable(fn):
+        return False, f"{path} is not callable"
+    return True, ""
+
+
+def _check_agent_tool_handlers():
+    if not frappe.db.exists("DocType", "OS Agent Tool"):
+        return
+    for row in frappe.get_all("OS Agent Tool", fields=["name", "handler"]):
+        if not row.handler:
+            continue
+        ok, detail = _resolve_handler(row.handler)
+        frappe.db.set_value(
+            "OS Agent Tool", row.name,
+            {"handler_ok": 1 if ok else 0, "handler_health_detail": detail},
+            update_modified=False,
+        )
+
+
+def _check_connector_registry_handlers():
+    if not frappe.db.exists("DocType", "OS Connector Registry"):
+        return
+    fields = ["name"] + list(_HANDLER_FIELDS.keys())
+    for row in frappe.get_all("OS Connector Registry", fields=fields):
+        problems = []
+        for fieldname, label in _HANDLER_FIELDS.items():
+            path = row.get(fieldname)
+            if not path:
+                continue
+            ok, detail = _resolve_handler(path)
+            if not ok:
+                problems.append(f"{label}: {detail}")
+        frappe.db.set_value(
+            "OS Connector Registry", row.name,
+            {
+                "handlers_ok": 0 if problems else 1,
+                "handlers_health_detail": "; ".join(problems),
+            },
+            update_modified=False,
+        )
+
+
+def check_dotted_path_handlers():
+    _check_agent_tool_handlers()
+    _check_connector_registry_handlers()
