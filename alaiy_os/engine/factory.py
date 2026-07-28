@@ -39,7 +39,18 @@ def build_runnable(agent_id):
 				f"Agent {agent_id} tool {row.tool_id} requires connector {row.connector},"
 				" which is not installed or not enabled."
 			)
-		handlers[row.tool_id] = frappe.get_attr(row.handler)
+		try:
+			handlers[row.tool_id] = frappe.get_attr(row.handler)
+		except Exception:
+			# Validated at save time (OSAgentTool._validate_handler()) and
+			# re-checked on every migrate (setup/install.py's
+			# check_dotted_path_handlers()), but the providing app can still
+			# go stale in between — fail with a clear message instead of an
+			# unhandled traceback.
+			frappe.throw(
+				f"Agent {agent_id} tool {row.tool_id}'s handler <code>{row.handler}</code>"
+				" could not be imported. See its Handler OK field."
+			)
 		tools.append(
 			{
 				"name": row.tool_id,
