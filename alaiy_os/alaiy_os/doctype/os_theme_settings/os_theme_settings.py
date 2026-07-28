@@ -551,14 +551,27 @@ class OSThemeSettings(Document):
             "--s-font-mono": "ui-monospace, Menlo, monospace",
         }
 
+        # A blank field falls back to this doctype's own JSON "default" —
+        # the one canonical set of defaults (os_theme_settings.js reads the
+        # same values via frappe.meta.get_docfield()) — not a second,
+        # independently hardcoded value.
+        meta = frappe.get_meta("OS Theme Settings")
+
+        def field_default(fieldname):
+            field = meta.get_field(fieldname)
+            return field.default if field else None
+
         root_lines = [":root {"]
         for fieldname, token in _LIGHT_COLOR_FIELDS:
-            root_lines.append(f"  {token}: {self.get(fieldname) or '#000000'};")
+            value = self.get(fieldname) or field_default(fieldname) or "#000000"
+            root_lines.append(f"  {token}: {value};")
         for fieldname, token in _FONT_FIELDS:
             root_lines.append(f"  {token}: {self._font_stack(self.get(fieldname), font_fallbacks[token])};")
         for fieldname in _DIM_FIELDS:
             token = _DIM_FIELD_TOKENS[fieldname]
             value = self.get(fieldname)
+            if value in (None, ""):
+                value = field_default(fieldname)
             if value not in (None, ""):
                 root_lines.append(f"  {token}: {value};")
         root_lines.append("}")
