@@ -91,6 +91,14 @@ app_include_css = [
     "/api/method/alaiy_os.api.theme.custom_theme_css",
 ]
 
+# Per-doctype form scripts. Unlike app_include_js these are read server-side and
+# inlined into the doctype's cached meta (frappe/desk/form/meta.py), so the path
+# is app-relative and needs no cache-busting param — a `bench clear-cache` /
+# migrate picks up edits.
+doctype_js = {
+    "Item": "public/js/item.js",
+}
+
 # Website assets (login page only — NOT the desk)
 web_include_css = [
     f"/assets/alaiy_os/css/login.css?v={_V}",
