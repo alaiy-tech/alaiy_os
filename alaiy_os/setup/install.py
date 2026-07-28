@@ -278,11 +278,14 @@ def restrict_foreign_workspaces():
             doc.set("roles", [{"role": "Administrator"}])
             doc.flags.ignore_validate = True
             doc.flags.ignore_links = True
-            # Some stock ERPNext/Frappe workspaces (e.g. "Welcome Workspace")
-            # ship with legacy/partial records missing newer mandatory
-            # fields (e.g. `type`). We're only touching is_hidden/roles here,
-            # not fixing their data — ignore_mandatory keeps that out of scope.
-            doc.flags.ignore_mandatory = True
+            # No ignore_mandatory here: the one stock workspace known to ship
+            # with legacy missing-mandatory-field data ("Welcome Workspace")
+            # is hard-deleted above, before this loop ever sees it — nothing
+            # left in this loop is a known-bad record, so this app shouldn't
+            # blanket-bypass mandatory-field guarantees on documents it
+            # doesn't own. If some other foreign workspace genuinely can't
+            # save without it, that surfaces in the Error Log below instead
+            # of being silently skipped.
             doc.save(ignore_permissions=True)
         except Exception:
             frappe.log_error(
