@@ -220,7 +220,15 @@ def restrict_foreign_workspaces():
     Re-runs on every after_migrate so new workspaces introduced by future
     app/ERPNext updates get caught too. Our own workspaces (OS, OS Settings)
     are left untouched.
+
+    Set "alaiy_os_restrict_foreign_workspaces": false in site_config.json to
+    disable this step entirely on a given site — e.g. a site that genuinely
+    wants another installed app's workspace to stay visible/editable by
+    non-Administrator roles.
     """
+    if not frappe.conf.get("alaiy_os_restrict_foreign_workspaces", True):
+        return
+
     _delete_welcome_workspace()
 
     own_names = {WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME}
