@@ -77,14 +77,16 @@
   {
    "description": "Settings DocType shipped by the agent app (API keys, toggles).",
    "fieldname": "settings_doctype",
-   "fieldtype": "Data",
-   "label": "Settings DocType"
+   "fieldtype": "Link",
+   "label": "Settings DocType",
+   "options": "DocType"
   },
   {
    "description": "Custom UI Page shipped by the agent app; sidebar links here when set.",
    "fieldname": "page",
-   "fieldtype": "Data",
-   "label": "Page"
+   "fieldtype": "Link",
+   "label": "Page",
+   "options": "Page"
   },
   {
    "fieldname": "engine_section",
