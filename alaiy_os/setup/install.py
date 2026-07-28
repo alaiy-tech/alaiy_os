@@ -863,9 +863,8 @@ def create_or_update_workspace_sidebar():
 
 # ── OS Settings Workspace ─────────────────────────────────────────────────────
 
-def _build_os_settings_content():
+def _build_os_settings_content(links):
     blocks = []
-    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
     for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
@@ -877,9 +876,9 @@ def _build_os_settings_content():
 
 
 def create_or_update_os_settings_workspace():
-    content = _build_os_settings_content()
-    title = _get_os_settings_workspace_title()
     links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
+    content = _build_os_settings_content(links)
+    title = _get_os_settings_workspace_title()
 
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
