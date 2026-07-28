@@ -19,8 +19,6 @@ WORKSPACE_SHORTCUTS = [
         "label": "Ask Alaiy",   "color": "purple"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Dashboard",   "color": "blue"},
-    {"type": "DocType", "link_to": "Stock Entry",
-        "label": "My Pinned",   "color": "green"},
 ]
 
 WORKSPACE_LINKS = [
@@ -163,12 +161,10 @@ WORKSPACE_LINKS = [
 # else needs updating here. icon names are Lucide/Frappe icon names.
 WORKSPACE_SIDEBAR_ITEMS = [
     # ── Top standalone actions ─────────────────────────────────────────────────
-    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
+    {"type": "Link", "link_type": "Page", "link_to": "ask-alaiy",
      "label": "Ask Alaiy",  "child": 0, "indent": 0, "icon": "sparkles"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "Dashboard",  "child": 0, "indent": 0, "icon": "layout-dashboard"},
-    {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
-     "label": "My Pinned",  "child": 0, "indent": 0, "icon": "pin"},
 
     # ── Catalog ────────────────────────────────────────────────────────────────
     {"type": "Section Break", "label": "Catalog",
@@ -340,9 +336,15 @@ WORKSPACE_SIDEBAR_ITEMS = [
     {"type": "Link", "link_type": "DocType", "link_to": "Currency Exchange",
      "label": "Currency Exchange",        "child": 1, "icon": "currency"},
 
-    # ── Settings ───────────────────────────────────────────────────────────────
-    # Positioned last, right where "Logs" used to sit — Logs itself now lives
-    # in the OS Settings sidebar (see workspace_settings.py) instead of here.
-    {"type": "Link", "link_type": "Workspace", "link_to": "OS Settings",
-     "label": "Settings",   "child": 0, "indent": 0, "icon": "settings"},
+    # Connector sections (one per installed connector) get appended after
+    # this list by setup/install.py::create_or_update_workspace_sidebar();
+    # "Settings" is appended after those (see WORKSPACE_SIDEBAR_SETTINGS_ITEM
+    # below) so it stays pinned at the very bottom, below the connectors.
 ]
+
+# Kept separate from WORKSPACE_SIDEBAR_ITEMS so it can be appended AFTER the
+# dynamically-built connector sections instead of before them.
+WORKSPACE_SIDEBAR_SETTINGS_ITEM = {
+    "type": "Link", "link_type": "Workspace", "link_to": "OS Settings",
+    "label": "Settings", "child": 0, "indent": 0, "icon": "settings",
+}

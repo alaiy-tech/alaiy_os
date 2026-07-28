@@ -4,6 +4,26 @@ app_publisher = "Alaiy"
 app_description = "Specialized E-commerce OS built on top of Frappe"
 app_version = "0.0.1"
 required_apps = ["erpnext"]
+
+# Static/one-time provisioning — seed data, synced (upserted) on every
+# bench migrate via Frappe's own fixtures mechanism instead of hand-rolled
+# frappe.db.set_value(dt, name, {...}) reconciliation in setup/install.py.
+# Only genuinely dynamic reconciliation (connector-driven sidebar building,
+# which depends on runtime OS Connector Registry state) stays procedural.
+fixtures = [
+    {"dt": "Role", "filters": [["name", "=", "OS Manager"]]},
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["dt", "=", "Item"],
+            ["fieldname", "in", [
+                "supplier_attributes", "channel_listings",
+                "dimensions_section", "width", "length", "height", "dimension_uom",
+            ]],
+        ],
+    },
+]
+
 # Provisioning hooks
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
@@ -24,10 +44,10 @@ on_login = "alaiy_os.setup.boot.on_login"
 # home-page hook just substitutes the *template* rendered at "/" without
 # changing the browser's actual URL, so the desk SPA boots seeing path "/"
 # and falls back to its own default ("Dashboard") instead of "os". A real
-# redirect sends the browser to an actual /desk/os request, which does hit
+# redirect sends the browser to an actual /desk/ask-alaiy request, which does hit
 # that fast path — exactly how /app already behaves (301 -> /desk).
 website_redirects = [
-    {"source": "/", "target": "/desk/os"},
+    {"source": "/", "target": "/desk/ask-alaiy"},
 ]
 get_website_user_home_page = "alaiy_os.setup.boot.get_home_page"
 
@@ -77,6 +97,14 @@ app_include_css = [
     # Settings save reflects on the next reload — see alaiy_os/api/theme.py.
     "/api/method/alaiy_os.api.theme.custom_theme_css",
 ]
+
+# Per-doctype form scripts. Unlike app_include_js these are read server-side and
+# inlined into the doctype's cached meta (frappe/desk/form/meta.py), so the path
+# is app-relative and needs no cache-busting param — a `bench clear-cache` /
+# migrate picks up edits.
+doctype_js = {
+    "Item": "public/js/item.js",
+}
 
 # Website assets (login page only — NOT the desk)
 web_include_css = [

@@ -4,6 +4,15 @@ Alaiy OS — provisioning logic.
 Runs on after_install (fresh install) and after_migrate (every deploy).
 Reconciles the site's workspace, branding and company to match this codebase.
 
+Only genuinely dynamic reconciliation lives here — state that depends on
+runtime DB content (which connectors are registered, the site's company
+name) or on other apps' hooks. Static, one-time seed data (the OS Manager
+role, the Item custom fields backing the shared connector doctypes) is
+declared in hooks.py's `fixtures` list instead and synced automatically by
+Frappe's own fixtures mechanism on every bench migrate — see
+alaiy_os/fixtures/*.json. Module Def needs no provisioning code at all:
+Frappe creates it automatically from modules.txt.
+
 Data definitions:
   constants/roles.py       — OS_MANAGER_ROLE
   constants/workspace.py   — WORKSPACE_NAME, shortcuts, links, sidebar items
@@ -23,6 +32,7 @@ from alaiy_os.constants.workspace import (
     WORKSPACE_SHORTCUTS,
     WORKSPACE_LINKS,
     WORKSPACE_SIDEBAR_ITEMS,
+    WORKSPACE_SIDEBAR_SETTINGS_ITEM,
 )
 from alaiy_os.constants.workspace_settings import (
     SETTINGS_WORKSPACE_NAME,
@@ -31,6 +41,7 @@ from alaiy_os.constants.workspace_settings import (
     SETTINGS_WORKSPACE_SIDEBAR_ITEMS,
 )
 from alaiy_os.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
+from alaiy_os.alaiy_os.doctype.os_connector_registry.os_connector_registry import _HANDLER_FIELDS
 
 MODULE_NAME = "Alaiy OS"
 
@@ -57,13 +68,15 @@ def _cleanup_legacy_workspace():
 
 
 def _run_provisioning():
+    # Reset once per run so _connector_registry_rows() below fetches fresh
+    # data on the first call this run, then reuses it for every other step.
+    global _connector_registry_rows_cache
+    _connector_registry_rows_cache = None
+
     steps = [
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
-        create_module_def,
-        create_or_update_role,
         delete_desktop_page,
-        provision_shared_doctypes,
         create_or_update_workspace,
         create_or_update_workspace_sidebar,
         create_or_update_os_settings_workspace,
@@ -76,6 +89,7 @@ def _run_provisioning():
         configure_system_settings,
         configure_navbar,
         configure_portal_settings,
+        check_dotted_path_handlers,
     ]
     failed = []
     for step in steps:
@@ -144,32 +158,6 @@ def skip_erpnext_onboarding():
             "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
 
 
-# ── Role ─────────────────────────────────────────────────────────────────────
-
-def create_or_update_role():
-    """Create the OS Manager role with the OS home page.
-
-    "is_standard" was never a real field on Role (frappe/core/doctype/role)
-    — it only exists on frappe.get_doc({...}).insert(), which silently drops
-    unknown keys when building the INSERT; frappe.db.set_value(dt, name, {...})
-    below builds a raw UPDATE from the dict's keys as-is, so on every re-run
-    after the first (bench migrate, once the Role already exists) it failed
-    with "Unknown column 'is_standard'".
-    """
-    role_data = {
-        "desk_access": 1,
-        "home_page":   "/desk/os",
-    }
-    if not frappe.db.exists("Role", OS_MANAGER_ROLE):
-        frappe.get_doc({
-            "doctype":   "Role",
-            "role_name": OS_MANAGER_ROLE,
-            **role_data,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Role", OS_MANAGER_ROLE, role_data)
-
-
 # ── Desktop page removal ───────────────────────────────────────────────────────
 
 def delete_desktop_page():
@@ -190,6 +178,28 @@ def delete_desktop_page():
 
 
 # ── Foreign workspace restriction ───────────────────────────────────────────────
+
+def _foreign_workspace_allowlist():
+    """
+    Workspace names and/or owning-app names that restrict_foreign_workspaces()
+    (and the Welcome Workspace hard-delete alongside it) should leave alone —
+    entries aren't distinguished as "name" vs "app"; a Workspace is skipped if
+    either its own name or its owning app matches any entry. Populated from:
+
+      - site_config.json's "alaiy_os_foreign_workspace_allowlist" — a list,
+        for a specific site's own exception (e.g. ["Welcome Workspace"] to
+        keep the stock one on this site only).
+      - the alaiy_os_foreign_workspace_allowlist hook, e.g. in another app's
+        own hooks.py:
+            alaiy_os_foreign_workspace_allowlist = ["some_app"]
+        so an app can protect its own workspace regardless of which site
+        it's installed on, without every site admin having to configure it.
+    """
+    entries = list(frappe.conf.get("alaiy_os_foreign_workspace_allowlist", []) or [])
+    for hook_entries in frappe.get_hooks("alaiy_os_foreign_workspace_allowlist"):
+        entries.extend(hook_entries if isinstance(hook_entries, list) else [hook_entries])
+    return set(entries)
+
 
 def _delete_welcome_workspace():
     """Hard-delete the stock "Welcome Workspace" (and its sidebar row, if
@@ -214,8 +224,20 @@ def restrict_foreign_workspaces():
     Re-runs on every after_migrate so new workspaces introduced by future
     app/ERPNext updates get caught too. Our own workspaces (OS, OS Settings)
     are left untouched.
+
+    Set "alaiy_os_restrict_foreign_workspaces": false in site_config.json to
+    disable this step entirely on a given site — e.g. a site that genuinely
+    wants another installed app's workspace to stay visible/editable by
+    non-Administrator roles. For a narrower opt-out, see
+    _foreign_workspace_allowlist().
     """
-    _delete_welcome_workspace()
+    if not frappe.conf.get("alaiy_os_restrict_foreign_workspaces", True):
+        return
+
+    allowlist = _foreign_workspace_allowlist()
+
+    if "Welcome Workspace" not in allowlist:
+        _delete_welcome_workspace()
 
     own_names = {WORKSPACE_NAME, SETTINGS_WORKSPACE_NAME}
     rows = frappe.get_all(
@@ -224,7 +246,13 @@ def restrict_foreign_workspaces():
         fields=["name", "app"],
     )
     for row in rows:
-        if row.name in own_names or row.app == "alaiy_os" or row.name == "Welcome Workspace":
+        if (
+            row.name in own_names
+            or row.app == "alaiy_os"
+            or row.name == "Welcome Workspace"
+            or row.name in allowlist
+            or (row.app and row.app in allowlist)
+        ):
             continue
         try:
             doc = frappe.get_doc("Workspace", row.name)
@@ -232,11 +260,14 @@ def restrict_foreign_workspaces():
             doc.set("roles", [{"role": "Administrator"}])
             doc.flags.ignore_validate = True
             doc.flags.ignore_links = True
-            # Some stock ERPNext/Frappe workspaces (e.g. "Welcome Workspace")
-            # ship with legacy/partial records missing newer mandatory
-            # fields (e.g. `type`). We're only touching is_hidden/roles here,
-            # not fixing their data — ignore_mandatory keeps that out of scope.
-            doc.flags.ignore_mandatory = True
+            # No ignore_mandatory here: the one stock workspace known to ship
+            # with legacy missing-mandatory-field data ("Welcome Workspace")
+            # is hard-deleted above, before this loop ever sees it — nothing
+            # left in this loop is a known-bad record, so this app shouldn't
+            # blanket-bypass mandatory-field guarantees on documents it
+            # doesn't own. If some other foreign workspace genuinely can't
+            # save without it, that surfaces in the Error Log below instead
+            # of being silently skipped.
             doc.save(ignore_permissions=True)
         except Exception:
             frappe.log_error(
@@ -335,139 +366,6 @@ def configure_portal_settings():
     frappe.db.set_single_value("Portal Settings", "default_portal_home", "/desk/os")
 
 
-# ── Shared Generic DocTypes ───────────────────────────────────────────────────
-
-def provision_shared_doctypes():
-    """
-    Create shared generic DocTypes used by all connector types.
-    Idempotent — skips creation if each DocType already exists.
-    """
-    _create_item_supplier_attribute()
-    _create_supplier_item_availability()
-    _create_channel_listing()
-    frappe.db.commit()
-
-
-def _shared_permissions():
-    return [{"role": "System Manager", "read": 1, "write": 1, "create": 1, "delete": 1}]
-
-
-def _create_item_supplier_attribute():
-    if frappe.db.exists("DocType", "Item Supplier Attribute"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Item Supplier Attribute",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "istable": 1,
-        "editable_grid": 1,
-        "fields": [
-            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
-             "label": "Supplier", "in_list_view": 1},
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "attribute_key", "fieldtype": "Data",
-             "label": "Key", "in_list_view": 1},
-            {"fieldname": "attribute_value",
-                "fieldtype": "Small Text", "label": "Value"},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-    if not frappe.db.exists("Custom Field", "Item-supplier_attributes"):
-        frappe.get_doc({
-            "doctype": "Custom Field",
-            "dt": "Item",
-            "fieldname": "supplier_attributes",
-            "label": "Supplier Attributes",
-            "fieldtype": "Table",
-            "options": "Item Supplier Attribute",
-            "insert_after": "description",
-        }).insert(ignore_permissions=True)
-
-
-def _create_supplier_item_availability():
-    if frappe.db.exists("DocType", "Supplier Item Availability"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Supplier Item Availability",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "fields": [
-            {"fieldname": "item_code", "fieldtype": "Link", "options": "Item",
-             "label": "Item Code", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "supplier", "fieldtype": "Link", "options": "Supplier",
-             "label": "Supplier", "reqd": 1, "in_list_view": 1},
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "available_qty", "fieldtype": "Float",
-             "label": "Available Qty", "in_list_view": 1},
-            {"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse",
-             "label": "Warehouse"},
-            {"fieldname": "last_updated", "fieldtype": "Datetime",
-             "label": "Last Updated", "read_only": 1},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-
-
-def _create_channel_listing():
-    if frappe.db.exists("DocType", "Channel Listing"):
-        return
-    frappe.get_doc({
-        "doctype": "DocType",
-        "name": "Channel Listing",
-        "module": MODULE_NAME,
-        "custom": 1,
-        "istable": 1,
-        "editable_grid": 1,
-        "fields": [
-            {"fieldname": "connector_name", "fieldtype": "Data",
-             "label": "Connector", "in_list_view": 1},
-            {"fieldname": "channel", "fieldtype": "Data",
-             "label": "Channel", "in_list_view": 1},
-            {"fieldname": "listed", "fieldtype": "Check",
-             "label": "Listed", "default": "0"},
-            {"fieldname": "external_product_id", "fieldtype": "Data",
-             "label": "External Product ID"},
-            {"fieldname": "external_variant_id", "fieldtype": "Data",
-             "label": "External Variant ID"},
-            {"fieldname": "channel_url", "fieldtype": "Data", "label": "Channel URL"},
-            {"fieldname": "last_pushed_at", "fieldtype": "Datetime",
-             "label": "Last Pushed At", "read_only": 1},
-        ],
-        "permissions": _shared_permissions(),
-    }).insert(ignore_permissions=True)
-    if not frappe.db.exists("Custom Field", "Item-channel_listings"):
-        frappe.get_doc({
-            "doctype": "Custom Field",
-            "dt": "Item",
-            "fieldname": "channel_listings",
-            "label": "Channel Listings",
-            "fieldtype": "Table",
-            "options": "Channel Listing",
-            "insert_after": "supplier_attributes",
-        }).insert(ignore_permissions=True)
-
-
-# ── Module Def ────────────────────────────────────────────────────────────────
-
-def create_module_def():
-    if not frappe.db.exists("Module Def", MODULE_NAME):
-        frappe.get_doc({
-            "doctype":     "Module Def",
-            "module_name": MODULE_NAME,
-            "app_name":    "alaiy_os",
-            "custom":      1,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Module Def", MODULE_NAME, {
-            "app_name": "alaiy_os",
-            "custom":   1,
-        })
-
-
 # ── Workspace naming ──────────────────────────────────────────────────────────
 #
 # Frappe's URL for a Workspace is slug(Workspace.name) — there is no separate
@@ -505,15 +403,28 @@ def _get_os_settings_workspace_title():
     return f"{company} OS Settings" if company else SETTINGS_WORKSPACE_NAME
 
 
+_connector_registry_rows_cache = None
+
+
 def _connector_registry_rows():
+    # Called independently by several _build_connector_* helpers within one
+    # provisioning run; cache so that only costs one query per run instead of
+    # one per caller. _run_provisioning() resets the cache before each run.
+    global _connector_registry_rows_cache
+    if _connector_registry_rows_cache is not None:
+        return _connector_registry_rows_cache
+
     if not frappe.db.exists("DocType", "OS Connector Registry"):
-        return []
+        _connector_registry_rows_cache = []
+        return _connector_registry_rows_cache
+
     rows = frappe.get_all(
         "OS Connector Registry",
         fields=["connector_id", "connector_name", "settings_doctype", "icon"],
         order_by="connector_name asc",
     )
-    return [r for r in rows if r.get("settings_doctype")]
+    _connector_registry_rows_cache = [r for r in rows if r.get("settings_doctype")]
+    return _connector_registry_rows_cache
 
 
 def _connector_link_target(row):
@@ -542,9 +453,26 @@ def _build_connector_workspace_links():
     return links
 
 
-def _build_connector_sidebar_items():
-    """Connectors section in the main OS sidebar: one Link per installed
-    connector."""
+def _build_connector_settings_workspace_links():
+    """Connectors card on the OS Settings workspace body: one Link per
+    installed connector, straight to its settings DocType (not the Page
+    dashboard -- this is the settings hub, not the operational one)."""
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    links = [{"type": "Card Break", "label": "Connectors", "icon": "plug"}]
+    for row in rows:
+        links.append({
+            "type": "Link", "link_type": "DocType",
+            "link_to": row.settings_doctype, "label": row.connector_name,
+        })
+    return links
+
+
+def _build_connector_settings_sidebar_items():
+    """Connectors section in the OS Settings sidebar: one Link per
+    installed connector, straight to its settings DocType."""
     rows = [r for r in _connector_registry_rows()
             if frappe.db.exists("DocType", r.settings_doctype)]
     if not rows:
@@ -552,11 +480,74 @@ def _build_connector_sidebar_items():
     items = [{"type": "Section Break", "label": "Connectors",
               "icon": "plug", "child": 0, "indent": 1}]
     for row in rows:
+        items.append({
+            "type": "Link", "link_type": "DocType", "link_to": row.settings_doctype,
+            "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
+        })
+    return items
+
+
+def _connector_extra_sidebar_items(connector_id):
+    """
+    Extra sidebar rows (e.g. "Listings") a connector app wants under its own
+    top-level section, beyond the automatic Dashboard link. Declared via:
+
+        alaiy_os_sidebar_connector_items = [
+            {"connector_id": "shopify", "label": "Listings",
+             "link_type": "DocType", "link_to": "Shopify Product Listing",
+             "icon": "list"},
+        ]
+
+    Nothing connector-specific lives in alaiy_os itself -- each connector
+    app registers its own rows, filtered here by connector_id and by
+    whether the target actually exists.
+    """
+    entries = []
+    for hook_entries in frappe.get_hooks("alaiy_os_sidebar_connector_items"):
+        for entry in (hook_entries if isinstance(hook_entries, list) else [hook_entries]):
+            if entry.get("connector_id") != connector_id:
+                continue
+            link_type = entry.get("link_type", "DocType")
+            link_to = (entry.get("link_to") or "").strip()
+            if not link_to:
+                continue
+            if link_type == "DocType" and not frappe.db.exists("DocType", link_to):
+                continue
+            if link_type == "Page" and not frappe.db.exists("Page", link_to):
+                continue
+            entries.append({
+                "type": "Link", "link_type": link_type, "link_to": link_to,
+                "label": entry.get("label", link_to), "child": 1,
+                "icon": entry.get("icon", "chevron-right"),
+            })
+    return entries
+
+
+def _build_connector_sidebar_items():
+    """
+    Each installed connector gets its OWN top-level section in the main OS
+    sidebar (sibling to Catalog, Inventory, Sales, ...) instead of being
+    nested one level deeper under a shared "Connectors" heading. Every
+    section always has a Dashboard link (the connector's Page if it has
+    one, else its settings DocType); connector apps can add more rows
+    (e.g. Listings) via the alaiy_os_sidebar_connector_items hook. No
+    connector name is hard-coded here -- rows come from OS Connector
+    Registry and each app's own hook.
+    """
+    rows = [r for r in _connector_registry_rows()
+            if frappe.db.exists("DocType", r.settings_doctype)]
+    if not rows:
+        return []
+    items = []
+    for row in rows:
+        items.append({"type": "Section Break", "label": row.connector_name,
+                       "icon": row.icon or "plug", "child": 0, "indent": 1})
         link_type, link_to = _connector_link_target(row)
         items.append({
             "type": "Link", "link_type": link_type, "link_to": link_to,
-            "label": row.connector_name, "child": 1, "icon": row.icon or "plug",
+            "label": "Dashboard", "child": 1, "icon": "layout-dashboard",
         })
+        items.extend(_connector_extra_sidebar_items(row.connector_id))
     return items
 
 
@@ -671,7 +662,11 @@ def create_or_update_workspace():
 # ── Workspace Sidebar ─────────────────────────────────────────────────────────
 
 def create_or_update_workspace_sidebar():
-    items = list(WORKSPACE_SIDEBAR_ITEMS) + _build_connector_sidebar_items()
+    items = (
+        list(WORKSPACE_SIDEBAR_ITEMS)
+        + _build_connector_sidebar_items()
+        + [WORKSPACE_SIDEBAR_SETTINGS_ITEM]
+    )
     # Title must stay == WORKSPACE_NAME: Workspace Sidebar autonames from
     # title, and that name must match the Workspace's own (fixed) name for
     # Frappe's client-side sidebar lookup to find it.
@@ -704,9 +699,8 @@ def create_or_update_workspace_sidebar():
 
 # ── OS Settings Workspace ─────────────────────────────────────────────────────
 
-def _build_os_settings_content():
+def _build_os_settings_content(links):
     blocks = []
-    links = list(SETTINGS_WORKSPACE_LINKS)
     for link in links:
         if link.get("type") == "Card Break":
             blocks.append({
@@ -718,9 +712,9 @@ def _build_os_settings_content():
 
 
 def create_or_update_os_settings_workspace():
-    content = _build_os_settings_content()
+    links = list(SETTINGS_WORKSPACE_LINKS) + _build_connector_settings_workspace_links()
+    content = _build_os_settings_content(links)
     title = _get_os_settings_workspace_title()
-    links = list(SETTINGS_WORKSPACE_LINKS)
 
     if not frappe.db.exists("Workspace", SETTINGS_WORKSPACE_NAME):
         ws = frappe.get_doc({
@@ -763,6 +757,7 @@ def create_or_update_os_settings_workspace():
 
 def create_or_update_os_settings_workspace_sidebar():
     items = list(SETTINGS_WORKSPACE_SIDEBAR_ITEMS)
+    items += _build_connector_settings_sidebar_items()
     items += _build_log_items()
 
     # Title must stay == SETTINGS_WORKSPACE_NAME — see create_or_update_workspace_sidebar().
@@ -867,9 +862,68 @@ def create_or_update_onboarding():
         doc.flags.ignore_validate = True
         doc.save(ignore_permissions=True)
 
-    # Link or unlink from sidebar based on config flag
-    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
+
+# ── Dotted-path handler health check ─────────────────────────────────────────
+#
+# OS Agent Tool.handler and OS Connector Registry's test_method/sync_*_method
+# fields are only validated once, at save time (OSAgentTool._validate_handler(),
+# OSConnectorRegistry._validate_handlers()). If the app providing one is later
+# uninstalled, or refactors the target function away, that's otherwise only
+# discovered the next time something actually calls it — engine/factory.py's
+# build_runnable() had no try/except around its frappe.get_attr() at all
+# before this, and api/connectors.py's test/sync calls just report a generic
+# {"success": False} either way. Re-check every registered path on every
+# migrate instead, and record the result on the row itself so it's visible
+# without waiting for a live failure.
+
+def _resolve_handler(path):
+    """(ok, detail) for a dotted path — ok only if it imports and is callable."""
+    try:
+        fn = frappe.get_attr(path)
+    except Exception:
+        return False, f"{path} could not be imported"
+    if not callable(fn):
+        return False, f"{path} is not callable"
+    return True, ""
+
+
+def _check_agent_tool_handlers():
+    if not frappe.db.exists("DocType", "OS Agent Tool"):
+        return
+    for row in frappe.get_all("OS Agent Tool", fields=["name", "handler"]):
+        if not row.handler:
+            continue
+        ok, detail = _resolve_handler(row.handler)
         frappe.db.set_value(
-            "Workspace Sidebar", WORKSPACE_NAME,
-            "module_onboarding", ONBOARDING_NAME
+            "OS Agent Tool", row.name,
+            {"handler_ok": 1 if ok else 0, "handler_health_detail": detail},
+            update_modified=False,
         )
+
+
+def _check_connector_registry_handlers():
+    if not frappe.db.exists("DocType", "OS Connector Registry"):
+        return
+    fields = ["name"] + list(_HANDLER_FIELDS.keys())
+    for row in frappe.get_all("OS Connector Registry", fields=fields):
+        problems = []
+        for fieldname, label in _HANDLER_FIELDS.items():
+            path = row.get(fieldname)
+            if not path:
+                continue
+            ok, detail = _resolve_handler(path)
+            if not ok:
+                problems.append(f"{label}: {detail}")
+        frappe.db.set_value(
+            "OS Connector Registry", row.name,
+            {
+                "handlers_ok": 0 if problems else 1,
+                "handlers_health_detail": "; ".join(problems),
+            },
+            update_modified=False,
+        )
+
+
+def check_dotted_path_handlers():
+    _check_agent_tool_handlers()
+    _check_connector_registry_handlers()

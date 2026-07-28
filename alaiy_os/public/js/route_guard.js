@@ -58,6 +58,51 @@ function alaiyReconcileSidebar() {
   if (own && own !== current) sidebar.setup(own);
 }
 
+// If the browser ever ends up sitting bare on /desk (no workspace slug),
+// send it to ALAIY_OS_ROUTE instead. Route by ALAIY_OS_ROUTE (stable) rather
+// than workspace name — the Workspace doc itself is renamed to match the
+// current company branding.
+function redirectBareDeskToHome() {
+  if (!ALAIY_OS_ROUTE) return;
+  var path = window.location.pathname;
+  var hash = window.location.hash;
+  if (
+    (path === "/desk" || path === "/desk/") &&
+    (!hash || hash === "#" || hash === "")
+  ) {
+    frappe.set_route(ALAIY_OS_ROUTE);
+  }
+}
+
+// The sidebar's "Desktop" (home) menu item calls frappe.set_route("/desk")
+// directly (frappe/public/js/frappe/ui/sidebar/sidebar_header.js). Frappe
+// fully renders that bare route -- there's nothing mapped to it, hence the
+// "Page not found" flash -- and only AFTER that render does
+// router.on("change") fire, which is what redirectBareDeskToHome() above
+// reacts to. So on this one known trigger, the user sees "not found" for a
+// moment before landing on ALAIY_OS_ROUTE.
+//
+// Fix it earlier: frappe.router.set_route() normalizes ANY route that means
+// "bare desk" (frappe.set_route("/desk"), ("desk"), (""), etc.) down to an
+// empty array via get_route_from_arguments() before it ever calls
+// push_state()/renders anything. Reuse that exact normalization to catch the
+// empty-array case here and substitute ALAIY_OS_ROUTE before the real
+// set_route runs -- so the bare route is never pushed to history or rendered
+// at all, not just corrected after the fact. This covers every caller that
+// goes through frappe.set_route/frappe.router.set_route (the home icon
+// today, anything else tomorrow), not just one hardcoded DOM selector.
+(function () {
+  if (!frappe.router || typeof frappe.router.set_route !== "function") return;
+  const _core_set_route = frappe.router.set_route;
+  frappe.router.set_route = function (...args) {
+    if (ALAIY_OS_ROUTE) {
+      const normalized = this.get_route_from_arguments(Array.from(args));
+      if (!normalized.length) args = [ALAIY_OS_ROUTE];
+    }
+    return _core_set_route.apply(this, args);
+  };
+})();
+
 // Update page title on route change; fall back to OS workspace if desk loads bare.
 $(document).on("app_ready", function () {
   alaiyReconcileSidebar();
@@ -69,25 +114,21 @@ $(document).on("app_ready", function () {
     if (typeof updateAlaiyTitle === "function") {
       updateAlaiyTitle(resolveAlaiySection(route));
     }
+
+    // Safety net for whatever lands on bare /desk WITHOUT going through
+    // frappe.set_route (the patch above already catches that) -- e.g. the
+    // browser back/forward buttons fire popstate straight into
+    // frappe.router.route(), which re-parses window.location directly.
+    redirectBareDeskToHome();
   });
 
-  if (!ALAIY_OS_ROUTE) return;
-
-  var path = window.location.pathname;
-  var hash = window.location.hash;
-  if (
-    (path === "/desk" || path === "/desk/") &&
-    (!hash || hash === "#" || hash === "")
-  ) {
-    // Frappe auto-navigates to the first sidebar workspace on bare /desk.
-    // Wait briefly so we don't double-navigate if Frappe already moved on.
-    // Route by ALAIY_OS_ROUTE (stable) rather than workspace name — the
-    // Workspace doc itself is renamed to match the current company branding.
-    setTimeout(function () {
-      var cur = window.location.pathname;
-      if (cur === "/desk" || cur === "/desk/") {
-        frappe.set_route(ALAIY_OS_ROUTE);
-      }
-    }, 150);
-  }
+  // The very first route resolution on a hard reload/direct URL load runs
+  // before this script has even been fetched (app_include_js loads after
+  // Frappe's own desk bundle, which resolves the initial route -- and fires
+  // its own first "change" trigger -- synchronously as soon as it loads), so
+  // the listener above installs too late to catch THAT one. Covered here
+  // instead, with a short wait so this doesn't double-navigate if Frappe's
+  // own auto-navigate-to-first-workspace already moved on by the time this
+  // runs.
+  setTimeout(redirectBareDeskToHome, 150);
 });

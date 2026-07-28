@@ -253,7 +253,7 @@
         var params = new URLSearchParams(window.location.search);
         var r = params.get("redirect-to") || params.get("redirect_to") || "";
         if (r && r.startsWith("/") && !r.startsWith("//")) return r;
-        return "/desk/os";
+        return "/desk/ask-alaiy";
       }
 
       function getCsrf() {

@@ -2,7 +2,7 @@ import frappe
 
 
 def on_login(login_manager):
-    frappe.local.response["redirect_to"] = "/desk/os"
+    frappe.local.response["redirect_to"] = "/desk/ask-alaiy"
 
 
 def get_home_page(user):
@@ -11,4 +11,4 @@ def get_home_page(user):
     Frappe's path resolver actually consults for "/" (a www/index.py
     controller is never reached — get_home_page() resolves the target path
     first and routes straight there)."""
-    return "login" if user == "Guest" else "desk/os"
+    return "login" if user == "Guest" else "desk/ask-alaiy"
