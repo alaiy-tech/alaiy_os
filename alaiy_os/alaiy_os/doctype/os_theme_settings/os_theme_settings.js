@@ -40,6 +40,25 @@ frappe.provide("alaiy_os.theme_settings");
 		return (df && df.default) || "";
 	}
 
+	// Every colour token pal() produces below, and every "color_<key>" field
+	// on this doctype — declared here (rather than down by WATCHED_FIELDS
+	// below) so solistDefaults() can use it.
+	var LIGHT_FIELDS = ["ink", "black", "white", "cream", "muted", "border", "hover", "active", "on_black",
+		"black_hover", "grid_line", "scroll_hover", "nav", "nav_text", "heading", "green", "blue", "amber", "gray", "red"];
+
+	// "The Solist" is this doctype's own shipped default palette — read
+	// directly from each color_* field's JSON default rather than
+	// hand-copied, so it can never drift from what a blank record actually
+	// gets. Every field here is independently editable in the form (not
+	// truly derived at the data level, even though pal()'s mix() below
+	// happens to reproduce the same 5 "computed" tokens from the other 15),
+	// so this reads all 20 verbatim instead of re-deriving via pal().
+	function solistDefaults() {
+		var light = { expanded: true };
+		LIGHT_FIELDS.forEach((key) => { light[key] = docDefault("color_" + key); });
+		return light;
+	}
+
 	// Expand a compact palette spec into every --s-* colour token. One colour
 	// theme only (light) — see os_theme_settings.py's build_css().
 	function pal(s) {
@@ -61,8 +80,8 @@ frappe.provide("alaiy_os.theme_settings");
 
 	var F = (sans, serif, mono) => ({ sans: sans, serif: serif, mono: mono });
 	var THEMES = [
-		{ name: "The Solist", fonts: F("Inter", "Playfair Display", "JetBrains Mono"),
-			light: { ink: "#1A1A1A", primary: "#111111", surface: "#FFFFFF", page: "#FAF9F6", muted: "#8A8A8A", border: "#D9D5C9", green: "#2E7D5B", blue: "#3B5BB5", amber: "#B7791F", gray: "#8A8A8A", red: "#B23A3A", onPrimary: "#FFFFFF" } },
+		{ name: "The Solist", fonts: F(docDefault("font_sans"), docDefault("font_serif"), docDefault("font_mono")),
+			light: solistDefaults() },
 		{ name: "Zinc (Minimal)", fonts: F("Inter", "Inter", "Roboto Mono"),
 			light: { ink: "#18181B", primary: "#18181B", surface: "#FFFFFF", page: "#FAFAFA", muted: "#71717A", border: "#E4E4E7", green: "#16A34A", blue: "#2563EB", amber: "#D97706", gray: "#71717A", red: "#DC2626", onPrimary: "#FFFFFF" } },
 		{ name: "GitHub", fonts: F("Inter", "Inter", "Roboto Mono"),
@@ -98,8 +117,10 @@ frappe.provide("alaiy_os.theme_settings");
 	var DIM_DEFAULTS = {};
 	DIM_DEFAULT_FIELDS.forEach((f) => { DIM_DEFAULTS[f] = docDefault(f); });
 
+	// "The Solist" needs no entry here — DIM_DEFAULTS above is already read
+	// from this doctype's own field defaults, which is what its "personality"
+	// used to hand-copy.
 	var THEME_DIMS = {
-		"The Solist": { radius_sm: "0px", radius: "4px", radius_lg: "6px", radius_xl: "8px", btn_radius: "5px", border_width: "1px" },
 		"Zinc (Minimal)": { radius_sm: "6px", radius: "8px", radius_lg: "10px", radius_xl: "12px", btn_radius: "8px", card_pad: "22px", section_pad: "24px", gap: "18px" },
 		"GitHub": { radius_sm: "6px", radius: "6px", radius_lg: "8px", radius_xl: "12px", btn_radius: "6px" },
 		"Nord": { radius_sm: "6px", radius: "8px", radius_lg: "12px", radius_xl: "16px", btn_radius: "8px", card_pad: "22px", gap: "18px" },
@@ -121,9 +142,6 @@ frappe.provide("alaiy_os.theme_settings");
 		"Bitter", "Domine", "Spectral", "Fraunces", "Newsreader", "DM Serif Display", "Bodoni Moda",
 		"JetBrains Mono", "Roboto Mono", "Source Code Pro", "IBM Plex Mono", "Fira Code", "Space Mono",
 		"Inconsolata", "Ubuntu Mono", "DM Mono", "Oswald", "Bebas Neue", "Anton", "Archivo", "Abril Fatface"];
-
-	var LIGHT_FIELDS = ["ink", "black", "white", "cream", "muted", "border", "hover", "active", "on_black",
-		"black_hover", "grid_line", "scroll_hover", "nav", "nav_text", "heading", "green", "blue", "amber", "gray", "red"];
 
 	// Every field the live preview reacts to — built once, reused both to wire
 	// per-field triggers (see bottom of file) and to repaint the preview.
@@ -161,7 +179,10 @@ frappe.provide("alaiy_os.theme_settings");
 	function applyPreset(frm, name) {
 		var t = THEMES.find((x) => x.name === name);
 		if (!t) return;
-		var light = pal(t.light);
+		// "The Solist" (solistDefaults()) is already a full, flat token map —
+		// running it through pal() would re-derive 5 of its 20 tokens via
+		// mix() instead of using the doctype's own defaults for them verbatim.
+		var light = t.light.expanded ? t.light : pal(t.light);
 		var dims = Object.assign({}, DIM_DEFAULTS, THEME_DIMS[name] || {});
 		var values = { last_preset: name, font_sans: t.fonts.sans, font_serif: t.fonts.serif, font_mono: t.fonts.mono };
 		LIGHT_FIELDS.forEach((key) => { values["color_" + key] = light[key]; });
