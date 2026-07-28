@@ -1008,10 +1008,3 @@ def create_or_update_onboarding():
             pass
         doc.flags.ignore_validate = True
         doc.save(ignore_permissions=True)
-
-    # Link or unlink from sidebar based on config flag
-    if frappe.db.exists("Workspace Sidebar", WORKSPACE_NAME):
-        frappe.db.set_value(
-            "Workspace Sidebar", WORKSPACE_NAME,
-            "module_onboarding", ONBOARDING_NAME
-        )
