@@ -121,7 +121,8 @@ def _run_provisioning():
     failed = []
     for step in steps:
         try:
-            step()
+            with _provisioning_savepoint(step.__name__):
+                step()
         except Exception:
             failed.append(step.__name__)
             frappe.log_error(
