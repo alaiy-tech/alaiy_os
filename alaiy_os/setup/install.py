@@ -68,7 +68,6 @@ def _run_provisioning():
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
         create_module_def,
-        create_or_update_role,
         delete_desktop_page,
         provision_shared_doctypes,
         create_or_update_workspace,
@@ -150,32 +149,6 @@ def skip_erpnext_onboarding():
     if frappe.db.exists("DocType", "User") and frappe.db.has_column("User", "onboarding_status"):
         frappe.db.sql(
             "UPDATE tabUser SET onboarding_status = 'Skipped' WHERE onboarding_status IS NULL OR onboarding_status = ''")
-
-
-# ── Role ─────────────────────────────────────────────────────────────────────
-
-def create_or_update_role():
-    """Create the OS Manager role with the OS home page.
-
-    "is_standard" was never a real field on Role (frappe/core/doctype/role)
-    — it only exists on frappe.get_doc({...}).insert(), which silently drops
-    unknown keys when building the INSERT; frappe.db.set_value(dt, name, {...})
-    below builds a raw UPDATE from the dict's keys as-is, so on every re-run
-    after the first (bench migrate, once the Role already exists) it failed
-    with "Unknown column 'is_standard'".
-    """
-    role_data = {
-        "desk_access": 1,
-        "home_page":   "/desk/ask-alaiy",
-    }
-    if not frappe.db.exists("Role", OS_MANAGER_ROLE):
-        frappe.get_doc({
-            "doctype":   "Role",
-            "role_name": OS_MANAGER_ROLE,
-            **role_data,
-        }).insert(ignore_permissions=True)
-    else:
-        frappe.db.set_value("Role", OS_MANAGER_ROLE, role_data)
 
 
 # ── Desktop page removal ───────────────────────────────────────────────────────

@@ -4,6 +4,26 @@ app_publisher = "Alaiy"
 app_description = "Specialized E-commerce OS built on top of Frappe"
 app_version = "0.0.1"
 required_apps = ["erpnext"]
+
+# Static/one-time provisioning — seed data, synced (upserted) on every
+# bench migrate via Frappe's own fixtures mechanism instead of hand-rolled
+# frappe.db.set_value(dt, name, {...}) reconciliation in setup/install.py.
+# Only genuinely dynamic reconciliation (connector-driven sidebar building,
+# which depends on runtime OS Connector Registry state) stays procedural.
+fixtures = [
+    {"dt": "Role", "filters": [["name", "=", "OS Manager"]]},
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["dt", "=", "Item"],
+            ["fieldname", "in", [
+                "supplier_attributes", "channel_listings",
+                "dimensions_section", "width", "length", "height", "dimension_uom",
+            ]],
+        ],
+    },
+]
+
 # Provisioning hooks
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
