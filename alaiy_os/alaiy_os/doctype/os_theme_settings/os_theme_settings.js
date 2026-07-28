@@ -29,6 +29,17 @@ frappe.provide("alaiy_os.theme_settings");
 		return r2h([255 * f(0), 255 * f(8), 255 * f(4)]);
 	}
 
+	// This doctype's own JSON field "default" is the one canonical set of
+	// theme defaults (os_theme_settings.py's _build_root_block() falls back
+	// to the same values) — read them here rather than hand-maintaining a
+	// second copy in JS. Frappe has already loaded this doctype's full field
+	// metadata by the time this file runs (it's this doctype's own client
+	// script), so this is a plain client-side lookup, no server round-trip.
+	function docDefault(fieldname) {
+		var df = frappe.meta.get_docfield("OS Theme Settings", fieldname);
+		return (df && df.default) || "";
+	}
+
 	// Expand a compact palette spec into every --s-* colour token. One colour
 	// theme only (light) — see os_theme_settings.py's build_css().
 	function pal(s) {
@@ -74,17 +85,18 @@ frappe.provide("alaiy_os.theme_settings");
 			light: { ink: "#433422", primary: "#7A5C3E", surface: "#FBF7EF", page: "#F3EAD9", muted: "#8A7B63", border: "#DED3BD", green: "#5C7A3E", blue: "#3E5C7A", amber: "#A9791F", gray: "#8A7B63", red: "#A6402F", onPrimary: "#FBF7EF" } },
 	];
 
-	var DIM_DEFAULTS = {
-		font_size: "14px", font_size_sm: "12.5px", line_height: "1.5",
-		body_weight: "450", medium_weight: "550", heading_weight: "600",
-		heading_tracking: "0.005em", brand_tracking: "0.14em", label_tracking: "0.07em",
-		btn_radius: "5px", btn_pad_y: "8px", btn_pad_x: "16px",
-		sidebar_width: "252px", navbar_height: "56px", control_height: "36px", page_max_width: "1200px",
-		page_pad: "28px", card_pad: "20px", section_pad: "22px", gap: "16px", field_gap: "13px",
-		btn_gap: "8px", control_pad_x: "12px",
-		radius: "4px", radius_sm: "0px", radius_lg: "6px", radius_xl: "8px", pill: "999px",
-		border_width: "1px", border_style: "solid",
-	};
+	// Same field list as os_theme_settings.py's _DIM_FIELDS — values are read
+	// from each field's own JSON default (docDefault()) below, not hardcoded
+	// here a second time.
+	var DIM_DEFAULT_FIELDS = [
+		"font_size", "font_size_sm", "line_height", "body_weight", "medium_weight", "heading_weight",
+		"heading_tracking", "brand_tracking", "label_tracking", "btn_radius", "btn_pad_y", "btn_pad_x",
+		"sidebar_width", "navbar_height", "control_height", "page_max_width", "page_pad", "card_pad",
+		"section_pad", "gap", "field_gap", "btn_gap", "control_pad_x", "radius", "radius_sm", "radius_lg",
+		"radius_xl", "pill", "border_width", "border_style",
+	];
+	var DIM_DEFAULTS = {};
+	DIM_DEFAULT_FIELDS.forEach((f) => { DIM_DEFAULTS[f] = docDefault(f); });
 
 	var THEME_DIMS = {
 		"The Solist": { radius_sm: "0px", radius: "4px", radius_lg: "6px", radius_xl: "8px", btn_radius: "5px", border_width: "1px" },
