@@ -25,6 +25,9 @@ alaiy_os.connector_card.mount = function (frm, connector_id) {
       );
       frm.dashboard.show();
     },
+    error() {
+      alaiy_os.ui.show_error(__("Could not load connector status."));
+    },
   });
 };
 
@@ -92,6 +95,9 @@ alaiy_os.connector_card.setup_password_reveal = function (
         if (r.message) {
           $input.attr("type", "text").val(r.message);
         }
+      },
+      error() {
+        alaiy_os.ui.show_error(__("Could not reveal password."));
       },
     });
   });
