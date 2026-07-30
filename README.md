@@ -96,5 +96,7 @@ alaiy_os/
 │                                      # shared connector doctypes, ...
 ├── public/images/logo-square.png     # app icon / favicon / sidebar logo
 ├── public/js/route_guard.js          # client-side sidebar-ownership + route patch
+├── public/js/referrer_policy.js      # document-wide no-referrer stamping for CDN images
+├── public/js/item.js                 # Item-form-only version of the same fix (doctype_js hook)
 └── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
 ```
