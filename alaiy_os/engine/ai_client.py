@@ -20,10 +20,12 @@ returning the shape the executor consumes:
 The default below is the BYOK (bring-your-own-key) client: it speaks the
 Anthropic Messages wire format using a key the customer supplies in
 site_config. It is not pinned to api.anthropic.com — set `ai_base_url` to
-point the same client at any Anthropic-compatible endpoint (e.g. a LiteLLM
-proxy's `/anthropic` route, which accepts LiteLLM virtual keys via the same
-x-api-key header). Managed benches that need more than a base-url swap
-override the hook with their own client instead.
+point the same client at any Anthropic-compatible endpoint: a LiteLLM proxy
+(accepts virtual keys via the same x-api-key header), OpenRouter's Anthropic
+Skin at https://openrouter.ai/api (an sk-or- key reaches any OpenRouter
+model), or providers with native Anthropic-format APIs (DeepSeek, Kimi, GLM).
+Managed benches that need more than a base-url swap override the hook with
+their own client instead.
 """
 
 import frappe
@@ -36,7 +38,9 @@ class ByokClient:
 
 	site_config keys:
 	    ai_api_key    — API key (falls back to legacy `anthropic_api_key`)
-	    ai_base_url   — optional; any Anthropic-compatible endpoint
+	    ai_base_url   — optional; any Anthropic-compatible endpoint, e.g.
+	                    https://openrouter.ai/api or a LiteLLM proxy.
+	                    Unset = Anthropic direct.
 	"""
 
 	def complete(self, model, system, messages, tools=None):
@@ -46,8 +50,13 @@ class ByokClient:
 		if not api_key:
 			frappe.throw("Set ai_api_key (or anthropic_api_key) in site_config.json before running agents.")
 
+		# api_key goes out as `x-api-key` (Anthropic, LiteLLM); auth_token as
+		# `Authorization: Bearer` (OpenRouter's Anthropic-compatible endpoint).
+		# Sending both lets one config key work everywhere — each provider
+		# reads its own header and ignores the other.
 		client = anthropic.Anthropic(
 			api_key=api_key,
+			auth_token=api_key,
 			base_url=frappe.conf.get("ai_base_url"),  # None = SDK default (api.anthropic.com)
 		)
 		kwargs = {
