@@ -4,30 +4,65 @@ A clean, minimal Frappe v16 / ERPNext v16 app that provisions a self-contained
 **Alaiy OS** workspace environment on install and keeps it reconciled on every
 `bench migrate`.
 
-The app uses only Frappe's supported hooks and APIs. It does **not** monkey-patch
-Frappe internals, fake the sidebar via the DOM, or inject global UI overrides.
+The app does not fake the sidebar via the DOM or inject global UI overrides.
+It does patch two Frappe prototype methods client-side
+(`public/js/route_guard.js` — see "Access control" below) for sidebar
+ownership and route handling; that's the one deliberate exception, not
+something this app tries to avoid altogether.
 
 ## What it provisions
 
-On `after_install` and `after_migrate` (`alaiy_os/setup/install.py`):
+On `after_install` and `after_migrate` (`alaiy_os/setup/install.py`), plus
+Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
+`hooks.py`'s `fixtures` list):
 
-1. **Roles** — `Alaiy OS Manager` and `Alaiy OS User`.
-3. **Workspace** — `Alaiy OS`, with links/shortcuts rebuilt from code each run
-   (the app is the source of truth — manual UI edits are overwritten on migrate).
-4. **DocType permissions** — `Custom DocPerm` records reconciled two-way (added
-   for new target DocTypes, removed for ones dropped from the list).
-5. **Standard workspace restrictions** — Alaiy OS roles stripped from standard
-   ERPNext workspaces so they don't appear in the sidebar for Alaiy OS users.
-6. **Login redirect** — the admin user's `home_page` is set to `/app/os`.
+1. **Role** — one role, `OS Manager` (`constants/roles.py`), managed as a
+   fixture (`fixtures/role.json`). It is **not** granted any DocType
+   permissions automatically — there is no `Custom DocPerm` reconciliation
+   anywhere in this app. If a non-`System Manager` role needs access to
+   `OS Agent Registry`, `OS Connector Registry`, etc., that has to be
+   configured explicitly (Role Permission Manager / a `Custom DocPerm`),
+   the same as for any other Frappe app.
+2. **Workspace + sidebar** — the `OS` and `OS Settings` workspaces, with
+   links/shortcuts rebuilt from `constants/workspace.py` /
+   `constants/workspace_settings.py` on every run (the app is the source of
+   truth — manual UI edits to these two workspaces are overwritten on
+   migrate). Connector-specific sections are appended dynamically from
+   `OS Connector Registry` rows and other installed apps' hooks.
+3. **Shared connector doctypes + Item custom fields** — `Item Supplier
+   Attribute`, `Supplier Item Availability`, `Channel Listing` (real
+   `doctype/*.json` files under `alaiy_os/doctype/`) and the Item custom
+   fields they — plus the product-dimension fields — need, all managed as a
+   fixture (`fixtures/custom_field.json`).
+4. **Foreign workspace restriction** — every public Workspace not owned by
+   `alaiy_os` (ERPNext's, Frappe's own, any other installed app's) is hidden
+   from the workspace switcher and locked to `Administrator`; configurable
+   per-site (a `site_config.json` flag) or per-app (a hook another app can
+   declare in its own `hooks.py`) — see `restrict_foreign_workspaces()`'s
+   docstring in `setup/install.py`. The stock "Welcome Workspace" and
+   "desktop" Page are removed outright.
+5. **Login/home redirects** — a bare `/`, a bare `/desk`, and login all
+   resolve to the OS workspace (`/desk/ask-alaiy`) instead of Frappe's own
+   defaults.
 
-## Access control — three layers
+## Access control
 
-1. `home_page` DB field — redirects Alaiy OS users on login.
-2. `boot_session` hook — filters the sidebar boot data to only `Alaiy OS`.
-3. `public/js/route_guard.js` — intercepts client-side navigation and redirects
-   Alaiy OS users back to `/os`.
+There are two real mechanisms — not three, and no `boot_session` hook exists
+anywhere in this app:
 
-All three explicitly bypass `System Manager` and `Administrator`.
+1. `setup/boot.py`'s `on_login` / `get_home_page` — redirect on login and
+   resolve `/` to the OS workspace.
+2. `public/js/route_guard.js` — a client-side patch that (a) makes sure
+   Alaiy OS's own Workspace Sidebar wins whenever a shared doctype (e.g.
+   `Item`) also has an ERPNext/HRMS sidebar pointing at it, and (b) sends a
+   bare `/desk` (no workspace slug) to the OS workspace instead of Frappe's
+   default. It's a sidebar-selection and navigation convenience, not a
+   permission check.
+
+Neither mechanism restricts what `System Manager` or `Administrator` can see
+— both always get the full, unrestricted Desk. Actual visibility
+restriction of *other* apps' workspaces is handled server-side, by
+`restrict_foreign_workspaces()` (see above), not by any client-side code.
 
 ## Install
 
@@ -42,11 +77,16 @@ bench build --app alaiy_os
 
 ```
 alaiy_os/
-├── hooks.py
-├── setup/install.py                 # all provisioning logic
-├── setup/boot.py                    # boot_session + on_session_creation
-├── public/images/logo-square.png    # app icon
-├── public/js/route_guard.js         # client-side route protection
-├── public/css/core.css          # scoped styles (no global overrides)
-└── workspace/Alaiy OS/Alaiy OS.json # workspace fixture for version control
+├── hooks.py                          # app_include_js/css, fixtures, provisioning hooks
+├── setup/install.py                  # after_install/after_migrate provisioning
+├── setup/boot.py                     # on_login + get_home_page redirects
+├── constants/                        # workspace/sidebar/role/onboarding definitions
+├── fixtures/role.json                # OS Manager role (synced via Frappe's fixtures hook)
+├── fixtures/custom_field.json        # Item custom fields (synced via Frappe's fixtures hook)
+├── doctype/                          # this app's DocTypes — OS Agent Registry,
+│                                      # OS Connector Registry, OS Theme Settings, the
+│                                      # shared connector doctypes, ...
+├── public/images/logo-square.png     # app icon / favicon / sidebar logo
+├── public/js/route_guard.js          # client-side sidebar-ownership + route patch
+└── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
 ```

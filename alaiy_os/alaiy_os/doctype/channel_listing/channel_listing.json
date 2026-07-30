@@ -15,9 +15,10 @@
  "fields": [
   {
    "fieldname": "connector_name",
-   "fieldtype": "Data",
+   "fieldtype": "Link",
    "in_list_view": 1,
-   "label": "Connector"
+   "label": "Connector",
+   "options": "OS Connector Registry"
   },
   {
    "fieldname": "channel",

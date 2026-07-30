@@ -61,6 +61,8 @@ _V = str(int(_time.time()))
 # globals only earlier files define, and none of them use frappe.provide()
 # for these shared constants/helpers, so nothing enforces this at build time
 # beyond this comment:
+#   referrer_policy.js   depends on nothing, but must stay FIRST: its observer
+#                        has to be watching before the desk fetches any image
 #   roles.js             defines ALAIY_OS_ROUTE
 #   workspace_config.js  defines ALAIY_SIDEBAR_CONFIG, ALAIY_LABEL_TO_DOCTYPE,
 #                        ALAIY_SKIP_LABELS (generated server-side — see
@@ -76,6 +78,7 @@ _V = str(int(_time.time()))
 # Reordering this list will silently break with a ReferenceError at runtime —
 # there is no compiler or bundler here to catch it.
 app_include_js = [
+    f"/assets/alaiy_os/js/referrer_policy.js?v={_V}",
     f"/assets/alaiy_os/constants/roles.js?v={_V}",
     f"/api/method/alaiy_os.api.workspace.sidebar_config_js?v={_V}",
     f"/assets/alaiy_os/constants/route_titles.js?v={_V}",
@@ -90,6 +93,14 @@ app_include_css = [
     # Settings save reflects on the next reload — see alaiy_os/api/theme.py.
     "/api/method/alaiy_os.api.theme.custom_theme_css",
 ]
+
+# Per-doctype form scripts. Unlike app_include_js these are read server-side and
+# inlined into the doctype's cached meta (frappe/desk/form/meta.py), so the path
+# is app-relative and needs no cache-busting param — a `bench clear-cache` /
+# migrate picks up edits.
+doctype_js = {
+    "Item": "public/js/item.js",
+}
 
 # Website assets (login page only — NOT the desk)
 web_include_css = [

@@ -72,8 +72,9 @@
   },
   {
    "fieldname": "settings_doctype",
-   "fieldtype": "Data",
-   "label": "Settings DocType Name"
+   "fieldtype": "Link",
+   "label": "Settings DocType Name",
+   "options": "DocType"
   },
   {
    "fieldname": "test_method",
