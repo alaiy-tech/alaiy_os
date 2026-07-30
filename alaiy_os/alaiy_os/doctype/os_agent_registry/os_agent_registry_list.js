@@ -94,6 +94,13 @@ function ensure_tools_fetched(names, on_loaded) {
 				(OS_AGENT_TOOLS[r.parent] || (OS_AGENT_TOOLS[r.parent] = [])).push(r.tool_id);
 			});
 			on_loaded();
+		})
+		.catch(() => {
+			// Deliberately don't mark `missing` as resolved (e.g. to []) here --
+			// that would misreport a fetch failure as "no tools configured".
+			// Cards are left showing "Loading tools..." and the toast below is
+			// the signal that something actually went wrong.
+			alaiy_os.ui.show_error(__("Could not load agent tools."));
 		});
 }
 
@@ -223,6 +230,9 @@ function enrich_image_view(listview) {
 				missing_meta.forEach((n) => (OS_AGENT_META[n] = {}));
 				(recs || []).forEach((r) => (OS_AGENT_META[r.name] = r));
 				paint_image_tiles(listview);
+			})
+			.catch(() => {
+				alaiy_os.ui.show_error(__("Could not load agent details."));
 			});
 	}
 	ensure_tools_fetched(names, () => paint_image_tiles(listview));
