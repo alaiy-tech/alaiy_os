@@ -33,7 +33,12 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    Attribute`, `Supplier Item Availability`, `Channel Listing` (real
    `doctype/*.json` files under `alaiy_os/doctype/`) and the Item custom
    fields they — plus the product-dimension fields — need, all managed as a
-   fixture (`fixtures/custom_field.json`).
+   fixture (`fixtures/custom_field.json`). **All three doctypes are
+   deprecated** — see each one's own `description` field. `Item Supplier
+   Attribute` is still populated by the Cloudstore connector, but
+   `Supplier Item Availability` and `Channel Listing` are unused by any
+   current connector; neither is the recommended pattern for new work
+   (both real connectors model this state their own way instead).
 4. **Foreign workspace restriction** — every public Workspace not owned by
    `alaiy_os` (ERPNext's, Frappe's own, any other installed app's) is hidden
    from the workspace switcher and locked to `Administrator`; configurable

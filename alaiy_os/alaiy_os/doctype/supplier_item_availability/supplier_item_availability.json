@@ -1,5 +1,6 @@
 {
  "creation": "2026-07-28 00:00:00.000000",
+ "description": "Deprecated — not used by any current connector. The Cloudstore connector drives ERPNext's native Stock Reconciliation directly instead of this doctype. Kept only for backward compatibility with sites that may already have data here; do not build a new connector against this shape.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
