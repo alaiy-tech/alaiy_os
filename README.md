@@ -44,6 +44,14 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
 5. **Login/home redirects** — a bare `/`, a bare `/desk`, and login all
    resolve to the OS workspace (`/desk/ask-alaiy`) instead of Frappe's own
    defaults.
+6. **CDN image referrer policy** — Item product images are usually supplier
+   or marketplace CDN URLs with hotlink protection that 403s any
+   cross-origin `Referer`. `public/js/referrer_policy.js` (loaded first in
+   `app_include_js`, before anything else can fetch an image) stamps
+   `referrerpolicy="no-referrer"` onto every `<img>` in the desk via a
+   `MutationObserver`. There is also a narrower, Item-form-only version of
+   the same fix (`public/js/item.js`, wired through the `doctype_js` hook)
+   still present alongside it — both currently run on the Item form.
 
 ## Access control
 
@@ -88,5 +96,7 @@ alaiy_os/
 │                                      # shared connector doctypes, ...
 ├── public/images/logo-square.png     # app icon / favicon / sidebar logo
 ├── public/js/route_guard.js          # client-side sidebar-ownership + route patch
+├── public/js/referrer_policy.js      # document-wide no-referrer stamping for CDN images
+├── public/js/item.js                 # Item-form-only version of the same fix (doctype_js hook)
 └── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
 ```
