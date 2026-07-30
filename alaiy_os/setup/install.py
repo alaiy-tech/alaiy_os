@@ -22,6 +22,7 @@ Data definitions:
 import hashlib
 import json
 import os
+from contextlib import contextmanager
 
 import frappe
 
@@ -67,6 +68,32 @@ def _cleanup_legacy_workspace():
                               ignore_permissions=True, force=True)
 
 
+@contextmanager
+def _provisioning_savepoint(name):
+    """Runs one provisioning step's writes inside a SQL SAVEPOINT.
+
+    All of _run_provisioning()'s steps share one uncommitted transaction —
+    only the single frappe.db.commit() at the end of the loop actually
+    persists anything. A plain frappe.db.rollback() in a step's except
+    block would therefore undo every *other* step's already-succeeded
+    writes too, not just the failing one. Rolling back to a per-step
+    savepoint instead undoes only this step's own writes, leaving
+    everything else pending exactly as if this step had never run.
+
+    Re-raises on failure (unlike frappe.database.database.savepoint(),
+    whose own context manager swallows the exception) so the caller's
+    try/except still logs it and adds it to the failed-steps list.
+    """
+    frappe.db.savepoint(name)
+    try:
+        yield
+    except Exception:
+        frappe.db.rollback(save_point=name)
+        raise
+    else:
+        frappe.db.release_savepoint(name)
+
+
 def _run_provisioning():
     # Reset once per run so _connector_registry_rows() below fetches fresh
     # data on the first call this run, then reuses it for every other step.
@@ -94,7 +121,8 @@ def _run_provisioning():
     failed = []
     for step in steps:
         try:
-            step()
+            with _provisioning_savepoint(step.__name__):
+                step()
         except Exception:
             failed.append(step.__name__)
             frappe.log_error(

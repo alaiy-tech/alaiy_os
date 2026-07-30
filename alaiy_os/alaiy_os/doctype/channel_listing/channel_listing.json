@@ -1,5 +1,6 @@
 {
  "creation": "2026-07-28 00:00:00.000000",
+ "description": "Deprecated — not used by any current connector. The Shopify connector adds its own fields directly onto Item (sh_shopify_product_id, sync_to_shopify, etc.) instead of using this doctype. Kept only for backward compatibility with sites that may already have data here; do not build a new connector against this shape.",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",

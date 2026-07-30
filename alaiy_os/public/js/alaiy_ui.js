@@ -6,6 +6,18 @@
  *   constants/route_titles.js
  */
 
+// ── Shared async-error handling ────────────────────────────────────────────
+// No frappe.call/frappe.db.* callback in this app's client scripts had an
+// error: handler before this existed — a failed request just failed
+// silently, with nothing shown to the user. Namespaced under
+// alaiy_os.ui (unlike the two window.* globals below) so new shared helpers
+// added to this file don't keep adding to that same pattern.
+frappe.provide("alaiy_os.ui");
+
+alaiy_os.ui.show_error = function (message) {
+  frappe.show_alert({ message: message, indicator: "red" }, 7);
+};
+
 // ── Page-container failsafe ───────────────────────────────────────────────────
 
 function _ensurePageVisible() {
