@@ -17,10 +17,13 @@ returning the shape the executor consumes:
      "stop_reason": str,
      "usage": {"input_tokens": int, "output_tokens": int}}
 
-The default below is the BYOK (bring-your-own-key) client: it talks to
-Anthropic directly using a key the customer supplies in site_config. Managed
-benches override the seam so the same Anthropic wire format is spoken against
-our LiteLLM proxy instead.
+The default below is the BYOK (bring-your-own-key) client: it speaks the
+Anthropic Messages wire format using a key the customer supplies in
+site_config. It is not pinned to api.anthropic.com — set `ai_base_url` to
+point the same client at any Anthropic-compatible endpoint (e.g. a LiteLLM
+proxy's `/anthropic` route, which accepts LiteLLM virtual keys via the same
+x-api-key header). Managed benches that need more than a base-url swap
+override the hook with their own client instead.
 """
 
 import frappe
@@ -29,16 +32,24 @@ MAX_TOKENS = 4096
 
 
 class ByokClient:
-	"""Default client: Anthropic direct, customer-supplied key."""
+	"""Default client: Anthropic wire format, customer-supplied key.
+
+	site_config keys:
+	    ai_api_key    — API key (falls back to legacy `anthropic_api_key`)
+	    ai_base_url   — optional; any Anthropic-compatible endpoint
+	"""
 
 	def complete(self, model, system, messages, tools=None):
 		import anthropic
 
-		api_key = frappe.conf.get("anthropic_api_key")
+		api_key = frappe.conf.get("ai_api_key") or frappe.conf.get("anthropic_api_key")
 		if not api_key:
-			frappe.throw("Set anthropic_api_key in site_config.json before running agents.")
+			frappe.throw("Set ai_api_key (or anthropic_api_key) in site_config.json before running agents.")
 
-		client = anthropic.Anthropic(api_key=api_key)
+		client = anthropic.Anthropic(
+			api_key=api_key,
+			base_url=frappe.conf.get("ai_base_url"),  # None = SDK default (api.anthropic.com)
+		)
 		kwargs = {
 			"model": model,
 			"max_tokens": MAX_TOKENS,
