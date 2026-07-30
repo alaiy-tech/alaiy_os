@@ -1,31 +1,21 @@
 import frappe
 
-MAX_TOKENS = 4096
+# MAX_TOKENS lives with the client now (engine/ai_client.py); re-exported here
+# for any callers that imported it from this module.
+from alaiy_os.engine.ai_client import MAX_TOKENS  # noqa: F401
+
+
+def _client():
+	"""Resolve the active AI client via the `ai_client` hook.
+
+	Scalar hook: the last app in the install order wins, so a managed bench's
+	client app transparently replaces the default BYOK client here.
+	"""
+	paths = frappe.get_hooks("ai_client")
+	if not paths:
+		frappe.throw("No `ai_client` hook registered.")
+	return frappe.get_attr(paths[-1])()
 
 
 def complete(model, system, messages, tools=None):
-	import anthropic
-
-	api_key = frappe.conf.get("anthropic_api_key")
-	if not api_key:
-		frappe.throw("Set anthropic_api_key in site_config.json before running agents.")
-
-	client = anthropic.Anthropic(api_key=api_key)
-	kwargs = {
-		"model": model,
-		"max_tokens": MAX_TOKENS,
-		"system": system,
-		"messages": messages,
-	}
-	if tools:
-		kwargs["tools"] = tools
-
-	response = client.messages.create(**kwargs)
-	return {
-		"content": [block.model_dump() for block in response.content],
-		"stop_reason": response.stop_reason,
-		"usage": {
-			"input_tokens": response.usage.input_tokens,
-			"output_tokens": response.usage.output_tokens,
-		},
-	}
+	return _client().complete(model, system, messages, tools=tools)
