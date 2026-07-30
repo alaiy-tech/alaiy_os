@@ -36,7 +36,7 @@ alaiy_os.connector_card._html = function (connector) {
     failed: __("Failed"),
   };
   const iconHtml = connector.icon_url
-    ? `<img src="${connector.icon_url}" alt="" class="alaiy-connector-icon-img">`
+    ? `<img src="${frappe.utils.escape_html(connector.icon_url)}" alt="" class="alaiy-connector-icon-img">`
     : frappe.utils.icon(connector.icon || "plug", "lg");
   const subtitle = [connector.connector_type, connector.description]
     .filter(Boolean)
