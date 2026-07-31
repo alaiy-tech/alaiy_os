@@ -51,6 +51,64 @@ website_redirects = [
 ]
 get_website_user_home_page = "alaiy_os.setup.boot.get_home_page"
 
+# New React dashboard SPA (frontend/, built into alaiy_os/www/os - see
+# frontend/vite.config.ts). Runs alongside the desk customization above; "/"
+# still redirects to the desk. Deep links like /os/products or
+# /os/sales-orders/<id> all need to resolve to the same built index.html so
+# the client-side router (React Router) can take over. This is deliberately
+# an explicit list, not an /os/<path:...> wildcard: a wildcard also
+# intercepts /os/assets/*.js|css (Frappe rewrites the route BEFORE checking
+# for a matching static file - see frappe.website.path_resolver.resolve_from_map),
+# which would serve the HTML shell instead of the actual built JS/CSS and
+# break the app. Keep this in sync with frontend/src/config/navigation.ts
+# and the routes registered in frontend/src/App.tsx.
+website_route_rules = [
+    {"from_route": f"/os/{route}", "to_route": "os"}
+    for route in (
+        "login",
+        "ask-alaiy",
+        "products",
+        "products/<id>",
+        "item-groups",
+        "item-attributes",
+        "brands",
+        "item-prices",
+        "price-lists",
+        "pricing-rules",
+        "serial-numbers",
+        "stock-entries",
+        "stock-reconciliations",
+        "warehouses",
+        "warehouse-types",
+        "sales-orders",
+        "sales-orders/<id>",
+        "sales-invoices",
+        "delivery-notes",
+        "product-bundles",
+        "purchase-orders",
+        "purchase-invoices",
+        "purchase-receipts",
+        "suppliers",
+        "supplier-groups",
+        "supplier-scorecards",
+        "customers",
+        "customers/<id>",
+        "customer-groups",
+        "addresses",
+        "utm-sources",
+        "contacts",
+        "coupon-codes",
+        "promotional-schemes",
+        "loyalty-programs",
+        "subscription-plans",
+        "campaigns",
+        "shipping-rules",
+        "fiscal-years",
+        "currency-exchanges",
+        "accounts-settings",
+    )
+]
+
 # App-switcher / desk-loading identity — otherwise Frappe falls back to the
 # stock Frappe Framework logo wherever an app doesn't set its own.
 app_logo_url = "/assets/images/client-logo-square.png"

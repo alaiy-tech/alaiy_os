@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Brand palette (hex -> HSL triplet used below):
+ *   navy  #003254  -> 204 100% 16%
+ *   blue  #91D1F2  -> 200  79% 76%
+ *   white #FFFFFF  ->   0   0% 100%
+ *   paper #F7F4EF  ->  38  33% 95%
+ *   ink   #1A1A2E  -> 240  28% 14%
+ * Light mode only for this pass - no .dark overrides.
+ */
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 240 28% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 28% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 28% 14%;
+
+    --primary: 204 100% 16%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 38 33% 95%;
+    --secondary-foreground: 204 100% 16%;
+
+    --muted: 38 20% 96%;
+    --muted-foreground: 240 10% 45%;
+
+    --accent: 200 79% 76%;
+    --accent-foreground: 204 100% 16%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 36 20% 90%;
+    --input: 36 20% 88%;
+    --ring: 200 79% 76%;
+
+    --radius: 0.375rem;
+
+    /* Sidebar is always navy, regardless of surrounding light-mode surfaces. */
+    --sidebar-background: 204 100% 16%;
+    --sidebar-foreground: 0 0% 100%;
+    --sidebar-primary: 200 79% 76%;
+    --sidebar-primary-foreground: 204 100% 16%;
+    --sidebar-accent: 204 70% 24%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 204 60% 22%;
+    --sidebar-ring: 200 79% 76%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+  h1, h2, h3, .font-heading {
+    @apply font-serif;
+  }
+}
