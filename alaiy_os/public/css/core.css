@@ -32,6 +32,18 @@
     left: 240px !important;
 }
 
+@media (max-width: 768px) {
+    .layout-side-section {
+        width: auto !important;
+        min-width: auto !important;
+    }
+
+    .collapse-sidebar-link.sidebar-toggle-btn,
+    .btn-collapse-sidebar {
+        left: auto !important;
+    }
+}
+
 /* Workspace sidebar header logo */
 .desk-sidebar .standard-sidebar-item[data-label="Alaiy OS"] .sidebar-icon,
 .desk-sidebar .standard-sidebar-item[data-name="Alaiy OS"] .sidebar-icon {
