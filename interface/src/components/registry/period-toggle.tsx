@@ -2,7 +2,7 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 import { PERIODS, type Period, readPeriod } from "../derived/list/period";
 

@@ -7,8 +7,8 @@ import { ArrowUpDown } from "lucide-react";
 import type { DocFieldMeta } from "@/components/derived/list/types";
 import { Button } from "@/components/primitive/button";
 import { STATUS_TONE } from "@/constants/list";
-import { formatCurrency } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/format";
+import { cn } from "@/utils";
 
 /**
  * The `data-table` capability contract's column shape (brief §20) - plain,

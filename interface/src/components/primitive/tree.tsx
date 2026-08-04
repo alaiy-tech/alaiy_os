@@ -1,20 +1,24 @@
-"use client"
+"use client";
 
-import type { ButtonHTMLAttributes, CSSProperties, HTMLAttributes } from "react"
-import { createContext, Fragment, useContext } from "react"
-import type { ItemInstance } from "@headless-tree/core"
-import { Slot } from "radix-ui"
+import type {
+  ButtonHTMLAttributes,
+  CSSProperties,
+  HTMLAttributes,
+} from "react";
+import { createContext, Fragment, useContext } from "react";
+import type { ItemInstance } from "@headless-tree/core";
+import { Slot } from "radix-ui";
 
-import { cn } from "@/lib/utils"
-import { MinusIcon, PlusIcon, ChevronDownIcon } from "lucide-react"
+import { cn } from "@/utils";
+import { MinusIcon, PlusIcon, ChevronDownIcon } from "lucide-react";
 
-type ToggleIconType = "chevron" | "plus-minus"
+type ToggleIconType = "chevron" | "plus-minus";
 
 interface TreeContextValue<T = any> {
-  indent: number
-  currentItem?: ItemInstance<T>
-  tree?: any
-  toggleIconType?: ToggleIconType
+  indent: number;
+  currentItem?: ItemInstance<T>;
+  tree?: any;
+  toggleIconType?: ToggleIconType;
 }
 
 const TreeContext = createContext<TreeContextValue>({
@@ -22,17 +26,17 @@ const TreeContext = createContext<TreeContextValue>({
   currentItem: undefined,
   tree: undefined,
   toggleIconType: "plus-minus",
-})
+});
 
 function useTreeContext<T = any>() {
-  return useContext(TreeContext) as TreeContextValue<T>
+  return useContext(TreeContext) as TreeContextValue<T>;
 }
 
 interface TreeProps extends HTMLAttributes<HTMLDivElement> {
-  indent?: number
-  tree?: any
-  toggleIconType?: ToggleIconType
-  asChild?: boolean
+  indent?: number;
+  tree?: any;
+  toggleIconType?: ToggleIconType;
+  asChild?: boolean;
 }
 
 function Tree({
@@ -48,24 +52,24 @@ function Tree({
   // Compiler memoizes on reference identity, so every read below
   // (getContainerProps/getProps/isExpanded/...) would be frozen at its
   // first-render value. Opt the tree primitives out of compilation.
-  "use no memo"
+  "use no memo";
 
   const containerProps =
     tree && typeof tree.getContainerProps === "function"
       ? tree.getContainerProps()
-      : {}
-  const mergedProps = { ...props, ...containerProps }
+      : {};
+  const mergedProps = { ...props, ...containerProps };
 
   // Extract style from mergedProps to merge with our custom styles
-  const { style: propStyle, ...otherProps } = mergedProps
+  const { style: propStyle, ...otherProps } = mergedProps;
 
   // Merge styles
   const mergedStyle = {
     ...propStyle,
     "--tree-indent": `${indent}px`,
-  } as CSSProperties
+  } as CSSProperties;
 
-  const Comp = asChild ? Slot.Root : "div"
+  const Comp = asChild ? Slot.Root : "div";
 
   return (
     <TreeContext.Provider value={{ indent, tree, toggleIconType }}>
@@ -76,16 +80,16 @@ function Tree({
         {...otherProps}
       />
     </TreeContext.Provider>
-  )
+  );
 }
 
 interface TreeItemProps<T = any> extends Omit<
   ButtonHTMLAttributes<HTMLButtonElement>,
   "indent"
 > {
-  item: ItemInstance<T>
-  indent?: number
-  asChild?: boolean
+  item: ItemInstance<T>;
+  indent?: number;
+  asChild?: boolean;
 }
 
 function TreeItem<T = any>({
@@ -96,29 +100,29 @@ function TreeItem<T = any>({
   ...props
 }: TreeItemProps<T>) {
   // See Tree above - item is a stable mutable instance.
-  "use no memo"
+  "use no memo";
 
-  const parentContext = useTreeContext<T>()
-  const { indent } = parentContext
+  const parentContext = useTreeContext<T>();
+  const { indent } = parentContext;
 
-  const itemProps = typeof item.getProps === "function" ? item.getProps() : {}
-  const mergedProps = { ...props, children, ...itemProps }
+  const itemProps = typeof item.getProps === "function" ? item.getProps() : {};
+  const mergedProps = { ...props, children, ...itemProps };
 
   // Extract style from mergedProps to merge with our custom styles
-  const { style: propStyle, ...otherProps } = mergedProps
+  const { style: propStyle, ...otherProps } = mergedProps;
 
   // Merge styles
   const mergedStyle = {
     ...propStyle,
     "--tree-padding": `${item.getItemMeta().level * indent}px`,
-  } as CSSProperties
+  } as CSSProperties;
 
   const defaultProps = {
     "data-slot": "tree-item",
     style: mergedStyle,
     className: cn(
       "z-10 ps-(--tree-padding) outline-hidden select-none not-last:pb-0.5 focus:z-20 data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
-      className
+      className,
     ),
     "data-focus":
       typeof item.isFocused === "function"
@@ -141,9 +145,9 @@ function TreeItem<T = any>({
         ? item.isMatchingSearch() || false
         : undefined,
     "aria-expanded": item.isExpanded(),
-  }
+  };
 
-  const Comp = asChild ? Slot.Root : "button"
+  const Comp = asChild ? Slot.Root : "button";
 
   return (
     <TreeContext.Provider value={{ ...parentContext, currentItem: item }}>
@@ -151,12 +155,12 @@ function TreeItem<T = any>({
         {children}
       </Comp>
     </TreeContext.Provider>
-  )
+  );
 }
 
 interface TreeItemLabelProps<T = any> extends HTMLAttributes<HTMLSpanElement> {
-  item?: ItemInstance<T>
-  asChild?: boolean
+  item?: ItemInstance<T>;
+  asChild?: boolean;
 }
 
 function TreeItemLabel<T = any>({
@@ -167,17 +171,17 @@ function TreeItemLabel<T = any>({
   ...props
 }: TreeItemLabelProps<T>) {
   // See Tree above - item is a stable mutable instance.
-  "use no memo"
+  "use no memo";
 
-  const { currentItem, toggleIconType } = useTreeContext<T>()
-  const item = propItem || currentItem
+  const { currentItem, toggleIconType } = useTreeContext<T>();
+  const item = propItem || currentItem;
 
   if (!item) {
-    console.warn("TreeItemLabel: No item provided via props or context")
-    return null
+    console.warn("TreeItemLabel: No item provided via props or context");
+    return null;
   }
 
-  const Comp = asChild ? Slot.Root : "span"
+  const Comp = asChild ? Slot.Root : "span";
 
   return (
     <Comp
@@ -188,7 +192,7 @@ function TreeItemLabel<T = any>({
         "py-1.5",
         "px-2",
         "text-sm",
-        className
+        className,
       )}
       {...props}
     >
@@ -196,9 +200,17 @@ function TreeItemLabel<T = any>({
         {item.isFolder() &&
           (toggleIconType === "plus-minus" ? (
             item.isExpanded() ? (
-              <MinusIcon className="text-muted-foreground size-3.5" stroke="currentColor" strokeWidth="1" />
+              <MinusIcon
+                className="text-muted-foreground size-3.5"
+                stroke="currentColor"
+                strokeWidth="1"
+              />
             ) : (
-              <PlusIcon className="text-muted-foreground size-3.5" stroke="currentColor" strokeWidth="1" />
+              <PlusIcon
+                className="text-muted-foreground size-3.5"
+                stroke="currentColor"
+                strokeWidth="1"
+              />
             )
           ) : (
             <ChevronDownIcon className="text-muted-foreground size-4 in-aria-[expanded=false]:-rotate-90" />
@@ -207,34 +219,34 @@ function TreeItemLabel<T = any>({
           (typeof item.getItemName === "function" ? item.getItemName() : null)}
       </Fragment>
     </Comp>
-  )
+  );
 }
 
 function TreeDragLine({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   // See Tree above - tree is a stable mutable instance.
-  "use no memo"
+  "use no memo";
 
-  const { tree } = useTreeContext()
+  const { tree } = useTreeContext();
 
   if (!tree || typeof tree.getDragLineStyle !== "function") {
     console.warn(
-      "TreeDragLine: No tree provided via context or tree does not have getDragLineStyle method"
-    )
-    return null
+      "TreeDragLine: No tree provided via context or tree does not have getDragLineStyle method",
+    );
+    return null;
   }
 
-  const dragLine = tree.getDragLineStyle()
+  const dragLine = tree.getDragLineStyle();
   return (
     <div
       style={dragLine}
       className={cn(
         "bg-primary before:bg-background before:border-primary absolute z-30 -mt-px h-0.5 w-[unset] before:absolute before:-top-[3px] before:left-0 before:size-2 before:border-2",
         "before:rounded-full",
-        className
+        className,
       )}
       {...props}
     />
-  )
+  );
 }
 
-export { Tree, TreeItem, TreeItemLabel, TreeDragLine }
+export { Tree, TreeItem, TreeItemLabel, TreeDragLine };

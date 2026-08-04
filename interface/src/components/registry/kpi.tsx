@@ -4,8 +4,8 @@ import { TrendingDown, TrendingUp } from "lucide-react";
 
 import { Badge } from "@/components/primitive/badge";
 import { KPI_ICONS } from "@/config/kpi-icons";
-import { formatCurrency } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import { formatCurrency } from "@/utils/format";
+import { cn } from "@/utils";
 import type {
   OsKpiBorderTone,
   OsKpiFormat,
@@ -42,6 +42,15 @@ function formatValue(
     : Math.round(value).toLocaleString();
 }
 
+function normalizeNumber(
+  value: number | string | null | undefined,
+): number | null {
+  if (value === null || value === undefined || value === "") return null;
+
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
 /** The badge shown next to the value - green/destructive per whether the
  * movement is good news (`trendPolarity` flips this for metrics like Return
  * Requests, where a rising count is bad). `null` (no comparison available)
@@ -51,13 +60,14 @@ function TrendBadge({
   trendUnit = "percent",
   trendPolarity = "positive",
 }: {
-  trend: number | undefined | null;
+  trend: number | string | null | undefined;
   trendUnit?: OsKpiTrendUnit;
   trendPolarity?: OsKpiTrendPolarity;
 }) {
-  if (trend === undefined || trend === null) return null;
+  const normalizedTrend = normalizeNumber(trend);
+  if (normalizedTrend === null) return null;
 
-  const isUp = trend >= 0;
+  const isUp = normalizedTrend >= 0;
   const isGood = isUp === (trendPolarity === "positive");
   const suffix = trendUnit === "points" ? " pts" : "%";
   const TrendIcon = isUp ? TrendingUp : TrendingDown;
@@ -73,7 +83,7 @@ function TrendBadge({
     >
       <TrendIcon />
       {isUp ? "+" : ""}
-      {trend.toFixed(1)}
+      {normalizedTrend.toFixed(1)}
       {suffix}
     </Badge>
   );
@@ -85,14 +95,17 @@ function TrendSummary({
   trend,
   trendLabel,
 }: {
-  trend: number | undefined | null;
+  trend: number | string | null | undefined;
   trendLabel?: string;
 }) {
-  if (trend === undefined || trend === null) {
+  const normalizedTrend = normalizeNumber(trend);
+
+  if (normalizedTrend === null) {
     return (
       <span className="text-muted-foreground">No comparison available</span>
     );
   }
+
   return (
     <span className="text-muted-foreground">
       {trendLabel ?? "vs last period"}

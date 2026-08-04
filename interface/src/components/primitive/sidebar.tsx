@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { Slot } from "radix-ui";
 
 import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { Button } from "@/components/primitive/button";
 import { Input } from "@/components/primitive/input";
 import { Separator } from "@/components/primitive/separator";

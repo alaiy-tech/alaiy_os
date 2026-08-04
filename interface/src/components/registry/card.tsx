@@ -9,7 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/primitive/card";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 /** The `os-card` registry entry - generic shadcn chrome with no page-specific
  * logic. Used to wrap a single child component under a titled card, exactly

@@ -8,7 +8,7 @@ import {
   CardHeader,
 } from "@/components/primitive/card";
 import { KPI_BORDER_TONE_CLASSES } from "@/config/kpi-classes";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import type { OsKpiBorderTone } from "@/types/kpi";
 
 /**
