@@ -55,6 +55,7 @@ def _run_provisioning():
     steps = [
         set_company_defaults,
         configure_system_settings,
+        reconcile_price_list_currency,
         skip_erpnext_onboarding,
         _cleanup_legacy_workspace,
         create_module_def,
@@ -83,6 +84,9 @@ def set_company_defaults():
     if not company_name:
         return
 
+    target_currency = getattr(boot_config, "COMPANY_CURRENCY", "USD")
+    target_country = getattr(boot_config, "COMPANY_COUNTRY", "India")
+
     if not frappe.db.exists("Company", company_name):
         try:
             abbr = "".join(w[0].upper() for w in company_name.split()[
@@ -91,17 +95,57 @@ def set_company_defaults():
                 "doctype":          "Company",
                 "company_name":     company_name,
                 "abbr":             abbr,
-                "default_currency": getattr(boot_config, "COMPANY_CURRENCY", "USD"),
-                "country":          getattr(boot_config, "COMPANY_COUNTRY", "India"),
+                "default_currency": target_currency,
+                "country":          target_country,
             }).insert(ignore_permissions=True)
         except Exception:
             frappe.log_error(
                 title="AlaiyOS: could not create Company",
                 message=frappe.get_traceback(),
             )
+    else:
+        _reconcile_existing_company(company_name, target_currency, target_country)
 
     frappe.db.set_single_value(
         "Global Defaults", "default_company", company_name)
+
+
+def _reconcile_existing_company(company_name, target_currency, target_country):
+    """
+    The Company already exists (e.g. created by frappe_docker's default
+    provisioning before boot_config was correct) — bring its currency/country
+    in line with boot_config on every migrate, not just at creation time.
+
+    default_currency is guarded by ERPNext once transactions exist against
+    the company, so that part is best-effort and logged rather than fatal.
+    """
+    current_currency, current_country = frappe.db.get_value(
+        "Company", company_name, ["default_currency", "country"]
+    )
+
+    if current_country != target_country:
+        try:
+            frappe.db.set_value("Company", company_name, "country", target_country)
+        except Exception:
+            frappe.log_error(
+                title="AlaiyOS: could not update existing Company country",
+                message=frappe.get_traceback(),
+            )
+
+    if current_currency != target_currency:
+        try:
+            frappe.get_doc("Company", company_name).save(ignore_permissions=True)
+        except Exception:
+            pass
+        try:
+            frappe.db.set_value(
+                "Company", company_name, "default_currency", target_currency)
+        except Exception:
+            frappe.log_error(
+                title="AlaiyOS: could not update existing Company default_currency "
+                      "(likely blocked by existing transactions against this company)",
+                message=frappe.get_traceback(),
+            )
 
 
 # ── System Settings ──────────────────────────────────────────────────────────
@@ -123,6 +167,36 @@ def configure_system_settings():
 
     _safe_set("language", getattr(boot_config, "LANGUAGE", ""))
     _safe_set("time_zone", getattr(boot_config, "TIMEZONE", ""))
+    _safe_set("country", getattr(boot_config, "COMPANY_COUNTRY", ""))
+
+
+# ── Price Lists ───────────────────────────────────────────────────────────────
+
+def reconcile_price_list_currency():
+    """
+    Price Lists (e.g. Standard Buying / Standard Selling) inherit whatever
+    currency was live when they were first created — usually the
+    frappe_docker INR default, before boot_config was corrected. Bring them
+    in line with boot_config.COMPANY_CURRENCY on every migrate.
+
+    This only corrects the currency label on the Price List doc — it does
+    not rescale existing Item Price rates, since those were already entered
+    in boot_config's target currency by the connectors/imports (the mismatch
+    is a settings bug, not a unit-conversion problem).
+    """
+    target_currency = getattr(boot_config, "COMPANY_CURRENCY", "")
+    if not target_currency:
+        return
+
+    for name in frappe.get_all("Price List", pluck="name"):
+        try:
+            if frappe.db.get_value("Price List", name, "currency") != target_currency:
+                frappe.db.set_value("Price List", name, "currency", target_currency)
+        except Exception:
+            frappe.log_error(
+                title=f"AlaiyOS: could not reconcile currency for Price List {name}",
+                message=frappe.get_traceback(),
+            )
 
 
 def skip_erpnext_onboarding():

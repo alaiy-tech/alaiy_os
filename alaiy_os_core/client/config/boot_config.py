@@ -2,14 +2,14 @@
 # Configure these values before installing the app.
 
 # ── Company ────────────────────────────────────────────────────────────────────
-COMPANY_NAME     = "Alto Moda"
-COMPANY_CURRENCY = "INR"
-COMPANY_COUNTRY  = "India"
+COMPANY_NAME     = "The Solist"
+COMPANY_CURRENCY = "USD"
+COMPANY_COUNTRY  = "United States"
 
 # ── Localisation ───────────────────────────────────────────────────────────────
 # Applied to System Settings on every migrate.
 LANGUAGE         = "en"          # e.g. "en", "hi", "ar"
-TIMEZONE         = "Asia/Kolkata"
+TIMEZONE         = "America/New_York"
 
 # ── ERPNext onboarding ─────────────────────────────────────────────────────────
 # The ERPNext setup wizard asks for fiscal year dates.
