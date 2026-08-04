@@ -11,7 +11,7 @@ import {
   SidebarTrigger,
 } from "@/components/primitive/sidebar";
 import { getServerUser } from "@/lib/frappe/server";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { getPreference } from "@/server/server-actions";
 
 import UserMenu from "../../../components/derived/menu/user-menu";

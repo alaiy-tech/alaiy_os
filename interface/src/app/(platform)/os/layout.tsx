@@ -11,7 +11,7 @@ import {
   SidebarTrigger,
 } from "@/components/primitive/sidebar";
 import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { getPreference } from "@/server/server-actions";
 import { CompanyProvider } from "@/runtime/store/company/company-provider";
 import { getSidebarStore } from "@/runtime/store/sqlite-sidebar-store";
