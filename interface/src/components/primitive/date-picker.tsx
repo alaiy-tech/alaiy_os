@@ -10,7 +10,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/primitive/popover";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 export function DatePicker({
   value,
