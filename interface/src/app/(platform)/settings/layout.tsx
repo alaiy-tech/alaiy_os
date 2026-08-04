@@ -12,6 +12,7 @@ import {
 } from "@/components/primitive/sidebar";
 import { getServerUser } from "@/lib/frappe/server";
 import { cn } from "@/lib/utils";
+import { getPreference } from "@/server/server-actions";
 
 import UserMenu from "../../../components/derived/menu/user-menu";
 import { NotificationsPopover } from "../../../components/derived/popover/notifications-popover";
@@ -28,7 +29,11 @@ export default async function Layout({
 }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
-  const user = await getServerUser();
+  const [variant, collapsible, user] = await Promise.all([
+    getPreference("sidebar_variant"),
+    getPreference("sidebar_collapsible"),
+    getServerUser(),
+  ]);
 
   if (!user) {
     const headersList = await headers();
@@ -45,7 +50,7 @@ export default async function Layout({
         } as React.CSSProperties
       }
     >
-      <SettingsSidebar />
+      <SettingsSidebar variant={variant} collapsible={collapsible} />
       <SidebarInset
         className={cn(
           "[html[data-content-layout=centered]_&>*]:mx-auto",
