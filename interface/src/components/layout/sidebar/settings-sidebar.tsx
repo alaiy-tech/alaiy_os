@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { ArrowLeft, Building2, type LucideIcon, Palette, Plug, Server, Shield, Users } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 
 import {
   Sidebar,
@@ -18,6 +19,7 @@ import {
   SidebarMenuItem,
 } from "@/components/primitive/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
+import { usePreferencesStore } from "@/runtime/store/preferences/preferences-provider";
 
 import { NavUser } from "../../derived/menu/nav-user-menu";
 
@@ -68,8 +70,25 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
 export function SettingsSidebar(props: React.ComponentProps<typeof Sidebar>) {
   const pathname = usePathname();
 
+  // Same sync as `AppSidebar`: the store starts from `props` (the SSR-read
+  // preference values `settings/layout.tsx` passes down, mirroring
+  // `os/layout.tsx`) until the client-side preferences store hydrates, at
+  // which point its own value wins - so this sidebar reflects the same
+  // `/settings/themes` Sidebar Style/Collapse Mode settings `AppSidebar`
+  // already does, instead of silently falling back to `<Sidebar>`'s own
+  // hardcoded defaults.
+  const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
+    useShallow((s) => ({
+      sidebarVariant: s.values.sidebar_variant,
+      sidebarCollapsible: s.values.sidebar_collapsible,
+      isSynced: s.isSynced,
+    })),
+  );
+  const variant = isSynced ? sidebarVariant : props.variant;
+  const collapsible = isSynced ? sidebarCollapsible : props.collapsible;
+
   return (
-    <Sidebar {...props}>
+    <Sidebar {...props} variant={variant} collapsible={collapsible}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

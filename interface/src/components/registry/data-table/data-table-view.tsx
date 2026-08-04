@@ -32,6 +32,15 @@ export type OsDataTableViewProps = {
   selectable?: boolean;
   paginated?: boolean;
   pageSize?: number;
+  /** Server/generic-source pagination metadata - a `data`-bound prop (e.g.
+   * `{ ref: "customers", path: "pagination" }`), resolved from the same
+   * source `rows` came from. See `docs/UI_RUNTIME.md`'s "Paginated Data
+   * Sources" and `OsDataTable`'s own doc comment. */
+  pagination?: { page: number; pageSize: number; hasMore: boolean };
+  /** The URL search param this table's page reads/writes when `pagination`
+   * is set (e.g. `"customers_page"`) - a plain `props` value, not resolved
+   * from any source. */
+  pageParam?: string;
   emptyMessage?: string;
 };
 
@@ -61,6 +70,8 @@ export function OsDataTableView({
   selectable,
   paginated,
   pageSize,
+  pagination,
+  pageParam,
   emptyMessage,
 }: OsDataTableViewProps) {
   const columnDefs = React.useMemo(() => buildColumnDefs(columns, currency), [columns, currency]);
@@ -84,6 +95,8 @@ export function OsDataTableView({
       selectable={selectable}
       paginated={paginated}
       pageSize={pageSize}
+      pagination={pagination}
+      pageParam={pageParam}
       emptyMessage={emptyMessage}
     />
   );

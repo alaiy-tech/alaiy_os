@@ -16,43 +16,19 @@ import {
 } from "@tanstack/react-table";
 import { Cog, Search, X } from "lucide-react";
 
-import { PaginationFooter } from "@/components/layout/pagination-footer";
-import type {
-  ColumnPrefs,
-  DocFieldMeta,
-  FilterRow,
-} from "@/components/derived/list/types";
-import {
-  type ColumnField,
-  ColumnSettingsPopover,
-} from "@/components/derived/popover/column-settings-popover";
+import type { ColumnPrefs, DocFieldMeta, FilterRow } from "@/components/derived/list/types";
+import { type ColumnField, ColumnSettingsPopover } from "@/components/derived/popover/column-settings-popover";
 import { FilterPopover } from "@/components/derived/popover/filter-popover";
+import { PaginationFooter } from "@/components/layout/pagination-footer";
 import { Button } from "@/components/primitive/button";
 import { ButtonGroup } from "@/components/primitive/button-group";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/primitive/card";
+import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/primitive/card";
 import { Checkbox } from "@/components/primitive/checkbox";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/primitive/input-group";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/primitive/table";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/primitive/input-group";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/primitive/table";
 
 import { applyFilterRows } from "./apply-filters";
+import { usePaginationParam } from "./use-pagination-param";
 
 export type OsDataTableProps<TData> = {
   title?: string;
@@ -96,14 +72,23 @@ export type OsDataTableProps<TData> = {
   paginated?: boolean;
   pageSize?: number;
 
+  /** Server/generic-source pagination metadata - when present, this table
+   * pages via URL state (`pageParam`) instead of TanStack's client-side row
+   * slicing, and `data` is expected to already be just the current page's
+   * rows (no re-slicing happens in this mode - see `docs/UI_RUNTIME.md`'s
+   * "Paginated Data Sources"). `hasMore`, not a true total, drives
+   * Next/Previous - there's no "of N pages" total in this mode. */
+  pagination?: { page: number; pageSize: number; hasMore: boolean };
+  /** The URL search param this table's page number reads/writes when
+   * `pagination` is set (e.g. `"customers_page"`) - a source needs an
+   * explicit, stable name to be paginated interactively; omitted,
+   * Next/Previous render disabled rather than silently doing nothing. */
+  pageParam?: string;
+
   emptyMessage?: string;
 };
 
-function applySearch<TData>(
-  data: TData[],
-  query: string,
-  fields?: (keyof TData)[],
-): TData[] {
+function applySearch<TData>(data: TData[], query: string, fields?: (keyof TData)[]): TData[] {
   if (!query) return data;
   const needle = query.toLowerCase();
 
@@ -122,10 +107,7 @@ function columnId(column: ColumnDef<unknown, unknown>): string | undefined {
   return column.id ?? (column as { accessorKey?: string }).accessorKey;
 }
 
-function columnFieldsFrom<TData>(
-  columns: ColumnDef<TData, unknown>[],
-  structuralIds: Set<string>,
-): ColumnField[] {
+function columnFieldsFrom<TData>(columns: ColumnDef<TData, unknown>[], structuralIds: Set<string>): ColumnField[] {
   return columns
     .map((column) => {
       const id = columnId(column as ColumnDef<unknown, unknown>);
@@ -139,10 +121,7 @@ function columnFieldsFrom<TData>(
 /** Structural columns are assumed to run as a leading and/or trailing block
  * (a `select` checkbox first, an `actions` menu last) - real usage here never
  * interleaves one in the middle. */
-function splitStructural(
-  allIds: string[],
-  structuralIds: Set<string>,
-): { leading: string[]; trailing: string[] } {
+function splitStructural(allIds: string[], structuralIds: Set<string>): { leading: string[]; trailing: string[] } {
   let start = 0;
   while (start < allIds.length && structuralIds.has(allIds[start])) start++;
   let end = allIds.length;
@@ -181,8 +160,21 @@ export function OsDataTable<TData>({
   selectable = false,
   paginated = true,
   pageSize = 10,
+  pagination,
+  pageParam,
   emptyMessage = "No results.",
 }: OsDataTableProps<TData>) {
+  const manualPagination = pagination !== undefined;
+
+  // Dev-only, loud rather than silently inert: a paginated source with no
+  // stable name to page against is a real authoring mistake, not a no-op.
+  React.useEffect(() => {
+    if (process.env.NODE_ENV === "production" || !manualPagination || pageParam) return;
+    console.warn(
+      "OsDataTable: `pagination` was provided without a `pageParam` - Next/Previous will render disabled. Give this table's data source an explicit name (a page-level `data` entry) to make it paginable.",
+    );
+  }, [manualPagination, pageParam]);
+
   // `selectable` gets a checkbox column for free - the caller only supplies
   // its own structural columns (e.g. a trailing "actions" menu), not a select
   // column, so "just set a boolean" holds for the single most common case.
@@ -198,9 +190,7 @@ export function OsDataTable<TData>({
         return (
           <Checkbox
             checked={checked}
-            onCheckedChange={(value) =>
-              table.toggleAllPageRowsSelected(!!value)
-            }
+            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
             aria-label="Select all rows"
           />
         );
@@ -219,20 +209,14 @@ export function OsDataTable<TData>({
   }, [selectable, columns]);
 
   const effectiveStructuralColumnIds = React.useMemo(
-    () =>
-      selectable ? ["select", ...structuralColumnIds] : structuralColumnIds,
+    () => (selectable ? ["select", ...structuralColumnIds] : structuralColumnIds),
     [selectable, structuralColumnIds],
   );
 
-  const structuralIds = React.useMemo(
-    () => new Set(effectiveStructuralColumnIds),
-    [effectiveStructuralColumnIds],
-  );
+  const structuralIds = React.useMemo(() => new Set(effectiveStructuralColumnIds), [effectiveStructuralColumnIds]);
   const allColumnIds = React.useMemo(
     () =>
-      effectiveColumns
-        .map((c) => columnId(c as ColumnDef<unknown, unknown>))
-        .filter((id): id is string => Boolean(id)),
+      effectiveColumns.map((c) => columnId(c as ColumnDef<unknown, unknown>)).filter((id): id is string => Boolean(id)),
     [effectiveColumns],
   );
   const manageableColumnIds = React.useMemo(
@@ -259,25 +243,35 @@ export function OsDataTable<TData>({
 
   const [rowSelection, setRowSelection] = React.useState({});
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [pagination, setPagination] = React.useState<PaginationState>(() => ({
+  const [clientPagination, setClientPagination] = React.useState<PaginationState>(() => ({
     pageIndex: 0,
     pageSize: paginated ? pageSize : Number.MAX_SAFE_INTEGER,
   }));
+
+  // Always called (Rules of Hooks) - inert when `manualPagination` is
+  // false, since nothing reads `urlPage`/`setUrlPage` in that branch.
+  const { page: urlPage, setPage: setUrlPage } = usePaginationParam(pageParam ?? "", pagination?.page ?? 1);
+
+  const effectivePagination: PaginationState = manualPagination
+    ? { pageIndex: urlPage - 1, pageSize: pagination.pageSize }
+    : clientPagination;
+
+  function handlePaginationChange(updater: React.SetStateAction<PaginationState>) {
+    if (!manualPagination) {
+      setClientPagination(updater);
+      return;
+    }
+    if (!pageParam) return; // no stable identity to write a page number to
+    const next = typeof updater === "function" ? updater(effectivePagination) : updater;
+    setUrlPage(next.pageIndex + 1);
+  }
 
   const filteredData = React.useMemo(() => {
     let result = data;
     if (searchable) result = applySearch(result, search, searchFields);
     if (filterable) result = applyFilterRows(result, filterRows, filterFields);
     return result;
-  }, [
-    data,
-    searchable,
-    search,
-    searchFields,
-    filterable,
-    filterRows,
-    filterFields,
-  ]);
+  }, [data, searchable, search, searchFields, filterable, filterRows, filterFields]);
 
   const columnVisibilityState = React.useMemo<VisibilityState>(() => {
     if (!columnVisibility) return {};
@@ -290,25 +284,17 @@ export function OsDataTable<TData>({
   const columnOrderState = React.useMemo<string[]>(() => {
     if (!columnVisibility) return [];
     const { leading, trailing } = splitStructural(allColumnIds, structuralIds);
-    const middle = columnPrefs.columnOrder.filter((id) =>
-      manageableColumnIds.includes(id),
-    );
+    const middle = columnPrefs.columnOrder.filter((id) => manageableColumnIds.includes(id));
     const remaining = manageableColumnIds.filter((id) => !middle.includes(id));
     return [...leading, ...middle, ...remaining, ...trailing];
-  }, [
-    columnVisibility,
-    allColumnIds,
-    structuralIds,
-    columnPrefs,
-    manageableColumnIds,
-  ]);
+  }, [columnVisibility, allColumnIds, structuralIds, columnPrefs, manageableColumnIds]);
 
   const table = useReactTable({
     data: filteredData,
     columns: effectiveColumns,
     state: {
       sorting,
-      pagination,
+      pagination: effectivePagination,
       rowSelection,
       columnVisibility: columnVisibilityState,
       columnOrder: columnOrderState,
@@ -317,10 +303,16 @@ export function OsDataTable<TData>({
     enableRowSelection: selectable,
     onRowSelectionChange: setRowSelection,
     onSortingChange: setSorting,
-    onPaginationChange: setPagination,
+    onPaginationChange: handlePaginationChange,
+    manualPagination,
+    pageCount: manualPagination ? -1 : undefined,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
+    // Not wired at all in manual mode: `data` is already just the current
+    // page's rows (server-resolved), so there's nothing to slice - TanStack's
+    // own documented server-pagination pattern. Wiring it anyway would
+    // silently re-slice an already-one-page result into an empty "page 2."
+    ...(manualPagination ? {} : { getPaginationRowModel: getPaginationRowModel() }),
   });
 
   // Plain boolean/truthiness checks, not "pick the first defined value" - `??`
@@ -351,7 +343,7 @@ export function OsDataTable<TData>({
                   value={searchInput}
                   onChange={(event) => {
                     setSearchInput(event.target.value);
-                    setPagination((p) => ({ ...p, pageIndex: 0 }));
+                    setClientPagination((p) => ({ ...p, pageIndex: 0 }));
                   }}
                 />
               </InputGroup>
@@ -364,7 +356,7 @@ export function OsDataTable<TData>({
                   value={filterRows}
                   onApply={(rows) => {
                     setFilterRows(rows);
-                    setPagination((p) => ({ ...p, pageIndex: 0 }));
+                    setClientPagination((p) => ({ ...p, pageIndex: 0 }));
                   }}
                 />
                 <Button
@@ -408,12 +400,7 @@ export function OsDataTable<TData>({
                 <TableRow key={headerGroup.id}>
                   {headerGroup.headers.map((header) => (
                     <TableHead key={header.id} colSpan={header.colSpan}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(
-                            header.column.columnDef.header,
-                            header.getContext(),
-                          )}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   ))}
                 </TableRow>
@@ -422,26 +409,15 @@ export function OsDataTable<TData>({
             <TableBody>
               {table.getRowModel().rows.length ? (
                 table.getRowModel().rows.map((row) => (
-                  <TableRow
-                    key={row.id}
-                    data-state={row.getIsSelected() && "selected"}
-                  >
+                  <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
                     {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </TableCell>
+                      <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
                     ))}
                   </TableRow>
                 ))
               ) : (
                 <TableRow>
-                  <TableCell
-                    colSpan={table.getVisibleLeafColumns().length}
-                    className="h-24 text-center"
-                  >
+                  <TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center">
                     {emptyMessage}
                   </TableCell>
                 </TableRow>
@@ -455,6 +431,16 @@ export function OsDataTable<TData>({
             table={table}
             totalCount={filteredData.length}
             itemLabel="rows"
+            external={
+              manualPagination
+                ? {
+                    hasMore: pagination.hasMore,
+                    onNext: () => setUrlPage(urlPage + 1),
+                    onPrevious: () => setUrlPage(urlPage - 1),
+                    disabled: !pageParam,
+                  }
+                : undefined
+            }
           />
         )}
       </CardContent>
