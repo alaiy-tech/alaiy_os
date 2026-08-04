@@ -68,5 +68,18 @@
   "options": "UOM",
   "insert_after": "height",
   "description": "Unit of measure for Width / Length / Height (e.g. Centimeter, Inch)."
+ },
+ {
+  "doctype": "Custom Field",
+  "name": "Sales Order-sales_channel",
+  "dt": "Sales Order",
+  "fieldname": "sales_channel",
+  "label": "Sales Channel",
+  "fieldtype": "Data",
+  "read_only": 1,
+  "in_list_view": 1,
+  "in_standard_filter": 1,
+  "insert_after": "order_type",
+  "description": "Channel this order originated from. Set by the connector that imported it; blank for orders raised directly in AlaiyOS."
  }
 ]

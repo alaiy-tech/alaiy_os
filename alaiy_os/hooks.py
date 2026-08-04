@@ -22,6 +22,13 @@ fixtures = [
             ]],
         ],
     },
+    {
+        "dt": "Custom Field",
+        "filters": [
+            ["dt", "=", "Sales Order"],
+            ["fieldname", "in", ["sales_channel"]],
+        ],
+    },
 ]
 
 # Provisioning hooks
