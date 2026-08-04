@@ -4,7 +4,13 @@ import { Check } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import { Button } from "@/components/primitive/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/primitive/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/primitive/card";
 import { Label } from "@/components/primitive/label";
 import {
   Select,
@@ -14,25 +20,34 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/primitive/select";
-import { ToggleGroup, ToggleGroupItem } from "@/components/primitive/toggle-group";
+import {
+  ToggleGroup,
+  ToggleGroupItem,
+} from "@/components/primitive/toggle-group";
 import { PageHeader } from "@/components/registry/page-header";
 import { fontOptions } from "@/config/fonts";
 import { THEME_PRESET_OPTIONS } from "@/constants/theme";
 import { cn } from "@/lib/utils";
 import { usePreferencesStore } from "@/runtime/store/preferences/preferences-provider";
 import type { FontKey } from "@/types/fonts";
-import type { ContentLayout, NavbarStyle, SidebarCollapsible, SidebarVariant } from "@/types/layout-preferences";
+import type {
+  ContentLayout,
+  NavbarStyle,
+  SidebarCollapsible,
+  SidebarVariant,
+} from "@/types/layout-preferences";
 import type { ThemeMode, ThemePreset } from "@/types/theme";
 
 export function ThemeSettings() {
-  const { values, resolvedThemeMode, setPreference, resetPreferences } = usePreferencesStore(
-    useShallow((state) => ({
-      values: state.values,
-      resolvedThemeMode: state.resolvedThemeMode,
-      setPreference: state.setPreference,
-      resetPreferences: state.resetPreferences,
-    })),
-  );
+  const { values, resolvedThemeMode, setPreference, resetPreferences } =
+    usePreferencesStore(
+      useShallow((state) => ({
+        values: state.values,
+        resolvedThemeMode: state.resolvedThemeMode,
+        setPreference: state.setPreference,
+        resetPreferences: state.resetPreferences,
+      })),
+    );
 
   const {
     theme_mode: themeMode,
@@ -81,7 +96,7 @@ export function ThemeSettings() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Theme"
+        title="Themes"
         subtitle="Customize the look, feel, and layout of your workspace."
         action={
           <Button type="button" variant="outline" onClick={resetPreferences}>
@@ -93,7 +108,9 @@ export function ThemeSettings() {
       <Card>
         <CardHeader className="border-b">
           <CardTitle className="text-base">Appearance</CardTitle>
-          <CardDescription>Pick a color preset, mode, and font for the interface.</CardDescription>
+          <CardDescription>
+            Pick a color preset, mode, and font for the interface.
+          </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6 pt-2">
           <div className="space-y-2">
@@ -106,17 +123,24 @@ export function ThemeSettings() {
                   onClick={() => onThemePresetChange(preset.value)}
                   className={cn(
                     "flex items-center gap-2 rounded-lg border p-3 text-left text-sm transition-colors hover:bg-accent",
-                    themePreset === preset.value ? "border-primary ring-1 ring-primary" : "border-border",
+                    themePreset === preset.value
+                      ? "border-primary ring-1 ring-primary"
+                      : "border-border",
                   )}
                 >
                   <span
                     className="size-4 shrink-0 rounded-full border"
                     style={{
-                      backgroundColor: resolvedThemeMode === "dark" ? preset.primary.dark : preset.primary.light,
+                      backgroundColor:
+                        resolvedThemeMode === "dark"
+                          ? preset.primary.dark
+                          : preset.primary.light,
                     }}
                   />
                   <span className="font-medium">{preset.label}</span>
-                  {themePreset === preset.value && <Check className="ml-auto size-4 text-primary" />}
+                  {themePreset === preset.value && (
+                    <Check className="ml-auto size-4 text-primary" />
+                  )}
                 </button>
               ))}
             </div>
@@ -134,13 +158,25 @@ export function ThemeSettings() {
                 value={themeMode}
                 onValueChange={onThemeModeChange}
               >
-                <ToggleGroupItem className="flex-1" value="light" aria-label="Toggle light">
+                <ToggleGroupItem
+                  className="flex-1"
+                  value="light"
+                  aria-label="Toggle light"
+                >
                   Light
                 </ToggleGroupItem>
-                <ToggleGroupItem className="flex-1" value="dark" aria-label="Toggle dark">
+                <ToggleGroupItem
+                  className="flex-1"
+                  value="dark"
+                  aria-label="Toggle dark"
+                >
                   Dark
                 </ToggleGroupItem>
-                <ToggleGroupItem className="flex-1" value="system" aria-label="Toggle system">
+                <ToggleGroupItem
+                  className="flex-1"
+                  value="system"
+                  aria-label="Toggle system"
+                >
                   System
                 </ToggleGroupItem>
               </ToggleGroup>
@@ -170,7 +206,9 @@ export function ThemeSettings() {
       <Card>
         <CardHeader className="border-b">
           <CardTitle className="text-base">Layout</CardTitle>
-          <CardDescription>Control how the sidebar, navbar, and page content are arranged.</CardDescription>
+          <CardDescription>
+            Control how the sidebar, navbar, and page content are arranged.
+          </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-6 pt-2 sm:grid-cols-2">
           <div className="space-y-2">
@@ -184,10 +222,18 @@ export function ThemeSettings() {
               value={contentLayout}
               onValueChange={onContentLayoutChange}
             >
-              <ToggleGroupItem className="flex-1" value="centered" aria-label="Toggle centered">
+              <ToggleGroupItem
+                className="flex-1"
+                value="centered"
+                aria-label="Toggle centered"
+              >
                 Centered
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="full-width" aria-label="Toggle full-width">
+              <ToggleGroupItem
+                className="flex-1"
+                value="full-width"
+                aria-label="Toggle full-width"
+              >
                 Full Width
               </ToggleGroupItem>
             </ToggleGroup>
@@ -204,10 +250,18 @@ export function ThemeSettings() {
               value={navbarStyle}
               onValueChange={onNavbarStyleChange}
             >
-              <ToggleGroupItem className="flex-1" value="sticky" aria-label="Toggle sticky">
+              <ToggleGroupItem
+                className="flex-1"
+                value="sticky"
+                aria-label="Toggle sticky"
+              >
                 Sticky
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="scroll" aria-label="Toggle scroll">
+              <ToggleGroupItem
+                className="flex-1"
+                value="scroll"
+                aria-label="Toggle scroll"
+              >
                 Scroll
               </ToggleGroupItem>
             </ToggleGroup>
@@ -224,13 +278,25 @@ export function ThemeSettings() {
               value={variant}
               onValueChange={onSidebarStyleChange}
             >
-              <ToggleGroupItem className="flex-1" value="inset" aria-label="Toggle inset">
+              <ToggleGroupItem
+                className="flex-1"
+                value="inset"
+                aria-label="Toggle inset"
+              >
                 Inset
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="sidebar" aria-label="Toggle sidebar">
+              <ToggleGroupItem
+                className="flex-1"
+                value="sidebar"
+                aria-label="Toggle sidebar"
+              >
                 Sidebar
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="floating" aria-label="Toggle floating">
+              <ToggleGroupItem
+                className="flex-1"
+                value="floating"
+                aria-label="Toggle floating"
+              >
                 Floating
               </ToggleGroupItem>
             </ToggleGroup>
@@ -247,10 +313,18 @@ export function ThemeSettings() {
               value={collapsible}
               onValueChange={onSidebarCollapseModeChange}
             >
-              <ToggleGroupItem className="flex-1" value="icon" aria-label="Toggle icon">
+              <ToggleGroupItem
+                className="flex-1"
+                value="icon"
+                aria-label="Toggle icon"
+              >
                 Icon
               </ToggleGroupItem>
-              <ToggleGroupItem className="flex-1" value="offcanvas" aria-label="Toggle offcanvas">
+              <ToggleGroupItem
+                className="flex-1"
+                value="offcanvas"
+                aria-label="Toggle offcanvas"
+              >
                 OffCanvas
               </ToggleGroupItem>
             </ToggleGroup>

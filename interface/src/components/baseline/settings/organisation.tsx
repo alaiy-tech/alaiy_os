@@ -1,7 +1,7 @@
 "use client";
 
 import type { ChangeEvent } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { UploadCloud } from "lucide-react";
 import { toast } from "sonner";
@@ -60,7 +60,7 @@ function LogoUploadField({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col w-full gap-2">
       <FieldLabel htmlFor={`logo-${label}`}>{label}</FieldLabel>
       <div className="flex items-center gap-4">
         <div
@@ -102,7 +102,7 @@ function LogoUploadField({
           >
             {isUploading ? "Uploading…" : "Upload image"}
           </Button>
-          <p className="max-w-xs text-muted-foreground text-xs">
+          <p className=" text-muted-foreground text-xs">
             {description}
           </p>
         </div>
@@ -159,6 +159,17 @@ export function OrganisationSettings() {
       cancelled = true;
     };
   }, []);
+
+  // Mirrors `handleSave`'s own per-field diff below - the single source of
+  // truth for "did the Company section actually change" both read from.
+  const isDirty = useMemo(() => {
+    if (!info) return false;
+    return (
+      companyName !== info.companyName ||
+      defaultCurrency !== (info.defaultCurrency ?? "") ||
+      country !== (info.country ?? "")
+    );
+  }, [info, companyName, defaultCurrency, country]);
 
   async function handleSave() {
     if (!info) return;
@@ -227,7 +238,7 @@ export function OrganisationSettings() {
           <Button
             type="button"
             onClick={handleSave}
-            disabled={isLoading || isSaving || !info}
+            disabled={isLoading || isSaving || !info || !isDirty}
           >
             {isSaving ? "Saving…" : "Save Changes"}
           </Button>
@@ -316,7 +327,7 @@ export function OrganisationSettings() {
             desk.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-6 pt-2">
+        <CardContent className="flex flex-row w-full gap-6 pt-2">
           <LogoUploadField
             label="Square Logo"
             description="Used in the sidebar, favicon, and app switcher. Square images work best."
