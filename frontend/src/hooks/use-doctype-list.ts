@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { useFrappeGetDocList, type Filter } from "frappe-react-sdk";
+import { useEffect, useMemo, useState } from "react";
+import { useFrappeGetDocCount, useFrappeGetDocList, type Filter } from "frappe-react-sdk";
 
 interface UseDoctypeListOptions {
   fields: string[];
@@ -7,27 +7,34 @@ interface UseDoctypeListOptions {
   /** Field the free-text search box filters on with a `like` match. */
   searchField?: string;
   orderBy?: { field: string; order?: "asc" | "desc" };
+  /** Extra filters (dropdowns, chips, tabs) - pass a new array when these change. */
   filters?: Filter[];
 }
 
 /**
  * Shared pagination + search state for doctype list screens. Wraps
- * frappe-react-sdk's useFrappeGetDocList so every list screen (Products,
- * Sales Orders, Customers, ...) fetches real data the same way - see
- * docs/adding-a-screen.md.
+ * frappe-react-sdk's useFrappeGetDocList (+ useFrappeGetDocCount for the
+ * "of N entries" footer) so every list screen fetches real data the same
+ * way - see docs/adding-a-screen.md.
  */
 export function useDoctypeList<T = Record<string, unknown>>(doctype: string, options: UseDoctypeListOptions) {
-  const { fields, pageSize = 20, searchField, orderBy, filters: staticFilters } = options;
+  const { fields, pageSize = 20, searchField, orderBy, filters: extraFilters } = options;
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
 
   const filters = useMemo<Filter[]>(() => {
-    const base = staticFilters ?? [];
+    const base = extraFilters ?? [];
     if (search && searchField) {
       return [...base, [searchField, "like", `%${search}%`] as Filter];
     }
     return base;
-  }, [staticFilters, search, searchField]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(extraFilters), search, searchField]);
+
+  // Reset to page 0 whenever the effective filter set changes, so a filter
+  // change while on page 3 doesn't silently show an out-of-range empty page.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setPage(0), [JSON.stringify(filters)]);
 
   const { data, error, isLoading } = useFrappeGetDocList<T>(doctype, {
     fields: fields as (keyof T | "*")[],
@@ -36,6 +43,8 @@ export function useDoctypeList<T = Record<string, unknown>>(doctype: string, opt
     filters,
     orderBy,
   });
+
+  const { data: totalCount } = useFrappeGetDocCount(doctype, filters);
 
   return {
     data: data ?? [],
@@ -49,6 +58,7 @@ export function useDoctypeList<T = Record<string, unknown>>(doctype: string, opt
       setSearch(value);
       setPage(0);
     },
+    totalCount,
     hasNextPage: (data?.length ?? 0) === pageSize,
   };
 }

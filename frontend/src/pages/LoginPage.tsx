@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useFrappeAuth } from "frappe-react-sdk";
-import { AlertCircle, Loader2 } from "lucide-react";
+import { CircleAlert, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,46 +40,57 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-svh items-center justify-center bg-primary px-4">
-      <div className="w-full max-w-sm rounded-lg bg-card p-8 shadow-lg">
-        <div className="mb-6 flex flex-col items-center text-center">
-          <img src={logoHorizontal} alt="Alaiy OS" className="mb-6 h-8 w-auto" />
-          <h1 className="font-serif text-2xl font-bold text-foreground">Sign in to Alaiy OS</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Enter your credentials to access the dashboard.</p>
-        </div>
+    <div className="grid min-h-screen place-items-center bg-navy p-6">
+      <div className="w-full max-w-[404px] rounded-[10px] bg-white p-10 shadow-[0_24px_60px_rgba(0,20,36,.36)]">
+        <img src={logoHorizontal} alt="Alaiy OS" className="mb-7 h-[26px] w-auto" />
+        <h1 className="text-[22px] font-semibold tracking-[-.02em] text-ink">Sign in to Alaiy OS</h1>
+        <p className="mt-1.5 text-[13px] leading-[1.5] text-slate">Enter your credentials to access the operating platform.</p>
 
         {error && (
-          <Alert variant="destructive" className="mb-4">
-            <AlertCircle className="size-4" />
-            <AlertDescription>{error}</AlertDescription>
+          <Alert variant="destructive" className="mt-5">
+            <CircleAlert className="size-[15px]" />
+            <AlertDescription className="text-[12.5px] leading-[1.45]">{error}</AlertDescription>
           </Alert>
         )}
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+        <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="username">Email or username</Label>
+            <Label htmlFor="username" className="text-[12.5px] font-medium text-ink">
+              Email or username
+            </Label>
             <Input
               id="username"
               type="text"
               autoComplete="username"
+              placeholder="you@company.com"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               required
               autoFocus
+              className="h-11 rounded-md border-line-strong px-3 text-[13.5px] focus-visible:border-blue focus-visible:ring-blue/40"
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-baseline justify-between">
+              <Label htmlFor="password" className="text-[12.5px] font-medium text-ink">
+                Password
+              </Label>
+              <a href="#" className="text-[12px] text-navy decoration-blue decoration-2 underline-offset-[3px] hover:underline">
+                Forgot password?
+              </a>
+            </div>
             <Input
               id="password"
               type="password"
               autoComplete="current-password"
+              placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              className="h-11 rounded-md border-line-strong px-3 text-[13.5px] focus-visible:border-blue focus-visible:ring-blue/40"
             />
           </div>
-          <Button type="submit" disabled={submitting} className="mt-2 uppercase tracking-wide">
+          <Button type="submit" disabled={submitting} className="mt-2 h-11 text-[13px] tracking-[.09em] uppercase">
             {submitting && <Loader2 className="size-4 animate-spin" />}
             Sign in
           </Button>

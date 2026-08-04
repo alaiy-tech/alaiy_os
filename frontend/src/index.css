@@ -3,18 +3,17 @@
 @tailwind utilities;
 
 /*
- * Brand palette (hex -> HSL triplet used below):
- *   navy  #003254  -> 204 100% 16%
- *   blue  #91D1F2  -> 200  79% 76%
- *   white #FFFFFF  ->   0   0% 100%
- *   paper #F7F4EF  ->  38  33% 95%
- *   ink   #1A1A2E  -> 240  28% 14%
- * Light mode only for this pass - no .dark overrides.
+ * Palette lifted from mydesign/Alaiy OS Dashboard.dc.html (the approved design).
+ * These are the shadcn-convention semantic tokens (need HSL for the /NN opacity
+ * modifiers used in the base primitives). The full literal design palette
+ * (status pills, hairlines, muted text tiers, etc.) lives in tailwind.config.ts
+ * as plain hex - see docs/DESIGN_TOKENS.md.
+ * Light mode only - the design has no dark variant.
  */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 240 28% 14%;
+    --foreground: 240 28% 14%; /* ink #1A1A2E */
 
     --card: 0 0% 100%;
     --card-foreground: 240 28% 14%;
@@ -22,35 +21,36 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 28% 14%;
 
-    --primary: 204 100% 16%;
+    --primary: 204 100% 16%; /* navy #003254 */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 38 33% 95%;
+    --secondary: 38 33% 95%; /* paper #F7F4EF */
     --secondary-foreground: 204 100% 16%;
 
-    --muted: 38 20% 96%;
-    --muted-foreground: 240 10% 45%;
+    --muted: 36 38% 97%; /* surface-faint #FBF9F6 */
+    --muted-foreground: 240 8% 59%; /* ash #8E8E9E */
 
-    --accent: 200 79% 76%;
+    --accent: 200 79% 76%; /* blue #91D1F2 */
     --accent-foreground: 204 100% 16%;
 
-    --destructive: 0 72% 51%;
+    --destructive: 357 67% 42%; /* danger #B4232A */
     --destructive-foreground: 0 0% 100%;
 
-    --border: 36 20% 90%;
-    --input: 36 20% 88%;
+    --border: 39 23% 88%; /* line-default #E7E2D9 */
+    --input: 38 21% 85%; /* line-strong #E0DAD0 */
     --ring: 200 79% 76%;
 
     --radius: 0.375rem;
 
-    /* Sidebar is always navy, regardless of surrounding light-mode surfaces. */
-    --sidebar-background: 204 100% 16%;
-    --sidebar-foreground: 0 0% 100%;
-    --sidebar-primary: 200 79% 76%;
-    --sidebar-primary-foreground: 204 100% 16%;
-    --sidebar-accent: 204 70% 24%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 204 60% 22%;
+    /* Sidebar is the "paper" theme variant from the design (sidebarTheme=paper),
+       not navy - the design supports both but paper is what's approved. */
+    --sidebar-background: 38 33% 95%; /* paper #F7F4EF */
+    --sidebar-foreground: 220 18% 30%; /* slate-2 #3E4759 */
+    --sidebar-primary: 204 100% 16%; /* navy - active item bg */
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 37 27% 90%; /* line-subtle #EDE8E0 - hover */
+    --sidebar-accent-foreground: 204 100% 16%;
+    --sidebar-border: 37 27% 90%; /* #EDE8E0 */
     --sidebar-ring: 200 79% 76%;
   }
 }
@@ -61,8 +61,5 @@
   }
   body {
     @apply bg-background text-foreground font-sans antialiased;
-  }
-  h1, h2, h3, .font-heading {
-    @apply font-serif;
   }
 }

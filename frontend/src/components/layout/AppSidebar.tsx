@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, PanelLeft, Settings as SettingsIcon } from "lucide-react";
 
-import { navigationConfig } from "@/config/navigation";
+import { navigationConfig, settingsItem } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -34,23 +35,23 @@ function NavSectionGroup({ section }: { section: (typeof navigationConfig)[numbe
   const location = useLocation();
   const { state } = useSidebar();
   const SectionIcon = section.icon;
-  const sectionIsCollapsedRail = state === "collapsed";
+  const collapsedRail = state === "collapsed";
 
   return (
-    <SidebarGroup>
+    <SidebarGroup className="p-2">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-md px-2 py-1"
+        className={cn("flex w-full items-center gap-1.5 rounded-md", collapsedRail ? "justify-center py-2" : "px-2 py-[5px] pt-[9px]")}
       >
-        <SidebarGroupLabel className="p-0">
-          {sectionIsCollapsedRail ? <SectionIcon className="size-4" /> : section.label}
+        <SidebarGroupLabel className="h-auto flex-1 justify-start p-0 text-left text-[10.5px] font-semibold tracking-[.1em] text-ash-3 uppercase group-data-[collapsible=icon]:opacity-100 group-data-[collapsible=icon]:mt-0">
+          {collapsedRail ? <SectionIcon className="size-[17px] text-ash-3" /> : section.label}
         </SidebarGroupLabel>
-        {!sectionIsCollapsedRail && (
-          <ChevronDown className={cn("size-3.5 text-sidebar-foreground/50 transition-transform", !open && "-rotate-90")} />
+        {!collapsedRail && (
+          <ChevronDown className={cn("size-[13px] text-ash-3 transition-transform duration-150", !open && "-rotate-90")} />
         )}
       </button>
-      {(open || sectionIsCollapsedRail) && (
+      {(open || collapsedRail) && (
         <SidebarGroupContent>
           <SidebarMenu>
             {section.items.map((item) => {
@@ -60,8 +61,20 @@ function NavSectionGroup({ section }: { section: (typeof navigationConfig)[numbe
                 <SidebarMenuItem key={item.label + item.path}>
                   <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
                     <Link to={toHref(item.path)}>
-                      <Icon />
-                      <span>{item.label}</span>
+                      <Icon className="size-4" />
+                      <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap group-data-[collapsible=icon]:hidden">
+                        {item.label}
+                      </span>
+                      {item.badge && (
+                        <span
+                          className={cn(
+                            "flex-none rounded-full px-[6px] py-px text-[10.5px] font-semibold tabular-nums group-data-[collapsible=icon]:hidden",
+                            active ? "bg-white/[.18] text-white" : "bg-blue text-navy",
+                          )}
+                        >
+                          {item.badge}
+                        </span>
+                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -75,25 +88,47 @@ function NavSectionGroup({ section }: { section: (typeof navigationConfig)[numbe
 }
 
 export default function AppSidebar() {
-  const { state } = useSidebar();
+  const { state, toggleSidebar } = useSidebar();
+  const location = useLocation();
   const collapsed = state === "collapsed";
+  const settingsActive = isItemActive(location.pathname, settingsItem.path);
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex h-10 items-center px-2">
+      <SidebarHeader className="border-b border-sidebar-border p-0">
+        <div className={cn("flex h-14 items-center", collapsed ? "justify-center" : "px-3.5")}>
           {collapsed ? (
-            <img src={logoSquare} alt="Alaiy OS" className="size-7 rounded-md object-contain" />
+            <img src={logoSquare} alt="Alaiy OS" className="size-[26px] object-contain" />
           ) : (
-            <img src={logoHorizontal} alt="Alaiy OS" className="h-6 w-auto object-contain" />
+            <img src={logoHorizontal} alt="Alaiy OS" className="h-5 w-auto object-contain" />
           )}
         </div>
       </SidebarHeader>
-      <SidebarContent>
+      <SidebarContent className="py-2">
         {navigationConfig.map((section) => (
           <NavSectionGroup key={section.label} section={section} />
         ))}
       </SidebarContent>
+      <SidebarFooter className="gap-1 border-t border-sidebar-border p-2">
+        <SidebarMenuButton asChild isActive={settingsActive} tooltip="Settings">
+          <Link to={toHref(settingsItem.path)}>
+            <SettingsIcon className="size-4" />
+            <span className="flex-1 overflow-hidden text-ellipsis whitespace-nowrap group-data-[collapsible=icon]:hidden">Settings</span>
+          </Link>
+        </SidebarMenuButton>
+        <button
+          type="button"
+          onClick={toggleSidebar}
+          title="Collapse sidebar"
+          className={cn(
+            "flex w-full items-center gap-[9px] rounded-md text-[12.5px] font-medium text-ash transition-colors hover:bg-sidebar-accent",
+            collapsed ? "justify-center py-2" : "px-[9px] py-2",
+          )}
+        >
+          <PanelLeft className="size-4" />
+          {!collapsed && <span>Collapse</span>}
+        </button>
+      </SidebarFooter>
     </Sidebar>
   );
 }
