@@ -117,6 +117,7 @@ def _run_provisioning():
         configure_navbar,
         configure_portal_settings,
         check_dotted_path_handlers,
+        ensure_sales_channel_field,
     ]
     failed = []
     for step in steps:
@@ -144,6 +145,44 @@ def _run_provisioning():
         )
     else:
         print(f"Alaiy OS: {succeeded}/{len(steps)} provisioning steps succeeded.")
+
+
+# ── Sales channel field ─────────────────────────────────────────────────────
+
+def ensure_sales_channel_field():
+    """
+    Sales Order.sales_channel -- confirmed live that Frappe's fixtures
+    sync (frappe.utils.fixtures.sync_fixtures, driven by hooks.py's
+    `fixtures` list) silently fails to create a genuinely NEW Custom Field
+    row on some sites: no exception, no Error Log entry, and a re-run
+    reproduces the same silent no-op even right after deleting the row.
+    A plain frappe.get_doc({...}).insert() for the identical field
+    definition succeeds immediately. create_custom_fields is the same
+    reliable mechanism every connector app in this codebase already uses
+    for its own custom fields -- used here instead of trusting the
+    fixtures path for this one.
+
+    The field stays declared in hooks.py's fixtures list too (harmless,
+    and correct for sites where the fixtures path does work); this is a
+    belt-and-suspenders guarantee, not a replacement for it.
+    """
+    if not frappe.db.exists("DocType", "Sales Order"):
+        return
+    from frappe.custom.doctype.custom_field.custom_field import create_custom_fields
+    create_custom_fields({
+        "Sales Order": [
+            {
+                "fieldname": "sales_channel",
+                "label": "Sales Channel",
+                "fieldtype": "Data",
+                "read_only": 1,
+                "in_list_view": 1,
+                "in_standard_filter": 1,
+                "insert_after": "order_type",
+                "description": "Channel this order originated from. Set by the connector that imported it; blank for orders raised directly in AlaiyOS.",
+            },
+        ],
+    }, update=True)
 
 
 def skip_erpnext_onboarding():
