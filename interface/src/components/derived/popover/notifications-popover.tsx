@@ -11,7 +11,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/primitive/popover";
-import { cn, getInitials } from "@/lib/utils";
+import { cn, getInitials } from "@/utils";
 
 interface NotificationItem {
   readonly id: string;

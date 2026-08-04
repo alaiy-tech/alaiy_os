@@ -4,12 +4,24 @@ import { useEffect, useMemo, useState } from "react";
 
 import { FileClock, X } from "lucide-react";
 
-import { type DateRange, DateRangePicker } from "@/components/derived/date-range-picker";
-import { type DocFieldMeta, type FilterRow, toFrappeFilters } from "@/components/derived/list/types";
+import {
+  type DateRange,
+  DateRangePicker,
+} from "@/components/derived/date-range-picker";
+import {
+  type DocFieldMeta,
+  type FilterRow,
+  toFrappeFilters,
+} from "@/components/derived/list/types";
 import { FilterPopover } from "@/components/derived/popover/filter-popover";
 import { Button } from "@/components/primitive/button";
 import { ButtonGroup } from "@/components/primitive/button-group";
-import { Card, CardAction, CardContent, CardHeader } from "@/components/primitive/card";
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardHeader,
+} from "@/components/primitive/card";
 import {
   Pagination,
   PaginationContent,
@@ -17,14 +29,31 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/primitive/pagination";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/primitive/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/primitive/select";
 import { Skeleton } from "@/components/primitive/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/primitive/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/primitive/table";
 import { TIMESTAMP_FIELD } from "@/constants/logs";
 import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
-import { toDateParam } from "@/lib/dates";
-import { formatDateTime } from "@/lib/format";
-import { fetchLogCount, fetchLogRows, fetchLogSources } from "@/lib/frappe/logs";
+import { toDateParam } from "@/utils/dates";
+import { formatDateTime } from "@/utils/format";
+import {
+  fetchLogCount,
+  fetchLogRows,
+  fetchLogSources,
+} from "@/lib/frappe/logs";
 import type { LogRow, LogSource } from "@/types/logs";
 
 import { LogDetailSheet } from "./log-detail-sheet";
@@ -61,7 +90,10 @@ function LogTableRows({
   if (rows.length === 0) {
     return (
       <TableRow>
-        <TableCell colSpan={span} className="h-24 text-center text-muted-foreground">
+        <TableCell
+          colSpan={span}
+          className="h-24 text-center text-muted-foreground"
+        >
           Nothing logged in this range.
         </TableCell>
       </TableRow>
@@ -69,13 +101,19 @@ function LogTableRows({
   }
 
   return rows.map((row) => (
-    <TableRow key={row.name} className="cursor-pointer border-border/60" onClick={() => onOpen(row.name)}>
+    <TableRow
+      key={row.name}
+      className="cursor-pointer border-border/60"
+      onClick={() => onOpen(row.name)}
+    >
       <TableCell className="whitespace-nowrap py-3 text-muted-foreground tabular-nums">
         {formatDateTime(row[TIMESTAMP_FIELD] as string | undefined)}
       </TableCell>
       {columns.map((column) => (
         <TableCell key={column.fieldname} className="py-3">
-          <span className="line-clamp-2 break-all">{formatFieldValue(row[column.fieldname], column.fieldtype)}</span>
+          <span className="line-clamp-2 break-all">
+            {formatFieldValue(row[column.fieldname], column.fieldtype)}
+          </span>
         </TableCell>
       ))}
     </TableRow>
@@ -124,7 +162,8 @@ export function Logs() {
     // `creation` is a Datetime and the picker yields whole days, so the upper
     // bound is compared against the start of the day after the one chosen —
     // "<= 2026-08-19" would otherwise exclude everything logged that day.
-    if (dateRange?.from) built.push([TIMESTAMP_FIELD, ">=", toDateParam(dateRange.from)]);
+    if (dateRange?.from)
+      built.push([TIMESTAMP_FIELD, ">=", toDateParam(dateRange.from)]);
     if (dateRange?.to) {
       const dayAfter = new Date(dateRange.to);
       dayAfter.setDate(dayAfter.getDate() + 1);
@@ -139,7 +178,13 @@ export function Logs() {
     let cancelled = false;
     setIsLoading(true);
 
-    const fields = Array.from(new Set(["name", TIMESTAMP_FIELD, ...columns.map((column) => column.fieldname)]));
+    const fields = Array.from(
+      new Set([
+        "name",
+        TIMESTAMP_FIELD,
+        ...columns.map((column) => column.fieldname),
+      ]),
+    );
 
     Promise.all([
       fetchLogRows({
@@ -195,8 +240,8 @@ export function Logs() {
           <FileClock className="size-6 text-muted-foreground" />
           <p className="font-medium">No logs to show.</p>
           <p className="max-w-md text-muted-foreground text-sm">
-            Logs appear here once an app that records them is installed. If one already is, you may not have permission
-            to read it.
+            Logs appear here once an app that records them is installed. If one
+            already is, you may not have permission to read it.
           </p>
         </CardContent>
       </Card>
@@ -278,7 +323,10 @@ export function Logs() {
                 <TableRow>
                   <TableHead className="py-3 font-medium">When</TableHead>
                   {columns.map((column) => (
-                    <TableHead key={column.fieldname} className="py-3 font-medium">
+                    <TableHead
+                      key={column.fieldname}
+                      className="py-3 font-medium"
+                    >
                       {column.label}
                     </TableHead>
                   ))}
@@ -286,14 +334,21 @@ export function Logs() {
               </TableHeader>
 
               <TableBody>
-                <LogTableRows columns={columns} rows={rows} isLoading={isLoading} onOpen={(name) => setOpenRow(name)} />
+                <LogTableRows
+                  columns={columns}
+                  rows={rows}
+                  isLoading={isLoading}
+                  onOpen={(name) => setOpenRow(name)}
+                />
               </TableBody>
             </Table>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-3">
             <span className="text-muted-foreground text-sm tabular-nums">
-              {totalCount === 0 ? "No entries" : `${firstRow}–${lastRow} of ${totalCount}`}
+              {totalCount === 0
+                ? "No entries"
+                : `${firstRow}–${lastRow} of ${totalCount}`}
             </span>
             <Pagination className="mx-0 w-auto justify-end">
               <PaginationContent>
@@ -301,7 +356,9 @@ export function Logs() {
                   <PaginationPrevious
                     href="#"
                     text=""
-                    className={page === 0 ? "pointer-events-none opacity-50" : undefined}
+                    className={
+                      page === 0 ? "pointer-events-none opacity-50" : undefined
+                    }
                     onClick={(event) => {
                       event.preventDefault();
                       if (page > 0) setPage(page - 1);
@@ -312,7 +369,9 @@ export function Logs() {
                   <PaginationNext
                     href="#"
                     text=""
-                    className={hasNextPage ? undefined : "pointer-events-none opacity-50"}
+                    className={
+                      hasNextPage ? undefined : "pointer-events-none opacity-50"
+                    }
                     onClick={(event) => {
                       event.preventDefault();
                       if (hasNextPage) setPage(page + 1);

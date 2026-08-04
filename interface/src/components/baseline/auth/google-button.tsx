@@ -2,7 +2,7 @@ import { siGoogle } from "simple-icons";
 
 import { SimpleIcon } from "@/components/derived/simple-icon";
 import { Button } from "@/components/primitive/button";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 export function GoogleButton({
   className,

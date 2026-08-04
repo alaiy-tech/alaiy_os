@@ -38,7 +38,7 @@ import {
   PopoverTrigger,
 } from "@/components/primitive/popover";
 import { TooltipWrap } from "@/components/primitive/tooltip-wrap";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 export interface ColumnField {
   fieldname: string;

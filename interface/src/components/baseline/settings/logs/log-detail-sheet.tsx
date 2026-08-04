@@ -4,10 +4,16 @@ import { useEffect, useState } from "react";
 
 import type { DocFieldMeta } from "@/components/derived/list/types";
 import { Separator } from "@/components/primitive/separator";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/primitive/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/primitive/sheet";
 import { Skeleton } from "@/components/primitive/skeleton";
 import { TIMESTAMP_FIELD } from "@/constants/logs";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime } from "@/utils/format";
 import { fetchLogDocument } from "@/lib/frappe/logs";
 import type { LogRow } from "@/types/logs";
 
@@ -68,7 +74,9 @@ export function LogDetailSheet({
         <SheetHeader>
           <SheetTitle className="font-mono text-sm">{name}</SheetTitle>
           <SheetDescription>
-            {doc?.[TIMESTAMP_FIELD] ? formatDateTime(String(doc[TIMESTAMP_FIELD])) : doctype}
+            {doc?.[TIMESTAMP_FIELD]
+              ? formatDateTime(String(doc[TIMESTAMP_FIELD]))
+              : doctype}
           </SheetDescription>
         </SheetHeader>
 
@@ -84,11 +92,15 @@ export function LogDetailSheet({
           )}
 
           {hasFailed && !isLoading && (
-            <p className="text-muted-foreground text-sm">This entry could not be loaded. It may have been deleted.</p>
+            <p className="text-muted-foreground text-sm">
+              This entry could not be loaded. It may have been deleted.
+            </p>
           )}
 
           {doc && shown.length === 0 && !isLoading && (
-            <p className="text-muted-foreground text-sm">This entry recorded no values.</p>
+            <p className="text-muted-foreground text-sm">
+              This entry recorded no values.
+            </p>
           )}
 
           {doc &&
@@ -96,7 +108,9 @@ export function LogDetailSheet({
               const value = doc[field.fieldname];
               return (
                 <div key={field.fieldname} className="flex flex-col gap-1">
-                  <span className="text-muted-foreground text-xs">{field.label}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {field.label}
+                  </span>
                   {isLongText(field.fieldtype) ? (
                     // Long values arrive as whatever the app wrote — often JSON
                     // or an error body. Kept monospace and wrapped rather than
@@ -105,7 +119,9 @@ export function LogDetailSheet({
                       {String(value)}
                     </pre>
                   ) : (
-                    <span className="break-words text-sm">{formatFieldValue(value, field.fieldtype)}</span>
+                    <span className="break-words text-sm">
+                      {formatFieldValue(value, field.fieldtype)}
+                    </span>
                   )}
                 </div>
               );

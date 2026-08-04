@@ -45,7 +45,7 @@ import type {
   NavMainLinkItem,
   NavMainParentItem,
 } from "@/types/navigation";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];

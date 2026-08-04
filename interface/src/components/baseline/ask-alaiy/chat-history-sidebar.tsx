@@ -17,7 +17,7 @@ import {
   InputGroupAddon,
   InputGroupInput,
 } from "@/components/primitive/input-group";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 interface ChatHistoryGroup {
   readonly label: string;

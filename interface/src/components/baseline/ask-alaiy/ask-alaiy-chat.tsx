@@ -18,7 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/primitive/select";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 interface ChatMessage {
   readonly id: string;

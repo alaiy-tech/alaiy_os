@@ -102,9 +102,7 @@ function LogoUploadField({
           >
             {isUploading ? "Uploading…" : "Upload image"}
           </Button>
-          <p className=" text-muted-foreground text-xs">
-            {description}
-          </p>
+          <p className=" text-muted-foreground text-xs">{description}</p>
         </div>
       </div>
     </div>

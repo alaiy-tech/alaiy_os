@@ -39,9 +39,9 @@ import {
 } from "@/components/primitive/empty";
 import { Skeleton } from "@/components/primitive/skeleton";
 import { STATUS_TONE } from "@/constants/list";
-import { formatDateTime, labelOr } from "@/lib/format";
+import { formatDateTime, labelOr } from "@/utils/format";
 import { fetchConnectors } from "@/lib/frappe/connectors";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import type { ConnectorRegistryRow } from "@/types/connectors";
 
 /**

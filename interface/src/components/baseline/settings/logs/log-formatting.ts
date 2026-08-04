@@ -1,5 +1,5 @@
 import type { DocFieldMeta } from "@/components/derived/list/types";
-import { formatDate, formatDateTime, formatQty } from "@/lib/format";
+import { formatDate, formatDateTime, formatQty } from "@/utils/format";
 import type { LogRow } from "@/types/logs";
 
 /** How many of the doctype's own columns the table shows beside the timestamp.
@@ -9,7 +9,15 @@ const MAX_COLUMNS = 5;
 
 /** Fieldtypes that hold more text than a table cell can show. They are still
  * offered in the drawer — this only keeps them out of the table. */
-const LONG_TEXT_FIELDTYPES = new Set(["Text", "Small Text", "Long Text", "Text Editor", "Code", "JSON", "Markdown"]);
+const LONG_TEXT_FIELDTYPES = new Set([
+  "Text",
+  "Small Text",
+  "Long Text",
+  "Text Editor",
+  "Code",
+  "JSON",
+  "Markdown",
+]);
 
 /** The doctype's own list columns, in the order its meta declares them.
  *
@@ -18,7 +26,9 @@ const LONG_TEXT_FIELDTYPES = new Set(["Text", "Small Text", "Long Text", "Text E
  * marks nothing falls back to whatever short fields it has, which is better
  * than a table of one timestamp column. */
 export function logColumns(fields: DocFieldMeta[]): DocFieldMeta[] {
-  const shortFields = fields.filter((field) => !LONG_TEXT_FIELDTYPES.has(field.fieldtype));
+  const shortFields = fields.filter(
+    (field) => !LONG_TEXT_FIELDTYPES.has(field.fieldtype),
+  );
 
   const declared = shortFields.filter((field) => field.in_list_view);
   const chosen = declared.length > 0 ? declared : shortFields;
@@ -56,7 +66,10 @@ export function formatFieldValue(value: unknown, fieldtype: string): string {
  * (`owner`, `modified_by`, `docstatus`, `idx`, …) that say nothing about what
  * the log recorded. Filtering to the doctype's declared fields drops those
  * without this page having to name them one by one. */
-export function drawerFields(fields: DocFieldMeta[], doc: LogRow): DocFieldMeta[] {
+export function drawerFields(
+  fields: DocFieldMeta[],
+  doc: LogRow,
+): DocFieldMeta[] {
   return fields.filter((field) => {
     const value = doc[field.fieldname];
     return value !== null && value !== undefined && value !== "";

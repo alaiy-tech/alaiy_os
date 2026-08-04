@@ -17,7 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/primitive/dropdown-menu";
 import { Progress } from "@/components/primitive/progress";
-import { getInitials } from "@/lib/utils";
+import { getInitials } from "@/utils";
 import { useAuth } from "@/runtime/store/auth/auth-provider";
 
 const HELP_URL = "https://os.alaiy.com";

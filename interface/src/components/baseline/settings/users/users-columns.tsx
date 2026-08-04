@@ -22,7 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/primitive/dropdown-menu";
-import { cn, getInitials } from "@/lib/utils";
+import { cn, getInitials } from "@/utils";
 
 import { statusMeta, type UserRow } from "./data";
 

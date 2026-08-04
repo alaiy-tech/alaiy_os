@@ -30,7 +30,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/primitive/table";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
 import type { Role } from "./data";
 

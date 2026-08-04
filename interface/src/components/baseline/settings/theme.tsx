@@ -27,7 +27,7 @@ import {
 import { PageHeader } from "@/components/registry/page-header";
 import { fontOptions } from "@/config/fonts";
 import { THEME_PRESET_OPTIONS } from "@/constants/theme";
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import { usePreferencesStore } from "@/runtime/store/preferences/preferences-provider";
 import type { FontKey } from "@/types/fonts";
 import type {
@@ -35,7 +35,7 @@ import type {
   NavbarStyle,
   SidebarCollapsible,
   SidebarVariant,
-} from "@/types/layout-preferences";
+} from "@/types/theme";
 import type { ThemeMode, ThemePreset } from "@/types/theme";
 
 export function ThemeSettings() {

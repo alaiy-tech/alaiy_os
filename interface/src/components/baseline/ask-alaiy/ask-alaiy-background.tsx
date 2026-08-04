@@ -1,8 +1,12 @@
 import Image from "next/image";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 
-export function AskAlaiyBackground({ className }: { readonly className?: string }) {
+export function AskAlaiyBackground({
+  className,
+}: {
+  readonly className?: string;
+}) {
   return (
     <div
       className={cn(
