@@ -91,7 +91,17 @@ def _provisioning_savepoint(name):
         frappe.db.rollback(save_point=name)
         raise
     else:
-        frappe.db.release_savepoint(name)
+        try:
+            frappe.db.release_savepoint(name)
+        except Exception:
+            # A DDL statement inside the step (e.g. create_custom_fields
+            # altering a table for a new column) implicitly commits in
+            # MySQL, which destroys the savepoint before we get here --
+            # the step's writes already committed for real, so there is
+            # nothing left to release. Confirmed live: this is exactly
+            # what happened for ensure_sales_channel_field, which
+            # succeeded but still showed up as a "failed" step.
+            pass
 
 
 def _run_provisioning():
