@@ -29,6 +29,20 @@ import {
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 
+/** Overrides the default `totalCount`-derived rendering for a table whose
+ * rows come from a server/generic data source that only knows `hasMore`,
+ * not a true total (`FrappeListResult.pagination`, for example) - see
+ * `docs/UI_RUNTIME.md`'s "Paginated Data Sources". `disabled` forces both
+ * buttons off regardless of `hasMore`/page - used when the table has no
+ * stable identity to page against (no `pageParam`), so paging would have
+ * nothing to write to. */
+export type PaginationFooterExternalState = {
+  hasMore: boolean;
+  onNext: () => void;
+  onPrevious: () => void;
+  disabled?: boolean;
+};
+
 /** Rows-per-page + page count + prev/next, driven by a TanStack table's own
  * pagination state - shared by every list/grid view so the same table
  * instance's pagination works identically no matter how the rows themselves
@@ -37,25 +51,64 @@ export function PaginationFooter<T>({
   table,
   totalCount,
   itemLabel,
+  external,
 }: {
   table: TableType<T>;
-  totalCount: number;
+  totalCount?: number;
   itemLabel: string;
+  external?: PaginationFooterExternalState;
 }) {
   const pageIndex = table.getState().pagination.pageIndex;
   const pageSize = table.getState().pagination.pageSize;
-  const pageCount = Math.max(Math.ceil(totalCount / pageSize), 1);
-  const currentPage = Math.min(pageIndex + 1, pageCount);
+  const currentPage = pageIndex + 1;
+
+  if (external) {
+    const canGoBack = !external.disabled && currentPage > 1;
+    const canGoForward = !external.disabled && external.hasMore;
+
+    return (
+      <div className="flex items-center justify-between px-4">
+        <span className="text-muted-foreground text-sm">Page {currentPage}</span>
+
+        <Pagination className="mx-0 w-auto justify-start md:justify-end">
+          <PaginationContent>
+            <PaginationItem>
+              <PaginationPrevious
+                href="#"
+                text=""
+                className={canGoBack ? undefined : "pointer-events-none opacity-50"}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (canGoBack) external.onPrevious();
+                }}
+              />
+            </PaginationItem>
+            <PaginationItem>
+              <PaginationNext
+                href="#"
+                text=""
+                className={canGoForward ? undefined : "pointer-events-none opacity-50"}
+                onClick={(event) => {
+                  event.preventDefault();
+                  if (canGoForward) external.onNext();
+                }}
+              />
+            </PaginationItem>
+          </PaginationContent>
+        </Pagination>
+      </div>
+    );
+  }
+
+  const pageCount = Math.max(Math.ceil((totalCount ?? 0) / pageSize), 1);
+  const clampedPage = Math.min(currentPage, pageCount);
 
   return (
     <div className="flex items-center justify-between px-4">
       <div className="flex items-center gap-4 text-muted-foreground text-sm">
         <div className="flex items-center gap-2">
           <span>Per page</span>
-          <Select
-            value={`${pageSize}`}
-            onValueChange={(value) => table.setPageSize(Number(value))}
-          >
+          <Select value={`${pageSize}`} onValueChange={(value) => table.setPageSize(Number(value))}>
             <SelectTrigger size="sm" className="w-16">
               <SelectValue placeholder={`${pageSize}`} />
             </SelectTrigger>
@@ -71,7 +124,7 @@ export function PaginationFooter<T>({
           </Select>
         </div>
         <span>
-          Page {currentPage} of {pageCount} · {totalCount} {itemLabel}
+          Page {clampedPage} of {pageCount} · {totalCount} {itemLabel}
         </span>
       </div>
 
@@ -81,9 +134,7 @@ export function PaginationFooter<T>({
             <PaginationPrevious
               href="#"
               text=""
-              className={
-                pageIndex === 0 ? "pointer-events-none opacity-50" : undefined
-              }
+              className={pageIndex === 0 ? "pointer-events-none opacity-50" : undefined}
               onClick={(event) => {
                 event.preventDefault();
                 table.previousPage();
@@ -94,11 +145,7 @@ export function PaginationFooter<T>({
             <PaginationNext
               href="#"
               text=""
-              className={
-                currentPage >= pageCount
-                  ? "pointer-events-none opacity-50"
-                  : undefined
-              }
+              className={clampedPage >= pageCount ? "pointer-events-none opacity-50" : undefined}
               onClick={(event) => {
                 event.preventDefault();
                 table.nextPage();

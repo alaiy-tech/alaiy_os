@@ -4,7 +4,9 @@ import { useMemo } from "react";
 
 import Image from "next/image";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
+import { Settings } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
 import {
@@ -79,6 +81,7 @@ export function AppSidebar({
   companyName?: string | null;
   items: SidebarNavGroupData[];
 }) {
+  const pathname = usePathname();
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
     useShallow((s) => ({
       sidebarVariant: s.values.sidebar_variant,
@@ -127,6 +130,21 @@ export function AppSidebar({
         <NavMain items={resolvedItems} />
       </SidebarContent>
       <SidebarFooter>
+        {/* A standalone baseline button, not a `sidebarNav`/`NavMain` group -
+            "Settings" is app-wide chrome (like the logo above), not
+            user/site page configuration, so it lives in code here rather
+            than as a `source: 'code'` sidebar-store row. Sits directly
+            above NavUser by default. */}
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Settings" isActive={pathname.startsWith("/settings")}>
+              <Link prefetch={false} href="/settings">
+                <Settings />
+                <span>Settings</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <NavUser />
       </SidebarFooter>
     </Sidebar>
