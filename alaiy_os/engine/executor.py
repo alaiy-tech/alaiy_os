@@ -49,7 +49,11 @@ def run_queued(run):
 
 	try:
 		result = _run_loop(doc)
-	except Exception:
+	except Exception as exc:
+		# The conversation so far, when the loop got far enough to have one —
+		# without it a failed run is undebuggable (the whole reason it failed is
+		# usually IN the transcript, e.g. an empty final reply).
+		messages = getattr(exc, "_agent_messages", None)
 		# Undo any half-done tool side effects, then record the failure.
 		frappe.db.rollback()
 		doc.reload()
@@ -57,6 +61,9 @@ def run_queued(run):
 			{
 				"status": "Failed",
 				"error": traceback.format_exc(),
+				"transcript": json.dumps(_redact_media(messages), indent=1, default=str)
+				if messages
+				else None,
 				"ended_at": now_datetime(),
 			},
 			commit=True,
@@ -83,20 +90,25 @@ def _run_loop(run_doc):
 	messages = [{"role": "user", "content": run_doc.input or "Run."}]
 	usage = {"input_tokens": 0, "output_tokens": 0, "image_tokens": 0}
 
-	response = None
-	for _ in range(agent.max_turns):
-		response = _call(agent, messages, usage)
-		messages.append({"role": "assistant", "content": response["content"]})
-		if response["stop_reason"] != "tool_use":
-			break
-		messages.append({"role": "user", "content": _dispatch_tools(agent, response["content"], usage)})
-	else:
-		frappe.throw(f"Agent {agent.agent_id} exceeded max_turns ({agent.max_turns}).")
+	try:
+		response = None
+		for _ in range(agent.max_turns):
+			response = _call(agent, messages, usage)
+			messages.append({"role": "assistant", "content": response["content"]})
+			if response["stop_reason"] != "tool_use":
+				break
+			messages.append({"role": "user", "content": _dispatch_tools(agent, response["content"], usage)})
+		else:
+			frappe.throw(f"Agent {agent.agent_id} exceeded max_turns ({agent.max_turns}).")
 
-	output = _final_text(response)
-	if agent.output_format == "JSON":
-		output, retry_messages = _validate_json_output(agent, output, messages, usage)
-		messages = retry_messages
+		output = _final_text(response)
+		if agent.output_format == "JSON":
+			output, messages = _validate_json_output(agent, output, messages, usage)
+	except Exception as exc:
+		# Ride the transcript out on the exception so run_queued can store it
+		# with the failure — a failed run without its conversation is opaque.
+		exc._agent_messages = messages
+		raise
 
 	return {"output": output, "messages": messages, **usage}
 
@@ -160,28 +172,51 @@ def _final_text(response):
 	return "\n".join(b["text"] for b in response["content"] if b["type"] == "text").strip()
 
 
+EMPTY_REPLY = "the model returned an empty reply"
+
+
 def _validate_json_output(agent, output, messages, usage):
 	"""Parse + schema-validate the final output; one corrective retry."""
+	for attempt in range(2):
+		parsed, problem = _check_json_output(agent, output)
+		if problem is None:
+			return parsed, messages
+		if attempt == 1:
+			frappe.throw(f"Output failed schema validation after retry: {problem}")
+		messages.append({"role": "user", "content": _correction_prompt(problem)})
+		response = _call(agent, messages, usage)
+		messages.append({"role": "assistant", "content": response["content"]})
+		output = _final_text(response)
+
+
+def _check_json_output(agent, output):
+	"""(formatted_json, None) when the reply satisfies the schema, else (None, why)."""
 	import jsonschema
 
-	for attempt in range(2):
-		try:
-			parsed = json.loads(_strip_code_fences(output))
-			jsonschema.validate(parsed, agent.output_schema)
-			return json.dumps(parsed, indent=1), messages
-		except (ValueError, jsonschema.ValidationError) as e:
-			if attempt == 1:
-				frappe.throw(f"Output failed schema validation after retry: {e}")
-			messages.append(
-				{
-					"role": "user",
-					"content": f"Your reply failed validation: {e}\n"
-					"Reply again with ONLY the corrected JSON object.",
-				}
-			)
-			response = _call(agent, messages, usage)
-			messages.append({"role": "assistant", "content": response["content"]})
-			output = _final_text(response)
+	stripped = _strip_code_fences(output)
+	if not stripped:
+		return None, EMPTY_REPLY
+	try:
+		parsed = json.loads(stripped)
+		jsonschema.validate(parsed, agent.output_schema)
+	except (ValueError, jsonschema.ValidationError) as e:
+		return None, str(e)
+	return json.dumps(parsed, indent=1), None
+
+
+def _correction_prompt(problem):
+	# The retry runs after the tool loop has ended, so the ask is the same either
+	# way: produce the JSON. The empty case only needs wording that makes sense to
+	# a model that said nothing — "your reply failed validation" does not.
+	if problem == EMPTY_REPLY:
+		return (
+			"Your reply was empty. Reply with the complete JSON object as plain "
+			"text, matching the schema you were given."
+		)
+	return (
+		f"Your reply failed validation: {problem}\n"
+		"Reply again with ONLY the corrected JSON object."
+	)
 
 
 def _strip_code_fences(text):
