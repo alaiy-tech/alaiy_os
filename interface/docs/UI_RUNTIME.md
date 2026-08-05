@@ -91,8 +91,11 @@ src/runtime/                  behavior only - functions, classes, registries hol
 │   └── validate-against-registry.ts   registry-aware validation
 ├── data/
 │   ├── registry.ts            Data Source Registry (registerDataSource/getDataSource/listDataSources)
-│   ├── resolver.ts             resolvePageData - walks a definition, resolves referenced sources in parallel
-│   ├── resolve-data-source.ts  DataSourceRef resolution (dot-path getter)
+│   ├── resolver.ts             resolvePageData/resolveSource - walks a definition, dispatches each
+│   │                           referenced source (registry id or inline config) in parallel
+│   ├── resolve-data-source.ts  DataSourceRef resolution (sourceKey, dot-path getter)
+│   ├── frappe-list-resolver.ts  createFrappeListSource - generic frappe-list mechanism
+│   ├── frappe-count-resolver.ts resolveFrappeCount - generic frappe-count mechanism
 │   └── sources/                dashboard.ts, customers.ts, index.ts (registers both as a side effect)
 └── store/
     ├── sqlite-page-store.ts        SQLiteUIPageStore (ui_pages table)
@@ -106,20 +109,26 @@ src/runtime/                  behavior only - functions, classes, registries hol
 
 src/types/runtime/            every pure type/interface the runtime uses - zero logic
 ├── node.ts        LayoutType, ComponentType, NodeLayout, LayoutNode, ComponentNode, UINode
-├── page.ts         UIPageDefinition
+├── page.ts         UIPageDefinition (incl. the optional named `data` dict - see "Paginated Data Sources")
 ├── page-config.ts   PageConfigFile, ValidationResult
 ├── page-features.ts PageFeatureBinding
 ├── actions.ts       UIAction
 ├── data-source.ts   DataSourceFieldType/Field/Context/Capabilities/Definition
-├── data-source-ref.ts  DataSourceRef
+├── data-source-ref.ts  DataSourceRef (source: registry id, or an inline frappe-list/frappe-count config)
+├── frappe-list.ts   FrappeListFilterOperator/Filter/Pagination/SourceConfig, FrappeListResult
+├── frappe-count.ts  FrappeCountSourceConfig
 ├── layout.ts        Breakpoint, ResponsiveValue
 ├── registry.ts      ComponentCapabilities, ComponentRegistryEntry, ComponentRegistry
 ├── validation.ts    ValidateAgainstRegistryOptions
 └── store.ts         UIPageStore, SidebarStore interfaces
 
 src/config/
-├── page-schema.ts    the zod schemas validate/validate.ts checks a definition against (structural)
+├── page-schema.ts    the zod schemas validate/validate.ts checks a definition against (structural) -
+│                     DATA_SOURCE_REF_SCHEMA's `source` is a union: a registry-id string, or the
+│                     frappe-list/frappe-count schemas below (nested in their own discriminated union)
 ├── component-props-schema.ts  per-type propsSchema zod objects (registry-aware, see below)
+├── frappe-list-schema.ts  FRAPPE_LIST_SOURCE_CONFIG_SCHEMA + its filter/pagination sub-schemas
+├── frappe-count-schema.ts  FRAPPE_COUNT_SOURCE_CONFIG_SCHEMA (reuses frappe-list's filter schema)
 ├── layout-classes.ts  GRID_COLS_CLASSES/SPAN_CLASSES Tailwind lookup tables
 ├── kpi-icons.ts        curated icon-name ↔ LucideIcon map for os-kpi (KPI_ICONS, KPI_ICON_NAMES)
 ├── kpi-classes.ts      KPI_BORDER_TONES + KPI_BORDER_TONE_CLASSES for os-kpi's accent bar
@@ -129,7 +138,7 @@ src/config/
                                extension point - ships empty, see "Composing registries" below)
 
 src/seeds/
-├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, SEED_PAGES
+├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE, SEED_PAGES
 ├── sidebar/seed-data.ts  buildCodeDefinedSidebar() - base groups + contributedNav merge
 └── seed-headless-db.ts   dev script: deletes the sqlite file to force a reseed
 
@@ -328,7 +337,11 @@ client-side, whether or not that matched what was saved.
 ## The Data Source Registry
 
 The abstraction boundary between a UI Definition's `data` bindings and the
-existing Frappe BFF (`src/lib/frappe/`):
+existing Frappe BFF (`src/lib/frappe/`). A `data` binding's `source` is one
+of two things - a **named** id resolved through the registry below (this
+section), or an **inline declarative config** resolved by `type` instead
+(`frappe-list`/`frappe-count` - see "Generic Frappe Data Sources" further
+down):
 
 ```
 UI Definition's `data` binding (e.g. { source: "customers" })
@@ -376,6 +389,293 @@ calls the exact fetchers `/os` and `/os/customers` always used
 from one shared place instead of a page-specific loader. UI JSON never
 contains a Frappe method path, SQL, or an arbitrary function name - only a
 semantic source id like `"customers"` or `"dashboard.salesTrend"`.
+
+## Generic Frappe Data Sources
+
+`dashboard.ts`/`customers.ts` are bespoke: each `resolve()` is hand-written
+against a page-specific fetcher, right for business calculations (KPI
+comparisons, derived statuses, multi-fetch aggregates). Most data needs
+aren't that - "list this DocType's rows, these fields, this filter, this
+order" (or "how many rows match this filter") is an ordinary shape that used
+to need a new fetcher and a new source file every time anyway. `frappe-list`/
+`frappe-count` are a second, generic path for exactly that case - and unlike
+when they were first introduced, a page definition declares one **directly**,
+with no source file and no `registerDataSource()` call:
+
+```
+UI Definition's `data` binding
+  { rows: { source: { type: "frappe-list", doctype: "Customer", ... }, path: "data" } }
+        │
+        ▼
+resolvePageData (runtime/data/resolver.ts) - collects every referenced source
+        │
+        ▼
+resolveSource - a string dispatches through the (unchanged) Data Source
+Registry; an inline config dispatches on its own `type` instead
+        │
+        ▼
+createFrappeListSource(config).resolve() / resolveFrappeCount(config) - frappeFetch(...)
+        │
+        ▼
+Frappe's standard /api/resource/<Doctype> or /api/method/frappe.client.get_count endpoint
+```
+
+A `DataSourceRef.source` (`types/runtime/data-source-ref.ts`) is now either a
+named registry id (the original, still-primary case - `dashboard`/
+`customers`, entirely unchanged) **or** a plain declarative object:
+
+```ts
+{
+  rows: {
+    source: {
+      type: "frappe-list",
+      doctype: "Customer",
+      fields: ["name", "customer_name", "customer_group", "territory"],
+      filters: [{ field: "disabled", operator: "=", value: 0 }],
+      orderBy: "modified desc",
+      pagination: { pageSize: 20 },
+    },
+    path: "data", // pulls just the row array out of FrappeListResult
+  },
+}
+```
+
+`id`/`description` (`types/runtime/frappe-list.ts`'s `FrappeListSourceConfig`)
+are optional precisely because of this - they're only needed for the
+*other*, still-available use case: a future concrete source file calling
+`registerDataSource(createFrappeListSource({ id, description, ... }))` to
+register a named, reusable generic source the ordinary way. An inline config
+has no id to register in the first place.
+
+**Dispatch lives in `resolver.ts`, not the registry.** `resolveSource`
+branches on `typeof source`: a string goes through the unchanged
+`getDataSource(id)?.resolve(context)` path; an object dispatches on its own
+`type` via an exhaustively-checked (`never`) switch -
+`"frappe-list"` → `createFrappeListSource(source).resolve(context)`,
+`"frappe-count"` → `resolveFrappeCount(source)`. The registry itself never
+learns about either type - an inline config has no id to look up, so a
+registry-shaped mechanism doesn't fit it. Two independent tree-walks need to
+agree on a lookup key for the same inline config without sharing state
+(`resolvePageData`, which builds the flat `data` record server-side, and
+`resolveDataSource`, called per-node at render time) - `resolve-data-source.ts`'s
+`sourceKey()` handles this: a string is already a stable key, an inline
+object gets a stable, key-sorted stringification (not raw `JSON.stringify`,
+which would let two byte-equal-but-differently-key-ordered configs fail to
+dedup). Two nodes referencing identical inline configs collapse to one
+Frappe call, the same "resolve each unique source exactly once" property the
+registry path always had.
+
+`resolve()` calls `frappeFetch` - the same server-side BFF call every
+existing `*.server.ts` fetcher already uses - against Frappe's *standard*
+doctype REST endpoint (`/api/resource/<Doctype>`) or
+`frappe.client.get_count`, not a custom whitelisted method the way
+`dashboard.ts`/`customers.ts` do. No second HTTP client, no new API route,
+same cookie-forwarded session Frappe stays authoritative over (no
+client-side permission logic here - an unauthorized filter or field just
+gets Frappe's own permission error, which the resolver turns into the same
+safe-empty result as any other failure).
+
+**A real page proves this**: `seeds/pages/seed-data.ts`'s
+`HEADLESS_DATA_TEST_PAGE` (`/os/headless-data-test`) - a `PageHeader`, a
+`frappe-count`-backed KPI, and **two** independently-paginated,
+`frappe-list`-backed `os-data-table`s (`Customer` and `Sales Order`), no
+page-specific fetcher anywhere. `?customers_page=2&orders_page=5` moves
+each table independently - the concrete proof the namespaced convention
+above exists for. Both tables deliberately request only genuine native
+DocType fields (`Customer`'s `name`/`customer_name`/`customer_group`/
+`territory`; `Sales Order`'s `name`/`customer`/`transaction_date`/
+`grand_total`/`status`) through the standard REST endpoint - unlike
+`HEADLESS_CUSTOMERS_PAGE`'s bespoke `customers` source, which also carries
+`orders`/`total_spend` computed by a custom whitelisted API method the
+generic source has no way to reach. That's the real, honest boundary between
+"generic Frappe access" and "domain-specific computation," not a coincidence
+of column choice. No filter is wired into this page even though
+`os-filter-bar`/`resetPageParams` exist - a `frappe-list` config's `filters`
+are still static JSON, not read from `searchParams` the way `pagination.page`
+now is, so a live filter here would look interactive while silently doing
+nothing; `resetPageParams` is proven by `OsFilterBar`'s own unit tests
+instead.
+
+**What's supported**: field selection (`"name"`, every doctype's primary
+key, is always requested even if the config omits it, so a resolved row is
+never missing a stable id), a restricted filter-operator set (`=` `!=`
+`like` `not like` `>` `<` `>=` `<=` `in` `not in` - a subset of the fuller
+`FilterOperator` vocabulary already in `types/list.ts`), single- or
+multi-field `order_by`, and fixed-page-size pagination via an over-fetch
+trick: the resolver requests `pageSize + 1` rows and trims the extra one,
+which is how `hasMore` is known without a separate count call (Frappe's
+list endpoint returns no total by default).
+
+## Paginated Data Sources
+
+Pagination is now genuinely interactive, URL-driven, and safe for multiple
+independent paginated sources on one page:
+
+```
+Data Source (a page-level named `data` entry)
+        │
+        ▼
+{ data, pagination: { page, pageSize, hasMore } }        ← FrappeListResult
+        │                     │
+        ▼                     ▼
+  { ref, path:"data" }   { ref, path:"pagination" }        ← two component bindings,
+        │                     │                              ONE resolution
+        ▼                     ▼
+   os-data-table's        os-data-table's
+   `rows` prop             `pagination` prop
+        │
+        ▼
+  user clicks Next/Previous → usePaginationParam writes `?<name>_page=`
+        │
+        ▼
+  router.replace (client nav, no reload) → the named source re-resolves
+```
+
+**A source needs an explicit, stable name to be interactively paginated.**
+`UIPageDefinition` (`types/runtime/page.ts`) gained an optional page-level
+`data: Record<string, FrappeListSourceConfig | FrappeCountSourceConfig>` -
+a source declared **once, by name**, e.g.:
+
+```ts
+definition: {
+  data: {
+    customers: { type: "frappe-list", doctype: "Customer", fields: [...], pagination: { pageSize: 10 } },
+    orders: { type: "frappe-list", doctype: "Sales Order", fields: [...], pagination: { pageSize: 10 } },
+  },
+  children: [
+    { id: "customers-table", type: "os-data-table", props: { pageParam: "customers_page", ... },
+      data: { rows: { ref: "customers", path: "data" }, pagination: { ref: "customers", path: "pagination" } } },
+    { id: "orders-table", type: "os-data-table", props: { pageParam: "orders_page", ... },
+      data: { rows: { ref: "orders", path: "data" }, pagination: { ref: "orders", path: "pagination" } } },
+  ],
+}
+```
+
+`DataSourceRef` (`types/runtime/data-source-ref.ts`) gained a second shape
+alongside the existing `{ source, path? }`: `{ ref, path? }`, naming a
+`definition.data` entry instead of carrying (or duplicating) a source config
+itself. `resolver.ts`'s `resolveNamedData` resolves every `definition.data`
+entry exactly once, into the flat data record under `` `page-data:${name}` ``
+- a keyspace deliberately separate from `sourceKey`'s (a bare registry id,
+or a stable-stringified anonymous inline config), so a page reusing the same
+word for both a named entry and, say, a registered string source can never
+collide, and so an anonymous inline binding elsewhere on the page does
+*not* dedup against a named entry even if byte-for-byte identical - a
+disclosed non-goal, not an oversight (`sourceKey`-based dedup is unchanged
+and still applies to every anonymous binding). Two component bindings
+naming the same entry (`rows`/`pagination` above) share that one resolution
+- confirmed by test (`resolver.test.ts`), not just by inspection.
+
+**Why an explicit name, not an auto-picked default.** An anonymous inline
+`frappe-list` binding (no `definition.data` entry) always uses its own
+static `pagination.page` - no URL reading, no interactivity. The
+alternative - auto-namespacing "the sole `frappe-list` source" on a page -
+is exactly the bug this mechanism exists to rule out, just deferred: the
+day a second table is added (`HEADLESS_DATA_TEST_PAGE`'s own proof point),
+*which* source silently keeps the default namespace becomes order-dependent
+again. A one-line author cost (naming the entry) permanently rules out the
+whole collision class instead of narrowing it.
+
+**The URL convention is `${name}_page`** (`customers_page`, `orders_page`) -
+the only existing "derive a compound param from a base name" precedent in
+this codebase before this phase was `os-filter-bar`'s date-range
+`${searchParam}_from`/`_to`; this matches it exactly, stays flat (Next's
+`searchParams` prop has no bracket-object parsing built in - `?page[x]=`
+would need a parsing library nothing here has), and carries no
+Frappe-specific words. `resolver.ts`'s `readNamedPage` is the *only* place
+a page number is read from the URL - `frappe-list-resolver.ts` itself has
+zero `searchParams` awareness anymore (an earlier version of this resolver
+read a flat, unnamespaced `?page=` directly; that's exactly the bug fixed
+by moving this concern up to the one layer that knows a source's name).
+
+**`os-data-table`/`OsDataTable` never sees `limit_start`/`limit_page_length`
+- only `{ page, pageSize, hasMore }`.** Two new optional props,
+`pagination` (data-bound, e.g. `{ ref: "customers", path: "pagination" }`)
+and `pageParam` (a plain `props` string, e.g. `"customers_page"`). When
+`pagination` is present, `OsDataTable` sets TanStack's `manualPagination: true`
+and skips `getPaginationRowModel()` entirely (the resolved `data` is already
+just the current page - re-slicing it client-side would silently show an
+empty "page 2"); a new, genuinely generic (zero Frappe/doctype knowledge)
+`usePaginationParam` hook (`components/registry/data-table/use-pagination-param.ts`)
+owns reading/writing the named URL param, using the exact same
+clone-`URLSearchParams`-then-`router.replace(..., {scroll:false})` pattern
+`OSPeriodToggle`/`OsFilterBar` already use - client navigation, no full
+reload, every other search param preserved, browser back/forward just works,
+for free. `PaginationFooter` gained an `external` mode (`hasMore`-driven
+Next/Previous instead of a `totalCount`-derived page count, since no true
+total exists) that leaves its default `totalCount`-based rendering - and
+every table not passing these new props - completely untouched.
+**No `pageParam` means Next/Previous render disabled**, not hidden and not
+silently inert - loud, matching this codebase's "unknown type renders a
+visible placeholder, never nothing" convention (`UnknownNodePlaceholder`) -
+plus a dev-only `console.warn` naming the missing prop.
+
+**Filter change resets the relevant page.** `os-filter-bar` gained an
+optional `resetPageParams: string[]` prop - any filter value change (or
+Reset) also deletes every param listed there, alongside the filter's own.
+Fully generic: the filter bar never knows what `"customers_page"` *means*,
+only that it should go away. There was no existing "filter change resets
+pagination" behavior to reuse (`setParam`/`reset` only ever touched their
+own filter param(s) before this) - this is the smallest mechanism that
+makes the rule real without page-specific logic anywhere.
+
+**Filter values are passed through exactly as configured - no wildcard
+injection.** The end-user-facing `toFrappeFilters` (`components/derived/list/types.ts`)
+auto-wraps a `like`/`not like` filter's value in `%...%`, because it's
+built from live text-input search. `frappe-list`'s filters are
+developer-authored declarative config instead, so the config author writes
+the literal Frappe value - `"%foo%"`, `"foo%"`, whatever match they want -
+rather than having the resolver silently rewrite it. Same operator
+vocabulary, deliberately different wildcard behavior; don't assume the two
+agree.
+
+**`frappe-count`** (`types/runtime/frappe-count.ts`, `runtime/data/frappe-count-resolver.ts`)
+is `frappe-list`'s intentionally tiny sibling - "how many rows match this
+filter," nothing more. `{ type: "frappe-count", doctype: "Customer", filters?: [...] }`,
+reusing `frappe-list`'s own filter vocabulary so the two can't drift apart.
+Calls `frappe.client.get_count` (the same endpoint `lib/frappe/logs.ts`'s
+`fetchLogCount` already proves out for a different doctype) and returns a
+plain `number`, `0` on any failure, never throws. No `id`/`description`, no
+standalone `DataSourceDefinition` wrapper, no validate-or-throw guard inside
+the resolver itself - it's only ever reached inline, after
+`validatePageConfig` has already zod-validated the whole page, so a second
+check would be dead code rather than defense in depth.
+
+**Explicitly deferred, not forgotten:**
+
+- Aggregations, joins, SQL, or any universal query language.
+- DocType-meta-driven field `label`/`type` - `createFrappeListSource`
+  currently synthesizes a label (title-cased field name) and defaults every
+  field's `type` to `"string"`, since fetching real DocField metadata is
+  out of scope ("do not attempt full DocType metadata validation"). The
+  first real `frappe-list`-backed page (`HEADLESS_DATA_TEST_PAGE`) uses
+  handwritten, explicit `os-data-table` column specs instead of this
+  synthesized metadata - prefer that over inventing a metadata system.
+- Boolean filter values - Frappe `Check` fields query as `0`/`1`, not JSON
+  `true`/`false`, and nothing exercises that path yet to confirm the
+  mapping against, so `FrappeListFilter.value` doesn't accept `boolean`.
+- The `between`/`is`/`is not` operators (`types/list.ts`'s fuller
+  `FilterOperator` vocabulary has them; `frappe-list` doesn't yet - they
+  need a different value shape than an ordinary list filter does).
+- Full-text search (Frappe's list endpoint has no such param - `frappe-list`
+  sources never claim `capabilities.search`).
+- Request-driven *filter* values - a `frappe-list` config's `filters` are
+  still static JSON; only `pagination.page` (via a named entry's
+  `${name}_page`) is read from the URL. `os-filter-bar`'s `resetPageParams`
+  is ready for the day filters become request-driven too, but nothing wires
+  a filter's value into a `frappe-list` config yet.
+- Page *size* is not URL-addressable, only page *number* - `pageSize` comes
+  from the named entry's own config; `PaginationFooter`'s "Per page"
+  selector is suppressed entirely in external/manual mode rather than left
+  connected to nothing.
+- `applyUIAction`'s mutation vocabulary (`runtime/mutations.ts`) has no verb
+  for `UIPageDefinition.data` yet - nothing calls `applyUIAction` in
+  production regardless, so this is a flagged follow-up, not a blocker.
+
+**Bespoke sources aren't going away.** `dashboard.ts`/`customers.ts` remain
+the right shape for business calculations and multi-step logic;
+`frappe-list`/`frappe-count` are additive - a second, simpler path for the
+ordinary case, not a replacement for the sources that already exist.
 
 ## The Component Registry: a machine-readable contract
 
