@@ -149,7 +149,7 @@ session cookies so the two checks can stop disagreeing and looping.
 Unlike Settings' fixed sidebar (below), the `/os/*` sidebar's groups and
 items are read from the same local SQLite database as `ui_pages`, via
 `src/runtime/store/sqlite-sidebar-store.ts` - see `docs/UI_RUNTIME.md`
-for the schema and how it stays in sync with code (`src/seeds/sidebar/seed-data.ts`)
+for the schema and how it stays in sync with code (`src/seeds/seed.ts`)
 and connector contributions (`src/config/contributed-nav.ts`).
 
 The code-owned baseline is deliberately minimal - reset from an earlier
@@ -186,22 +186,23 @@ connector needs no manual reseed step.
 is a baseline UI layout thing, per the same reasoning as `/os/ask-alaiy`
 being source-defined: its 7 items (Back to OS, Organisation, Users, Roles
 and Permissions, Connectors, Themes, Logs) are fixed in code, not read from
-the database. Reached via a "Settings" button in the main `/os/*` sidebar's
-baseline (code-owned, unlabeled) group, and also via a "Settings" entry in
-the account menu (`src/components/derived/menu/nav-user-menu.tsx`) - both
-just link to `/settings`.
+the database. Reached via a standalone "Settings" button in the main
+`/os/*` sidebar's footer (above the account menu, `AppSidebar`), and also
+via a "Settings" entry in the account menu itself
+(`src/components/derived/menu/nav-user-menu.tsx`) - both just link to
+`/settings`.
 
 ## Adding a route
 
 **Config-driven (preferred for anything under `/os` that isn't platform
 shell/auth)**: insert a row into the local `ui_pages` SQLite table (see
 `docs/UI_RUNTIME.md` - today that means adding to
-`src/seeds/pages/seed-data.ts` and running `npm run seed:headless-db`;
+`src/seeds/seed.ts` and running `npm run seed:headless-db`;
 there is no admin UI yet). No `page.tsx` required - it resolves through the
 existing `/os/[...page]` catch-all automatically. Creating the page through
 `runtime/store/create-page.ts`'s `createPageWithSidebarEntry()` also gives
 it a sidebar entry (under "Uncategorised") automatically - prefer that over
-hand-editing `src/seeds/sidebar/seed-data.ts`'s `baseSidebarGroups`, which
+hand-editing `src/seeds/seed.ts`'s `baseSidebarGroups`, which
 is for the code-owned baseline itself, not individual pages. If the route
 needs live data, register a Data Source (`src/runtime/data/sources/`)
 rather than writing a page-specific fetcher. A connector's own pages

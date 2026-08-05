@@ -138,9 +138,10 @@ src/config/
                                extension point - ships empty, see "Composing registries" below)
 
 src/seeds/
-├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE,
-│                         HEADLESS_SUPPLIERS_PAGE, SEED_PAGES
-├── sidebar/seed-data.ts  buildCodeDefinedSidebar() - base groups + contributedNav merge
+└── seed.ts             HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE,
+                        HEADLESS_SUPPLIERS_PAGE, SEED_PAGES, buildCodeDefinedSidebar()
+
+src/scripts/
 └── seed-headless-db.ts   dev script: deletes the sqlite file to force a reseed
 
 src/tests/runtime/        every runtime test, mirroring the file map above
@@ -243,7 +244,7 @@ as `UIPageStore`/`SQLiteUIPageStore`, singleton getter included.
 
 **Unlike `ui_pages`'s seed-once `ensureSeeded`**, `source = 'code'` rows are
 deleted and reinserted on *every* store construction
-(`syncCodeDefinedSidebar`), from `seeds/sidebar/seed-data.ts`'s
+(`syncCodeDefinedSidebar`), from `seeds/seed.ts`'s
 `buildCodeDefinedSidebar()` - the base's own baseline groups (just "OS" and
 an unlabeled group holding "Settings" today - see below) and connector
 contributions (`config/contributed-nav.ts`, unchanged - see
@@ -318,23 +319,19 @@ configuration rather than per-user. A future per-user store would key by
 the Frappe user id `getServerUser()` already resolves, without changing the
 `PreferencesStore` interface itself.
 
-**Cookies/localStorage don't go away - they become a client-side cache, not
-the source of truth.** `ThemeBootScript` (`scripts/theme-boot.tsx`) runs
-pre-hydration, directly reading `document.cookie`/`localStorage`
-synchronously to set `data-*` attributes before first paint - a DB round
-trip can't happen at that point, so something synchronous and client-local
-still has to. `lib/preferences/preferences-storage.ts`'s `persistPreference`
-now does both on every write: sets the cookie/localStorage value it always
-did (`persistence: "client-cookie" | "server-cookie" | "localStorage"`), and
-calls the new `setPreferenceValue` Server Action to write the same value
-into `SQLitePreferencesStore` - the durable copy. `"none"`-persistence keys
-skip both, unchanged. Server-side reads (`getPreference`/`getAllPreferences`
-in `server/server-actions.ts`, used by `RootLayout` and `os/layout.tsx`) now
-read the DB, not a cookie - `RootLayout` in particular renders the real
-saved preferences into `<html>`'s initial `data-*` attributes instead of
-always seeding hardcoded defaults, which is new: previously every request
-rendered `PREFERENCE_DEFAULTS` and let the boot script correct it
-client-side, whether or not that matched what was saved.
+**SQLite is the only source of truth - no cookie or localStorage mirror.**
+Every write goes straight through `setPreferenceValue` (`server/server-actions.ts`)
+into `SQLitePreferencesStore`. Server-side reads (`getPreference`/
+`getAllPreferences`, used by `RootLayout` and `os/layout.tsx`) read the same
+table, so `RootLayout` always renders the real saved values into `<html>`'s
+initial `data-*` attributes. `ThemeBootScript` (`scripts/theme-boot.tsx`)
+still runs pre-hydration, but only to resolve `"system"` theme mode via
+`matchMedia` (the one thing SSR can't know) and set `.dark`/`colorScheme`
+from the `data-theme-mode` attribute already there - it never reads or
+rewrites any other attribute. An earlier version mirrored every write to a
+cookie/localStorage for the boot script to read, which meant a stale or
+cleared cookie could silently override a correct DB value on load; removing
+the mirror removes that failure mode entirely, not just the redundancy.
 
 ## The Data Source Registry
 
@@ -477,7 +474,7 @@ client-side permission logic here - an unauthorized filter or field just
 gets Frappe's own permission error, which the resolver turns into the same
 safe-empty result as any other failure).
 
-**A real page proves this**: `seeds/pages/seed-data.ts`'s
+**A real page proves this**: `seeds/seed.ts`'s
 `HEADLESS_DATA_TEST_PAGE` (`/os/headless-data-test`) - a `PageHeader`, a
 `frappe-count`-backed KPI, and **two** independently-paginated,
 `frappe-list`-backed `os-data-table`s (`Customer` and `Sales Order`), no
