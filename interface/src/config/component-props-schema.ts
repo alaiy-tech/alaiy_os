@@ -99,6 +99,10 @@ const OS_DATA_TABLE_PROPS_SCHEMA = z
     // "customers_page") - see docs/UI_RUNTIME.md's "Paginated Data Sources".
     // No name here means Next/Previous render disabled, deliberately.
     pageParam: z.string(),
+    // Same convention as `pageParam`, for sort instead of page number (e.g.
+    // "suppliers_sort") - see docs/UI_RUNTIME.md's "Generic List Query
+    // State". No name here means a sortable header click does nothing.
+    sortParam: z.string(),
   })
   .partial()
   .strict();

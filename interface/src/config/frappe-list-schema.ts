@@ -41,8 +41,35 @@ export const FRAPPE_LIST_PAGINATION_SCHEMA = z
   .partial({ page: true })
   .strict();
 
-// "fieldname asc|desc", comma-separated for multiple fields.
-const ORDER_BY_PATTERN = /^\w+\s+(asc|desc)(\s*,\s*\w+\s+(asc|desc))*$/i;
+// "fieldname asc|desc", comma-separated for multiple fields. Exported so
+// `runtime/data/resolver.ts`'s `readNamedSort` can validate a request-driven
+// `${name}_sort` value against this exact same shape.
+export const ORDER_BY_PATTERN = /^\w+\s+(asc|desc)(\s*,\s*\w+\s+(asc|desc))*$/i;
+
+/** Extracts just the field names from an `orderBy`-shaped string (already
+ * assumed to match `ORDER_BY_PATTERN`) - e.g. `"name asc, modified desc"` ->
+ * `["name", "modified"]`. Shared by anything that needs to check every
+ * referenced field is actually allowed (`resolver.ts`'s `readNamedSort`),
+ * so the parsing logic can't drift from the pattern that validates the
+ * string's shape in the first place. */
+export function parseOrderByFields(orderBy: string): string[] {
+  return orderBy.split(",").map((clause) => clause.trim().split(/\s+/)[0]);
+}
+
+const FRAPPE_LIST_QUERY_FILTER_OPERATORS = ["=", "!=", "like", "not like", ">", "<", ">=", "<="] as const;
+
+export const FRAPPE_LIST_QUERY_FILTER_SCHEMA = z
+  .object({
+    field: z.string().min(1),
+    operator: z.enum(FRAPPE_LIST_QUERY_FILTER_OPERATORS),
+  })
+  .strict();
+
+export const FRAPPE_LIST_SEARCH_SCHEMA = z
+  .object({
+    fields: z.array(z.string().min(1)).min(1),
+  })
+  .strict();
 
 export const FRAPPE_LIST_SOURCE_CONFIG_SCHEMA = z
   .object({
@@ -59,6 +86,18 @@ export const FRAPPE_LIST_SOURCE_CONFIG_SCHEMA = z
     filters: z.array(FRAPPE_LIST_FILTER_SCHEMA),
     orderBy: z.string().regex(ORDER_BY_PATTERN, 'orderBy must look like "fieldname asc|desc"'),
     pagination: FRAPPE_LIST_PAGINATION_SCHEMA,
+    queryFilters: z.array(FRAPPE_LIST_QUERY_FILTER_SCHEMA),
+    search: FRAPPE_LIST_SEARCH_SCHEMA,
   })
-  .partial({ id: true, description: true, filters: true, orderBy: true })
-  .strict();
+  .partial({ id: true, description: true, filters: true, orderBy: true, queryFilters: true, search: true })
+  .strict()
+  .refine(
+    (config) => {
+      const staticFields = new Set((config.filters ?? []).map((filter) => filter.field));
+      return !(config.queryFilters ?? []).some((queryFilter) => staticFields.has(queryFilter.field));
+    },
+    {
+      message: "a field cannot appear in both `filters` and `queryFilters` on the same config",
+      path: ["queryFilters"],
+    },
+  );
