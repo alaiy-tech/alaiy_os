@@ -156,6 +156,24 @@ const OS_FILTER_BAR_PROPS_SCHEMA = z
   .partial()
   .strict();
 
+const OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA = z
+  .object({
+    category: z.enum([
+      "docstatus",
+      "job",
+      "payment",
+      "sales",
+      "stock",
+      "project",
+      "hr",
+      "manufacturing",
+      "generic",
+    ]),
+    content: z.string(),
+  })
+  .partial()
+  .strict();
+
 const OS_PERIOD_TOGGLE_PROPS_SCHEMA = z
   .object({
     paramName: z.string(),
@@ -166,6 +184,7 @@ const OS_PERIOD_TOGGLE_PROPS_SCHEMA = z
 
 export const COMPONENT_PROPS_SCHEMAS = {
   "os-page-header": OS_PAGE_HEADER_PROPS_SCHEMA,
+  "os-dynamic-badge": OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA,
   "os-card": OS_CARD_PROPS_SCHEMA,
   "os-kpi": OS_KPI_PROPS_SCHEMA,
   "os-data-table": OS_DATA_TABLE_PROPS_SCHEMA,
