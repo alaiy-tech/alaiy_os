@@ -94,6 +94,11 @@ const OS_DATA_TABLE_PROPS_SCHEMA = z
     paginated: z.boolean(),
     pageSize: z.number(),
     emptyMessage: z.string(),
+    // The URL search param this table's page number reads/writes when its
+    // `rows`/`pagination` are bound to a paginated source (e.g.
+    // "customers_page") - see docs/UI_RUNTIME.md's "Paginated Data Sources".
+    // No name here means Next/Previous render disabled, deliberately.
+    pageParam: z.string(),
   })
   .partial()
   .strict();
@@ -136,6 +141,13 @@ const FILTER_FIELD_CONFIG_SCHEMA = z
 const OS_FILTER_BAR_PROPS_SCHEMA = z
   .object({
     filters: z.array(FILTER_FIELD_CONFIG_SCHEMA),
+    // URL params to clear alongside a filter's own when its value changes
+    // (or on Reset) - e.g. a paginated table's `pageParam`, so a filter
+    // change doesn't leave the user stranded on a page number that no
+    // longer matches the new result set. Fully generic: this component
+    // never knows what the listed params mean, only that they should go
+    // away. See docs/UI_RUNTIME.md's "Paginated Data Sources".
+    resetPageParams: z.array(z.string()),
   })
   .partial()
   .strict();
