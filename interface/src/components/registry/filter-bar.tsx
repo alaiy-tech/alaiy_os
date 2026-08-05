@@ -42,20 +42,37 @@ export type FilterFieldConfig = {
  * a Server Component page reads the same values back via its own
  * `searchParams` prop with nothing threaded between them.
  */
-export function OsFilterBar({ filters }: { filters: FilterFieldConfig[] }) {
+export function OsFilterBar({
+  filters,
+  resetPageParams,
+}: {
+  filters: FilterFieldConfig[];
+  /** URL params to clear alongside a filter's own whenever any filter value
+   * changes (or on Reset) - e.g. a paginated table's `pageParam`, so a
+   * filter change never strands the user on a page number that no longer
+   * matches the new result set. Fully generic: this component never knows
+   * what a listed param *means*, only that it should go away. See
+   * `docs/UI_RUNTIME.md`'s "Paginated Data Sources". */
+  resetPageParams?: string[];
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+
+  function navigate(params: URLSearchParams) {
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
+  }
 
   function setParam(name: string, value: string, isDefault: boolean) {
     const params = new URLSearchParams(searchParams);
     if (isDefault || !value) params.delete(name);
     else params.set(name, value);
+    for (const pageParam of resetPageParams ?? []) params.delete(pageParam);
 
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
+    navigate(params);
   }
 
   function reset() {
@@ -67,18 +84,14 @@ export function OsFilterBar({ filters }: { filters: FilterFieldConfig[] }) {
         params.delete(`${filter.searchParam}_to`);
       }
     }
-    const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, {
-      scroll: false,
-    });
+    for (const pageParam of resetPageParams ?? []) params.delete(pageParam);
+
+    navigate(params);
   }
 
   const hasNonDefaultValue = filters.some((filter) => {
     if (filter.type === "date-range") {
-      return (
-        searchParams.get(`${filter.searchParam}_from`) ||
-        searchParams.get(`${filter.searchParam}_to`)
-      );
+      return searchParams.get(`${filter.searchParam}_from`) || searchParams.get(`${filter.searchParam}_to`);
     }
     const value = searchParams.get(filter.searchParam);
     return value !== null && value !== (filter.defaultValue ?? "");
@@ -88,21 +101,14 @@ export function OsFilterBar({ filters }: { filters: FilterFieldConfig[] }) {
     <div className="flex flex-wrap items-center gap-2">
       {filters.map((filter) => {
         if (filter.type === "select") {
-          const value =
-            searchParams.get(filter.searchParam) ?? filter.defaultValue ?? "";
+          const value = searchParams.get(filter.searchParam) ?? filter.defaultValue ?? "";
           return (
             <Select
               key={filter.id}
               value={value}
-              onValueChange={(next) =>
-                setParam(filter.searchParam, next, next === filter.defaultValue)
-              }
+              onValueChange={(next) => setParam(filter.searchParam, next, next === filter.defaultValue)}
             >
-              <SelectTrigger
-                className="w-40"
-                size="sm"
-                aria-label={filter.label}
-              >
+              <SelectTrigger className="w-40" size="sm" aria-label={filter.label}>
                 <SelectValue placeholder={filter.label} />
               </SelectTrigger>
               <SelectContent>
@@ -119,17 +125,14 @@ export function OsFilterBar({ filters }: { filters: FilterFieldConfig[] }) {
         }
 
         if (filter.type === "text") {
-          const value =
-            searchParams.get(filter.searchParam) ?? filter.defaultValue ?? "";
+          const value = searchParams.get(filter.searchParam) ?? filter.defaultValue ?? "";
           return (
             <Input
               key={filter.id}
               className="h-8 w-48"
               placeholder={filter.placeholder ?? filter.label}
               value={value}
-              onChange={(event) =>
-                setParam(filter.searchParam, event.target.value, false)
-              }
+              onChange={(event) => setParam(filter.searchParam, event.target.value, false)}
             />
           );
         }
@@ -144,9 +147,7 @@ export function OsFilterBar({ filters }: { filters: FilterFieldConfig[] }) {
               aria-label={`${filter.label} from`}
               className="h-8 w-36"
               value={searchParams.get(fromParam) ?? ""}
-              onChange={(event) =>
-                setParam(fromParam, event.target.value, false)
-              }
+              onChange={(event) => setParam(fromParam, event.target.value, false)}
             />
             <span className="text-muted-foreground text-xs">to</span>
             <Input
