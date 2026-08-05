@@ -41,6 +41,14 @@ export type OsDataTableViewProps = {
    * is set (e.g. `"customers_page"`) - a plain `props` value, not resolved
    * from any source. */
   pageParam?: string;
+  /** The current effective sort - a `data`-bound prop (e.g. `{ ref:
+   * "suppliers", path: "orderBy" }`), resolved from the same source `rows`
+   * came from. See `docs/UI_RUNTIME.md`'s "Generic List Query State". */
+  sort?: string;
+  /** The URL search param this table's sort reads/writes when `sort` is set
+   * (e.g. `"suppliers_sort"`) - a plain `props` value, not resolved from any
+   * source. */
+  sortParam?: string;
   emptyMessage?: string;
 };
 
@@ -72,6 +80,8 @@ export function OsDataTableView({
   pageSize,
   pagination,
   pageParam,
+  sort,
+  sortParam,
   emptyMessage,
 }: OsDataTableViewProps) {
   const columnDefs = React.useMemo(() => buildColumnDefs(columns, currency), [columns, currency]);
@@ -97,6 +107,8 @@ export function OsDataTableView({
       pageSize={pageSize}
       pagination={pagination}
       pageParam={pageParam}
+      sort={sort}
+      sortParam={sortParam}
       emptyMessage={emptyMessage}
     />
   );

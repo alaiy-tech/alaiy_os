@@ -29,6 +29,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 
 import { applyFilterRows } from "./apply-filters";
 import { usePaginationParam } from "./use-pagination-param";
+import { useSortParam } from "./use-sort-param";
 
 export type OsDataTableProps<TData> = {
   title?: string;
@@ -84,6 +85,19 @@ export type OsDataTableProps<TData> = {
    * explicit, stable name to be paginated interactively; omitted,
    * Next/Previous render disabled rather than silently doing nothing. */
   pageParam?: string;
+
+  /** The current effective sort - e.g. `"supplier_name asc"`, the same
+   * literal format `frappe-list`'s own static `orderBy` uses. When present,
+   * this table's sortable column headers become URL-driven (`sortParam`)
+   * instead of local TanStack state, and `data` is expected to already be
+   * sorted server-side (no client re-sort happens in this mode - see
+   * `docs/UI_RUNTIME.md`'s "Generic List Query State"). */
+  sort?: string;
+  /** The URL search param this table's sort reads/writes when `sort` is set
+   * (e.g. `"suppliers_sort"`) - mirrors `pageParam`: omitted, clicking a
+   * sortable header does nothing rather than silently sorting only the
+   * current page. */
+  sortParam?: string;
 
   emptyMessage?: string;
 };
@@ -162,18 +176,29 @@ export function OsDataTable<TData>({
   pageSize = 10,
   pagination,
   pageParam,
+  sort,
+  sortParam,
   emptyMessage = "No results.",
 }: OsDataTableProps<TData>) {
   const manualPagination = pagination !== undefined;
+  const manualSorting = sort !== undefined;
 
-  // Dev-only, loud rather than silently inert: a paginated source with no
-  // stable name to page against is a real authoring mistake, not a no-op.
+  // Dev-only, loud rather than silently inert: a paginated/sorted source
+  // with no stable name to write URL state against is a real authoring
+  // mistake, not a no-op.
   React.useEffect(() => {
-    if (process.env.NODE_ENV === "production" || !manualPagination || pageParam) return;
-    console.warn(
-      "OsDataTable: `pagination` was provided without a `pageParam` - Next/Previous will render disabled. Give this table's data source an explicit name (a page-level `data` entry) to make it paginable.",
-    );
-  }, [manualPagination, pageParam]);
+    if (process.env.NODE_ENV === "production") return;
+    if (manualPagination && !pageParam) {
+      console.warn(
+        "OsDataTable: `pagination` was provided without a `pageParam` - Next/Previous will render disabled. Give this table's data source an explicit name (a page-level `data` entry) to make it paginable.",
+      );
+    }
+    if (manualSorting && !sortParam) {
+      console.warn(
+        "OsDataTable: `sort` was provided without a `sortParam` - clicking a sortable header will do nothing. Give this table's data source an explicit name (a page-level `data` entry) to make it sortable.",
+      );
+    }
+  }, [manualPagination, pageParam, manualSorting, sortParam]);
 
   // `selectable` gets a checkbox column for free - the caller only supplies
   // its own structural columns (e.g. a trailing "actions" menu), not a select
@@ -266,6 +291,31 @@ export function OsDataTable<TData>({
     setUrlPage(next.pageIndex + 1);
   }
 
+  // Always called (Rules of Hooks) - inert when `manualSorting` is false.
+  // Resetting `pageParam` (if any) alongside a sort write, not just a page
+  // write, is what satisfies "changing sort resets the relevant page"
+  // without OsFilterBar's involvement - see docs/UI_RUNTIME.md.
+  const { value: urlSort, setValue: setUrlSort } = useSortParam(sortParam ?? "", pageParam ? [pageParam] : []);
+
+  const effectiveSorting: SortingState = React.useMemo(() => {
+    if (!manualSorting) return [];
+    const value = urlSort ?? sort;
+    if (!value) return [];
+    const [field, direction] = value.trim().split(/\s+/);
+    return field ? [{ id: field, desc: direction?.toLowerCase() === "desc" }] : [];
+  }, [manualSorting, urlSort, sort]);
+
+  function handleSortingChange(updater: React.SetStateAction<SortingState>) {
+    if (!manualSorting) {
+      setSorting(updater);
+      return;
+    }
+    if (!sortParam) return; // no stable identity to write a sort to
+    const next = typeof updater === "function" ? updater(effectiveSorting) : updater;
+    const entry = next[0];
+    setUrlSort(entry ? `${entry.id} ${entry.desc ? "desc" : "asc"}` : null);
+  }
+
   const filteredData = React.useMemo(() => {
     let result = data;
     if (searchable) result = applySearch(result, search, searchFields);
@@ -293,7 +343,7 @@ export function OsDataTable<TData>({
     data: filteredData,
     columns: effectiveColumns,
     state: {
-      sorting,
+      sorting: manualSorting ? effectiveSorting : sorting,
       pagination: effectivePagination,
       rowSelection,
       columnVisibility: columnVisibilityState,
@@ -302,12 +352,18 @@ export function OsDataTable<TData>({
     getRowId,
     enableRowSelection: selectable,
     onRowSelectionChange: setRowSelection,
-    onSortingChange: setSorting,
+    onSortingChange: handleSortingChange,
     onPaginationChange: handlePaginationChange,
     manualPagination,
+    manualSorting,
     pageCount: manualPagination ? -1 : undefined,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
+    // Not wired at all in manual-sort mode: `data` is already sorted
+    // server-side - re-sorting client-side would be redundant at best
+    // (a stable no-op) and wrong at worst (TanStack's default comparator
+    // doesn't know a column is numeric/date), same reasoning as skipping
+    // `getPaginationRowModel` below.
+    ...(manualSorting ? {} : { getSortedRowModel: getSortedRowModel() }),
     // Not wired at all in manual mode: `data` is already just the current
     // page's rows (server-resolved), so there's nothing to slice - TanStack's
     // own documented server-pagination pattern. Wiring it anyway would
@@ -334,7 +390,7 @@ export function OsDataTable<TData>({
         {[searchable, filterable, columnVisibility].some(Boolean) && (
           <div className="flex flex-wrap items-center gap-2">
             {searchable && (
-              <InputGroup className="h-8 w-full md:w-64">
+              <InputGroup className="h-7 w-full md:w-64">
                 <InputGroupAddon align="inline-start">
                   <Search className="size-3.5" />
                 </InputGroupAddon>
