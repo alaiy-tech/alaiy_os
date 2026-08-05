@@ -206,7 +206,7 @@ application's UI afterward. Don't conflate the two.
 ## 11. Persistence: planned, not built
 
 Today's two real pages are seeded from TypeScript into SQLite
-(`seeds/pages/seed-data.ts`) — a developer-owned artifact, not yet
+(`seeds/seed.ts`) — a developer-owned artifact, not yet
 user-editable storage. The next real step (not started) is Frappe-backed
 persistence:
 

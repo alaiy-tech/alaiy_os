@@ -815,7 +815,7 @@ is on), so nothing is lost on the consuming side.
 
 `icon` is a lucide-react name in lower-kebab-case. The composer turns the `nav`
 blocks of every app into `src/config/contributed-nav.ts` — emitting the icon
-imports it needs — and [seed-data.ts](src/seeds/sidebar/seed-data.ts)'s
+imports it needs — and [seed.ts](src/seeds/seed.ts)'s
 `buildCodeDefinedSidebar()` folds that list into its own groups by matching
 `group` against a group `label`. An unrecognised label opens a new group,
 which is what lets a client add a section the base has never heard of.
