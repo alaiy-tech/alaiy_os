@@ -2,7 +2,10 @@ import type { OrganisationInfo } from "@/types/organisation";
 
 export class OrganisationApiError extends Error {}
 
-async function getSingleValue(doctype: string, field: string): Promise<string | null> {
+async function getSingleValue(
+  doctype: string,
+  field: string,
+): Promise<string | null> {
   const res = await fetch(
     `/api/method/frappe.client.get_single_value?doctype=${encodeURIComponent(doctype)}&field=${encodeURIComponent(field)}`,
   );
@@ -15,7 +18,10 @@ async function getSingleValue(doctype: string, field: string): Promise<string | 
  * this mirrors that, falling back to the oldest Company record if it's
  * unset, so the page still works on a freshly-installed site. */
 async function resolveDefaultCompanyName(): Promise<string> {
-  const defaultCompany = await getSingleValue("Global Defaults", "default_company");
+  const defaultCompany = await getSingleValue(
+    "Global Defaults",
+    "default_company",
+  );
   if (defaultCompany) return defaultCompany;
 
   const fields = encodeURIComponent(JSON.stringify(["name"]));
@@ -26,16 +32,28 @@ async function resolveDefaultCompanyName(): Promise<string> {
     const data = (await listRes.json()) as { data?: Array<{ name: string }> };
     if (data.data?.[0]?.name) return data.data[0].name;
   }
-  throw new OrganisationApiError("No company has been set up on this site yet.");
+  throw new OrganisationApiError(
+    "No company has been set up on this site yet.",
+  );
 }
 
 export async function getOrganisationSettings(): Promise<OrganisationInfo> {
   const companyDocName = await resolveDefaultCompanyName();
-  const fields = encodeURIComponent(JSON.stringify(["company_name", "abbr", "default_currency", "country"]));
-  const res = await fetch(`/api/resource/Company/${encodeURIComponent(companyDocName)}?fields=${fields}`);
-  if (!res.ok) throw new OrganisationApiError("Could not load company details.");
+  const fields = encodeURIComponent(
+    JSON.stringify(["company_name", "abbr", "default_currency", "country"]),
+  );
+  const res = await fetch(
+    `/api/resource/Company/${encodeURIComponent(companyDocName)}?fields=${fields}`,
+  );
+  if (!res.ok)
+    throw new OrganisationApiError("Could not load company details.");
   const { data } = (await res.json()) as {
-    data: { company_name: string; abbr: string; default_currency: string | null; country: string | null };
+    data: {
+      company_name: string;
+      abbr: string;
+      default_currency: string | null;
+      country: string | null;
+    };
   };
 
   const [squareLogoUrl, horizontalLogoUrl] = await Promise.all([
@@ -63,18 +81,27 @@ export async function updateOrganisationSettings(
   patch: { companyName?: string; defaultCurrency?: string; country?: string },
 ): Promise<string> {
   const fieldPatch: Record<string, string> = {};
-  if (patch.defaultCurrency) fieldPatch.default_currency = patch.defaultCurrency;
+  if (patch.defaultCurrency)
+    fieldPatch.default_currency = patch.defaultCurrency;
   if (patch.country) fieldPatch.country = patch.country;
 
   if (Object.keys(fieldPatch).length > 0) {
-    const res = await fetch(`/api/resource/Company/${encodeURIComponent(companyDocName)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(fieldPatch),
-    });
+    const res = await fetch(
+      `/api/resource/Company/${encodeURIComponent(companyDocName)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fieldPatch),
+      },
+    );
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}) as Record<string, unknown>);
-      throw new OrganisationApiError((data as { message?: string }).message ?? "Could not update company details.");
+      const data = await res
+        .json()
+        .catch(() => ({}) as Record<string, unknown>);
+      throw new OrganisationApiError(
+        (data as { message?: string }).message ??
+          "Could not update company details.",
+      );
     }
   }
 
@@ -82,11 +109,18 @@ export async function updateOrganisationSettings(
     const res = await fetch("/api/method/frappe.client.rename_doc", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ doctype: "Company", old_name: companyDocName, new_name: patch.companyName }),
+      body: JSON.stringify({
+        doctype: "Company",
+        old_name: companyDocName,
+        new_name: patch.companyName,
+      }),
     });
     const data = await res.json().catch(() => ({}) as Record<string, unknown>);
     if (!res.ok) {
-      throw new OrganisationApiError((data as { message?: string }).message ?? "Could not rename the company.");
+      throw new OrganisationApiError(
+        (data as { message?: string }).message ??
+          "Could not rename the company.",
+      );
     }
     return (data as { message?: string }).message ?? patch.companyName;
   }
@@ -107,22 +141,32 @@ export async function getCurrencyList(): Promise<string[]> {
 
 export async function getCountryList(): Promise<string[]> {
   const fields = encodeURIComponent(JSON.stringify(["name"]));
-  const res = await fetch(`/api/resource/Country?fields=${fields}&order_by=name+asc&limit_page_length=300`);
+  const res = await fetch(
+    `/api/resource/Country?fields=${fields}&order_by=name+asc&limit_page_length=300`,
+  );
   if (!res.ok) return [];
   const data = (await res.json()) as { data?: Array<{ name: string }> };
   return (data.data ?? []).map((row) => row.name);
 }
 
-export async function uploadOrganisationLogo(file: File, logoType: "square" | "horizontal"): Promise<string> {
+export async function uploadOrganisationLogo(
+  file: File,
+  logoType: "square" | "horizontal",
+): Promise<string> {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`/api/method/alaiy_os.api.theme.upload_organisation_logo?logo_type=${logoType}`, {
-    method: "POST",
-    body: formData,
-  });
+  const res = await fetch(
+    `/api/method/alaiy_os.api.theme.upload_organisation_logo?logo_type=${logoType}`,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
   const data = await res.json().catch(() => ({}) as Record<string, unknown>);
   if (!res.ok) {
-    throw new OrganisationApiError((data as { message?: string }).message ?? "Could not upload the logo.");
+    throw new OrganisationApiError(
+      (data as { message?: string }).message ?? "Could not upload the logo.",
+    );
   }
   return (data as { message?: { file_url?: string } }).message?.file_url ?? "";
 }

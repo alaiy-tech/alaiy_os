@@ -4,20 +4,27 @@
 import { cookies } from "next/headers";
 
 import { USER_PROFILE_FIELDS } from "@/constants/frappe-user";
-import type { CompanyInfo } from "@/types/company";
+import type { CompanyInfo } from "@/types/organisation";
 import type { FrappeUser, UserProfileFields } from "@/types/frappe-user";
 
 import { getFrappeUrl } from "./config";
 import { toFrappeUser } from "./user";
 
-export async function frappeFetch(path: string, init: RequestInit = {}): Promise<Response> {
+export async function frappeFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   const cookieStore = await cookies();
   const cookieHeader = cookieStore.toString();
 
   const headers = new Headers(init.headers);
   if (cookieHeader) headers.set("cookie", cookieHeader);
 
-  return fetch(`${getFrappeUrl()}${path}`, { ...init, headers, cache: "no-store" });
+  return fetch(`${getFrappeUrl()}${path}`, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
 }
 
 /**
@@ -34,8 +41,12 @@ export async function getServerUser(): Promise<FrappeUser | null> {
   if (!userId || userId === "Guest") return null;
 
   const fields = encodeURIComponent(JSON.stringify(USER_PROFILE_FIELDS));
-  const profileRes = await frappeFetch(`/api/resource/User/${encodeURIComponent(userId)}?fields=${fields}`);
-  const profile = profileRes.ok ? ((await profileRes.json()) as { data?: UserProfileFields }).data : undefined;
+  const profileRes = await frappeFetch(
+    `/api/resource/User/${encodeURIComponent(userId)}?fields=${fields}`,
+  );
+  const profile = profileRes.ok
+    ? ((await profileRes.json()) as { data?: UserProfileFields }).data
+    : undefined;
 
   return toFrappeUser(userId, profile);
 }
@@ -69,9 +80,15 @@ export async function getCompanyInfo(): Promise<CompanyInfo | null> {
   if (!companyName) return null;
 
   const fields = encodeURIComponent(JSON.stringify(["default_currency"]));
-  const companyRes = await frappeFetch(`/api/resource/Company/${encodeURIComponent(companyName)}?fields=${fields}`);
+  const companyRes = await frappeFetch(
+    `/api/resource/Company/${encodeURIComponent(companyName)}?fields=${fields}`,
+  );
   const defaultCurrency = companyRes.ok
-    ? (((await companyRes.json()) as { data?: { default_currency?: string | null } }).data?.default_currency ?? null)
+    ? ((
+        (await companyRes.json()) as {
+          data?: { default_currency?: string | null };
+        }
+      ).data?.default_currency ?? null)
     : null;
 
   return { name: companyName, defaultCurrency };
