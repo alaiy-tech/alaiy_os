@@ -14,6 +14,9 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Geist", "ui-sans-serif", "system-ui", "sans-serif"],
+        // Only for the login page's left-panel headline - the rest of the app is Geist-only,
+        // matching the approved design (see docs/DESIGN_TOKENS.md).
+        serif: ["Playfair Display", "serif"],
       },
       colors: {
         border: "hsl(var(--border))",
