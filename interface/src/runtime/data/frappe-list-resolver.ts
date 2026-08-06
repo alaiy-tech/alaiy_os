@@ -29,15 +29,20 @@ import type {
  * a *named*, reusable generic source (`id`/`description` supplied).
  *
  * This file has no `searchParams`/request awareness at all - `resolve()`
- * only ever uses `config.pagination.page` as given. Request-driven paging
- * (reading a `?<name>_page=` URL param) lives one layer up, in
- * `resolver.ts`, which is the only place that knows a source's *name* (a
- * page-level `data` dict key) - the one thing that makes a namespaced page
- * param safe. An earlier version of this file read a flat, unnamespaced
- * `?page=` here directly; that's exactly the bug fixed by moving this
- * concern up a layer - two `frappe-list` bindings on one page no longer
- * fight over the same URL param, because this file never looks at the URL
- * at all.
+ * only ever uses `config.pagination.page`/`config.filters`/`config.orderBy`
+ * as given. Request-driven paging, filtering, search, and sorting (reading
+ * `?<name>_page=`/`?<name>_filter_<field>=`/`?<name>_search=`/`?<name>_sort=`
+ * URL params) all live one layer up, in `resolver.ts`, which is the only
+ * place that knows a source's *name* (a page-level `data` dict key) - the
+ * one thing that makes a namespaced URL param safe. An earlier version of
+ * this file read a flat, unnamespaced `?page=` here directly; that's
+ * exactly the bug fixed by moving this concern up a layer - independent
+ * `frappe-list` bindings on one page no longer fight over the same URL
+ * param, because this file never looks at the URL at all. The one exception
+ * is `or_filters` (`createFrappeListSource`'s second `options` parameter,
+ * below): it's derived request-time state too, but it deliberately does
+ * NOT round-trip through `FrappeListSourceConfig`/its zod schema - see that
+ * function's doc comment for why.
  */
 
 function titleCase(fieldName: string): string {
@@ -66,7 +71,7 @@ export function toFrappeFilterTuples(
  * `encodeURIComponent`-ed since Frappe doctype names routinely contain
  * spaces ("Sales Order").
  */
-export function buildFrappeListRequestPath(config: FrappeListSourceConfig): string {
+export function buildFrappeListRequestPath(config: FrappeListSourceConfig, orFilters?: FrappeListFilter[]): string {
   const page = config.pagination.page ?? 1;
   const pageSize = config.pagination.pageSize;
 
@@ -80,6 +85,16 @@ export function buildFrappeListRequestPath(config: FrappeListSourceConfig): stri
     // No wildcard injection for like/not like - see FrappeListFilter's doc
     // comment. Values are passed through to Frappe exactly as configured.
     query.set("filters", JSON.stringify(toFrappeFilterTuples(config.filters)));
+  }
+  if (orFilters?.length) {
+    // Combines with `filters` above as `filters AND (or_filters)` - Frappe's
+    // own REST convention (precedented in this codebase's obsolete
+    // `supplier-list.ts`/`sales-order-list.ts` fetchers against this exact
+    // endpoint), giving the expected "narrow further within the filtered
+    // set" search-box semantics. Never author-supplied - see
+    // `createFrappeListSource`'s doc comment for why this arrives as a
+    // parameter rather than a `config` field.
+    query.set("or_filters", JSON.stringify(toFrappeFilterTuples(orFilters)));
   }
   if (config.orderBy) query.set("order_by", config.orderBy);
   // 1-indexed `page` - a new convention for this codebase, nothing else
@@ -100,8 +115,22 @@ export function buildFrappeListRequestPath(config: FrappeListSourceConfig): stri
  * fail-fast at whatever call site invokes this factory, since a
  * misconfigured source is a developer mistake to catch immediately, not a
  * request-time condition.
+ *
+ * `options.orFilters` carries the search term's derived OR-filter tuples
+ * (built by `runtime/data/resolver.ts`'s `resolveNamedData` from a named
+ * entry's `` `${name}_search` `` URL param and its own `config.search.fields`)
+ * - deliberately a *separate parameter*, not a `config` field: unlike
+ * `pagination.page` (a value an author may legitimately set as a static
+ * default), `orFilters` has no legitimate author-facing use - it's pure
+ * request-derived state. Putting it in the `.strict()`-validated
+ * `FrappeListSourceConfig`/`FRAPPE_LIST_SOURCE_CONFIG_SCHEMA` vocabulary
+ * would let an author hand-write it in page JSON, which `resolveNamedData`
+ * would then silently clobber on every single request.
  */
-export function createFrappeListSource(config: FrappeListSourceConfig): DataSourceDefinition<FrappeListResult> {
+export function createFrappeListSource(
+  config: FrappeListSourceConfig,
+  options?: { orFilters?: FrappeListFilter[] },
+): DataSourceDefinition<FrappeListResult> {
   const validated = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(config);
   if (!validated.success) {
     // `config.id ?? config.doctype`, not just `config.id`: an inline config
@@ -143,7 +172,7 @@ export function createFrappeListSource(config: FrappeListSourceConfig): DataSour
       const page = config.pagination.page ?? 1;
       const pageSize = config.pagination.pageSize;
 
-      const res = await frappeFetch(buildFrappeListRequestPath(config));
+      const res = await frappeFetch(buildFrappeListRequestPath(config, options?.orFilters));
       if (!res.ok) {
         // Never throw here - matches getCustomersServer's/
         // getCustomersOverviewServer's silent-null convention for
@@ -151,7 +180,7 @@ export function createFrappeListSource(config: FrappeListSourceConfig): DataSour
         // to lib/frappe/logs.ts's throwing behavior, which is a
         // client-side fetch pattern with its own error boundary - not the
         // precedent to follow for a source resolve()).
-        return { data: [], pagination: { page, pageSize, hasMore: false } };
+        return { data: [], pagination: { page, pageSize, hasMore: false }, orderBy: config.orderBy };
       }
 
       const body = (await res.json()) as { data?: Record<string, unknown>[] };
@@ -161,6 +190,7 @@ export function createFrappeListSource(config: FrappeListSourceConfig): DataSour
       return {
         data: hasMore ? rows.slice(0, pageSize) : rows,
         pagination: { page, pageSize, hasMore },
+        orderBy: config.orderBy,
       };
     },
   };
