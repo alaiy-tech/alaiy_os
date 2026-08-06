@@ -12,7 +12,7 @@ import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
 import type { PeriodComparison } from "@/types/list";
 import type { DataSourceContext } from "@/types/runtime/data-source";
 
-import { registerDataSource } from "../registry";
+import { registerDataSource } from "../../registry/data-source-registry";
 
 /**
  * Dashboard data sources - each `resolve()` calls the *existing, unmodified*
@@ -57,7 +57,10 @@ registerDataSource({
   ],
   async resolve(context: DataSourceContext) {
     const period = readPeriod(context.searchParams);
-    const [overview, company] = await Promise.all([getDashboardOverviewServer(period), getCompanyInfo()]);
+    const [overview, company] = await Promise.all([
+      getDashboardOverviewServer(period),
+      getCompanyInfo(),
+    ]);
 
     const flat: Record<string, unknown> = {
       period,
@@ -74,7 +77,11 @@ registerDataSource({
         flat.stock_accuracy_delta =
           overview.stock_accuracy.previous === null
             ? undefined
-            : Math.round((overview.stock_accuracy.current - overview.stock_accuracy.previous) * 10) / 10;
+            : Math.round(
+                (overview.stock_accuracy.current -
+                  overview.stock_accuracy.previous) *
+                  10,
+              ) / 10;
       }
     }
     return flat;
@@ -116,7 +123,8 @@ registerDataSource({
 
 registerDataSource({
   id: "dashboard.topProducts",
-  description: "Top-selling products for the current period, by category share.",
+  description:
+    "Top-selling products for the current period, by category share.",
   capabilities: { list: true },
   fields: [
     { name: "item_name", label: "Product", type: "string" },
@@ -133,7 +141,8 @@ registerDataSource({
 
 registerDataSource({
   id: "dashboard.stockMix",
-  description: "Catalog-wide stock split: in-stock, low-stock, and out-of-stock SKU counts.",
+  description:
+    "Catalog-wide stock split: in-stock, low-stock, and out-of-stock SKU counts.",
   capabilities: {},
   fields: [
     { name: "in_stock", label: "In Stock", type: "number" },
@@ -148,7 +157,8 @@ registerDataSource({
 
 registerDataSource({
   id: "dashboard.recentOrders",
-  description: "The most recent sales orders, with payment and fulfillment status.",
+  description:
+    "The most recent sales orders, with payment and fulfillment status.",
   capabilities: {
     list: true,
     search: true,

@@ -1,4 +1,4 @@
-import type { PageFeatureBinding } from "@/types/runtime/page-features";
+import type { PageFeatureBinding } from "@/types/runtime/page";
 
 /**
  * Round 4 note: this file used to also carry a hand-written `loadData`

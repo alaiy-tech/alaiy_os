@@ -1,6 +1,6 @@
-import type { DataSourceRef, DataSourceValue } from "@/types/runtime/data-source-ref";
+import type { DataSourceRef, DataSourceValue } from "@/types/runtime/data-source";
 
-export type { DataSourceRef } from "@/types/runtime/data-source-ref";
+export type { DataSourceRef } from "@/types/runtime/data-source";
 
 /** The reserved prefix a page-level named `data` dict entry
  * (`types/runtime/page.ts`) resolves under in the flat data record - keeps

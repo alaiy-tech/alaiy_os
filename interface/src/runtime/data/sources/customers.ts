@@ -1,12 +1,15 @@
 import { readPeriod } from "@/components/derived/list/period";
 import { getCustomersServer } from "@/lib/frappe/customer-list.server";
-import { getCustomersOverviewServer, getCustomerTrendServer } from "@/lib/frappe/customer-stats.server";
+import {
+  getCustomersOverviewServer,
+  getCustomerTrendServer,
+} from "@/lib/frappe/customer-stats.server";
 import { getCompanyInfo } from "@/lib/frappe/server";
 import type { Customer, CustomerStatus } from "@/types/customers";
 import type { PeriodComparison } from "@/types/list";
 import type { DataSourceContext } from "@/types/runtime/data-source";
 
-import { registerDataSource } from "../registry";
+import { registerDataSource } from "../../registry/data-source-registry";
 
 /** Customer data sources - each `resolve()` calls the existing, unmodified
  * fetchers in `src/lib/frappe/customer-list.server.ts` /
@@ -53,7 +56,8 @@ function toCustomerRow(customer: Customer): Record<string, unknown> {
 
 registerDataSource({
   id: "customers.overview",
-  description: "Headline KPI figures for the customer base: total/new/active customers, revenue per customer.",
+  description:
+    "Headline KPI figures for the customer base: total/new/active customers, revenue per customer.",
   capabilities: {},
   fields: [
     { name: "total_customers", label: "Total Customers", type: "number" },
@@ -67,7 +71,10 @@ registerDataSource({
   ],
   async resolve(context: DataSourceContext) {
     const period = readPeriod(context.searchParams);
-    const [overview, company] = await Promise.all([getCustomersOverviewServer(period), getCompanyInfo()]);
+    const [overview, company] = await Promise.all([
+      getCustomersOverviewServer(period),
+      getCompanyInfo(),
+    ]);
 
     const flat: Record<string, unknown> = {
       period,
@@ -77,7 +84,11 @@ registerDataSource({
       flattenComparison("total_customers", overview.total_customers, flat);
       flattenComparison("new_customers", overview.new_customers, flat);
       flattenComparison("active_customers", overview.active_customers, flat);
-      flattenComparison("revenue_per_customer", overview.revenue_per_customer, flat);
+      flattenComparison(
+        "revenue_per_customer",
+        overview.revenue_per_customer,
+        flat,
+      );
     }
     return flat;
   },
@@ -85,7 +96,8 @@ registerDataSource({
 
 registerDataSource({
   id: "customers.trend",
-  description: "New customers vs. those who placed an order, by month over the last 12 months.",
+  description:
+    "New customers vs. those who placed an order, by month over the last 12 months.",
   capabilities: { list: true },
   fields: [
     { name: "period", label: "Period", type: "string" },
@@ -99,7 +111,8 @@ registerDataSource({
 
 registerDataSource({
   id: "customers",
-  description: "The customer roster: name, status, group, territory, orders, spend, last order date, joined date.",
+  description:
+    "The customer roster: name, status, group, territory, orders, spend, last order date, joined date.",
   capabilities: {
     list: true,
     search: true,

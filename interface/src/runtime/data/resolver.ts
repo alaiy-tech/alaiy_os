@@ -1,15 +1,21 @@
-import { ORDER_BY_PATTERN, parseOrderByFields } from "@/config/frappe-list-schema";
+import {
+  ORDER_BY_PATTERN,
+  parseOrderByFields,
+} from "@/config/frappe-list-schema";
 import type { DataSourceContext } from "@/types/runtime/data-source";
-import type { DataSourceValue } from "@/types/runtime/data-source-ref";
+import type { DataSourceValue } from "@/types/runtime/data-source";
 import type { FrappeCountSourceConfig } from "@/types/runtime/frappe-count";
-import type { FrappeListFilter, FrappeListSourceConfig } from "@/types/runtime/frappe-list";
+import type {
+  FrappeListFilter,
+  FrappeListSourceConfig,
+} from "@/types/runtime/frappe-list";
 import type { UINode } from "@/types/runtime/node";
 import type { UIPageDefinition } from "@/types/runtime/page";
 
 import { isComponentNode, isLayoutNode } from "../node";
 import { resolveFrappeCount } from "./frappe-count-resolver";
 import { createFrappeListSource } from "./frappe-list-resolver";
-import { getDataSource } from "./registry";
+import { getDataSource } from "../registry/data-source-registry";
 import { PAGE_DATA_PREFIX, sourceKey } from "./resolve-data-source";
 
 /** Collects every unique `{ source, path? }`-shaped `DataSourceRef` a
@@ -19,7 +25,10 @@ import { PAGE_DATA_PREFIX, sourceKey } from "./resolve-data-source";
  * something to dispatch on. `{ ref, path? }`-shaped bindings are skipped
  * here entirely - they reference a *named* entry from `definition.data`,
  * resolved separately by `resolveNamedData` below. */
-function collectSources(node: UINode, collected: Map<string, DataSourceValue>): void {
+function collectSources(
+  node: UINode,
+  collected: Map<string, DataSourceValue>,
+): void {
   if (isComponentNode(node)) {
     for (const ref of Object.values(node.data ?? {})) {
       if ("source" in ref) collected.set(sourceKey(ref.source), ref.source);
@@ -29,7 +38,6 @@ function collectSources(node: UINode, collected: Map<string, DataSourceValue>): 
     for (const child of node.children) collectSources(child, collected);
   }
 }
-
 /**
  * Turns one `DataSourceRef.source` into a value. A string resolves through
  * the unchanged Data Source Registry (`dashboard`/`customers` and any other
@@ -54,7 +62,10 @@ function collectSources(node: UINode, collected: Map<string, DataSourceValue>): 
  * this is the one place that would matter, and it never reads
  * `context.searchParams` at all - hence the dev warning below.
  */
-async function resolveSource(source: DataSourceValue, context: DataSourceContext): Promise<unknown> {
+async function resolveSource(
+  source: DataSourceValue,
+  context: DataSourceContext,
+): Promise<unknown> {
   if (typeof source === "string") {
     const registered = getDataSource(source);
     return registered ? registered.resolve(context) : undefined;
@@ -62,7 +73,10 @@ async function resolveSource(source: DataSourceValue, context: DataSourceContext
 
   switch (source.type) {
     case "frappe-list":
-      if (process.env.NODE_ENV !== "production" && (source.search || source.queryFilters?.length)) {
+      if (
+        process.env.NODE_ENV !== "production" &&
+        (source.search || source.queryFilters?.length)
+      ) {
         console.warn(
           'frappe-list: "search"/"queryFilters" on an anonymous inline binding have no effect - only a ' +
             "named definition.data entry's <name>_search/<name>_filter_<field> URL params are read. " +
@@ -88,7 +102,10 @@ async function resolveSource(source: DataSourceValue, context: DataSourceContext
  * static `config.pagination.page`, deliberately (see `page.ts`'s doc
  * comment on why no-name means no interactivity, not an auto-picked
  * default). */
-function readNamedPage(searchParams: DataSourceContext["searchParams"], name: string): number | undefined {
+function readNamedPage(
+  searchParams: DataSourceContext["searchParams"],
+  name: string,
+): number | undefined {
   const raw = searchParams[`${name}_page`];
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (!value) return undefined;
@@ -114,14 +131,19 @@ function readNamedSort(
   if (!value || !ORDER_BY_PATTERN.test(value)) return undefined;
 
   const allowedFields = new Set([...config.fields, "name"]);
-  return parseOrderByFields(value).every((field) => allowedFields.has(field)) ? value : undefined;
+  return parseOrderByFields(value).every((field) => allowedFields.has(field))
+    ? value
+    : undefined;
 }
 
 /** Reads `` `?<name>_search=` `` for a named `frappe-list` entry - a plain
  * trimmed term, empty/absent -> `undefined`. Only meaningful when the
  * entry's own config declares `search.fields` (see `resolveNamedData`
  * below); this function itself doesn't know or care whether it does. */
-function readNamedSearch(searchParams: DataSourceContext["searchParams"], name: string): string | undefined {
+function readNamedSearch(
+  searchParams: DataSourceContext["searchParams"],
+  name: string,
+): string | undefined {
   const raw = searchParams[`${name}_search`];
   const value = Array.isArray(raw) ? raw[0] : raw;
   const trimmed = value?.trim();
@@ -144,15 +166,24 @@ function readNamedFilters(
   name: string,
   config: FrappeListSourceConfig,
 ): FrappeListFilter[] {
-  return (config.queryFilters ?? []).flatMap((queryFilter): FrappeListFilter[] => {
-    const raw = searchParams[`${name}_filter_${queryFilter.field}`];
-    const value = Array.isArray(raw) ? raw[0] : raw;
-    const trimmed = value?.trim();
-    if (!trimmed) return [];
+  return (config.queryFilters ?? []).flatMap(
+    (queryFilter): FrappeListFilter[] => {
+      const raw = searchParams[`${name}_filter_${queryFilter.field}`];
+      const value = Array.isArray(raw) ? raw[0] : raw;
+      const trimmed = value?.trim();
+      if (!trimmed) return [];
 
-    const isWildcard = queryFilter.operator === "like" || queryFilter.operator === "not like";
-    return [{ field: queryFilter.field, operator: queryFilter.operator, value: isWildcard ? `%${trimmed}%` : trimmed }];
-  });
+      const isWildcard =
+        queryFilter.operator === "like" || queryFilter.operator === "not like";
+      return [
+        {
+          field: queryFilter.field,
+          operator: queryFilter.operator,
+          value: isWildcard ? `%${trimmed}%` : trimmed,
+        },
+      ];
+    },
+  );
 }
 
 /** Resolves every entry of `definition.data` (`types/runtime/page.ts`'s
@@ -168,19 +199,33 @@ function readNamedFilters(
  * tuples) needs to flow, and it's derived here, not carried on the config
  * (see `createFrappeListSource`'s doc comment for why). */
 async function resolveNamedData(
-  data: Record<string, FrappeListSourceConfig | FrappeCountSourceConfig> | undefined,
+  data:
+    | Record<string, FrappeListSourceConfig | FrappeCountSourceConfig>
+    | undefined,
   context: DataSourceContext,
 ): Promise<[string, unknown][]> {
   return Promise.all(
     Object.entries(data ?? {}).map(async ([name, config]) => {
       if (config.type === "frappe-list") {
-        const page = readNamedPage(context.searchParams, name) ?? config.pagination.page ?? 1;
-        const orderBy = readNamedSort(context.searchParams, name, config) ?? config.orderBy;
-        const dynamicFilters = readNamedFilters(context.searchParams, name, config);
+        const page =
+          readNamedPage(context.searchParams, name) ??
+          config.pagination.page ??
+          1;
+        const orderBy =
+          readNamedSort(context.searchParams, name, config) ?? config.orderBy;
+        const dynamicFilters = readNamedFilters(
+          context.searchParams,
+          name,
+          config,
+        );
         const searchTerm = readNamedSearch(context.searchParams, name);
         const orFilters: FrappeListFilter[] | undefined =
           searchTerm && config.search
-            ? config.search.fields.map((field) => ({ field, operator: "like" as const, value: `%${searchTerm}%` }))
+            ? config.search.fields.map((field) => ({
+                field,
+                operator: "like" as const,
+                value: `%${searchTerm}%`,
+              }))
             : undefined;
 
         const effectiveConfig: FrappeListSourceConfig = {
@@ -203,10 +248,15 @@ async function resolveNamedData(
         };
         return [
           `${PAGE_DATA_PREFIX}${name}`,
-          await createFrappeListSource(effectiveConfig, { orFilters }).resolve(context),
+          await createFrappeListSource(effectiveConfig, { orFilters }).resolve(
+            context,
+          ),
         ] as const;
       }
-      return [`${PAGE_DATA_PREFIX}${name}`, await resolveSource(config, context)] as const;
+      return [
+        `${PAGE_DATA_PREFIX}${name}`,
+        await resolveSource(config, context),
+      ] as const;
     }),
   );
 }
@@ -243,7 +293,10 @@ export async function resolvePageData(
 
   const [anonymousEntries, namedEntries] = await Promise.all([
     Promise.all(
-      [...collected.entries()].map(async ([key, source]) => [key, await resolveSource(source, context)] as const),
+      [...collected.entries()].map(
+        async ([key, source]) =>
+          [key, await resolveSource(source, context)] as const,
+      ),
     ),
     resolveNamedData(definition.data, context),
   ]);
