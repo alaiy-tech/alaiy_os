@@ -1,4 +1,4 @@
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import type { PageConfigFile } from "@/types/runtime/page";
 
 import { getPageStore } from "./sqlite-page-store";
 import { getSidebarStore } from "./sqlite-sidebar-store";

@@ -3,12 +3,15 @@ import type { ReactNode } from "react";
 import "./data/sources"; // registers every data source as a side effect - see sources/index.ts
 
 import { contributedComponents } from "@/config/contributed-components";
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import type { PageConfigFile } from "@/types/runtime/page";
 
-import { getDataSource } from "./data/registry";
+import { getDataSource } from "./registry/data-source-registry";
 import { resolvePageData } from "./data/resolver";
 import { pageFeatures } from "./page-features";
-import { baseComponentRegistry, mergeRegistries } from "./registry/component-registry";
+import {
+  baseComponentRegistry,
+  mergeRegistries,
+} from "./registry/component-registry";
 import { InvalidPageConfigError } from "./store/invalid-page-config-error";
 import { getPageStore } from "./store/sqlite-page-store";
 import { UIRenderer } from "./ui-renderer";
@@ -25,7 +28,10 @@ export type ResolvePageResult =
  * (`config/contributed-components.ts`, empty in `alaiy_os`) - computed once
  * at module scope, not per request, since both inputs are static for the
  * lifetime of the server process. */
-const effectiveComponentRegistry = mergeRegistries(baseComponentRegistry, contributedComponents);
+const effectiveComponentRegistry = mergeRegistries(
+  baseComponentRegistry,
+  contributedComponents,
+);
 
 /**
  * The one pipeline every `/os/*` route calls: resolve a page id through the
@@ -36,12 +42,16 @@ const effectiveComponentRegistry = mergeRegistries(baseComponentRegistry, contri
  * caller decides how to present each, but neither one ever throws past this
  * function into a raw error boundary with a stack trace.
  */
-export async function resolvePage(id: string, searchParams: SearchParams): Promise<ResolvePageResult> {
+export async function resolvePage(
+  id: string,
+  searchParams: SearchParams,
+): Promise<ResolvePageResult> {
   let config: PageConfigFile | null;
   try {
     config = await getPageStore().getPageById(id);
   } catch (error) {
-    if (error instanceof InvalidPageConfigError) return { status: "invalid", errors: error.errors };
+    if (error instanceof InvalidPageConfigError)
+      return { status: "invalid", errors: error.errors };
     throw error;
   }
 
@@ -53,7 +63,8 @@ export async function resolvePage(id: string, searchParams: SearchParams): Promi
     componentRegistry: registry,
     isDataSourceRegistered: (id) => getDataSource(id) !== undefined,
   });
-  if (registryErrors.length > 0) return { status: "invalid", errors: registryErrors };
+  if (registryErrors.length > 0)
+    return { status: "invalid", errors: registryErrors };
 
   const data = await resolvePageData(config.definition, { searchParams });
   const binding = pageFeatures[config.id];
@@ -61,7 +72,11 @@ export async function resolvePage(id: string, searchParams: SearchParams): Promi
   const node = binding?.render ? (
     binding.render(config.definition, data, registry)
   ) : (
-    <UIRenderer definition={config.definition} data={data} registry={registry} />
+    <UIRenderer
+      definition={config.definition}
+      data={data}
+      registry={registry}
+    />
   );
 
   return { status: "ok", node, page: config };

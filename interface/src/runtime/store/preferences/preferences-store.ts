@@ -7,18 +7,23 @@ import {
   type PreferenceKey,
   type PreferenceValueMap,
 } from "@/lib/preferences/preferences-config";
-import { persistPreference } from "@/lib/preferences/preferences-storage";
+import { setPreferenceValue } from "@/server/server-actions";
 import type { ResolvedThemeMode } from "@/types/theme";
 
 export type PreferencesState = {
   values: PreferenceValueMap;
   resolvedThemeMode: ResolvedThemeMode;
   isSynced: boolean;
-  setPreference: <K extends PreferenceKey>(key: K, value: PreferenceValueMap[K]) => void;
+  setPreference: <K extends PreferenceKey>(
+    key: K,
+    value: PreferenceValueMap[K],
+  ) => void;
   resetPreferences: () => void;
 };
 
-export const createPreferencesStore = (initialValues: Partial<PreferenceValueMap> = {}) => {
+export const createPreferencesStore = (
+  initialValues: Partial<PreferenceValueMap> = {},
+) => {
   const values: PreferenceValueMap = {
     ...PREFERENCE_DEFAULTS,
     ...initialValues,
@@ -40,7 +45,7 @@ export const createPreferencesStore = (initialValues: Partial<PreferenceValueMap
         ...(resolvedThemeMode ? { resolvedThemeMode } : {}),
       }));
 
-      void persistPreference(key, value);
+      void setPreferenceValue(key, value);
     },
 
     resetPreferences: () => {
@@ -51,7 +56,7 @@ export const createPreferencesStore = (initialValues: Partial<PreferenceValueMap
         const resolved = applyPreference(key, value);
 
         if (resolved) resolvedThemeMode = resolved;
-        void persistPreference(key, value);
+        void setPreferenceValue(key, value);
       }
 
       set({

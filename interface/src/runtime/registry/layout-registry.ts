@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import type { ResponsiveValue } from "@/types/runtime/layout";
 import type { LayoutType } from "@/types/runtime/node";
 
@@ -32,7 +32,8 @@ export const layoutRegistry: Record<
   },
   /** A responsive CSS grid - columns come from the node's own `columns` map. */
   grid: {
-    description: "Responsive grid; children position themselves via `layout.span`.",
+    description:
+      "Responsive grid; children position themselves via `layout.span`.",
     className: (node) => cn("grid gap-4", ...gridColsClasses(node.columns)),
   },
 };

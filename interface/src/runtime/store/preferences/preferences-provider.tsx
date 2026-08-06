@@ -4,37 +4,12 @@ import { createContext, use, useEffect, useState } from "react";
 
 import { type StoreApi, useStore } from "zustand";
 
-import {
-  PREFERENCE_DEFAULTS,
-  PREFERENCE_KEYS,
-  PREFERENCE_REGISTRY,
-  type PreferenceKey,
-  type PreferenceValueMap,
-  parsePreference,
-} from "@/lib/preferences/preferences-config";
+import type { PreferenceValueMap } from "@/lib/preferences/preferences-config";
 import { applyThemeMode, subscribeToSystemTheme } from "@/lib/preferences/theme-utils";
 
 import { createPreferencesStore, type PreferencesState } from "./preferences-store";
 
 const PreferencesStoreContext = createContext<StoreApi<PreferencesState> | null>(null);
-
-function readDomPreference<K extends PreferenceKey>(key: K): PreferenceValueMap[K] {
-  const definition = PREFERENCE_REGISTRY[key];
-  const rawValue = document.documentElement.getAttribute(definition.attribute);
-
-  return parsePreference(key, rawValue);
-}
-
-function readDomPreferences(): PreferenceValueMap {
-  const values = { ...PREFERENCE_DEFAULTS };
-
-  function assignPreference<K extends PreferenceKey>(key: K) {
-    values[key] = readDomPreference(key);
-  }
-
-  for (const key of PREFERENCE_KEYS) assignPreference(key);
-  return values;
-}
 
 export function PreferencesStoreProvider({
   children,
@@ -46,8 +21,11 @@ export function PreferencesStoreProvider({
   const [store] = useState<StoreApi<PreferencesState>>(() => createPreferencesStore(initialValues));
 
   useEffect(() => {
+    // `initialValues` (the store's own creation-time state) is already
+    // SQLite-sourced and correct - only `resolvedThemeMode` needs picking up
+    // here, since ThemeBootScript resolved it (including "system") before
+    // this ever ran.
     store.setState({
-      values: readDomPreferences(),
       resolvedThemeMode: document.documentElement.classList.contains("dark") ? "dark" : "light",
       isSynced: true,
     });

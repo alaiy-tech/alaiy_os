@@ -1,15 +1,23 @@
 import { OsCard } from "@/components/registry/card";
 import { OsChart } from "@/components/registry/chart";
 import { OsDataTableView } from "@/components/registry/data-table/data-table-view";
+import { DynamicBadge } from "@/components/registry/dynamic-badge";
 import { OsFilterBar } from "@/components/registry/filter-bar";
 import { OsKpi } from "@/components/registry/kpi";
 import { PageHeader } from "@/components/registry/page-header";
 import { OSPeriodToggle } from "@/components/registry/period-toggle";
 import { COMPONENT_PROPS_SCHEMAS } from "@/config/component-props-schema";
 import type { ComponentType, LayoutType } from "@/types/runtime/node";
-import type { ComponentRegistry, ComponentRegistryEntry } from "@/types/runtime/registry";
+import type {
+  ComponentRegistry,
+  ComponentRegistryEntry,
+} from "@/types/runtime/registry";
 
-export type { ComponentCapabilities, ComponentRegistry, ComponentRegistryEntry } from "@/types/runtime/registry";
+export type {
+  ComponentCapabilities,
+  ComponentRegistry,
+  ComponentRegistryEntry,
+} from "@/types/runtime/registry";
 
 /**
  * The vocabulary a future AI system reads: a stable semantic `type`, the real
@@ -36,7 +44,9 @@ export type { ComponentCapabilities, ComponentRegistry, ComponentRegistryEntry }
 /** Last-registry-wins per key - the same merge semantics this repo's own
  * nav-contribution/`ProductExtension` pattern already established
  * (`interface/docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md`), not a new convention. */
-export function mergeRegistries(...registries: ComponentRegistry[]): ComponentRegistry {
+export function mergeRegistries(
+  ...registries: ComponentRegistry[]
+): ComponentRegistry {
   return Object.assign({}, ...registries);
 }
 
@@ -50,7 +60,8 @@ export const baseComponentRegistry: ComponentRegistry = {
   "os-page-header": {
     type: "os-page-header",
     component: PageHeader,
-    description: "Page title, optional subtitle, and a right-aligned action slot. Used once per page.",
+    description:
+      "Page title, optional subtitle, and a right-aligned action slot. Used once per page.",
     name: "Page Header",
     category: "page",
     ai: { exposed: true },
@@ -64,7 +75,8 @@ export const baseComponentRegistry: ComponentRegistry = {
   "os-card": {
     type: "os-card",
     component: OsCard,
-    description: "Generic chrome wrapper (title + content) for composing a single child component.",
+    description:
+      "Generic chrome wrapper (title + content) for composing a single child component.",
     name: "Card",
     category: "layout",
     ai: { exposed: true },
@@ -73,6 +85,20 @@ export const baseComponentRegistry: ComponentRegistry = {
     allowedParents: [...ANY_CONTAINER, "inline"],
     supportsChildren: true,
     propsSchema: COMPONENT_PROPS_SCHEMAS["os-card"],
+  },
+  "os-dynamic-badge": {
+    type: "os-dynamic-badge",
+    component: DynamicBadge,
+    description:
+      "A badge with a dynamic color and style based on its content and category.",
+    name: "Dynamic Badge",
+    category: "data-display",
+    ai: { exposed: true },
+    capabilities: { movable: true, resizable: false },
+    allowedParents: [...ANY_CONTAINER, "inline"],
+    supportsChildren: false,
+    requiredFields: ["content"],
+    propsSchema: COMPONENT_PROPS_SCHEMAS["os-dynamic-badge"],
   },
   "os-kpi": {
     type: "os-kpi",
@@ -119,7 +145,8 @@ export const baseComponentRegistry: ComponentRegistry = {
   "os-filter-bar": {
     type: "os-filter-bar",
     component: OsFilterBar,
-    description: "One or more filter controls (select/text/date-range), each bound to its own URL search param.",
+    description:
+      "One or more filter controls (select/text/date-range), each bound to its own URL search param.",
     name: "Filter Bar",
     category: "filtering",
     ai: { exposed: true },
@@ -132,7 +159,8 @@ export const baseComponentRegistry: ComponentRegistry = {
   "os-period-toggle": {
     type: "os-period-toggle",
     component: OSPeriodToggle,
-    description: "Period selector driven by the page's own `?period=` URL query param.",
+    description:
+      "Period selector driven by the page's own `?period=` URL query param.",
     name: "Period Toggle",
     category: "filtering",
     ai: { exposed: true },
@@ -143,7 +171,10 @@ export const baseComponentRegistry: ComponentRegistry = {
   },
 };
 
-export function resolveComponent(registry: ComponentRegistry, type: string): ComponentRegistryEntry | undefined {
+export function resolveComponent(
+  registry: ComponentRegistry,
+  type: string,
+): ComponentRegistryEntry | undefined {
   return registry[type as ComponentType];
 }
 
@@ -152,6 +183,10 @@ export function resolveComponent(registry: ComponentRegistry, type: string): Com
  * entry that omits `ai` entirely (an ad hoc override, a test fixture)
  * is excluded by the same governance-safe default `ComponentCapabilities`
  * already uses. */
-export function listAiExposedComponents(registry: ComponentRegistry): ComponentRegistryEntry[] {
-  return Object.values(registry).filter((entry): entry is ComponentRegistryEntry => Boolean(entry?.ai?.exposed));
+export function listAiExposedComponents(
+  registry: ComponentRegistry,
+): ComponentRegistryEntry[] {
+  return Object.values(registry).filter(
+    (entry): entry is ComponentRegistryEntry => Boolean(entry?.ai?.exposed),
+  );
 }
