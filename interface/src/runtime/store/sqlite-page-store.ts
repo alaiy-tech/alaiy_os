@@ -11,8 +11,8 @@
 // one file by the `UIPageStore` interface - swapping to `better-sqlite3` (a
 // native dependency) or a future `FrappeUIPageStore` is a change here only.
 
-import { SEED_PAGES } from "@/seeds/pages/seed-data";
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import { SEED_PAGES } from "@/seeds/seed";
+import type { PageConfigFile } from "@/types/runtime/page";
 import type { UIPageStore } from "@/types/runtime/store";
 
 import { validatePageConfig } from "../validate/validate";
@@ -54,9 +54,9 @@ export function createSchema(db: DatabaseSync): void {
 }
 
 /** Insert-or-update a page by id, bumping `version` on every update. Used
- * both by `ensureSeeded` (first-run auto-seed) and `seeds/seed-headless-db.ts`
- * (explicit reseed after editing `seeds/pages/seed-data.ts`) - the same
- * idempotent operation either way. */
+ * both by `ensureSeeded` (first-run auto-seed) and `scripts/seed-headless-db.ts`
+ * (explicit reseed after editing `seeds/seed.ts`) - the same idempotent
+ * operation either way. */
 export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
   const now = new Date().toISOString();
   db.prepare(
@@ -102,7 +102,9 @@ const SEED_PAGE_ICONS: Record<string, string> = {
  * gets a sidebar store bound to that same database instead of silently
  * falling back to the real on-disk file's singleton. */
 export function ensureSeeded(db: DatabaseSync, dbPath: string = DB_PATH): void {
-  const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
+  const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as {
+    count: number;
+  };
   if (row.count === 0) {
     for (const page of SEED_PAGES) upsertPage(db, page);
   }
@@ -150,21 +152,23 @@ export class SQLiteUIPageStore implements UIPageStore {
   }
 
   async getPageById(id: string): Promise<PageConfigFile | null> {
-    const row = this.db.prepare("SELECT * FROM ui_pages WHERE id = ? AND is_enabled = 1").get(id) as
-      | UiPageRow
-      | undefined;
+    const row = this.db
+      .prepare("SELECT * FROM ui_pages WHERE id = ? AND is_enabled = 1")
+      .get(id) as UiPageRow | undefined;
     return row ? rowToConfig(row) : null;
   }
 
   async getPageByRoute(route: string): Promise<PageConfigFile | null> {
-    const row = this.db.prepare("SELECT * FROM ui_pages WHERE route = ? AND is_enabled = 1").get(route) as
-      | UiPageRow
-      | undefined;
+    const row = this.db
+      .prepare("SELECT * FROM ui_pages WHERE route = ? AND is_enabled = 1")
+      .get(route) as UiPageRow | undefined;
     return row ? rowToConfig(row) : null;
   }
 
   async listPages(): Promise<PageConfigFile[]> {
-    const rows = this.db.prepare("SELECT * FROM ui_pages WHERE is_enabled = 1").all() as UiPageRow[];
+    const rows = this.db
+      .prepare("SELECT * FROM ui_pages WHERE is_enabled = 1")
+      .all() as UiPageRow[];
     const pages: PageConfigFile[] = [];
     for (const row of rows) {
       try {

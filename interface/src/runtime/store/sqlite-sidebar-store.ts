@@ -4,8 +4,11 @@
 // file's own constructor pattern exactly (default-param `dbPath`, private
 // handle, `createSchema` + a sync step run in the constructor).
 
-import { buildCodeDefinedSidebar } from "@/seeds/sidebar/seed-data";
-import type { SidebarNavGroupData, SidebarNavItemData } from "@/types/navigation";
+import { buildCodeDefinedSidebar } from "@/seeds/seed";
+import type {
+  SidebarNavGroupData,
+  SidebarNavItemData,
+} from "@/types/navigation";
 import type { DynamicPageEntry, SidebarStore } from "@/types/runtime/store";
 
 import path from "node:path";
@@ -71,13 +74,15 @@ export function createSchema(db: DatabaseSync): void {
   db.exec(SCHEMA);
 }
 
-function insertGroup(db: DatabaseSync, group: SidebarNavGroupData, index: number, now: string): void {
-  db.prepare(`INSERT INTO sidebar_groups (id, label, sort_order, source, updated_at) VALUES (?, ?, ?, 'code', ?)`).run(
-    group.id,
-    group.label ?? null,
-    index,
-    now,
-  );
+function insertGroup(
+  db: DatabaseSync,
+  group: SidebarNavGroupData,
+  index: number,
+  now: string,
+): void {
+  db.prepare(
+    `INSERT INTO sidebar_groups (id, label, sort_order, source, updated_at) VALUES (?, ?, ?, 'code', ?)`,
+  ).run(group.id, group.label ?? null, index, now);
 }
 
 function insertItem(
@@ -134,7 +139,9 @@ export function syncCodeDefinedSidebar(db: DatabaseSync): void {
   // under a code group (`ensureDynamicPageEntry` only ever targets the
   // dynamic "Uncategorised" group), so this can't delete anything that
   // should have survived.
-  db.exec("DELETE FROM sidebar_items WHERE group_id IN (SELECT id FROM sidebar_groups WHERE source = 'code')");
+  db.exec(
+    "DELETE FROM sidebar_items WHERE group_id IN (SELECT id FROM sidebar_groups WHERE source = 'code')",
+  );
   db.exec("DELETE FROM sidebar_groups WHERE source = 'code'");
 
   const groups = buildCodeDefinedSidebar();
@@ -146,25 +153,42 @@ export function syncCodeDefinedSidebar(db: DatabaseSync): void {
   });
 }
 
-function nextSortOrder(db: DatabaseSync, table: "sidebar_groups" | "sidebar_items", groupId?: string): number {
+function nextSortOrder(
+  db: DatabaseSync,
+  table: "sidebar_groups" | "sidebar_items",
+  groupId?: string,
+): number {
   const row =
     table === "sidebar_items"
-      ? (db.prepare("SELECT MAX(sort_order) as maxOrder FROM sidebar_items WHERE group_id = ?").get(groupId) as {
+      ? (db
+          .prepare(
+            "SELECT MAX(sort_order) as maxOrder FROM sidebar_items WHERE group_id = ?",
+          )
+          .get(groupId) as {
           maxOrder: number | null;
         })
-      : (db.prepare("SELECT MAX(sort_order) as maxOrder FROM sidebar_groups").get() as { maxOrder: number | null });
+      : (db
+          .prepare("SELECT MAX(sort_order) as maxOrder FROM sidebar_groups")
+          .get() as { maxOrder: number | null });
   return (row.maxOrder ?? -1) + 1;
 }
 
 /** Creates the "Uncategorised" group (`source: 'dynamic'`) the first time a
  * dynamic page entry needs it. A no-op every call after that. */
 function ensureUncategorisedGroup(db: DatabaseSync, now: string): void {
-  const existing = db.prepare("SELECT id FROM sidebar_groups WHERE id = ?").get(UNCATEGORISED_GROUP_ID);
+  const existing = db
+    .prepare("SELECT id FROM sidebar_groups WHERE id = ?")
+    .get(UNCATEGORISED_GROUP_ID);
   if (existing) return;
 
   db.prepare(
     `INSERT INTO sidebar_groups (id, label, sort_order, source, updated_at) VALUES (?, ?, ?, 'dynamic', ?)`,
-  ).run(UNCATEGORISED_GROUP_ID, UNCATEGORISED_GROUP_LABEL, nextSortOrder(db, "sidebar_groups"), now);
+  ).run(
+    UNCATEGORISED_GROUP_ID,
+    UNCATEGORISED_GROUP_LABEL,
+    nextSortOrder(db, "sidebar_groups"),
+    now,
+  );
 }
 
 function rowToItemData(row: SidebarItemRow): SidebarNavItemData {
@@ -203,7 +227,7 @@ function nestItems(items: SidebarItemRow[]): SidebarNavItemData[] {
 /**
  * Reads the `/os/*` sidebar from the local SQLite `sidebar_groups`/`sidebar_items`
  * tables (same file as `SQLiteUIPageStore`). See `sidebar-store.ts` for why
- * this is behind an interface, and `seeds/sidebar/seed-data.ts`/`syncCodeDefinedSidebar`
+ * this is behind an interface, and `seeds/seed.ts`/`syncCodeDefinedSidebar`
  * above for how `source = 'code'` rows stay in sync with that seed and
  * `contributed-nav.ts`.
  */
@@ -217,8 +241,12 @@ export class SQLiteSidebarStore implements SidebarStore {
   }
 
   async getSidebarNav(): Promise<SidebarNavGroupData[]> {
-    const groupRows = this.db.prepare("SELECT * FROM sidebar_groups ORDER BY sort_order").all() as SidebarGroupRow[];
-    const itemRows = this.db.prepare("SELECT * FROM sidebar_items ORDER BY sort_order").all() as SidebarItemRow[];
+    const groupRows = this.db
+      .prepare("SELECT * FROM sidebar_groups ORDER BY sort_order")
+      .all() as SidebarGroupRow[];
+    const itemRows = this.db
+      .prepare("SELECT * FROM sidebar_items ORDER BY sort_order")
+      .all() as SidebarItemRow[];
 
     return groupRows.map((group) => ({
       id: group.id,
@@ -228,7 +256,9 @@ export class SQLiteSidebarStore implements SidebarStore {
   }
 
   async ensureDynamicPageEntry(entry: DynamicPageEntry): Promise<void> {
-    const existing = this.db.prepare("SELECT id FROM sidebar_items WHERE page_id = ?").get(entry.pageId);
+    const existing = this.db
+      .prepare("SELECT id FROM sidebar_items WHERE page_id = ?")
+      .get(entry.pageId);
     if (existing) return;
 
     const now = new Date().toISOString();

@@ -1,5 +1,5 @@
 import { PAGE_CONFIG_FILE_SCHEMA, type UINodeInput } from "@/config/page-schema";
-import type { PageConfigFile, ValidationResult } from "@/types/runtime/page-config";
+import type { PageConfigFile, ValidationResult } from "@/types/runtime/page";
 
 /**
  * Runtime validation for page configuration read from the database

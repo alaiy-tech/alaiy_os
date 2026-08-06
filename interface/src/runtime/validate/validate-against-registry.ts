@@ -1,5 +1,5 @@
 import type { UINode } from "@/types/runtime/node";
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import type { PageConfigFile } from "@/types/runtime/page";
 import type { ComponentRegistry } from "@/types/runtime/registry";
 import type { ValidateAgainstRegistryOptions } from "@/types/runtime/validation";
 

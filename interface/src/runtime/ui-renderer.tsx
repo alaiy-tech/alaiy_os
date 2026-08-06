@@ -1,7 +1,7 @@
 import type React from "react";
 import { Fragment } from "react";
 
-import { cn } from "@/lib/utils";
+import { cn } from "@/utils";
 import type { UINode } from "@/types/runtime/node";
 import type { UIPageDefinition } from "@/types/runtime/page";
 import type { ComponentRegistry } from "@/types/runtime/registry";
@@ -18,7 +18,13 @@ import { resolveLayout } from "./registry/layout-registry";
  * everything else is a static lookup into a `ComponentRegistry`/the layout
  * registry, never `eval`, dynamic `import()`, or any other form of code
  * execution. */
-function UnknownNodePlaceholder({ kind, type }: { kind: string; type: string }) {
+function UnknownNodePlaceholder({
+  kind,
+  type,
+}: {
+  kind: string;
+  type: string;
+}) {
   return (
     <div className="rounded-md border border-destructive/50 border-dashed p-3 text-destructive text-xs">
       Unknown {kind} type: <code>{type}</code>
@@ -34,24 +40,34 @@ function renderNode(
 ): React.ReactNode {
   if (isLayoutNode(node)) {
     const layout = resolveLayout(node.type);
-    if (!layout) return <UnknownNodePlaceholder key={key} kind="layout" type={node.type} />;
+    if (!layout)
+      return (
+        <UnknownNodePlaceholder key={key} kind="layout" type={node.type} />
+      );
 
     return (
       <div key={key} className={layout.className({ columns: node.columns })}>
-        {node.children.map((child, index) => renderChild(child, data, registry, index))}
+        {node.children.map((child, index) =>
+          renderChild(child, data, registry, index),
+        )}
       </div>
     );
   }
 
   if (isComponentNode(node)) {
     const entry = resolveComponent(registry, node.type);
-    if (!entry) return <UnknownNodePlaceholder key={key} kind="component" type={node.type} />;
+    if (!entry)
+      return (
+        <UnknownNodePlaceholder key={key} kind="component" type={node.type} />
+      );
 
     const bound = resolveDataSources(data, node.data);
     const props: Record<string, unknown> = { ...node.props, ...bound };
 
     if (node.children && entry.childrenSlot) {
-      props[entry.childrenSlot] = node.children.map((child, index) => renderChild(child, data, registry, index));
+      props[entry.childrenSlot] = node.children.map((child, index) =>
+        renderChild(child, data, registry, index),
+      );
     }
 
     const Component = entry.component;
@@ -100,5 +116,11 @@ export function UIRenderer({
   data: Record<string, unknown>;
   registry: ComponentRegistry;
 }) {
-  return <>{definition.children.map((child, index) => renderChild(child, data, registry, index))}</>;
+  return (
+    <>
+      {definition.children.map((child, index) =>
+        renderChild(child, data, registry, index),
+      )}
+    </>
+  );
 }
