@@ -17,8 +17,9 @@ import { resolveComponent } from "../registry/component-registry";
  * registered Data Source ids - unknown component types, illegal
  * parent/child placement, a component missing a field it can't render
  * without, a literal prop whose value doesn't match its type's
- * `propsSchema`, an out-of-range grid span/columns value, and a `data`
- * binding pointing at a source that was never registered.
+ * `propsSchema`, an out-of-range grid span/columns value, a `data` binding
+ * pointing at a source that was never registered, and a `{ ref }` binding
+ * naming a page-level `data` entry that doesn't exist.
  *
  * Kept as a plain function callers opt into (wired into `resolve-page.tsx`
  * today), not folded into `validatePageConfig` itself - the renderer's
@@ -58,13 +59,14 @@ function walk(
   parentKey: string | undefined,
   registry: ComponentRegistry,
   isDataSourceRegistered: (id: string) => boolean,
+  dataNames: Set<string>,
   errors: string[],
 ): void {
   errors.push(...spanErrors(node.id, node.layout?.span));
 
   if (isLayoutNode(node)) {
     if (node.type === "grid") errors.push(...columnsErrors(node.id, node.columns));
-    for (const child of node.children) walk(child, node.type, registry, isDataSourceRegistered, errors);
+    for (const child of node.children) walk(child, node.type, registry, isDataSourceRegistered, dataNames, errors);
     return;
   }
 
@@ -102,13 +104,24 @@ function walk(
     }
 
     for (const [propName, ref] of Object.entries(node.data ?? {})) {
-      if (!isDataSourceRegistered(ref.source)) {
+      if ("ref" in ref) {
+        // References a page-level `data` entry by name - check it exists;
+        // there's no registry id involved at all here.
+        if (!dataNames.has(ref.ref)) {
+          errors.push(`${node.id}: data.${propName} references undefined page data entry "${ref.ref}"`);
+        }
+        continue;
+      }
+      // An inline declarative source (an object, not a string) has no
+      // registry id to check - its validity is fully determined by the
+      // structural pass (`page-schema.ts`'s `DATA_SOURCE_REF_SCHEMA`).
+      if (typeof ref.source === "string" && !isDataSourceRegistered(ref.source)) {
         errors.push(`${node.id}: data.${propName} references unregistered data source "${ref.source}"`);
       }
     }
 
     if (node.children) {
-      for (const child of node.children) walk(child, node.type, registry, isDataSourceRegistered, errors);
+      for (const child of node.children) walk(child, node.type, registry, isDataSourceRegistered, dataNames, errors);
     }
   }
 }
@@ -118,8 +131,9 @@ function walk(
  * `validatePageConfig`. */
 export function validateAgainstRegistry(page: PageConfigFile, options: ValidateAgainstRegistryOptions): string[] {
   const errors: string[] = [];
+  const dataNames = new Set(Object.keys(page.definition.data ?? {}));
   for (const child of page.definition.children) {
-    walk(child, undefined, options.componentRegistry, options.isDataSourceRegistered, errors);
+    walk(child, undefined, options.componentRegistry, options.isDataSourceRegistered, dataNames, errors);
   }
   return errors;
 }
