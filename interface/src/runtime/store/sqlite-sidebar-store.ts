@@ -123,7 +123,18 @@ function insertItem(
  */
 export function syncCodeDefinedSidebar(db: DatabaseSync): void {
   const now = new Date().toISOString();
-  db.exec("DELETE FROM sidebar_items WHERE source = 'code'");
+  // Deletes every item *belonging to* a code-owned group, not just items
+  // whose own `source` happens to say 'code' - `sidebar_items.group_id`
+  // is a NOT NULL FK into `sidebar_groups`, so any leftover row still
+  // pointing at a group this resync is about to remove (e.g. historical
+  // data from before a baseline reset, or a stale row inserted under a
+  // group id that no longer exists in the current seed) would otherwise
+  // fail the DELETE below with a FOREIGN KEY constraint error instead of
+  // being cleaned up. A correctly-tagged dynamic item is never inserted
+  // under a code group (`ensureDynamicPageEntry` only ever targets the
+  // dynamic "Uncategorised" group), so this can't delete anything that
+  // should have survived.
+  db.exec("DELETE FROM sidebar_items WHERE group_id IN (SELECT id FROM sidebar_groups WHERE source = 'code')");
   db.exec("DELETE FROM sidebar_groups WHERE source = 'code'");
 
   const groups = buildCodeDefinedSidebar();
@@ -246,8 +257,18 @@ let store: SidebarStore | null = null;
 
 /** The single place the rest of the app asks for "the current sidebar
  * store" - swapping `SQLiteSidebarStore` for a future `FrappeSidebarStore`
- * is a one-line change here. */
-export function getSidebarStore(): SidebarStore {
-  store ??= new SQLiteSidebarStore();
-  return store;
+ * is a one-line change here. Cached only for the default (real-file) path,
+ * matching production usage where one long-lived connection is desirable.
+ * Any other `dbPath` - a test's own `:memory:` database, passed through by
+ * `sqlite-page-store.ts`'s `ensureSeeded` - always gets a fresh, uncached
+ * instance instead: caching by the bare default would silently bind every
+ * caller to the real on-disk file regardless of which database it actually
+ * meant, which is what used to make every `:memory:` `SQLiteUIPageStore`
+ * test leak dynamic sidebar entries into `public/headless-os.sqlite`. */
+export function getSidebarStore(dbPath: string = DB_PATH): SidebarStore {
+  if (dbPath === DB_PATH) {
+    store ??= new SQLiteSidebarStore(dbPath);
+    return store;
+  }
+  return new SQLiteSidebarStore(dbPath);
 }

@@ -86,6 +86,7 @@ export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
 const SEED_PAGE_ICONS: Record<string, string> = {
   dashboard: "layout-dashboard",
   customers: "users",
+  "headless-data-test": "database",
 };
 
 /** Seeds the two Headless OS pages if the table is empty - a fresh clone
@@ -93,14 +94,19 @@ const SEED_PAGE_ICONS: Record<string, string> = {
  * error) if pages already exist, so it's safe to call unconditionally on
  * every store construction. Also ensures each seed page has a dynamic
  * "Uncategorised" sidebar entry (`ensureDynamicPageEntry` is itself
- * idempotent, so this is safe to run every time regardless). */
-export function ensureSeeded(db: DatabaseSync): void {
+ * idempotent, so this is safe to run every time regardless).
+ *
+ * `dbPath` is threaded through to `getSidebarStore` so a caller using a
+ * non-default database (every unit test's `:memory:` `SQLiteUIPageStore`)
+ * gets a sidebar store bound to that same database instead of silently
+ * falling back to the real on-disk file's singleton. */
+export function ensureSeeded(db: DatabaseSync, dbPath: string = DB_PATH): void {
   const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
   if (row.count === 0) {
     for (const page of SEED_PAGES) upsertPage(db, page);
   }
 
-  const sidebarStore = getSidebarStore();
+  const sidebarStore = getSidebarStore(dbPath);
   for (const page of SEED_PAGES) {
     void sidebarStore.ensureDynamicPageEntry({
       pageId: page.id,
@@ -139,7 +145,7 @@ export class SQLiteUIPageStore implements UIPageStore {
   constructor(dbPath: string = DB_PATH) {
     this.db = new DatabaseSync(dbPath);
     createSchema(this.db);
-    ensureSeeded(this.db);
+    ensureSeeded(this.db, dbPath);
   }
 
   async getPageById(id: string): Promise<PageConfigFile | null> {
