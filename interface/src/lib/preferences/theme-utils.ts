@@ -2,7 +2,9 @@ import type { ResolvedThemeMode, ThemeMode } from "@/types/theme";
 
 function resolveThemeMode(mode: ThemeMode): ResolvedThemeMode {
   if (mode === "system") {
-    const prefersDark = typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
+    const prefersDark =
+      typeof window !== "undefined" &&
+      window.matchMedia?.("(prefers-color-scheme: dark)")?.matches;
     return prefersDark ? "dark" : "light";
   }
   return mode === "dark" ? "dark" : "light";
@@ -21,7 +23,9 @@ export function applyThemeMode(mode: ThemeMode): ResolvedThemeMode {
   return resolved;
 }
 
-export function subscribeToSystemTheme(onChange: (mode: ResolvedThemeMode) => void): () => void {
+export function subscribeToSystemTheme(
+  onChange: (mode: ResolvedThemeMode) => void,
+): () => void {
   if (typeof window === "undefined") return () => undefined;
   const media = window.matchMedia?.("(prefers-color-scheme: dark)");
   if (!media) return () => undefined;
