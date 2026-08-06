@@ -1,36 +1,12 @@
-// Relative import, not the usual `@/constants/list` alias - this module is
-// also loaded by `seeds/seed-headless-db.ts` under plain ts-node, which
-// (unlike Next.js's own bundler) doesn't resolve `@/*` path aliases at
-// runtime. A relative path works identically under both.
-import { STATUS_TONE } from "../../constants/list";
-import type { PageConfigFile } from "../../types/runtime/page-config";
-
-/**
- * The two seed pages this local SQLite store ships with. Written as typed
- * TypeScript (checked against `PageConfigFile`/`UIPageDefinition` at compile
- * time) rather than hand-authored JSON, then serialized once at seed time -
- * a real benefit of moving off bundled `.json` files: a typo in a node's
- * `kind`/`type` field is now a build error, not a runtime validation
- * failure discovered by loading the page.
- */
-
-const ORDER_PAYMENT_TONES: Record<string, string> = {
-  Paid: STATUS_TONE.success,
-  Pending: STATUS_TONE.warning,
-  Refunded: STATUS_TONE.destructive,
-};
-
-const ORDER_FULFILLMENT_TONES: Record<string, string> = {
-  Fulfilled: STATUS_TONE.success,
-  Unfulfilled: STATUS_TONE.caution,
-  Returned: STATUS_TONE.destructive,
-};
-
-const CUSTOMER_STATUS_TONES: Record<string, string> = {
-  Active: STATUS_TONE.success,
-  "No Orders": STATUS_TONE.neutral,
-  Disabled: STATUS_TONE.destructive,
-};
+// Everything the local SQLite store seeds on first run: the UI pages
+// (`SEED_PAGES`, checked against `PageConfigFile`/`UIPageDefinition` at
+// compile time rather than hand-authored JSON) and the code-owned half of
+// the `/os/*` sidebar (`buildCodeDefinedSidebar`).
+import { contributedNav } from "@/config/contributed-nav";
+import { iconName } from "@/config/nav-icons";
+import { STATUS_TONE } from "@/constants/list";
+import type { NavContribution, SidebarNavGroupData, SidebarNavItemData } from "@/types/navigation";
+import type { PageConfigFile } from "@/types/runtime/page";
 
 export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
   id: "dashboard",
@@ -258,7 +234,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                   format: "badge",
                   filterable: true,
                   filterOptions: ["Paid", "Pending", "Refunded"],
-                  badgeTones: ORDER_PAYMENT_TONES,
+                  badgeTones: { Paid: STATUS_TONE.success, Pending: STATUS_TONE.warning, Refunded: STATUS_TONE.destructive },
                 },
                 {
                   field: "fulfillment",
@@ -266,7 +242,11 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                   format: "badge",
                   filterable: true,
                   filterOptions: ["Fulfilled", "Unfulfilled", "Returned"],
-                  badgeTones: ORDER_FULFILLMENT_TONES,
+                  badgeTones: {
+                    Fulfilled: STATUS_TONE.success,
+                    Unfulfilled: STATUS_TONE.caution,
+                    Returned: STATUS_TONE.destructive,
+                  },
                 },
                 { field: "total", label: "Total", format: "currency", align: "right", sortable: true },
                 { field: "date", label: "Date", format: "date", sortable: true },
@@ -422,7 +402,11 @@ export const HEADLESS_CUSTOMERS_PAGE: PageConfigFile = {
                   format: "badge",
                   filterable: true,
                   filterOptions: ["Active", "No Orders", "Disabled"],
-                  badgeTones: CUSTOMER_STATUS_TONES,
+                  badgeTones: {
+                    Active: STATUS_TONE.success,
+                    "No Orders": STATUS_TONE.neutral,
+                    Disabled: STATUS_TONE.destructive,
+                  },
                 },
                 { field: "group", label: "Group", filterable: true },
                 { field: "territory", label: "Territory", filterable: true },
@@ -444,30 +428,17 @@ export const HEADLESS_CUSTOMERS_PAGE: PageConfigFile = {
 };
 
 /**
- * Proves the generic, declarative data path added on top of the runtime:
- * `rows`/`pagination` bind to a *named* `frappe-list` entry declared once
- * in `definition.data` (`{ ref: "customers", path: "data"|"pagination" }`)
- * - no `src/lib/frappe/customer-list.server.ts`-style fetcher, no
- * `sources/customers.ts`-style registration file, just this page
- * definition. Two independently-named, independently-paginated tables
- * (`customers`, `orders`) prove the collision this phase exists to rule
- * out: `?customers_page=2` and `?orders_page=3` can both be set at once
- * without either table affecting the other - see
- * `docs/UI_RUNTIME.md`'s "Paginated Data Sources".
- *
- * Both tables deliberately request only genuine native DocType fields via
- * the standard REST list endpoint - unlike `HEADLESS_CUSTOMERS_PAGE` above,
- * whose `customers` source also carries `orders`/`total_spend`, computed by
- * a custom whitelisted API method the generic source has no way to reach.
- * That's the real boundary between "generic Frappe access" and
- * "domain-specific computation," not a coincidence of column choice.
- *
- * No filter is wired up here even though `os-filter-bar` exists: a
- * `frappe-list` config's `filters` are still static JSON, not read from
- * `searchParams` the way `pagination.page` now is - wiring a live filter
- * into this page would look interactive while silently doing nothing.
- * `resetPageParams` (the filter-change-resets-page mechanism) is proven by
- * `OsFilterBar`'s own unit tests instead.
+ * Proves the generic, declarative data path: `rows`/`pagination` bind to a
+ * *named* `frappe-list` entry declared once in `definition.data`, no
+ * per-page fetcher or source-registration file. Two independently-named,
+ * independently-paginated tables (`customers`, `orders`) prove
+ * `?customers_page=2`/`?orders_page=3` never collide - see
+ * `docs/UI_RUNTIME.md`'s "Paginated Data Sources". Both request only
+ * genuine native DocType fields via the standard REST endpoint, unlike
+ * `HEADLESS_CUSTOMERS_PAGE` above, whose `customers` source also carries
+ * `orders`/`total_spend` from a custom whitelisted API method the generic
+ * source can't reach - the real boundary between generic Frappe access and
+ * domain-specific computation.
  */
 export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
   id: "headless-data-test",
@@ -582,23 +553,13 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
 };
 
 /**
- * Phase 8's real, production-style second `frappe-list` page: search,
- * filter, sort, and pagination all request-driven, all through one named
- * `frappe-list` entry - no bespoke fetcher, source file, or
- * `registerDataSource()` call anywhere, the property this whole generic
- * data path exists to prove.
- *
- * `Supplier` over `Product`: no live route uses either doctype today, but
- * `obsolete/pages/os/products/` is a genuinely heavy implementation (variant
- * grid, image carousel, child rows, a detail route) - real scope-creep risk
- * this phase doesn't need. The only obsolete `Supplier` code is a
- * single-purpose list-search fetcher (`obsolete/data/lib/frappe/supplier-list.ts`),
- * with no detail page - and it's the direct precedent for the `search`
- * field choice below (`supplier_name`, `name`).
- *
- * No "Sort by" filter control: sorting is a real `os-data-table` column-
- * header interaction now (`sortParam`/`sort`, mirroring `pageParam`/
- * `pagination`), not a second thing for `os-filter-bar` to own.
+ * A production-style second `frappe-list` page: search, filter, sort, and
+ * pagination all request-driven, all through one named source, no bespoke
+ * fetcher. `Supplier` over `Product`: no live route uses either doctype,
+ * but `obsolete/pages/os/products/` is heavy (variants, image carousel, a
+ * detail route) - real scope-creep risk this doesn't need. Sorting is a
+ * real `os-data-table` column-header interaction (`sortParam`/`sort`), not
+ * a second "Sort by" control for `os-filter-bar` to own.
  */
 export const HEADLESS_SUPPLIERS_PAGE: PageConfigFile = {
   id: "suppliers",
@@ -705,3 +666,98 @@ export const SEED_PAGES: PageConfigFile[] = [
   HEADLESS_DATA_TEST_PAGE,
   HEADLESS_SUPPLIERS_PAGE,
 ];
+
+// The code-owned half of the `/os/*` sidebar: the base app's own groups,
+// merged with whatever the deployment composer generated into
+// `contributed-nav.ts` (empty in this base repo). `runtime/store/
+// sqlite-sidebar-store.ts` calls `buildCodeDefinedSidebar()` on every store
+// construction and writes the result as `source: 'code'` rows, so a
+// redeploy that changes either takes effect on next start, no reseed step.
+//
+// Icons are lower-kebab-case name strings (see `nav-icons.ts`), not
+// `LucideIcon` components - the exception is folding in `contributedNav`,
+// whose items still carry real components; `iconName()` converts those at
+// merge time.
+//
+// "Settings" isn't a sidebar-store group - it's a standalone button in
+// `AppSidebar`'s own footer (baseline UI chrome, not sidebar-store data).
+export const CONNECTORS_GROUP_LABEL = "Connectors";
+
+const baseSidebarGroups: SidebarNavGroupData[] = [
+  {
+    id: "os",
+    label: "OS",
+    items: [{ id: "ask-alaiy", title: "Ask Alaiy", url: "/os/ask-alaiy", icon: "sparkles" }],
+  },
+];
+
+function contributionToItemData(item: NavContribution["items"][number]): SidebarNavItemData {
+  // `NavMainItem` is a union of a link and a parent; a parent's `subItems`
+  // is a required array (an empty one is still truthy), so testing for
+  // `url` (present only on the link variant) is what narrows correctly.
+  if ("url" in item) {
+    return {
+      id: item.id,
+      title: item.title,
+      url: item.url,
+      icon: iconName(item.icon),
+      badge: item.badge,
+      disabled: item.disabled,
+      newTab: item.newTab,
+    };
+  }
+  return {
+    id: item.id,
+    title: item.title,
+    url: null,
+    icon: iconName(item.icon),
+    badge: item.badge,
+    disabled: item.disabled,
+    newTab: item.newTab,
+    subItems: item.subItems.map((sub) => ({
+      id: sub.id,
+      title: sub.title,
+      url: sub.url,
+      icon: iconName(sub.icon),
+      badge: sub.badge,
+      disabled: sub.disabled,
+      newTab: sub.newTab,
+    })),
+  };
+}
+
+/**
+ * Folds `contributedNav` into the base groups, matched by group `label` (an
+ * unrecognised label opens a new group; a contributed item whose `id`
+ * already exists in the target group replaces it). A connector declares one
+ * top-level item under `group: "Connectors"` - see
+ * `docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16; an item there with no icon
+ * falls back to `"plug"`, matching `connectors.tsx`'s own fallback.
+ */
+export function buildCodeDefinedSidebar(): SidebarNavGroupData[] {
+  if (contributedNav.length === 0) return baseSidebarGroups;
+
+  const merged = baseSidebarGroups.map((group) => ({ ...group, items: [...group.items] }));
+
+  for (const contribution of contributedNav) {
+    let target = merged.find((group) => group.label === contribution.group);
+    if (!target) {
+      target = {
+        id: `contributed-${contribution.group.toLowerCase().replace(/\s+/g, "-")}`,
+        label: contribution.group,
+        items: [],
+      };
+      merged.push(target);
+    }
+    const isConnectorsGroup = target.label === CONNECTORS_GROUP_LABEL;
+    for (const rawItem of contribution.items) {
+      const item = contributionToItemData(rawItem);
+      if (isConnectorsGroup && !item.icon) item.icon = "plug";
+      const existing = target.items.findIndex((candidate) => candidate.id === item.id);
+      if (existing === -1) target.items.push(item);
+      else target.items[existing] = item;
+    }
+  }
+
+  return merged;
+}
