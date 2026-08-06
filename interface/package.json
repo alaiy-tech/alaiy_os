@@ -13,7 +13,7 @@
     "test": "vitest run",
     "prepare": "husky",
     "generate:presets": "ts-node -P tsconfig.scripts.json src/scripts/generate-theme-presets.ts",
-    "seed:headless-db": "ts-node -P tsconfig.scripts.json src/seeds/seed-headless-db.ts"
+    "seed:headless-db": "ts-node -P tsconfig.scripts.json src/scripts/seed-headless-db.ts"
   },
   "lint-staged": {
     "*.{js,ts,jsx,tsx}": [
