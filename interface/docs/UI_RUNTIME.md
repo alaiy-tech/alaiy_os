@@ -138,7 +138,8 @@ src/config/
                                extension point - ships empty, see "Composing registries" below)
 
 src/seeds/
-├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE, SEED_PAGES
+├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE,
+│                         HEADLESS_SUPPLIERS_PAGE, SEED_PAGES
 ├── sidebar/seed-data.ts  buildCodeDefinedSidebar() - base groups + contributedNav merge
 └── seed-headless-db.ts   dev script: deletes the sqlite file to force a reseed
 
@@ -149,7 +150,8 @@ src/components/
 ├── registry/          the actual React components the Component Registry points at:
 │                       card.tsx, chart.tsx, filter-bar.tsx, kpi.tsx, page-header.tsx,
 │                       period-toggle.tsx, stat-card.tsx, data-table/ (data-table.tsx,
-│                       data-table-view.tsx, column-spec.tsx, apply-filters.ts)
+│                       data-table-view.tsx, column-spec.tsx, apply-filters.ts,
+│                       use-pagination-param.ts, use-sort-param.ts)
 └── layout/             coming-soon.tsx, invalid-page-config.tsx (the two render fallbacks),
                         sidebar/ (app-sidebar.tsx, settings-sidebar.tsx), nav-main.tsx
 ```
@@ -489,12 +491,9 @@ DocType fields (`Customer`'s `name`/`customer_name`/`customer_group`/
 `orders`/`total_spend` computed by a custom whitelisted API method the
 generic source has no way to reach. That's the real, honest boundary between
 "generic Frappe access" and "domain-specific computation," not a coincidence
-of column choice. No filter is wired into this page even though
-`os-filter-bar`/`resetPageParams` exist - a `frappe-list` config's `filters`
-are still static JSON, not read from `searchParams` the way `pagination.page`
-now is, so a live filter here would look interactive while silently doing
-nothing; `resetPageParams` is proven by `OsFilterBar`'s own unit tests
-instead.
+of column choice. No filter is wired into this page - it predates
+request-driven filtering (see "Generic List Query State" below, and
+`/os/suppliers`, which proves that instead).
 
 **What's supported**: field selection (`"name"`, every doctype's primary
 key, is always requested even if the config omits it, so a resolved row is
@@ -647,35 +646,183 @@ check would be dead code rather than defense in depth.
 - DocType-meta-driven field `label`/`type` - `createFrappeListSource`
   currently synthesizes a label (title-cased field name) and defaults every
   field's `type` to `"string"`, since fetching real DocField metadata is
-  out of scope ("do not attempt full DocType metadata validation"). The
-  first real `frappe-list`-backed page (`HEADLESS_DATA_TEST_PAGE`) uses
-  handwritten, explicit `os-data-table` column specs instead of this
-  synthesized metadata - prefer that over inventing a metadata system.
+  out of scope ("do not attempt full DocType metadata validation"). Every
+  `frappe-list`-backed page uses handwritten, explicit `os-data-table`
+  column specs instead of this synthesized metadata - prefer that over
+  inventing a metadata system.
 - Boolean filter values - Frappe `Check` fields query as `0`/`1`, not JSON
   `true`/`false`, and nothing exercises that path yet to confirm the
   mapping against, so `FrappeListFilter.value` doesn't accept `boolean`.
 - The `between`/`is`/`is not` operators (`types/list.ts`'s fuller
   `FilterOperator` vocabulary has them; `frappe-list` doesn't yet - they
-  need a different value shape than an ordinary list filter does).
-- Full-text search (Frappe's list endpoint has no such param - `frappe-list`
-  sources never claim `capabilities.search`).
-- Request-driven *filter* values - a `frappe-list` config's `filters` are
-  still static JSON; only `pagination.page` (via a named entry's
-  `${name}_page`) is read from the URL. `os-filter-bar`'s `resetPageParams`
-  is ready for the day filters become request-driven too, but nothing wires
-  a filter's value into a `frappe-list` config yet.
+  need a different value shape than an ordinary list filter does). Also not
+  in `queryFilters`' own operator set (see "Generic List Query State" below)
+  for the same reason, plus `in`/`not in` - no UI here produces an array
+  value for a request-driven filter.
 - Page *size* is not URL-addressable, only page *number* - `pageSize` comes
   from the named entry's own config; `PaginationFooter`'s "Per page"
   selector is suppressed entirely in external/manual mode rather than left
-  connected to nothing.
+  connected to nothing. No existing page-size control anywhere in this
+  codebase to make request-aware in the first place.
 - `applyUIAction`'s mutation vocabulary (`runtime/mutations.ts`) has no verb
   for `UIPageDefinition.data` yet - nothing calls `applyUIAction` in
-  production regardless, so this is a flagged follow-up, not a blocker.
+  production regardless, so this is a flagged follow-up, not a blocker (see
+  "Generic List Query State" below for the fuller reasoning).
 
 **Bespoke sources aren't going away.** `dashboard.ts`/`customers.ts` remain
 the right shape for business calculations and multi-step logic;
 `frappe-list`/`frappe-count` are additive - a second, simpler path for the
 ordinary case, not a replacement for the sources that already exist.
+
+## Generic List Query State
+
+Pagination (above) was the first piece of a `frappe-list` source's request
+state to become genuinely interactive. This phase does the same for
+filters, search, and sorting - all namespaced by a named entry's own name,
+the same `${name}_<thing>` convention `${name}_page` already established, so
+any number of independent lists on one page stay safe from each other.
+
+```
+Data Source (a page-level named `data` entry)
+        │
+        ▼
+config.filters (static) + config.queryFilters/search (capability declarations)
+        │
+        ▼
+${name}_filter_<field> / ${name}_search / ${name}_sort URL params  ← resolver.ts reads these
+        │
+        ▼
+effective filters / orFilters / orderBy   ← merged, once, in resolveNamedData
+        │
+        ▼
+createFrappeListSource(effectiveConfig, { orFilters }).resolve()
+        │
+        ▼
+{ data, pagination, orderBy }   ← orderBy is new: echoes the effective sort back
+```
+
+**Filters: `queryFilters` declares eligibility, the URL supplies the value.**
+`FrappeListSourceConfig` gains `queryFilters?: { field, operator }[]` -
+alongside the existing static `filters` (always applied, config-owned,
+non-negotiable), each `queryFilters` entry names one *additional* field a
+named entry allows filtering by, and with what operator. The actual value
+is never author-supplied: it's read from `` `${name}_filter_<field>` ``
+(`resolver.ts`'s `readNamedFilters`) and merged into the effective `filters`
+array at resolve time. Because the *field* always comes from author-written
+config and only the *value* comes from the URL, this can never inject an
+arbitrary field into a Frappe query - the same safety property `${name}_page`
+already had for pagination. A field cannot be declared in both `filters` and
+`queryFilters` on the same config (`config/frappe-list-schema.ts`'s
+`.refine()`) - both would AND together on that field, silently producing an
+always-empty result if they ever disagreed.
+
+**Search: a capability declaration plus Frappe's `or_filters`.** `search?:
+{ fields: string[] }` declares which fields a named entry allows searching
+across; a live term at `` `${name}_search` `` becomes a `like` match against
+each declared field, sent as `or_filters` (`buildFrappeListRequestPath`'s new
+second parameter) - a real, precedented Frappe REST parameter (this
+codebase's own obsolete `supplier-list.ts`/`sales-order-list.ts` fetchers
+already use it against this exact endpoint), which combines with `filters`
+as `filters AND (or_filters)` - the expected "narrow further within the
+already-filtered set" search-box semantics. This is not full-text search -
+it's only ever a `like` match against the fields a config explicitly lists,
+nothing Frappe-side is being asked to do beyond that.
+
+**`orFilters` is deliberately not a `config` field.** Unlike `pagination.page`
+(a value an author may legitimately set as a static default), the search
+term's derived OR-filter tuples have no legitimate author-facing use - so
+they're never added to `FrappeListSourceConfig`/its `.strict()` zod schema.
+Putting them there would let an author hand-write `orFilters` in page JSON,
+which `resolveNamedData` would then silently clobber every single request.
+Instead they flow as a second, non-schema-validated parameter:
+`createFrappeListSource(config, { orFilters })`.
+
+**The `like`/`not like` auto-wrap exception is narrowly scoped.** A
+`frappe-list` config's own static `filters` are never auto-wrapped - an
+author writes the literal Frappe value they want, wildcards included, by
+design. A `queryFilters`-sourced value *is* auto-wrapped in `%...%` when its
+operator is `like`/`not like` - the same treatment the end-user-facing
+`toFrappeFilters` (`components/derived/list/types.ts`) already gives live
+text input - because this value genuinely is live end-user text arriving
+through a URL param, not developer-authored config. This wrapping happens in
+exactly one function (`resolver.ts`'s `readNamedFilters`); nothing else can
+retroactively wrap a static value.
+
+**Sorting is a real `OsDataTable` mechanism, not an `OsFilterBar` control.**
+A disconnected "Sort by" dropdown was considered and rejected: `OsDataTable`
+already owns exactly this kind of generic, Frappe-agnostic, named-URL-param
+mechanism for pagination (`pageParam`/`usePaginationParam`), so a
+symmetrical `sort`/`sortParam` pair (mirroring `pagination`/`pageParam`
+exactly) is equally "Frappe-agnostic," and lets a sortable column header
+behave correctly instead of being replaced by an unrelated control.
+`sort` is a data-bound prop (e.g. `{ ref: "suppliers", path: "orderBy" }` -
+`FrappeListResult` gained an `orderBy` field for exactly this, echoing the
+effective sort back the same way `pagination` already echoes effective page
+state); `sortParam` is the URL param name (e.g. `"suppliers_sort"`). A new
+`useSortParam` hook (`components/registry/data-table/use-sort-param.ts`)
+mirrors `usePaginationParam`'s clone-`URLSearchParams`-then-`router.replace`
+pattern, holding one literal `"field asc|desc"` string - the exact format
+`orderBy` itself already uses, no new mini-language - and clearing a given
+`resetParams` list (this table's own `pageParam`) in the same navigation, so
+changing sort resets the relevant page without `OsFilterBar` involvement.
+`getSortedRowModel()` is skipped entirely in this mode, the same reasoning
+`getPaginationRowModel()` is already skipped for manual pagination: the
+resolved `data` is already sorted server-side.
+
+This fixed a real, already-shipped bug: `HEADLESS_DATA_TEST_PAGE`'s tables
+already marked columns `sortable: true` while paginating via `pageParam` -
+since `getSortedRowModel()` was unconditionally wired before this phase,
+clicking those headers silently re-sorted only the current page's rows, not
+the full result set. Both tables now also declare `sortParam`/`sort`,
+making the existing sort columns genuinely correct instead of quietly wrong.
+
+**`readNamedSort` is the actual security/correctness boundary for sorting.**
+A request-supplied `` `${name}_sort` `` must match `ORDER_BY_PATTERN`
+(exported from `config/frappe-list-schema.ts`, now shared with a
+`parseOrderByFields` helper) *and* every field it references must be one of
+the named entry's own declared `fields` or `"name"` - an arbitrary
+URL-supplied sort field must never reach Frappe unchecked. Invalid or absent
+falls back to the config's own static `orderBy`.
+
+**An anonymous inline `frappe-list` binding's `search`/`queryFilters` are
+inert, loudly.** Exactly like an anonymous binding's static `pagination.page`
+(no URL reading at all - see "Paginated Data Sources" above), an anonymous
+config declaring `search`/`queryFilters` has nothing to read them: only
+`resolveNamedData` (reached only for a named `definition.data` entry) ever
+looks at `` `${name}_search` ``/`` `${name}_filter_<field>` ``.
+`resolver.ts`'s generic `resolveSource` dispatcher - now reached *only* by
+anonymous bindings, since a named entry's `frappe-list` config is resolved
+directly by `resolveNamedData` instead (the one place `orFilters` needs to
+flow) - warns in dev when this happens, matching this codebase's "loud, not
+silently inert" convention (the same one behind `OsDataTable`'s missing-
+`pageParam` warning).
+
+**`/os/suppliers` is the proof**: a second real, production-style
+`frappe-list` page (`HEADLESS_SUPPLIERS_PAGE`) with no bespoke fetcher,
+source file, or `registerDataSource()` call anywhere - a `text` "Search"
+filter (`suppliers_search`), a `text` "Country" filter
+(`suppliers_filter_country`, `like`), sortable `name`/`supplier_name`
+column headers (`suppliers_sort`), and pagination (`suppliers_page`), all
+resolved through one named `frappe-list` entry. `Supplier` over `Product`:
+no live route uses either doctype, but `obsolete/pages/os/products/` is a
+genuinely heavy implementation (variant grid, image carousel, child rows, a
+detail route) - real scope-creep risk this phase doesn't need. The only
+obsolete `Supplier` code is a single-purpose list-search fetcher with no
+detail page - and it's the direct precedent for the `search` mechanism above
+(same field choice: `supplier_name`, `name`). Since `createFrappeListSource`
+never fetches real DocType metadata (a standing non-goal), this page's
+`supplier_group`/`country` fields were manually smoke-checked against a real
+Frappe site rather than assumed correct - a wrong field name fails silently
+as an always-empty column, not an error.
+
+**`applyUIAction` and `UIPageDefinition.data`: decided, not yet built.**
+Once Ask Alaiy can add a data-bound component, it will also need to
+introduce the named source that binding points at - so
+`ADD_DATA_SOURCE`/`REMOVE_DATA_SOURCE`/`UPDATE_DATA_SOURCE`-shaped verbs on
+`UIPageDefinition.data` are anticipated. Nothing calls `applyUIAction` in
+production today regardless (the same is already true of every existing
+verb), so there's no concrete caller to build and test against yet - this is
+a recorded decision, not an implementation.
 
 ## The Component Registry: a machine-readable contract
 
