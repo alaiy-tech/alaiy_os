@@ -55,4 +55,35 @@ describe("component-props-schema", () => {
       expect(result.success).toBe(false);
     });
   });
+
+  describe("os-data-table", () => {
+    const schema = COMPONENT_PROPS_SCHEMAS["os-data-table"];
+
+    it("accepts pageParam alongside the existing props", () => {
+      const result = schema.safeParse({ title: "Customers", pageParam: "customers_page" });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an unrecognised prop key (.strict())", () => {
+      const result = schema.safeParse({ title: "Customers", notARealProp: true });
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("os-filter-bar", () => {
+    const schema = COMPONENT_PROPS_SCHEMAS["os-filter-bar"];
+
+    it("accepts resetPageParams alongside filters", () => {
+      const result = schema.safeParse({
+        filters: [{ id: "group", type: "text", label: "Group", searchParam: "customer_group" }],
+        resetPageParams: ["customers_page", "orders_page"],
+      });
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an unrecognised prop key (.strict())", () => {
+      const result = schema.safeParse({ filters: [], notARealProp: true });
+      expect(result.success).toBe(false);
+    });
+  });
 });

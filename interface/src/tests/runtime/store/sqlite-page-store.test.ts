@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { InvalidPageConfigError } from "@/runtime/store/invalid-page-config-error";
 import { createSchema, SQLiteUIPageStore, upsertPage } from "@/runtime/store/sqlite-page-store";
+import { SEED_PAGES } from "@/seeds/pages/seed-data";
 import type { PageConfigFile } from "@/types/runtime/page-config";
 
 import { DatabaseSync } from "node:sqlite";
@@ -32,10 +33,24 @@ const VALID_PAGE: PageConfigFile = {
 };
 
 describe("SQLiteUIPageStore", () => {
-  it("initializes the schema and auto-seeds - a fresh store already has the two Headless OS pages", async () => {
+  it("initializes the schema and auto-seeds - a fresh store already has every seed page", async () => {
     const store = memoryStore();
-    expect(await store.getPageById("dashboard")).not.toBeNull();
-    expect(await store.getPageById("customers")).not.toBeNull();
+    for (const seedPage of SEED_PAGES) {
+      expect(await store.getPageById(seedPage.id)).not.toBeNull();
+    }
+  });
+
+  it("independent :memory: stores never collide with each other or with the real file's sidebar singleton", async () => {
+    // Regression test: `ensureSeeded` used to call `getSidebarStore()` with
+    // no path, which always bound to the real `public/headless-os.sqlite`
+    // singleton regardless of which database this store itself was using -
+    // so a second :memory: store in the same process could crash against
+    // state a first one (or a real dev server) had already left behind.
+    expect(() => memoryStore()).not.toThrow();
+    expect(() => memoryStore()).not.toThrow();
+
+    const { getSidebarStore } = await import("@/runtime/store/sqlite-sidebar-store");
+    expect(getSidebarStore(":memory:")).not.toBe(getSidebarStore(":memory:"));
   });
 
   it("auto-seeding is idempotent - re-opening an already-seeded database doesn't duplicate rows", async () => {
@@ -43,10 +58,10 @@ describe("SQLiteUIPageStore", () => {
     createSchema(db);
     // Simulate two store constructions against the same underlying database.
     const { ensureSeeded } = await import("@/runtime/store/sqlite-page-store");
-    ensureSeeded(db);
-    ensureSeeded(db);
+    ensureSeeded(db, ":memory:");
+    ensureSeeded(db, ":memory:");
     const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
-    expect(row.count).toBe(2);
+    expect(row.count).toBe(SEED_PAGES.length);
   });
 
   it("creates and reads back a page by id and by route", async () => {

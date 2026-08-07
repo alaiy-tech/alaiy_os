@@ -25,10 +25,11 @@ describe("SQLiteSidebarStore", () => {
     expect(askAlaiy?.url).toBe("/os/ask-alaiy");
     expect(askAlaiy?.icon).toBe("sparkles");
 
-    const settings = groups.find((group) => group.id === "settings");
-    expect(settings?.label).toBeUndefined();
-    expect(settings?.items.map((item) => item.id)).toEqual(["settings-link"]);
-    expect(settings?.items[0]?.url).toBe("/settings");
+    // "Settings" is no longer a sidebar-store group - it's a standalone,
+    // code-owned button in `AppSidebar`'s own footer (see that file), so the
+    // code-defined baseline sidebar has exactly one group today.
+    expect(groups.find((group) => group.id === "settings")).toBeUndefined();
+    expect(groups.map((group) => group.id)).toEqual(["os"]);
   });
 
   it("re-syncing (e.g. a second store construction against the same database) doesn't duplicate code rows", () => {
@@ -79,6 +80,29 @@ describe("SQLiteSidebarStore", () => {
       count: number;
     };
     expect(codeGroupCount.count).toBe(2);
+  });
+
+  it("a stray item still pointing at a code group doesn't crash the resync with a FOREIGN KEY error", () => {
+    // Regression test: `sidebar_items.group_id` is a NOT NULL FK into
+    // `sidebar_groups`. The old resync deleted only items whose own
+    // `source` was 'code' before deleting code groups - a leftover item
+    // tagged some other way (historical data, a bug elsewhere) but still
+    // pointing at a code group made the group DELETE fail with
+    // "FOREIGN KEY constraint failed" instead of being cleaned up.
+    const db = new DatabaseSync(":memory:");
+    createSchema(db);
+    syncCodeDefinedSidebar(db);
+
+    const os = db.prepare("SELECT id FROM sidebar_groups WHERE source = 'code'").get() as { id: string };
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO sidebar_items
+         (id, group_id, parent_item_id, title, url, icon, badge, disabled, new_tab, sort_order, page_id, source, updated_at)
+       VALUES (?, ?, NULL, ?, ?, NULL, NULL, 0, 0, 999, NULL, 'dynamic', ?)`,
+    ).run("stray-item", os.id, "Stray", "/os/stray", now);
+
+    expect(() => syncCodeDefinedSidebar(db)).not.toThrow();
+    expect(db.prepare("SELECT id FROM sidebar_items WHERE id = ?").get("stray-item")).toBeUndefined();
   });
 
   describe("ensureDynamicPageEntry", () => {
