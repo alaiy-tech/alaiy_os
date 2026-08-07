@@ -16,6 +16,15 @@ export type FrappeListFilterOperator = Extract<
   "=" | "!=" | "like" | "not like" | ">" | "<" | ">=" | "<=" | "in" | "not in"
 >;
 
+/** `queryFilters`' own operator vocabulary - `FrappeListFilterOperator` minus
+ * `in`/`not in`: a request-driven filter value comes from one URL param
+ * (`` `${name}_filter_<field>` ``, see `runtime/data/resolver.ts`), and no
+ * UI here produces a comma-separated/array value for it - only a scalar. */
+export type FrappeListQueryFilterOperator = Extract<
+  FrappeListFilterOperator,
+  "=" | "!=" | "like" | "not like" | ">" | "<" | ">=" | "<="
+>;
+
 /** Mirrors `FilterRow`'s `{ field, operator, value }` shape (`types/list.ts`),
  * but widens `value` beyond a plain string - this feeds a real Frappe query,
  * not an end-user text input, so `in`/`not in` need an array. No `boolean`
@@ -62,6 +71,25 @@ export type FrappeListSourceConfig = {
   /** `"fieldname asc|desc"`, comma-separated for multiple fields. */
   orderBy?: string;
   pagination: FrappeListPagination;
+  /** Fields a *named* `definition.data` entry (`types/runtime/page.ts`)
+   * allows filtering by via a URL param - `` `${name}_filter_<field>` ``,
+   * one per declared entry (see `runtime/data/resolver.ts`'s
+   * `readNamedFilters`). A capability declaration only: the actual value
+   * always comes from the request, never from this config - an anonymous
+   * inline binding (no page-level name) can declare this, but it has no
+   * effect (`resolver.ts` warns in dev when that happens). A field listed
+   * here must not also appear in the static `filters` array above - both
+   * would AND together on the same field, silently producing an
+   * always-empty result if they disagree (enforced by
+   * `config/frappe-list-schema.ts`). */
+  queryFilters?: { field: string; operator: FrappeListQueryFilterOperator }[];
+  /** Fields a *named* entry allows searching across via
+   * `` `${name}_search` `` - mapped to Frappe's `or_filters` as `like`
+   * matches, each field's value wildcarded automatically (the term is live
+   * end-user text, not developer-authored config - see
+   * `runtime/data/resolver.ts`'s `readNamedSearch`/`resolveNamedData`).
+   * Same anonymous-binding caveat as `queryFilters` above. */
+  search?: { fields: string[] };
 };
 
 /** The normalized result every `frappe-list` source resolves to. New for
@@ -77,4 +105,10 @@ export type FrappeListResult<TRow = Record<string, unknown>> = {
      * row - Frappe's list endpoint returns no total count by default. */
     hasMore: boolean;
   };
+  /** The *effective* `orderBy` this resolution actually used - echoes the
+   * config's own `orderBy` after `resolver.ts`'s request-driven substitution
+   * (`readNamedSort`), the same way `pagination.page` already echoes its own
+   * effective value back. Lets a data-bound `OsDataTable`'s `sort` prop show
+   * the correct initial sort-arrow state without re-deriving anything. */
+  orderBy?: string;
 };
