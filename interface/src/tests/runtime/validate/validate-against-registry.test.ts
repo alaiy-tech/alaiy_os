@@ -19,6 +19,17 @@ function page(children: PageConfigFile["definition"]["children"]): PageConfigFil
   };
 }
 
+function pageWithData(
+  data: PageConfigFile["definition"]["data"],
+  children: PageConfigFile["definition"]["children"],
+): PageConfigFile {
+  return {
+    id: "page",
+    route: "/os/page",
+    definition: { id: "page-root", kind: "page", data, children },
+  };
+}
+
 describe("validateAgainstRegistry", () => {
   it("accepts a well-formed page against the base registry", () => {
     const config = page([
@@ -197,6 +208,48 @@ describe("validateAgainstRegistry", () => {
       isDataSourceRegistered,
     });
     expect(errors).toEqual([expect.stringContaining('unregistered data source "does-not-exist"')]);
+  });
+
+  it("flags a { ref } binding naming a page data entry that doesn't exist", () => {
+    const config = pageWithData(undefined, [
+      { id: "kpi", kind: "component", type: "os-kpi", props: { title: "x" }, data: { value: { ref: "customers" } } },
+    ]);
+
+    const errors = validateAgainstRegistry(config, {
+      componentRegistry: baseComponentRegistry,
+      isDataSourceRegistered,
+    });
+    expect(errors).toEqual([expect.stringContaining('undefined page data entry "customers"')]);
+  });
+
+  it("does not flag a { ref } binding naming a real page data entry", () => {
+    const config = pageWithData({ customers: { type: "frappe-count", doctype: "Customer" } }, [
+      { id: "kpi", kind: "component", type: "os-kpi", props: { title: "x" }, data: { value: { ref: "customers" } } },
+    ]);
+
+    const errors = validateAgainstRegistry(config, {
+      componentRegistry: baseComponentRegistry,
+      isDataSourceRegistered,
+    });
+    expect(errors).toEqual([]);
+  });
+
+  it("never flags an inline declarative source as unregistered, regardless of isDataSourceRegistered's answer", () => {
+    const config = page([
+      {
+        id: "kpi",
+        kind: "component",
+        type: "os-kpi",
+        props: { title: "x" },
+        data: { value: { source: { type: "frappe-count", doctype: "Customer" } } },
+      },
+    ]);
+
+    const errors = validateAgainstRegistry(config, {
+      componentRegistry: baseComponentRegistry,
+      isDataSourceRegistered: () => false,
+    });
+    expect(errors).toEqual([]);
   });
 
   it("flags an out-of-range layout.span value", () => {
