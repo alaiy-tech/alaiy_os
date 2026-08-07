@@ -4,7 +4,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
 
-import { GenericCell } from "@/components/list/generic-cell";
+import { GenericCell } from "@/components/generic-cell";
 import type { DocFieldMeta } from "@/components/list/types";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -19,12 +19,22 @@ import {
   STATUS_BADGE_CLASS,
 } from "./product-types";
 
-function ItemNameCell({ row, showItemCode }: { row: ProductRow; showItemCode: boolean }) {
+function ItemNameCell({
+  row,
+  showItemCode,
+}: {
+  row: ProductRow;
+  showItemCode: boolean;
+}) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
         {row.image ? (
-          <img src={String(row.image)} alt={row.item_name} className="size-full object-cover" />
+          <img
+            src={String(row.image)}
+            alt={row.item_name}
+            className="size-full object-cover"
+          />
         ) : (
           <span className="text-[10px] text-muted-foreground">No img</span>
         )}
@@ -34,7 +44,10 @@ function ItemNameCell({ row, showItemCode }: { row: ProductRow; showItemCode: bo
           {row.item_name}
         </span>
         {showItemCode && row.item_code && (
-          <span className="block truncate text-muted-foreground text-xs" title={row.item_code}>
+          <span
+            className="block truncate text-muted-foreground text-xs"
+            title={row.item_code}
+          >
             {row.item_code}
           </span>
         )}
@@ -57,7 +70,11 @@ export function buildProductColumns({
   const showItemCode = columnOrder.includes(ITEM_CODE_COLUMN_FIELDNAME);
 
   const dynamicColumns: ColumnDef<ProductRow>[] = columnOrder
-    .filter((fieldname) => fieldname !== IMAGE_COLUMN_FIELDNAME && fieldname !== ITEM_CODE_COLUMN_FIELDNAME)
+    .filter(
+      (fieldname) =>
+        fieldname !== IMAGE_COLUMN_FIELDNAME &&
+        fieldname !== ITEM_CODE_COLUMN_FIELDNAME,
+    )
     .map((fieldname) => {
       const field = fieldsByName.get(fieldname);
       const label = field?.label ?? formatFieldLabel(fieldname);
@@ -70,7 +87,13 @@ export function buildProductColumns({
           cell: ({ row }) => {
             const status = getProductStatus(row.original);
             return (
-              <Badge variant="outline" className={cn("border-0 font-medium", STATUS_BADGE_CLASS[status])}>
+              <Badge
+                variant="outline"
+                className={cn(
+                  "border-0 font-medium",
+                  STATUS_BADGE_CLASS[status],
+                )}
+              >
                 {status}
               </Badge>
             );
@@ -84,7 +107,9 @@ export function buildProductColumns({
           accessorKey: "item_name",
           header: label,
           size: 240,
-          cell: ({ row }) => <ItemNameCell row={row.original} showItemCode={showItemCode} />,
+          cell: ({ row }) => (
+            <ItemNameCell row={row.original} showItemCode={showItemCode} />
+          ),
         };
       }
 
@@ -93,7 +118,12 @@ export function buildProductColumns({
         accessorKey: fieldname,
         header: label,
         size: 160,
-        cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} />,
+        cell: ({ getValue }) => (
+          <GenericCell
+            value={getValue()}
+            fieldtype={field?.fieldtype ?? "Data"}
+          />
+        ),
       };
     });
 
@@ -103,7 +133,10 @@ export function buildProductColumns({
       header: ({ table }) => (
         <Checkbox
           aria-label="Select all products"
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          checked={
+            table.getIsAllPageRowsSelected() ||
+            (table.getIsSomePageRowsSelected() && "indeterminate")
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
       ),
@@ -127,11 +160,18 @@ export function buildProductColumns({
           <button
             type="button"
             onClick={() => onToggleExpand(row.original)}
-            aria-label={expandedIds.has(row.original.name) ? "Collapse variants" : "Expand variants"}
+            aria-label={
+              expandedIds.has(row.original.name)
+                ? "Collapse variants"
+                : "Expand variants"
+            }
             className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <ChevronRight
-              className={cn("size-4 transition-transform", expandedIds.has(row.original.name) && "rotate-90")}
+              className={cn(
+                "size-4 transition-transform",
+                expandedIds.has(row.original.name) && "rotate-90",
+              )}
             />
           </button>
         ) : null,

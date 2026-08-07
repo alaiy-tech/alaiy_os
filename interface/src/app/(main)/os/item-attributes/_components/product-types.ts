@@ -23,9 +23,12 @@ export function getProductStatus(row: ProductRow): ProductStatus {
 }
 
 export const STATUS_BADGE_CLASS: Record<ProductStatus, string> = {
-  Active: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Template: "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Variant: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+  Active:
+    "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+  Template:
+    "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  Variant:
+    "bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
   Disabled: "bg-muted text-muted-foreground",
 };
 
@@ -61,6 +64,11 @@ export const ITEM_CODE_COLUMN_FIELDNAME = "item_code";
 // fetch. They're still pickable from the Columns popover once the site's
 // meta actually reports them; users opt in explicitly rather than the app
 // assuming they exist.
-export const DEFAULT_COLUMN_ORDER = ["item_name", "item_code", "item_group", "status"];
+export const DEFAULT_COLUMN_ORDER = [
+  "item_name",
+  "item_code",
+  "item_group",
+  "status",
+];
 
 export const MIN_VISIBLE_COLUMNS = 4;

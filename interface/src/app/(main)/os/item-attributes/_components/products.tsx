@@ -23,10 +23,10 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 
-import type { ColumnField } from "@/components/list/column-settings-popover";
-import { ColumnSettingsPopover } from "@/components/list/column-settings-popover";
-import { FilterPopover } from "@/components/list/filter-popover";
-import { SelectionActionsMenu } from "@/components/list/selection-actions-menu";
+import type { ColumnField } from "@/components/popover/column-settings-popover";
+import { ColumnSettingsPopover } from "@/components/popover/column-settings-popover";
+import { FilterPopover } from "@/components/popover/filter-popover";
+import { SelectionActionsMenu } from "@/components/menu/selection-actions-menu";
 import {
   type ColumnPrefs,
   type FilterRow,
