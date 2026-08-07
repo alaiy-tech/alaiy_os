@@ -21,9 +21,11 @@ import type { NavContribution, SidebarNavGroupData, SidebarNavItemData } from "@
  * composer's unchanged contract; `iconName()` converts those to strings at
  * merge time.
  *
- * The "Settings" group that used to live here has moved out entirely - see
- * `components/layout/sidebar/settings-sidebar.tsx` for the *separate*
- * fixed Settings sidebar. What's left here is deliberately minimal - a
+ * The "Settings" entry point that used to live here has moved out entirely -
+ * it's now a standalone button in `AppSidebar`'s own footer, above `NavUser`
+ * (baseline UI chrome, not sidebar-store data - see that file), the same way
+ * `components/layout/sidebar/settings-sidebar.tsx` is a *separate*, also
+ * code-owned, fixed Settings sidebar. What's left here is deliberately minimal - a
  * baseline reset - since the previous Catalog/Sales/Procurement/Inventory
  * groups described pages that don't exist yet. Real pages get a sidebar
  * entry dynamically, via `runtime/store/create-page.ts`'s
@@ -38,13 +40,6 @@ const baseSidebarGroups: SidebarNavGroupData[] = [
     id: "os",
     label: "OS",
     items: [{ id: "ask-alaiy", title: "Ask Alaiy", url: "/os/ask-alaiy", icon: "sparkles" }],
-  },
-  {
-    id: "settings",
-    // No `label` - renders with no group heading (`nav-main.tsx`'s
-    // `{group.label && <SidebarGroupLabel>}`), so this reads as a single
-    // standalone button sitting right below the OS group.
-    items: [{ id: "settings-link", title: "Settings", url: "/settings", icon: "settings" }],
   },
 ];
 

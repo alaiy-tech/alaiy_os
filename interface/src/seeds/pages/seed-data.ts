@@ -443,4 +443,138 @@ export const HEADLESS_CUSTOMERS_PAGE: PageConfigFile = {
   },
 };
 
-export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE];
+/**
+ * Proves the generic, declarative data path added on top of the runtime:
+ * `rows`/`pagination` bind to a *named* `frappe-list` entry declared once
+ * in `definition.data` (`{ ref: "customers", path: "data"|"pagination" }`)
+ * - no `src/lib/frappe/customer-list.server.ts`-style fetcher, no
+ * `sources/customers.ts`-style registration file, just this page
+ * definition. Two independently-named, independently-paginated tables
+ * (`customers`, `orders`) prove the collision this phase exists to rule
+ * out: `?customers_page=2` and `?orders_page=3` can both be set at once
+ * without either table affecting the other - see
+ * `docs/UI_RUNTIME.md`'s "Paginated Data Sources".
+ *
+ * Both tables deliberately request only genuine native DocType fields via
+ * the standard REST list endpoint - unlike `HEADLESS_CUSTOMERS_PAGE` above,
+ * whose `customers` source also carries `orders`/`total_spend`, computed by
+ * a custom whitelisted API method the generic source has no way to reach.
+ * That's the real boundary between "generic Frappe access" and
+ * "domain-specific computation," not a coincidence of column choice.
+ *
+ * No filter is wired up here even though `os-filter-bar` exists: a
+ * `frappe-list` config's `filters` are still static JSON, not read from
+ * `searchParams` the way `pagination.page` now is - wiring a live filter
+ * into this page would look interactive while silently doing nothing.
+ * `resetPageParams` (the filter-change-resets-page mechanism) is proven by
+ * `OsFilterBar`'s own unit tests instead.
+ */
+export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
+  id: "headless-data-test",
+  route: "/os/headless-data-test",
+  metadata: {
+    title: "Data Runtime Test",
+    description:
+      "Proves the generic frappe-list/frappe-count data sources - two independently-paginated tables plus a count - against real Customer/Sales Order data, no page-specific fetcher.",
+  },
+  definition: {
+    id: "headless-data-test-page",
+    kind: "page",
+    data: {
+      customers: {
+        type: "frappe-list",
+        doctype: "Customer",
+        fields: ["name", "customer_name", "customer_group", "territory"],
+        filters: [{ field: "disabled", operator: "=", value: 0 }],
+        orderBy: "modified desc",
+        pagination: { pageSize: 10 },
+      },
+      orders: {
+        type: "frappe-list",
+        doctype: "Sales Order",
+        fields: ["name", "customer", "transaction_date", "grand_total", "status"],
+        orderBy: "transaction_date desc",
+        pagination: { pageSize: 10 },
+      },
+    },
+    children: [
+      {
+        id: "root-stack",
+        kind: "layout",
+        type: "stack",
+        children: [
+          {
+            id: "page-header",
+            kind: "component",
+            type: "os-page-header",
+            props: {
+              title: "Data Runtime Test",
+              subtitle:
+                "Two independently-paginated generic list tables plus a count, all resolved through named frappe-list/frappe-count sources.",
+            },
+          },
+          {
+            id: "kpi-active-customers",
+            kind: "component",
+            type: "os-kpi",
+            props: { title: "Active Customers", icon: "UsersRound", format: "number" },
+            data: {
+              value: {
+                source: {
+                  type: "frappe-count",
+                  doctype: "Customer",
+                  filters: [{ field: "disabled", operator: "=", value: 0 }],
+                },
+              },
+            },
+          },
+          {
+            id: "customers-table",
+            kind: "component",
+            type: "os-data-table",
+            props: {
+              title: "Customers",
+              rowId: "name",
+              pageParam: "customers_page",
+              emptyMessage: "No customers found.",
+              columns: [
+                { field: "name", label: "ID", sortable: true },
+                { field: "customer_name", label: "Customer", sortable: true },
+                { field: "customer_group", label: "Group" },
+                { field: "territory", label: "Territory" },
+              ],
+            },
+            data: {
+              rows: { ref: "customers", path: "data" },
+              pagination: { ref: "customers", path: "pagination" },
+            },
+          },
+          {
+            id: "orders-table",
+            kind: "component",
+            type: "os-data-table",
+            props: {
+              title: "Orders",
+              rowId: "name",
+              pageParam: "orders_page",
+              emptyMessage: "No orders found.",
+              columns: [
+                { field: "name", label: "Order", sortable: true },
+                { field: "customer", label: "Customer" },
+                { field: "transaction_date", label: "Date", format: "date" },
+                { field: "grand_total", label: "Total", format: "currency", align: "right" },
+                { field: "status", label: "Status" },
+              ],
+            },
+            data: {
+              rows: { ref: "orders", path: "data" },
+              pagination: { ref: "orders", path: "pagination" },
+            },
+          },
+        ],
+      },
+    ],
+  },
+};
+
+export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE];
