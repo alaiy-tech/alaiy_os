@@ -6,6 +6,7 @@
 import { describe, expect, it } from "vitest";
 
 import { createSchema, SQLiteSidebarStore, syncCodeDefinedSidebar } from "@/runtime/store/sqlite-sidebar-store";
+import { buildCodeDefinedSidebar } from "@/seeds/sidebar/seed-data";
 
 import { DatabaseSync } from "node:sqlite";
 
@@ -41,8 +42,8 @@ describe("SQLiteSidebarStore", () => {
     const groupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups").get() as { count: number };
     const itemCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items").get() as { count: number };
 
-    // Sanity: exactly the 2 baseline groups, no duplicates.
-    expect(groupCount.count).toBe(2);
+    // Sanity: exactly the baseline groups, no duplicates.
+    expect(groupCount.count).toBe(buildCodeDefinedSidebar().length);
     const askAlaiyCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items WHERE id = ?").get("ask-alaiy") as {
       count: number;
     };
@@ -79,7 +80,7 @@ describe("SQLiteSidebarStore", () => {
     const codeGroupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups WHERE source = 'code'").get() as {
       count: number;
     };
-    expect(codeGroupCount.count).toBe(2);
+    expect(codeGroupCount.count).toBe(buildCodeDefinedSidebar().length);
   });
 
   it("a stray item still pointing at a code group doesn't crash the resync with a FOREIGN KEY error", () => {
