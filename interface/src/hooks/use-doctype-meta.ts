@@ -29,7 +29,9 @@ export function useDoctypeMeta(doctype: string) {
     let cancelled = false;
     setIsLoading(true);
 
-    fetch(`/api/method/alaiy_os.api.list_view.get_doctype_fields?doctype=${encodeURIComponent(doctype)}`)
+    fetch(
+      `/api/method/alaiy_os.api.list_view.get_doctype_fields?doctype=${encodeURIComponent(doctype)}`,
+    )
       .then((res) => (res.ok ? res.json() : null))
       .then((data: { message?: RawDoctypeFields } | null) => {
         if (cancelled || !data?.message) return;

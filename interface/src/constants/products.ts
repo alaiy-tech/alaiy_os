@@ -1,10 +1,35 @@
+import type { DocFieldMeta } from "@/types/list";
 import type { ProductStatus } from "@/types/products";
 
 export const ITEM_DOCTYPE = "Item";
 
+// status is derived (see getProductStatus), not a real DocField from
+// alaiy_os.api.list_view.get_doctype_fields, but still needs to be pickable
+// as a column.
+export const SYNTHETIC_COLUMN_FIELDS: DocFieldMeta[] = [
+  {
+    fieldname: "status",
+    label: "Status",
+    fieldtype: "Data",
+    read_only: true,
+    unique: false,
+    permlevel: 0,
+    in_list_view: true,
+  },
+];
+
 // Always fetched regardless of columnOrder - needed for row identity,
 // the merged image+name cell, status derivation, and the variant accordion.
-export const BASE_FIELDS = ["name", "item_code", "item_name", "image", "item_group", "disabled", "has_variants", "variant_of"];
+export const BASE_FIELDS = [
+  "name",
+  "item_code",
+  "item_name",
+  "image",
+  "item_group",
+  "disabled",
+  "has_variants",
+  "variant_of",
+];
 
 // The ID (docname) column is always shown first and is neither reorderable
 // nor removable - buildProductColumns renders it directly rather than
