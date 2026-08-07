@@ -4,7 +4,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
 
-import { GenericCell } from "@/components/list/generic-cell";
+import { GenericCell } from "@/components/generic-cell";
 import type { DocFieldMeta } from "@/components/list/types";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
