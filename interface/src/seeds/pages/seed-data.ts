@@ -536,6 +536,7 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
               title: "Customers",
               rowId: "name",
               pageParam: "customers_page",
+              sortParam: "customers_sort",
               emptyMessage: "No customers found.",
               columns: [
                 { field: "name", label: "ID", sortable: true },
@@ -547,6 +548,7 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
             data: {
               rows: { ref: "customers", path: "data" },
               pagination: { ref: "customers", path: "pagination" },
+              sort: { ref: "customers", path: "orderBy" },
             },
           },
           {
@@ -557,6 +559,7 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
               title: "Orders",
               rowId: "name",
               pageParam: "orders_page",
+              sortParam: "orders_sort",
               emptyMessage: "No orders found.",
               columns: [
                 { field: "name", label: "Order", sortable: true },
@@ -569,6 +572,7 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
             data: {
               rows: { ref: "orders", path: "data" },
               pagination: { ref: "orders", path: "pagination" },
+              sort: { ref: "orders", path: "orderBy" },
             },
           },
         ],
@@ -577,4 +581,127 @@ export const HEADLESS_DATA_TEST_PAGE: PageConfigFile = {
   },
 };
 
-export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_DATA_TEST_PAGE];
+/**
+ * Phase 8's real, production-style second `frappe-list` page: search,
+ * filter, sort, and pagination all request-driven, all through one named
+ * `frappe-list` entry - no bespoke fetcher, source file, or
+ * `registerDataSource()` call anywhere, the property this whole generic
+ * data path exists to prove.
+ *
+ * `Supplier` over `Product`: no live route uses either doctype today, but
+ * `obsolete/pages/os/products/` is a genuinely heavy implementation (variant
+ * grid, image carousel, child rows, a detail route) - real scope-creep risk
+ * this phase doesn't need. The only obsolete `Supplier` code is a
+ * single-purpose list-search fetcher (`obsolete/data/lib/frappe/supplier-list.ts`),
+ * with no detail page - and it's the direct precedent for the `search`
+ * field choice below (`supplier_name`, `name`).
+ *
+ * No "Sort by" filter control: sorting is a real `os-data-table` column-
+ * header interaction now (`sortParam`/`sort`, mirroring `pageParam`/
+ * `pagination`), not a second thing for `os-filter-bar` to own.
+ */
+export const HEADLESS_SUPPLIERS_PAGE: PageConfigFile = {
+  id: "suppliers",
+  route: "/os/suppliers",
+  metadata: {
+    title: "Suppliers",
+    description:
+      "A production-style frappe-list page: request-driven search, filter, sort, and pagination, no bespoke fetcher.",
+  },
+  definition: {
+    id: "headless-suppliers-page",
+    kind: "page",
+    data: {
+      suppliers: {
+        type: "frappe-list",
+        doctype: "Supplier",
+        fields: ["name", "supplier_name", "supplier_group", "country"],
+        search: { fields: ["supplier_name", "name"] },
+        queryFilters: [{ field: "country", operator: "like" }],
+        pagination: { pageSize: 10 },
+      },
+    },
+    children: [
+      {
+        id: "root-stack",
+        kind: "layout",
+        type: "stack",
+        children: [
+          {
+            id: "page-header",
+            kind: "component",
+            type: "os-page-header",
+            props: {
+              title: "Suppliers",
+              subtitle:
+                "Search, filter, sort, and page through suppliers - all resolved through a named frappe-list source.",
+            },
+            children: [
+              {
+                id: "header-actions",
+                kind: "layout",
+                type: "inline",
+                children: [
+                  {
+                    id: "filter-bar",
+                    kind: "component",
+                    type: "os-filter-bar",
+                    props: {
+                      filters: [
+                        {
+                          id: "search",
+                          type: "text",
+                          label: "Search",
+                          searchParam: "suppliers_search",
+                          placeholder: "Search suppliers...",
+                        },
+                        {
+                          id: "country",
+                          type: "text",
+                          label: "Country",
+                          searchParam: "suppliers_filter_country",
+                          placeholder: "Country",
+                        },
+                      ],
+                      resetPageParams: ["suppliers_page"],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "suppliers-table",
+            kind: "component",
+            type: "os-data-table",
+            props: {
+              title: "Suppliers",
+              rowId: "name",
+              pageParam: "suppliers_page",
+              sortParam: "suppliers_sort",
+              emptyMessage: "No suppliers found.",
+              columns: [
+                { field: "name", label: "ID", sortable: true },
+                { field: "supplier_name", label: "Supplier", sortable: true },
+                { field: "supplier_group", label: "Group" },
+                { field: "country", label: "Country" },
+              ],
+            },
+            data: {
+              rows: { ref: "suppliers", path: "data" },
+              pagination: { ref: "suppliers", path: "pagination" },
+              sort: { ref: "suppliers", path: "orderBy" },
+            },
+          },
+        ],
+      },
+    ],
+  },
+};
+
+export const SEED_PAGES: PageConfigFile[] = [
+  HEADLESS_DASHBOARD_PAGE,
+  HEADLESS_CUSTOMERS_PAGE,
+  HEADLESS_DATA_TEST_PAGE,
+  HEADLESS_SUPPLIERS_PAGE,
+];
