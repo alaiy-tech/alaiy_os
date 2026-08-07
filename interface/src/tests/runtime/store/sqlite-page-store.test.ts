@@ -8,9 +8,13 @@
 import { describe, expect, it } from "vitest";
 
 import { InvalidPageConfigError } from "@/runtime/store/invalid-page-config-error";
-import { createSchema, SQLiteUIPageStore, upsertPage } from "@/runtime/store/sqlite-page-store";
-import { SEED_PAGES } from "@/seeds/pages/seed-data";
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import {
+  createSchema,
+  SQLiteUIPageStore,
+  upsertPage,
+} from "@/runtime/store/sqlite-page-store";
+import { SEED_PAGES } from "@/seeds/seed";
+import type { PageConfigFile } from "@/types/runtime/page";
 
 import { DatabaseSync } from "node:sqlite";
 
@@ -28,7 +32,14 @@ const VALID_PAGE: PageConfigFile = {
   definition: {
     id: "test-def",
     kind: "page",
-    children: [{ id: "header", kind: "component", type: "os-page-header", props: { title: "Test" } }],
+    children: [
+      {
+        id: "header",
+        kind: "component",
+        type: "os-page-header",
+        props: { title: "Test" },
+      },
+    ],
   },
 };
 
@@ -49,7 +60,8 @@ describe("SQLiteUIPageStore", () => {
     expect(() => memoryStore()).not.toThrow();
     expect(() => memoryStore()).not.toThrow();
 
-    const { getSidebarStore } = await import("@/runtime/store/sqlite-sidebar-store");
+    const { getSidebarStore } =
+      await import("@/runtime/store/sqlite-sidebar-store");
     expect(getSidebarStore(":memory:")).not.toBe(getSidebarStore(":memory:"));
   });
 
@@ -60,7 +72,9 @@ describe("SQLiteUIPageStore", () => {
     const { ensureSeeded } = await import("@/runtime/store/sqlite-page-store");
     ensureSeeded(db, ":memory:");
     ensureSeeded(db, ":memory:");
-    const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
+    const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as {
+      count: number;
+    };
     expect(row.count).toBe(SEED_PAGES.length);
   });
 
@@ -95,7 +109,9 @@ describe("SQLiteUIPageStore", () => {
     // biome-ignore lint/suspicious/noExplicitAny: test-only access to the store's own db.
     const db = (store as any).db as DatabaseSync;
     upsertPage(db, VALID_PAGE);
-    db.prepare("UPDATE ui_pages SET is_enabled = 0 WHERE id = ?").run("test-page");
+    db.prepare("UPDATE ui_pages SET is_enabled = 0 WHERE id = ?").run(
+      "test-page",
+    );
 
     expect(await store.getPageById("test-page")).toBeNull();
   });
@@ -108,9 +124,17 @@ describe("SQLiteUIPageStore", () => {
     db.prepare(
       `INSERT INTO ui_pages (id, route, title, definition_json, metadata_json, is_enabled, version, created_at, updated_at)
        VALUES (?, ?, NULL, ?, NULL, 1, 1, ?, ?)`,
-    ).run("broken", "/os/broken", JSON.stringify({ id: "broken-def", kind: "not-a-page" }), now, now);
+    ).run(
+      "broken",
+      "/os/broken",
+      JSON.stringify({ id: "broken-def", kind: "not-a-page" }),
+      now,
+      now,
+    );
 
-    await expect(store.getPageById("broken")).rejects.toBeInstanceOf(InvalidPageConfigError);
+    await expect(store.getPageById("broken")).rejects.toBeInstanceOf(
+      InvalidPageConfigError,
+    );
   });
 
   it("upsertPage bumps version on update, and is otherwise idempotent", async () => {
@@ -120,10 +144,14 @@ describe("SQLiteUIPageStore", () => {
     upsertPage(db, VALID_PAGE);
     upsertPage(db, VALID_PAGE);
 
-    const row = db.prepare("SELECT version FROM ui_pages WHERE id = ?").get("test-page") as { version: number };
+    const row = db
+      .prepare("SELECT version FROM ui_pages WHERE id = ?")
+      .get("test-page") as { version: number };
     expect(row.version).toBe(2);
 
-    const count = db.prepare("SELECT COUNT(*) as count FROM ui_pages WHERE id = ?").get("test-page") as {
+    const count = db
+      .prepare("SELECT COUNT(*) as count FROM ui_pages WHERE id = ?")
+      .get("test-page") as {
       count: number;
     };
     expect(count.count).toBe(1);
