@@ -87,6 +87,7 @@ const SEED_PAGE_ICONS: Record<string, string> = {
   dashboard: "layout-dashboard",
   customers: "users",
   "headless-data-test": "database",
+  suppliers: "truck",
 };
 
 /** Seeds the two Headless OS pages if the table is empty - a fresh clone
