@@ -81,6 +81,25 @@ describe("buildFrappeListRequestPath", () => {
     const query = new URLSearchParams(path.split("?")[1]);
     expect(query.get("limit_page_length")).toBe("11");
   });
+
+  it("omits or_filters when not given", () => {
+    const path = buildFrappeListRequestPath(config());
+    const query = new URLSearchParams(path.split("?")[1]);
+    expect(query.has("or_filters")).toBe(false);
+  });
+
+  it("serializes a given orFilters as [field, operator, value] triples, alongside filters", () => {
+    const path = buildFrappeListRequestPath(config({ filters: [{ field: "disabled", operator: "=", value: 0 }] }), [
+      { field: "customer_name", operator: "like", value: "%acme%" },
+      { field: "name", operator: "like", value: "%acme%" },
+    ]);
+    const query = new URLSearchParams(path.split("?")[1]);
+    expect(JSON.parse(query.get("filters") ?? "[]")).toEqual([["disabled", "=", 0]]);
+    expect(JSON.parse(query.get("or_filters") ?? "[]")).toEqual([
+      ["customer_name", "like", "%acme%"],
+      ["name", "like", "%acme%"],
+    ]);
+  });
 });
 
 describe("createFrappeListSource", () => {
@@ -152,6 +171,26 @@ describe("createFrappeListSource", () => {
 
     const result = await source.resolve({ searchParams: {} });
     expect(result).toEqual({ data: [], pagination: { page: 1, pageSize: 2, hasMore: false } });
+  });
+
+  it("echoes the config's orderBy back on the result, in both the success and not-ok fallback branches", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [{ name: "CUST-1" }] }));
+    const ok = await createFrappeListSource(config({ orderBy: "modified desc" })).resolve({ searchParams: {} });
+    expect(ok.orderBy).toBe("modified desc");
+
+    frappeFetch.mockResolvedValue(jsonResponse({}, false));
+    const fallback = await createFrappeListSource(config({ orderBy: "modified desc" })).resolve({ searchParams: {} });
+    expect(fallback.orderBy).toBe("modified desc");
+  });
+
+  it("passes options.orFilters through to the request as or_filters", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    const source = createFrappeListSource(config(), {
+      orFilters: [{ field: "customer_name", operator: "like", value: "%acme%" }],
+    });
+
+    await source.resolve({ searchParams: {} });
+    expect(String(frappeFetch.mock.calls[0][0])).toContain("or_filters");
   });
 
   it("registers through the existing Data Source Registry and resolves by id", () => {

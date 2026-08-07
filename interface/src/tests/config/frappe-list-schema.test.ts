@@ -127,4 +127,56 @@ describe("frappe-list-schema", () => {
     );
     expect(result.success).toBe(false);
   });
+
+  describe("queryFilters", () => {
+    it("accepts a valid queryFilters entry", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(
+        validConfig({ queryFilters: [{ field: "country", operator: "like" }] }),
+      );
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an in/not-in operator (no UI produces an array value for this path)", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(
+        validConfig({ queryFilters: [{ field: "status", operator: "in" }] }),
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects an unrecognised key nested inside a queryFilters entry (.strict())", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(
+        validConfig({ queryFilters: [{ field: "country", operator: "=", extra: true }] }),
+      );
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects a field appearing in both `filters` and `queryFilters` - would silently AND to empty results", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(
+        validConfig({
+          filters: [{ field: "country", operator: "=", value: "India" }],
+          queryFilters: [{ field: "country", operator: "like" }],
+        }),
+      );
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("search", () => {
+    it("accepts a valid search declaration", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(validConfig({ search: { fields: ["customer_name"] } }));
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects an empty fields array", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(validConfig({ search: { fields: [] } }));
+      expect(result.success).toBe(false);
+    });
+
+    it("rejects an unrecognised key (.strict())", () => {
+      const result = FRAPPE_LIST_SOURCE_CONFIG_SCHEMA.safeParse(
+        validConfig({ search: { fields: ["customer_name"], extra: true } }),
+      );
+      expect(result.success).toBe(false);
+    });
+  });
 });

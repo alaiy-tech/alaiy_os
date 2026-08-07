@@ -23,6 +23,22 @@ const columns: ColumnDef<Row, unknown>[] = [
   { accessorKey: "name", header: "Name" },
 ];
 
+// A minimal stand-in for column-spec.tsx's real `SortableHeader` - just
+// enough of a clickable header to drive `column.toggleSorting()`, without
+// pulling the full declarative column-spec machinery into this test.
+const sortableColumns: ColumnDef<Row, unknown>[] = [
+  { accessorKey: "id", header: "ID" },
+  {
+    accessorKey: "name",
+    enableSorting: true,
+    header: ({ column }) => (
+      <button type="button" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
+        Name
+      </button>
+    ),
+  },
+];
+
 describe("OsDataTable - pagination contract", () => {
   beforeEach(() => {
     replace.mockReset();
@@ -100,5 +116,78 @@ describe("OsDataTable - pagination contract", () => {
     // Client-side slicing: only the first page's worth of rows render.
     expect(screen.getAllByText(/^Row \d+$/)).toHaveLength(10);
     expect(screen.getByText(/Page 1 of 2/)).toBeInTheDocument();
+  });
+});
+
+describe("OsDataTable - sort contract", () => {
+  beforeEach(() => {
+    replace.mockReset();
+    useSearchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  it("with sort+sortParam: the `sort` prop (not a fresh local state) drives the initial direction", () => {
+    // Discriminating check: `sortableColumns`' header always toggles to
+    // "desc" from an already-"asc" state, but to "asc" from unsorted -
+    // starting from `sort="name asc"` and getting "desc" back on click
+    // proves the initial state really came from the prop, not a default
+    // empty `sorting` array (which would have produced "asc" instead).
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={sortableColumns}
+        sort="name asc"
+        sortParam="suppliers_sort"
+        pagination={{ page: 1, pageSize: 10, hasMore: false }}
+        pageParam="suppliers_page"
+      />,
+    );
+
+    screen.getByRole("button", { name: "Name" }).click();
+
+    const [url] = replace.mock.calls.at(-1) ?? [];
+    expect(url).toContain("suppliers_sort=name+desc");
+  });
+
+  it("with sort+sortParam: clicking a sortable header writes 'field dir' to sortParam and clears pageParam", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={sortableColumns}
+        sort="name asc"
+        sortParam="suppliers_sort"
+        pagination={{ page: 3, pageSize: 10, hasMore: true }}
+        pageParam="suppliers_page"
+      />,
+    );
+
+    screen.getByRole("button", { name: "Name" }).click();
+
+    const [url] = replace.mock.calls.at(-1) ?? [];
+    expect(url).toContain("suppliers_sort=name");
+    expect(url).not.toContain("suppliers_page");
+  });
+
+  it("with sort but no sortParam: clicking a sortable header does nothing (no navigation)", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(<OsDataTable data={rows} columns={sortableColumns} sort="name asc" />);
+
+    screen.getByRole("button", { name: "Name" }).click();
+
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("with neither prop set: today's local-sort behavior is unchanged (regression)", () => {
+    const rows: Row[] = [
+      { id: "R0", name: "Charlie" },
+      { id: "R1", name: "Alice" },
+    ];
+    render(<OsDataTable data={rows} columns={sortableColumns} />);
+
+    screen.getByRole("button", { name: "Name" }).click();
+
+    // Purely local TanStack state - no navigation at all.
+    expect(replace).not.toHaveBeenCalled();
   });
 });
