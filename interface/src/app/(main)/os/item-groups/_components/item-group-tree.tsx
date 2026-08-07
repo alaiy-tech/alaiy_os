@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { TreeInstance } from "@headless-tree/core";
 import { Plus } from "lucide-react";
 
-import { Tree, TreeItem, TreeItemLabel } from "@/components/reui/tree";
+import { Tree, TreeItem, TreeItemLabel } from "@/components/ui/tree";
 import { Button } from "@/components/ui/button";
 import type { ItemGroupNode } from "@/lib/frappe/item-group";
 
