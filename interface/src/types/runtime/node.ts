@@ -1,4 +1,4 @@
-import type { DataSourceRef } from "./data-source-ref";
+import type { DataSourceRef } from "./data-source";
 import type { ResponsiveValue } from "./layout";
 
 /** The registered vocabulary of layout primitives. Kept as a closed union
@@ -21,6 +21,7 @@ export type ComponentType =
   | "os-page-header"
   | "os-card"
   | "os-kpi"
+  | "os-dynamic-badge"
   | "os-data-table"
   | "os-chart"
   | "os-filter-bar"
