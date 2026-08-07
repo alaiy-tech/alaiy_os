@@ -6,7 +6,7 @@
 import { PERIODS } from "@/constants/list";
 import type { Period } from "@/types/list";
 
-export { PERIODS, PERIOD_LABEL } from "@/constants/list";
+export { PERIOD_LABEL, PERIODS } from "@/constants/list";
 export type { Period } from "@/types/list";
 
 export function isPeriod(value: unknown): value is Period {

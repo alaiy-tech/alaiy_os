@@ -5,8 +5,8 @@
 import { DATE_OPERATORS, NUMERIC_OPERATORS, SELECT_OPERATORS, TEXT_OPERATORS } from "@/constants/list";
 import type { FilterOperator, FilterRow } from "@/types/list";
 
-export type { ColumnPrefs, DocFieldMeta, FilterOperator, FilterRow } from "@/types/list";
 export { OPERATOR_LABELS } from "@/constants/list";
+export type { ColumnPrefs, DocFieldMeta, FilterOperator, FilterRow } from "@/types/list";
 
 export function operatorsForFieldtype(fieldtype: string | undefined): FilterOperator[] {
   switch (fieldtype) {
