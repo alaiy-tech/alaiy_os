@@ -3,9 +3,9 @@ import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
 import { PERIOD_LABEL, type Period } from "@/components/list/period";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import type { PeriodComparison } from "@/lib/frappe/item-stats";
-import type { SalesOrdersOverview } from "@/lib/frappe/sales-order-stats";
 import { cn } from "@/lib/utils";
+import type { PeriodComparison } from "@/types/list";
+import type { SalesOrdersOverview } from "@/types/sales-orders";
 
 function pctChange(current: number, previous: number): number {
   if (previous === 0) return current === 0 ? 0 : 100;

@@ -13,75 +13,47 @@ import {
 import { Cog, Download, Plus, Search, X } from "lucide-react";
 import { toast } from "sonner";
 
-import type { ColumnField } from "@/components/list/column-settings-popover";
-import { ColumnSettingsPopover } from "@/components/list/column-settings-popover";
-import { FilterPopover } from "@/components/list/filter-popover";
-import { SelectionActionsMenu } from "@/components/list/selection-actions-menu";
-import {
-  type ColumnPrefs,
-  type FilterRow,
-  toFrappeFilters,
-} from "@/components/list/types";
+import { type ColumnPrefs, type FilterRow, toFrappeFilters } from "@/components/list/types";
+import { SelectionActionsMenu } from "@/components/menu/selection-actions-menu";
+import type { ColumnField } from "@/components/popover/column-settings-popover";
+import { ColumnSettingsPopover } from "@/components/popover/column-settings-popover";
+import { FilterPopover } from "@/components/popover/filter-popover";
 import { Button } from "@/components/ui/button";
 import { ButtonGroup } from "@/components/ui/button-group";
-import {
-  Card,
-  CardAction,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
-import {
-  InputGroup,
-  InputGroupAddon,
-  InputGroupInput,
-} from "@/components/ui/input-group";
+import { Card, CardAction, CardContent, CardHeader } from "@/components/ui/card";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { Kbd } from "@/components/ui/kbd";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  ALL_STATUSES,
+  BASE_FIELDS,
+  COMPULSORY_COLUMNS,
+  DEFAULT_COLUMN_ORDER,
+  MIN_VISIBLE_COLUMNS,
+  SALES_ORDER_DOCTYPE,
+} from "@/constants/sales-orders";
 import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
 import { useListPreference } from "@/hooks/use-list-preference";
-import {
-  fetchSalesOrderCount,
-  fetchSalesOrders,
-} from "@/lib/frappe/sales-order-list";
+import { fetchSalesOrderCount, fetchSalesOrders } from "@/lib/frappe/sales-order-list";
 import { getOrderStatuses } from "@/lib/frappe/sales-order-stats";
+import type { SalesOrderRow } from "@/types/sales-orders";
 
 import { buildSalesOrderColumns } from "./sales-order-columns";
 import { SalesOrderTable } from "./sales-order-table";
-import {
-  DEFAULT_COLUMN_ORDER,
-  MIN_VISIBLE_COLUMNS,
-  type SalesOrderRow,
-} from "./sales-order-types";
-
-const SALES_ORDER_DOCTYPE = "Sales Order";
-const BASE_FIELDS = ["id", "customer_name", "status"];
-const ALL_STATUSES = "__all__";
 
 export function SalesOrders() {
   const { meta } = useDoctypeMeta(SALES_ORDER_DOCTYPE);
 
-  const { value: columnPrefs, update: setColumnPrefs } =
-    useListPreference<ColumnPrefs>("sales-orders:columns", {
-      columnOrder: DEFAULT_COLUMN_ORDER,
-    });
-  const { value: filterRows, update: setFilterRows } = useListPreference<
-    FilterRow[]
-  >("sales-orders:filters", []);
+  const { value: columnPrefs, update: setColumnPrefs } = useListPreference<ColumnPrefs>("sales-orders:columns", {
+    columnOrder: DEFAULT_COLUMN_ORDER,
+  });
+  const { value: filterRows, update: setFilterRows } = useListPreference<FilterRow[]>("sales-orders:filters", []);
 
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>(ALL_STATUSES);
   const [statusOptions, setStatusOptions] = useState<string[]>([]);
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "transaction_date", desc: true },
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: "transaction_date", desc: true }]);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
     pageSize: 10,
@@ -105,10 +77,7 @@ export function SalesOrders() {
     return () => clearTimeout(timeout);
   }, [searchInput]);
 
-  const fieldsByName = useMemo(
-    () => new Map((meta?.fields ?? []).map((f) => [f.fieldname, f])),
-    [meta],
-  );
+  const fieldsByName = useMemo(() => new Map((meta?.fields ?? []).map((f) => [f.fieldname, f])), [meta]);
 
   const columnFields: ColumnField[] = useMemo(
     () =>
@@ -123,22 +92,17 @@ export function SalesOrders() {
     let cancelled = false;
     setIsLoading(true);
 
-    const fields = Array.from(
-      new Set([...BASE_FIELDS, ...columnPrefs.columnOrder]),
-    );
+    const fields = Array.from(new Set([...BASE_FIELDS, ...columnPrefs.columnOrder]));
     const filters = toFrappeFilters(filterRows);
-    if (statusFilter !== ALL_STATUSES)
-      filters.push(["status", "=", statusFilter]);
+    if (statusFilter !== ALL_STATUSES) filters.push(["status", "=", statusFilter]);
     const orFilters: Array<[string, string, unknown]> | undefined = search
       ? [
           ["customer_name", "like", `%${search}%`],
-          ["id", "like", `%${search}%`],
+          ["name", "like", `%${search}%`],
         ]
       : undefined;
     const sort = sorting[0];
-    const orderBy = sort
-      ? `${sort.id} ${sort.desc ? "desc" : "asc"}`
-      : undefined;
+    const orderBy = sort ? `${sort.id} ${sort.desc ? "desc" : "asc"}` : undefined;
 
     Promise.all([
       fetchSalesOrders({
@@ -169,15 +133,7 @@ export function SalesOrders() {
     return () => {
       cancelled = true;
     };
-  }, [
-    columnPrefs.columnOrder,
-    filterRows,
-    search,
-    statusFilter,
-    sorting,
-    pagination.pageIndex,
-    pagination.pageSize,
-  ]);
+  }, [columnPrefs.columnOrder, filterRows, search, statusFilter, sorting, pagination.pageIndex, pagination.pageSize]);
 
   const columns = useMemo(
     () =>
@@ -232,12 +188,7 @@ export function SalesOrders() {
 
         <CardAction className="col-start-1 row-start-auto flex w-full flex-wrap justify-start gap-2 justify-self-stretch md:col-start-2 md:row-span-2 md:row-start-1 md:w-auto md:flex-nowrap md:justify-end md:justify-self-end">
           <div className="flex items-center justify-between gap-3">
-            {selectedIds.length > 0 && (
-              <SelectionActionsMenu
-                selectedIds={selectedIds}
-                entityLabel="order"
-              />
-            )}
+            {selectedIds.length > 0 && <SelectionActionsMenu selectedIds={selectedIds} entityLabel="order" />}
           </div>
           <Select
             value={statusFilter}
@@ -292,33 +243,24 @@ export function SalesOrders() {
             }
             availableFields={columnFields}
             value={columnPrefs}
+            minVisibleColumns={MIN_VISIBLE_COLUMNS}
+            compulsoryFields={COMPULSORY_COLUMNS}
             onSave={(prefs) => {
               if (prefs.columnOrder.length < MIN_VISIBLE_COLUMNS) return;
               setColumnPrefs(prefs);
             }}
           />
 
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => toast.info("Export is coming soon.")}
-          >
+          <Button variant="outline" size="sm" onClick={() => toast.info("Export is coming soon.")}>
             <Download /> Export
           </Button>
-          <Button
-            size="sm"
-            onClick={() => toast.info("Add Order is coming soon.")}
-          >
+          <Button size="sm" onClick={() => toast.info("Add Order is coming soon.")}>
             <Plus /> Add Order
           </Button>
         </CardAction>
       </CardHeader>
       <CardContent className="flex flex-col px-0 gap-0">
-        <SalesOrderTable
-          table={table}
-          isLoading={isLoading}
-          totalCount={totalCount}
-        />
+        <SalesOrderTable table={table} isLoading={isLoading} totalCount={totalCount} />
       </CardContent>
     </Card>
   );

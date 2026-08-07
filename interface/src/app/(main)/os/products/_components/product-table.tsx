@@ -5,19 +5,12 @@ import { Fragment } from "react";
 
 import { flexRender, type Table as TableType } from "@tanstack/react-table";
 
-import {
-  Pagination,
-  PaginationContent,
-  PaginationItem,
-  PaginationNext,
-  PaginationPrevious,
-} from "@/components/ui/pagination";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PaginationFooter } from "@/components/layout/pagination-footer";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import type { ProductRow } from "@/types/products";
 
-import type { ProductRow } from "./product-types";
 import { VariantRows } from "./variant-rows";
 
 export function ProductTable({
@@ -31,10 +24,6 @@ export function ProductTable({
   totalCount: number;
   expandedIds: Set<string>;
 }) {
-  const pageIndex = table.getState().pagination.pageIndex;
-  const pageSize = table.getState().pagination.pageSize;
-  const pageCount = Math.max(Math.ceil(totalCount / pageSize), 1);
-  const currentPage = Math.min(pageIndex + 1, pageCount);
   const columnSizing = table.getState().columnSizing;
 
   // Only the checkbox/expand utility columns get a fixed width - every real
@@ -123,57 +112,7 @@ export function ProductTable({
 
       <Separator />
 
-      <div className="flex items-center justify-between px-4">
-        <div className="flex items-center gap-4 text-muted-foreground text-sm">
-          <div className="flex items-center gap-2">
-            <span>Per page</span>
-            <Select value={`${pageSize}`} onValueChange={(value) => table.setPageSize(Number(value))}>
-              <SelectTrigger size="sm" className="w-20" id="products-rows-per-page">
-                <SelectValue placeholder={`${pageSize}`} />
-              </SelectTrigger>
-              <SelectContent side="top">
-                <SelectGroup>
-                  {[10, 20, 30, 40, 50].map((size) => (
-                    <SelectItem key={size} value={`${size}`}>
-                      {size}
-                    </SelectItem>
-                  ))}
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </div>
-          <span>
-            Page {currentPage} of {pageCount} · {totalCount} products
-          </span>
-        </div>
-
-        <Pagination className="mx-0 w-auto justify-start md:justify-end">
-          <PaginationContent>
-            <PaginationItem>
-              <PaginationPrevious
-                href="#"
-                text=""
-                className={pageIndex === 0 ? "pointer-events-none opacity-50" : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  table.previousPage();
-                }}
-              />
-            </PaginationItem>
-            <PaginationItem>
-              <PaginationNext
-                href="#"
-                text=""
-                className={currentPage >= pageCount ? "pointer-events-none opacity-50" : undefined}
-                onClick={(event) => {
-                  event.preventDefault();
-                  table.nextPage();
-                }}
-              />
-            </PaginationItem>
-          </PaginationContent>
-        </Pagination>
-      </div>
+      <PaginationFooter table={table} totalCount={totalCount} itemLabel="products" />
     </div>
   );
 }
