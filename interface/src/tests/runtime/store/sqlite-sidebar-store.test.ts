@@ -5,8 +5,12 @@
 
 import { describe, expect, it } from "vitest";
 
-import { createSchema, SQLiteSidebarStore, syncCodeDefinedSidebar } from "@/runtime/store/sqlite-sidebar-store";
-import { buildCodeDefinedSidebar } from "@/seeds/sidebar/seed-data";
+import {
+  createSchema,
+  SQLiteSidebarStore,
+  syncCodeDefinedSidebar,
+} from "@/runtime/store/sqlite-sidebar-store";
+import { buildCodeDefinedSidebar } from "@/seeds/seed";
 
 import { DatabaseSync } from "node:sqlite";
 
@@ -39,12 +43,18 @@ describe("SQLiteSidebarStore", () => {
     syncCodeDefinedSidebar(db);
     syncCodeDefinedSidebar(db);
 
-    const groupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups").get() as { count: number };
-    const itemCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items").get() as { count: number };
+    const groupCount = db
+      .prepare("SELECT COUNT(*) as count FROM sidebar_groups")
+      .get() as { count: number };
+    const itemCount = db
+      .prepare("SELECT COUNT(*) as count FROM sidebar_items")
+      .get() as { count: number };
 
     // Sanity: exactly the baseline groups, no duplicates.
     expect(groupCount.count).toBe(buildCodeDefinedSidebar().length);
-    const askAlaiyCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items WHERE id = ?").get("ask-alaiy") as {
+    const askAlaiyCount = db
+      .prepare("SELECT COUNT(*) as count FROM sidebar_items WHERE id = ?")
+      .get("ask-alaiy") as {
       count: number;
     };
     expect(askAlaiyCount.count).toBe(1);
@@ -64,12 +74,23 @@ describe("SQLiteSidebarStore", () => {
       `INSERT INTO sidebar_items
          (id, group_id, parent_item_id, title, url, icon, badge, disabled, new_tab, sort_order, page_id, source, updated_at)
        VALUES (?, ?, NULL, ?, ?, NULL, NULL, 0, 0, 0, ?, 'dynamic', ?)`,
-    ).run("dynamic-item", "dynamic-group", "Dynamic Page", "/os/dynamic-page", "dynamic-page", now);
+    ).run(
+      "dynamic-item",
+      "dynamic-group",
+      "Dynamic Page",
+      "/os/dynamic-page",
+      "dynamic-page",
+      now,
+    );
 
     syncCodeDefinedSidebar(db);
 
-    const dynamicGroup = db.prepare("SELECT * FROM sidebar_groups WHERE id = ?").get("dynamic-group");
-    const dynamicItem = db.prepare("SELECT * FROM sidebar_items WHERE id = ?").get("dynamic-item") as {
+    const dynamicGroup = db
+      .prepare("SELECT * FROM sidebar_groups WHERE id = ?")
+      .get("dynamic-group");
+    const dynamicItem = db
+      .prepare("SELECT * FROM sidebar_items WHERE id = ?")
+      .get("dynamic-item") as {
       page_id: string | null;
     };
     expect(dynamicGroup).toBeDefined();
@@ -77,7 +98,11 @@ describe("SQLiteSidebarStore", () => {
     expect(dynamicItem.page_id).toBe("dynamic-page");
 
     // Code-owned rows are still exactly the seeded set, not duplicated.
-    const codeGroupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups WHERE source = 'code'").get() as {
+    const codeGroupCount = db
+      .prepare(
+        "SELECT COUNT(*) as count FROM sidebar_groups WHERE source = 'code'",
+      )
+      .get() as {
       count: number;
     };
     expect(codeGroupCount.count).toBe(buildCodeDefinedSidebar().length);
@@ -94,7 +119,9 @@ describe("SQLiteSidebarStore", () => {
     createSchema(db);
     syncCodeDefinedSidebar(db);
 
-    const os = db.prepare("SELECT id FROM sidebar_groups WHERE source = 'code'").get() as { id: string };
+    const os = db
+      .prepare("SELECT id FROM sidebar_groups WHERE source = 'code'")
+      .get() as { id: string };
     const now = new Date().toISOString();
     db.prepare(
       `INSERT INTO sidebar_items
@@ -103,34 +130,60 @@ describe("SQLiteSidebarStore", () => {
     ).run("stray-item", os.id, "Stray", "/os/stray", now);
 
     expect(() => syncCodeDefinedSidebar(db)).not.toThrow();
-    expect(db.prepare("SELECT id FROM sidebar_items WHERE id = ?").get("stray-item")).toBeUndefined();
+    expect(
+      db.prepare("SELECT id FROM sidebar_items WHERE id = ?").get("stray-item"),
+    ).toBeUndefined();
   });
 
   describe("ensureDynamicPageEntry", () => {
     it("creates the Uncategorised group and a dynamic item on first call", async () => {
       const store = memoryStore();
-      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
+      await store.ensureDynamicPageEntry({
+        pageId: "my-page",
+        title: "My Page",
+        url: "/os/my-page",
+      });
 
       const groups = await store.getSidebarNav();
-      const uncategorised = groups.find((group) => group.id === "uncategorised");
+      const uncategorised = groups.find(
+        (group) => group.id === "uncategorised",
+      );
       expect(uncategorised?.label).toBe("Uncategorised");
       expect(uncategorised?.items).toHaveLength(1);
-      expect(uncategorised?.items[0]).toMatchObject({ id: "my-page", title: "My Page", url: "/os/my-page" });
+      expect(uncategorised?.items[0]).toMatchObject({
+        id: "my-page",
+        title: "My Page",
+        url: "/os/my-page",
+      });
     });
 
     it("is idempotent - a second call for the same pageId does not duplicate the entry", async () => {
       const store = memoryStore();
-      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
-      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
+      await store.ensureDynamicPageEntry({
+        pageId: "my-page",
+        title: "My Page",
+        url: "/os/my-page",
+      });
+      await store.ensureDynamicPageEntry({
+        pageId: "my-page",
+        title: "My Page",
+        url: "/os/my-page",
+      });
 
       const groups = await store.getSidebarNav();
-      const uncategorised = groups.find((group) => group.id === "uncategorised");
+      const uncategorised = groups.find(
+        (group) => group.id === "uncategorised",
+      );
       expect(uncategorised?.items).toHaveLength(1);
     });
 
     it("falls back to a generic icon when none is given, but keeps a caller-supplied one", async () => {
       const store = memoryStore();
-      await store.ensureDynamicPageEntry({ pageId: "no-icon-page", title: "No Icon Page", url: "/os/no-icon-page" });
+      await store.ensureDynamicPageEntry({
+        pageId: "no-icon-page",
+        title: "No Icon Page",
+        url: "/os/no-icon-page",
+      });
       await store.ensureDynamicPageEntry({
         pageId: "icon-page",
         title: "Icon Page",
@@ -139,9 +192,15 @@ describe("SQLiteSidebarStore", () => {
       });
 
       const groups = await store.getSidebarNav();
-      const uncategorised = groups.find((group) => group.id === "uncategorised");
-      expect(uncategorised?.items.find((item) => item.id === "no-icon-page")?.icon).toBe("file-text");
-      expect(uncategorised?.items.find((item) => item.id === "icon-page")?.icon).toBe("layout-dashboard");
+      const uncategorised = groups.find(
+        (group) => group.id === "uncategorised",
+      );
+      expect(
+        uncategorised?.items.find((item) => item.id === "no-icon-page")?.icon,
+      ).toBe("file-text");
+      expect(
+        uncategorised?.items.find((item) => item.id === "icon-page")?.icon,
+      ).toBe("layout-dashboard");
     });
   });
 });
