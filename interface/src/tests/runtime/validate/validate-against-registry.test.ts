@@ -6,7 +6,7 @@ import {
   type ComponentRegistryEntry,
 } from "@/runtime/registry/component-registry";
 import { validateAgainstRegistry } from "@/runtime/validate/validate-against-registry";
-import type { PageConfigFile } from "@/types/runtime/page-config";
+import type { PageConfigFile } from "@/types/runtime/page";
 
 const REGISTERED_SOURCES = new Set(["kpis", "dashboard.overview"]);
 const isDataSourceRegistered = (id: string) => REGISTERED_SOURCES.has(id);
