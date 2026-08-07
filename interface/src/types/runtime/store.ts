@@ -1,7 +1,7 @@
 import type { PreferenceKey, PreferenceValueMap } from "@/lib/preferences/preferences-config";
 
 import type { SidebarNavGroupData } from "../navigation";
-import type { PageConfigFile } from "./page-config";
+import type { PageConfigFile } from "./page";
 
 /**
  * Where page definitions come from. Today there's exactly one implementation
@@ -56,11 +56,11 @@ export type DynamicPageEntry = {
  * one shared row per key, not per user or per browser (a deliberate
  * decision: this deployment's preferences are global, the same choice
  * `SQLiteSidebarStore`'s `source = 'code'` rows made for base sidebar
- * config). Raw and unvalidated: a missing key or a value that's since fallen
- * out of a preference's allowed set is the caller's job to fall back on via
- * `parsePreference` (`lib/preferences/preferences-config.ts`), the same
- * validation `server-actions.ts`'s `getPreference`/`getAllPreferences`
- * already apply to a cookie-sourced value today.
+ * config) - the only source of truth for a preference's value. Raw and
+ * unvalidated: a missing key or a value that's since fallen out of a
+ * preference's allowed set is the caller's job to fall back on via
+ * `parsePreference` (`lib/preferences/preferences-config.ts`), which
+ * `server-actions.ts`'s `getPreference`/`getAllPreferences` already apply.
  */
 export interface PreferencesStore {
   getPreferences(): Promise<Partial<PreferenceValueMap>>;
