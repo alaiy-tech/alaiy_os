@@ -3,7 +3,7 @@ import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
 import { PERIOD_LABEL, type Period } from "@/components/list/period";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { PeriodComparison } from "@/types/list";
 import type { ProductsOverview } from "@/types/products";
 
@@ -68,14 +68,20 @@ function formatUnits(value: number): string {
   return `${Math.round(value).toLocaleString()} Units`;
 }
 
-function formatCurrency(value: number): string {
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 /** Pure presentational Server Component - the overview is fetched
  * server-side in page.tsx (see item-stats.server.ts) and handed down already
- * resolved, so this never needs "use client" or a loading state of its own. */
-export function ProductKpiCards({ overview, period }: { overview: ProductsOverview | null; period: Period }) {
+ * resolved, so this never needs "use client" or a loading state of its own.
+ * `defaultCurrency` is the org's default currency (see
+ * useCompany()/getCompanyInfo()), resolved server-side by the caller page. */
+export function ProductKpiCards({
+  overview,
+  period,
+  defaultCurrency,
+}: {
+  overview: ProductsOverview | null;
+  period: Period;
+  defaultCurrency?: string;
+}) {
   if (!overview) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -83,6 +89,8 @@ export function ProductKpiCards({ overview, period }: { overview: ProductsOvervi
       </p>
     );
   }
+
+  const formatMoney = (value: number) => formatCurrency(value, { currency: defaultCurrency });
 
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -92,7 +100,7 @@ export function ProductKpiCards({ overview, period }: { overview: ProductsOvervi
         label="Average Unit Value"
         comparison={overview.average_unit_value}
         period={period}
-        format={formatCurrency}
+        format={formatMoney}
       />
       <KpiCard label="Active SKUs" comparison={overview.active_skus} period={period} format={formatUnits} />
     </div>

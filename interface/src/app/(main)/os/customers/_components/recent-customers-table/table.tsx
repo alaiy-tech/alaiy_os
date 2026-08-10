@@ -185,9 +185,9 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
                   table.setPageIndex(0);
                 }}
               >
-                {statusOptions.map((status) => (
+                {statusOptions.map((status, i) => (
                   <DropdownMenuRadioItem
-                    key={status.value}
+                    key={i}
                     value={status.value}
                   >
                     {status.label}
@@ -213,9 +213,9 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
                   table.setPageIndex(0);
                 }}
               >
-                {joinedDateOptions.map((option) => (
+                {joinedDateOptions.map((option, i ) => (
                   <DropdownMenuRadioItem
-                    key={option.value}
+                    key={i}
                     value={option.value}
                   >
                     {option.label}
@@ -243,9 +243,9 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
                   table.setPageIndex(0);
                 }}
               >
-                {billingOptions.map((billing) => (
+                {billingOptions.map((billing, i) => (
                   <DropdownMenuRadioItem
-                    key={billing.value}
+                    key={i}
                     value={billing.value}
                   >
                     {billing.label}
@@ -272,9 +272,9 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
                   table.setPageIndex(0);
                 }}
               >
-                {sortOptions.map((option) => (
+                {sortOptions.map((option, i) => (
                   <DropdownMenuRadioItem
-                    key={option.value}
+                    key={i}
                     value={option.value}
                   >
                     {option.label}
@@ -289,11 +289,11 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
           <TableHeader className="bg-muted/15">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
+            {table.getHeaderGroups().map((headerGroup, i ) => (
+              <TableRow key={i}>
+                {headerGroup.headers.map((header, j) => (
                   <TableHead
-                    key={header.id}
+                    key={j}
                     colSpan={header.colSpan}
                     className="h-11 p-3 font-medium"
                   >
@@ -310,13 +310,13 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
+              table.getRowModel().rows.map((row, i) => (
                 <TableRow
-                  key={row.id}
+                  key={i}
                   data-state={row.getIsSelected() && "selected"}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="p-3 align-middle">
+                  {row.getVisibleCells().map((cell,i) => (
+                    <TableCell key={i} className="p-3 align-middle">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext(),
@@ -369,8 +369,8 @@ export function RecentCustomersTable({ data }: { data: RecentCustomerRow[] }) {
               </SelectTrigger>
               <SelectContent side="top">
                 <SelectGroup>
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
-                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                  {[10, 20, 30, 40, 50].map((pageSize, i) => (
+                    <SelectItem key={i} value={`${pageSize}`}>
                       {pageSize}
                     </SelectItem>
                   ))}
