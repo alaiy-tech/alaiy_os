@@ -10,9 +10,10 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar";
-import { getCompanyName, getServerUser } from "@/lib/frappe/server";
+import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
 import { cn } from "@/lib/utils";
 import { getPreference } from "@/server/server-actions";
+import { CompanyProvider } from "@/stores/company/company-provider";
 
 import UserMenu from "../../../components/menu/user-menu";
 import { NotificationsPopover } from "../../../components/popover/notifications-popover";
@@ -23,11 +24,11 @@ export default async function Layout({
 }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
-  const [variant, collapsible, user, companyName] = await Promise.all([
+  const [variant, collapsible, user, company] = await Promise.all([
     getPreference("sidebar_variant"),
     getPreference("sidebar_collapsible"),
     getServerUser(),
-    getCompanyName(),
+    getCompanyInfo(),
   ]);
 
   if (!user) {
@@ -37,6 +38,7 @@ export default async function Layout({
   }
 
   return (
+    <CompanyProvider initialCompany={company}>
     <SidebarProvider
       defaultOpen={defaultOpen}
       style={
@@ -48,7 +50,7 @@ export default async function Layout({
       <AppSidebar
         variant={variant}
         collapsible={collapsible}
-        companyName={companyName}
+        companyName={company?.name ?? null}
       />
       <SidebarInset
         className={cn(
@@ -88,5 +90,6 @@ export default async function Layout({
         </div>
       </SidebarInset>
     </SidebarProvider>
+    </CompanyProvider>
   );
 }

@@ -51,11 +51,11 @@ export function ProductTable({
       <div className="overflow-x-auto">
         <Table className="w-full **:data-[slot='table-cell']:px-4 **:data-[slot='table-head']:px-4">
           <TableHeader className="[&_tr]:border-t">
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={header.id}
+            {table.getHeaderGroups().map((headerGroup, i) => (
+              <TableRow key={i}>
+                {headerGroup.headers.map((header, j) => (
+                  <TableHead  
+                    key={j}
                     className="relative py-4 font-normal select-none"
                     style={{ width: widthFor(header.column.id, header.getSize()) }}
                   >
