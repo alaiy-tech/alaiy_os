@@ -1,67 +1,54 @@
 import { format } from "date-fns";
 import { Settings2 } from "lucide-react";
 
+import { readPeriod } from "@/components/list/period";
 import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { getServerUser } from "@/lib/frappe/server";
+import {
+  getDashboardOverviewServer,
+  getSalesChannelsServer,
+  getSalesTrendServer,
+} from "@/lib/frappe/dashboard-stats.server";
+import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
 
+import { readChannel, toChannelParam } from "./_components/channel";
+import { DashboardFilters } from "./_components/dashboard-filters";
 import { Inventory } from "./_components/inventory";
 import { KpiStrip } from "./_components/kpi-strip";
 import { RecentOrders } from "./_components/recent-orders";
 import { TopProducts } from "./_components/top-products";
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const formattedDate = format(new Date(), "EEEE, do MMMM yyyy");
-  const user = await getServerUser();
+  const resolvedSearchParams = await searchParams;
+  const period = readPeriod(resolvedSearchParams);
+
+  // The channel list has to be resolved before the selected channel can be
+  // validated against it, so it can't join the parallel fetch below.
+  const [user, company, channels] = await Promise.all([getServerUser(), getCompanyInfo(), getSalesChannelsServer()]);
+  const channel = toChannelParam(readChannel(resolvedSearchParams, channels));
+
+  const [overview, trend] = await Promise.all([
+    getDashboardOverviewServer(period, channel),
+    getSalesTrendServer(channel),
+  ]);
+
   const firstName = user?.fullName.split(" ")[0] ?? "there";
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold leading-none tracking-tight">
-            Welcome, {firstName}!
-          </h1>
+          <h1 className="text-3xl font-semibold leading-none tracking-tight">Welcome, {firstName}!</h1>
           <p className="text-muted-foreground text-sm">{formattedDate}</p>
         </div>
 
         <div className="flex flex-wrap items-end justify-end gap-2 lg:w-fit">
-          <Select defaultValue="this-month">
-            <SelectTrigger className="w-34" id="ecommerce-period" size="sm">
-              <SelectValue placeholder="This Month" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="this-month">This Month</SelectItem>
-                <SelectItem value="last-month">Last Month</SelectItem>
-                <SelectItem value="last-30-days">Last 30 Days</SelectItem>
-                <SelectItem value="year-to-date">Year to Date</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-
-          <Select defaultValue="all-channels">
-            <SelectTrigger className="w-40" id="ecommerce-channel" size="sm">
-              <SelectValue placeholder="All Channels" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="all-channels">All Channels</SelectItem>
-                <SelectItem value="online-store">Online Store</SelectItem>
-                <SelectItem value="marketplace">Marketplace</SelectItem>
-                <SelectItem value="social">Social</SelectItem>
-                <SelectItem value="retail">Retail</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <DashboardFilters channels={channels} />
 
           <Separator orientation="vertical" />
 
@@ -72,7 +59,12 @@ export default async function Page() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <KpiStrip />
+        <KpiStrip
+          overview={overview}
+          trend={trend}
+          period={period}
+          defaultCurrency={company?.defaultCurrency ?? undefined}
+        />
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-6">
