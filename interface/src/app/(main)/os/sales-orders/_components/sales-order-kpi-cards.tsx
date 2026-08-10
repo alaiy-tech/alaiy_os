@@ -3,7 +3,7 @@ import { ArrowUpRight, TrendingDown, TrendingUp } from "lucide-react";
 import { PERIOD_LABEL, type Period } from "@/components/list/period";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardAction, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import type { PeriodComparison } from "@/types/list";
 import type { SalesOrdersOverview } from "@/types/sales-orders";
 
@@ -68,13 +68,19 @@ function formatCount(value: number): string {
   return Math.round(value).toLocaleString();
 }
 
-function formatCurrency(value: number): string {
-  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
-
 /** Pure presentational Server Component - see product-kpi-cards.tsx for why
- * this never needs "use client". */
-export function SalesOrderKpiCards({ overview, period }: { overview: SalesOrdersOverview | null; period: Period }) {
+ * this never needs "use client". `defaultCurrency` is the org's default
+ * currency (see useCompany()/getCompanyInfo()), resolved server-side by the
+ * caller page and threaded down as a prop. */
+export function SalesOrderKpiCards({
+  overview,
+  period,
+  defaultCurrency,
+}: {
+  overview: SalesOrdersOverview | null;
+  period: Period;
+  defaultCurrency?: string;
+}) {
   if (!overview) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -83,6 +89,8 @@ export function SalesOrderKpiCards({ overview, period }: { overview: SalesOrders
     );
   }
 
+  const formatMoney = (value: number) => formatCurrency(value, { currency: defaultCurrency });
+
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
       <KpiCard label="Total Orders" comparison={overview.total_orders} period={period} format={formatCount} />
@@ -90,13 +98,13 @@ export function SalesOrderKpiCards({ overview, period }: { overview: SalesOrders
         label="Total Order Value"
         comparison={overview.total_order_value}
         period={period}
-        format={formatCurrency}
+        format={formatMoney}
       />
       <KpiCard
         label="Average Order Value"
         comparison={overview.average_order_value}
         period={period}
-        format={formatCurrency}
+        format={formatMoney}
       />
       <KpiCard
         label="Cancelled/Returned Orders"

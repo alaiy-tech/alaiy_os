@@ -23,11 +23,15 @@ export function getStatusBadgeClass(status: string): string {
 export function buildSalesOrderColumns({
   columnOrder,
   fieldsByName,
+  currency,
 }: {
   columnOrder: string[];
   fieldsByName: Map<string, DocFieldMeta>;
+  currency?: string;
 }): ColumnDef<SalesOrderRow>[] {
-  const dynamicColumns: ColumnDef<SalesOrderRow>[] = columnOrder.map((fieldname) => {
+  const dynamicColumns: ColumnDef<SalesOrderRow>[] = columnOrder
+    .filter((fieldname) => fieldname !== ID_COLUMN_FIELDNAME)
+    .map((fieldname) => {
     const field = fieldsByName.get(fieldname);
     const label = LABEL_OVERRIDES[fieldname] ?? field?.label ?? formatFieldLabel(fieldname);
 
@@ -54,7 +58,7 @@ export function buildSalesOrderColumns({
       accessorKey: fieldname,
       header: label,
       size: 160,
-      cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} />,
+      cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} currency={currency} />,
     };
   });
 
