@@ -1,4 +1,33 @@
 import frappe
+from frappe.utils.file_manager import save_file
+
+_LOGO_FIELD_BY_TYPE = {"square": "square_logo", "horizontal": "horizontal_logo"}
+
+
+@frappe.whitelist()
+def upload_organisation_logo(logo_type):
+	"""Attaches an uploaded square/horizontal logo to the shared OS Theme
+	Settings singleton and saves it, so that doctype's own on_update hook
+	(_apply_logos) copies the file into the site's shared assets folder as
+	client-logo-square.png / client-logo-hor.png - the exact mechanism the
+	desk Theme Settings form's own logo fields already use, so this endpoint
+	and that form can never drift out of sync on what the live logo is.
+	"""
+	if logo_type not in _LOGO_FIELD_BY_TYPE:
+		frappe.throw(frappe._("Invalid logo type."))
+	if not frappe.has_permission("OS Theme Settings", "write"):
+		frappe.throw(frappe._("You do not have permission to update the organisation logos"), frappe.PermissionError)
+
+	uploaded = frappe.request.files.get("file")
+	if not uploaded:
+		frappe.throw(frappe._("No file uploaded."))
+
+	settings = frappe.get_single("OS Theme Settings")
+	file_doc = save_file(uploaded.filename, uploaded.stream.read(), "OS Theme Settings", settings.name, is_private=0)
+	settings.set(_LOGO_FIELD_BY_TYPE[logo_type], file_doc.file_url)
+	settings.save(ignore_permissions=True)
+	frappe.db.commit()
+	return {"file_url": file_doc.file_url}
 
 
 @frappe.whitelist(allow_guest=True)
