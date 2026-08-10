@@ -35,6 +35,23 @@ fixtures = [
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
 
+# ── MCP tools (Frappe Assistant Core) ────────────────────────────────────────
+# These are dotted-path STRINGS. Frappe never imports them; only FAC's
+# custom_tools plugin resolves them, and only when FAC is installed. So this
+# block adds no dependency — a site without frappe_assistant_core simply never
+# touches alaiy_os/assistant_tools/ and runs exactly as before. That is why
+# frappe_assistant_core is deliberately absent from required_apps above.
+#
+assistant_tools = [
+    # Channel tools
+    "alaiy_os.assistant_tools.sync_channel.SyncChannel",
+    "alaiy_os.assistant_tools.get_channel_sync_status.GetChannelSyncStatus",
+    # Catalogue
+    "alaiy_os.assistant_tools.get_catalogue_health.GetCatalogueHealth",
+    # Order tools
+    "alaiy_os.assistant_tools.cancel_order.CancelOrder",
+]
+
 # AI client seam. Agents call llm.complete(), which resolves this scalar hook
 # and delegates. The default is a BYOK client (customer-supplied Anthropic key).
 # A managed bench installs a private app *after* alaiy_os that re-registers this

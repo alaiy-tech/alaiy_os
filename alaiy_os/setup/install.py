@@ -43,6 +43,7 @@ from alaiy_os.constants.workspace_settings import (
 )
 from alaiy_os.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
 from alaiy_os.alaiy_os.doctype.os_connector_registry.os_connector_registry import _HANDLER_FIELDS
+from alaiy_os.assistant_tools.permissions import ensure_roles as _ensure_assistant_roles
 
 MODULE_NAME = "Alaiy OS"
 
@@ -128,6 +129,7 @@ def _run_provisioning():
         configure_portal_settings,
         check_dotted_path_handlers,
         ensure_sales_channel_field,
+        ensure_assistant_roles,
     ]
     failed = []
     for step in steps:
@@ -1004,3 +1006,15 @@ def _check_connector_registry_handlers():
 def check_dotted_path_handlers():
     _check_agent_tool_handlers()
     _check_connector_registry_handlers()
+
+
+# ── MCP tool roles ────────────────────────────────────────────────────────────
+
+def ensure_assistant_roles():
+    """Create the Alaiy Admin/Ops/Catalogue/Analyst roles the MCP tools gate on.
+
+    Runs regardless of whether frappe_assistant_core is installed — the roles
+    are ordinary desk roles and creating them early costs nothing, so a site
+    that adds FAC later has a working permission model immediately.
+    """
+    _ensure_assistant_roles()
