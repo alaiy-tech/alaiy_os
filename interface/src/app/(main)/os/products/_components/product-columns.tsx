@@ -55,16 +55,23 @@ export function buildProductColumns({
   fieldsByName,
   expandedIds,
   onToggleExpand,
+  currency,
 }: {
   columnOrder: string[];
   fieldsByName: Map<string, DocFieldMeta>;
   expandedIds: Set<string>;
   onToggleExpand: (row: ProductRow) => void;
+  currency?: string;
 }): ColumnDef<ProductRow>[] {
   const showItemCode = columnOrder.includes(ITEM_CODE_COLUMN_FIELDNAME);
 
   const dynamicColumns: ColumnDef<ProductRow>[] = columnOrder
-    .filter((fieldname) => fieldname !== IMAGE_COLUMN_FIELDNAME && fieldname !== ITEM_CODE_COLUMN_FIELDNAME)
+    .filter(
+      (fieldname) =>
+        fieldname !== IMAGE_COLUMN_FIELDNAME &&
+        fieldname !== ITEM_CODE_COLUMN_FIELDNAME &&
+        fieldname !== ID_COLUMN_FIELDNAME,
+    )
     .map((fieldname) => {
       const field = fieldsByName.get(fieldname);
       const label = field?.label ?? formatFieldLabel(fieldname);
@@ -100,7 +107,7 @@ export function buildProductColumns({
         accessorKey: fieldname,
         header: label,
         size: 160,
-        cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} />,
+        cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} currency={currency} />,
       };
     });
 
