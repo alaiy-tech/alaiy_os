@@ -29,6 +29,7 @@ import {
   BASE_FIELDS,
   COMPULSORY_COLUMNS,
   DEFAULT_COLUMN_ORDER,
+  ID_COLUMN_FIELDNAME,
   MIN_VISIBLE_COLUMNS,
   SALES_ORDER_DOCTYPE,
 } from "@/constants/sales-orders";
@@ -36,6 +37,7 @@ import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
 import { useListPreference } from "@/hooks/use-list-preference";
 import { fetchSalesOrderCount, fetchSalesOrders } from "@/lib/frappe/sales-order-list";
 import { getOrderStatuses } from "@/lib/frappe/sales-order-stats";
+import { useCompany } from "@/stores/company/company-provider";
 import type { SalesOrderRow } from "@/types/sales-orders";
 
 import { buildSalesOrderColumns } from "./sales-order-columns";
@@ -43,6 +45,7 @@ import { SalesOrderTable } from "./sales-order-table";
 
 export function SalesOrders() {
   const { meta } = useDoctypeMeta(SALES_ORDER_DOCTYPE);
+  const { defaultCurrency } = useCompany();
 
   const { value: columnPrefs, update: setColumnPrefs } = useListPreference<ColumnPrefs>("sales-orders:columns", {
     columnOrder: DEFAULT_COLUMN_ORDER,
@@ -81,10 +84,12 @@ export function SalesOrders() {
 
   const columnFields: ColumnField[] = useMemo(
     () =>
-      [...fieldsByName.values()].map((f) => ({
-        fieldname: f.fieldname,
-        label: f.label,
-      })),
+      [...fieldsByName.values()]
+        .filter((f) => f.fieldname !== ID_COLUMN_FIELDNAME)
+        .map((f) => ({
+          fieldname: f.fieldname,
+          label: f.label,
+        })),
     [fieldsByName],
   );
 
@@ -140,8 +145,9 @@ export function SalesOrders() {
       buildSalesOrderColumns({
         columnOrder: columnPrefs.columnOrder,
         fieldsByName,
+        currency: defaultCurrency,
       }),
-    [columnPrefs.columnOrder, fieldsByName],
+    [columnPrefs.columnOrder, fieldsByName, defaultCurrency],
   );
 
   const table = useReactTable({
@@ -204,8 +210,8 @@ export function SalesOrders() {
             <SelectContent position="popper" align="start">
               <SelectGroup>
                 <SelectItem value={ALL_STATUSES}>All</SelectItem>
-                {statusOptions.map((status) => (
-                  <SelectItem key={status} value={status}>
+                {statusOptions.map((status, index) => (
+                  <SelectItem key={index} value={status}>
                     {status}
                   </SelectItem>
                 ))}

@@ -1,6 +1,7 @@
 import { PageHeader } from "@/components/layout/page-header";
 import { readPeriod } from "@/components/list/period";
 import { PeriodToggle } from "@/components/list/period-toggle";
+import { getCompanyInfo } from "@/lib/frappe/server";
 import { getSalesOrdersOverviewServer } from "@/lib/frappe/sales-order-stats.server";
 
 import { SalesOrderKpiCards } from "./_components/sales-order-kpi-cards";
@@ -12,7 +13,7 @@ export default async function Page({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const period = readPeriod(await searchParams);
-  const overview = await getSalesOrdersOverviewServer(period);
+  const [overview, company] = await Promise.all([getSalesOrdersOverviewServer(period), getCompanyInfo()]);
 
   return (
     <div className="flex flex-col gap-4">
@@ -21,7 +22,7 @@ export default async function Page({
         subtitle="Track order volume, value, and cancellations across your sales cycle."
         action={<PeriodToggle />}
       />
-      <SalesOrderKpiCards overview={overview} period={period} />
+      <SalesOrderKpiCards overview={overview} period={period} defaultCurrency={company?.defaultCurrency ?? undefined} />
       <SalesOrders />
     </div>
   );
