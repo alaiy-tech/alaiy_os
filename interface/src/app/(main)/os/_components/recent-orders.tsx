@@ -184,8 +184,8 @@ export function RecentOrders() {
         <div className="overflow-hidden">
           <Table className="**:data-[slot='table-cell']:px-4.5 **:data-[slot='table-head']:px-4.5">
             <TableHeader className="border-t **:data-[slot='table-head']:h-11 **:data-[slot='table-head']:font-normal **:data-[slot='table-head']:text-foreground **:data-[slot='table-head']:text-sm">
-              {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id}>
+              {table.getHeaderGroups().map((headerGroup, i ) => (
+                <TableRow key={i}>
                   {headerGroup.headers.map((header) => (
                     <TableHead key={header.id} colSpan={header.colSpan}>
                       {header.isPlaceholder
@@ -201,9 +201,9 @@ export function RecentOrders() {
             </TableHeader>
             <TableBody className="**:data-[slot='table-row']:border-border/50 **:data-[slot='table-cell']:px-4 **:data-[slot='table-cell']:py-3 **:data-[slot='table-row']:hover:bg-transparent">
               {table.getRowModel().rows.length ? (
-                table.getRowModel().rows.map((row) => (
+                table.getRowModel().rows.map((row, i) => (
                   <TableRow
-                    key={row.id}
+                    key={i}
                     data-state={row.getIsSelected() && "selected"}
                   >
                     {row.getVisibleCells().map((cell) => (
