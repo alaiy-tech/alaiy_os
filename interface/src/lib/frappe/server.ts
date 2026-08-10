@@ -37,27 +37,43 @@ export async function getServerUser(): Promise<FrappeUser | null> {
   return toFrappeUser(userId, profile);
 }
 
-/** The sidebar shows "{Company} OS" instead of a hardcoded app name. Reads the
- * site's default company the same way ERPNext itself resolves it (Global
- * Defaults' default_company), falling back to the oldest Company record if
- * that's unset. Returns null (caller falls back to APP_CONFIG.name) rather
- * than throwing - this is cosmetic, never worth blocking the sidebar over. */
-export async function getCompanyName(): Promise<string | null> {
+export type CompanyInfo = { name: string; defaultCurrency: string | null };
+
+/** The sidebar shows "{Company} OS" instead of a hardcoded app name, and the
+ * default currency prefixes money figures across the OS (KPI cards, table
+ * Currency columns - see useCompany()/formatCurrency). Reads the site's
+ * default company the same way ERPNext itself resolves it (Global Defaults'
+ * default_company), falling back to the oldest Company record if that's
+ * unset. Returns null (callers fall back to APP_CONFIG.name / USD) rather
+ * than throwing - this is cosmetic, never worth blocking a page over. */
+export async function getCompanyInfo(): Promise<CompanyInfo | null> {
   const defaultRes = await frappeFetch(
     "/api/method/frappe.client.get_single_value?doctype=Global+Defaults&field=default_company",
   );
+  let companyName: string | null = null;
   if (defaultRes.ok) {
     const data = (await defaultRes.json()) as { message?: string | null };
-    if (data.message) return data.message;
+    companyName = data.message ?? null;
   }
 
-  const fields = encodeURIComponent(JSON.stringify(["name"]));
-  const listRes = await frappeFetch(
-    `/api/resource/Company?fields=${fields}&order_by=${encodeURIComponent("creation asc")}&limit_page_length=1`,
-  );
-  if (!listRes.ok) return null;
-  const data = (await listRes.json()) as { data?: Array<{ name: string }> };
-  return data.data?.[0]?.name ?? null;
+  if (!companyName) {
+    const fields = encodeURIComponent(JSON.stringify(["name"]));
+    const listRes = await frappeFetch(
+      `/api/resource/Company?fields=${fields}&order_by=${encodeURIComponent("creation asc")}&limit_page_length=1`,
+    );
+    if (!listRes.ok) return null;
+    const data = (await listRes.json()) as { data?: Array<{ name: string }> };
+    companyName = data.data?.[0]?.name ?? null;
+  }
+  if (!companyName) return null;
+
+  const fields = encodeURIComponent(JSON.stringify(["default_currency"]));
+  const companyRes = await frappeFetch(`/api/resource/Company/${encodeURIComponent(companyName)}?fields=${fields}`);
+  const defaultCurrency = companyRes.ok
+    ? (((await companyRes.json()) as { data?: { default_currency?: string | null } }).data?.default_currency ?? null)
+    : null;
+
+  return { name: companyName, defaultCurrency };
 }
 
 /** The Item Group tree's rootItemId (see os/item-groups) has to be known before
