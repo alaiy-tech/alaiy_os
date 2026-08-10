@@ -77,6 +77,56 @@ Neither mechanism restricts what `System Manager` or `Administrator` can see
 restriction of *other* apps' workspaces is handled server-side, by
 `restrict_foreign_workspaces()` (see above), not by any client-side code.
 
+## MCP tools
+
+`assistant_tools/` exposes the OS's basic commerce operations to any MCP client
+(Claude, GPT, Gemini, local models) through
+[Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core)
+(FAC), which supplies the MCP protocol, OAuth, and audit logging.
+
+| Tool | What it does |
+|---|---|
+| `sync_channel` | Trigger a sync for one/all channels via the connector registry |
+| `get_channel_sync_status` | Health + last-sync status of every channel |
+| `get_catalogue_health` | Items missing images / description / price / attributes + health score |
+| `cancel_order` | Cascade-cancel a Sales Order; `dry_run` previews without changing anything |
+
+**Every tool here is connector-agnostic.** Channel behaviour is resolved through
+`OS Connector Registry` — sync operations by label — never by naming a connector.
+A tool that can't be written that way belongs in the connector app:
+`publish_products` and `get_stock_overview` live in `alaiy_os_connector_shopify`
+because they read `Item.sync_to_shopify` and `Item.sh_shopify_product_id`, which
+that app owns.
+
+**FAC is not a dependency of this app.** `hooks.py`'s `assistant_tools` entries
+are dotted-path *strings*; only FAC's `custom_tools` plugin ever resolves them.
+On a site without FAC, `assistant_tools/` is never imported and the OS runs
+unchanged — which is why `required_apps` stays `["erpnext"]`. To use the tools,
+install FAC and enable its `custom_tools` plugin (FAC admin → Plugins).
+
+Agent- and connector-specific tools are *not* registered here. Those apps ship
+their own tools via their own `assistant_tools` hook, so a tool appears only
+when the app that owns it is installed (e.g. `alaiy_os_assistant` adds the
+listing-enrichment tools).
+
+### Permissions
+
+`assistant_tools/permissions.py` is the single source of truth. Four roles are
+created on install (`Alaiy Admin`, `Alaiy Ops`, `Alaiy Catalogue`,
+`Alaiy Analyst`); `System Manager`, `OS Manager`, and `Alaiy Admin` are
+superusers. A tool with no allow-list entry is **superuser-only** — the model
+fails closed, never open. Destructive tools are gated harder: `cancel_order`
+with `dry_run=false` requires Alaiy Admin even though Ops may preview it.
+
+Other apps declare roles for their own tools without editing core, via the
+`assistant_tool_roles` hook (Frappe merges the dict across installed apps):
+
+```python
+assistant_tool_roles = {
+    "run_enrichment_agent": ["Alaiy Catalogue"],
+}
+```
+
 ## Install
 
 ```bash
@@ -90,8 +140,11 @@ bench build --app alaiy_os
 
 ```
 alaiy_os/
-├── hooks.py                          # app_include_js/css, fixtures, provisioning hooks
+├── hooks.py                          # app_include_js/css, fixtures, provisioning, MCP tools
 ├── setup/install.py                  # after_install/after_migrate provisioning
+├── assistant_tools/                  # MCP tools + AlaiyTool base + permission model
+├── connectors.py                     # OS Connector Registry helpers (label-based sync resolution)
+├── analytics.py                      # channel-aware Sales Order analytics
 ├── setup/boot.py                     # on_login + get_home_page redirects
 ├── constants/                        # workspace/sidebar/role/onboarding definitions
 ├── fixtures/role.json                # OS Manager role (synced via Frappe's fixtures hook)
