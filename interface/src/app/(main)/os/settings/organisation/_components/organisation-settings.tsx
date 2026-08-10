@@ -173,7 +173,7 @@ export function OrganisationSettings() {
         <Button type="button" onClick={handleSave} disabled={isLoading || isSaving || !info}>
           {isSaving ? "Saving…" : "Save Changes"}
         </Button>
-      </div>
+      </div>x
 
       <Card>
         <CardHeader className="border-b">
