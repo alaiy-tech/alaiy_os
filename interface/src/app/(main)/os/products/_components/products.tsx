@@ -30,6 +30,7 @@ import {
   BASE_FIELDS,
   COMPULSORY_COLUMNS,
   DEFAULT_COLUMN_ORDER,
+  ID_COLUMN_FIELDNAME,
   IMAGE_COLUMN_FIELDNAME,
   ITEM_DOCTYPE,
   MIN_VISIBLE_COLUMNS,
@@ -38,6 +39,7 @@ import {
 import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
 import { useListPreference } from "@/hooks/use-list-preference";
 import { fetchItemCount, fetchItems } from "@/lib/frappe/item-list";
+import { useCompany } from "@/stores/company/company-provider";
 import type { ProductRow } from "@/types/products";
 
 import { buildProductColumns } from "./product-columns";
@@ -85,7 +87,7 @@ export default function Products() {
   const columnFields: ColumnField[] = useMemo(
     () =>
       [...fieldsByName.values()]
-        .filter((f) => f.fieldname !== IMAGE_COLUMN_FIELDNAME)
+        .filter((f) => f.fieldname !== IMAGE_COLUMN_FIELDNAME && f.fieldname !== ID_COLUMN_FIELDNAME)
         .map((f) => ({ fieldname: f.fieldname, label: f.label })),
     [fieldsByName],
   );
@@ -145,6 +147,8 @@ export default function Products() {
     });
   }, []);
 
+  const { defaultCurrency } = useCompany();
+
   const columns = useMemo(
     () =>
       buildProductColumns({
@@ -152,8 +156,9 @@ export default function Products() {
         fieldsByName,
         expandedIds,
         onToggleExpand: toggleExpand,
+        currency: defaultCurrency,
       }),
-    [columnPrefs.columnOrder, fieldsByName, expandedIds, toggleExpand],
+    [columnPrefs.columnOrder, fieldsByName, expandedIds, toggleExpand, defaultCurrency],
   );
 
   const table = useReactTable({
