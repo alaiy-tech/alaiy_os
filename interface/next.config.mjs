@@ -12,6 +12,12 @@ const nextConfig = {
         destination: "/os",
         permanent: false,
       },
+      // Sales Orders moved under /os/sales/ — keep old bookmarks working.
+      {
+        source: "/os/sales-orders",
+        destination: "/os/sales/orders",
+        permanent: false,
+      },
     ];
   },
 };

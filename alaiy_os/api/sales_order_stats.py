@@ -1,82 +1,50 @@
 import frappe
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import add_days, date_diff, getdate, nowdate
 
-PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 30, "1Y": 365}
+# An order past its delivery date is only worth flagging while it can still be
+# delivered. Completed and Cancelled are the two states the Sales Orders page
+# treats as closed out; anything else (Draft, To Deliver, On Hold, ...) still
+# counts as an overdue delivery.
+SETTLED_STATUSES = ["Completed", "Cancelled"]
 
-
-def _period_bounds(period):
-	days = PERIOD_DAYS.get(period)
-	if not days:
-		frappe.throw(frappe._("Invalid period: {0}").format(period))
-	today = getdate(nowdate())
-	start = add_days(today, -days)
-	prev_start = add_days(start, -days)
-	return prev_start, start
-
-
-def _order_totals(start, end=None, docstatus=None):
-	"""Count + sum(grand_total) of Sales Orders booked in [start, end) by
-	transaction_date - end=None means unbounded (up to now)."""
-	conditions = ["so.transaction_date >= %(start)s"]
-	params = {"start": start}
-	if end:
-		conditions.append("so.transaction_date < %(end)s")
-		params["end"] = end
-	if docstatus is not None:
-		conditions.append("so.docstatus = %(docstatus)s")
-		params["docstatus"] = docstatus
-	else:
-		# "Total Orders" counts anything that was ever actually placed -
-		# submitted (1) or since cancelled (2) - not drafts (0).
-		conditions.append("so.docstatus in (1, 2)")
-
-	row = frappe.db.sql(
-		f"""
-		select count(*) as cnt, coalesce(sum(so.grand_total), 0) as total
-		from `tabSales Order` so
-		where {" and ".join(conditions)}
-		""",
-		params,
-		as_dict=True,
-	)
-	return {"count": int(row[0].cnt or 0), "total": float(row[0].total or 0)}
-
-
-def _safe_avg(total, count):
-	return float(total / count) if count else 0.0
+DATE_FIELD = "transaction_date"
 
 
 @frappe.whitelist()
-def get_sales_orders_overview(period="1M"):
-	"""The four Sales Orders KPI cards (total orders, total order value,
-	average order value, cancelled orders) in one call, each as
-	{current, previous} for the period-over-period % badge.
+def get_sales_orders_summary(filters=None, or_filters=None, from_date=None, to_date=None):
+	"""The four Sales Orders KPI cards for whatever the list is currently
+	showing, in one call.
 
-	Total order value and AOV are computed from submitted (docstatus=1)
-	orders only - a cancelled order's grand_total isn't real revenue, so
-	including it would inflate both figures.
+	`filters`/`or_filters` are the same conditions the page sends to the list
+	query, so every card describes exactly the rows in the table beneath it -
+	including the status tab. That equivalence is the point: a KPI that
+	silently applied its own docstatus rules would disagree with the row count
+	right below it, and the user has no way to tell which one to believe. It
+	also means the Cancelled tab reports cancelled GMV rather than nothing,
+	which is the honest reading of "value of what I'm looking at".
+
+	`from_date`/`to_date` are passed separately from the filters they already
+	appear in, because the comparison figures need the window's length: the
+	previous period is the equally-long stretch ending the day before it. With
+	no date range picked there's nothing to compare against, so `previous`
+	comes back null and the page drops the trend badge rather than inventing
+	a baseline.
 	"""
 	frappe.has_permission("Sales Order", "read", throw=True)
-	prev_start, start = _period_bounds(period)
 
-	current_all = _order_totals(start)
-	previous_all = _order_totals(prev_start, start)
+	filters = _parse_list(filters)
+	or_filters = _parse_list(or_filters)
 
-	current_active = _order_totals(start, docstatus=1)
-	previous_active = _order_totals(prev_start, start, docstatus=1)
+	current = _window_summary(filters, or_filters, from_date, to_date)
 
-	current_cancelled = _order_totals(start, docstatus=2)
-	previous_cancelled = _order_totals(prev_start, start, docstatus=2)
+	previous_from, previous_to = _previous_window(from_date, to_date)
+	previous = _window_summary(filters, or_filters, previous_from, previous_to) if previous_from else None
 
 	return {
-		"period": period,
-		"total_orders": {"current": current_all["count"], "previous": previous_all["count"]},
-		"total_order_value": {"current": current_active["total"], "previous": previous_active["total"]},
-		"average_order_value": {
-			"current": _safe_avg(current_active["total"], current_active["count"]),
-			"previous": _safe_avg(previous_active["total"], previous_active["count"]),
-		},
-		"cancelled_orders": {"current": current_cancelled["count"], "previous": previous_cancelled["count"]},
+		"total_orders": _pair(current, previous, "count"),
+		"total_gmv": _pair(current, previous, "total"),
+		"average_order_value": _pair(current, previous, "average"),
+		"past_due_deliveries": _pair(current, previous, "past_due"),
 	}
 
 
@@ -88,3 +56,85 @@ def get_order_statuses():
 	status yet and an empty dropdown option is worse than a short one."""
 	frappe.has_permission("Sales Order", "read", throw=True)
 	return frappe.get_all("Sales Order", pluck="status", distinct=True, order_by="status asc")
+
+
+def _window_summary(filters, or_filters, from_date, to_date):
+	"""Count, GMV, average and past-due total over one date window."""
+	scoped = _with_window(filters, from_date, to_date)
+
+	# Aggregates go through the dict form: Frappe rejects "count(name)" and
+	# friends as raw strings in SELECT.
+	totals = frappe.get_all(
+		"Sales Order",
+		filters=scoped,
+		or_filters=or_filters,
+		fields=[{"COUNT": "name", "as": "count"}, {"SUM": "grand_total", "as": "total"}],
+	)[0]
+
+	# SUM over no rows is NULL, not 0.
+	count = int(totals.count or 0)
+	total = float(totals.total or 0)
+
+	past_due = frappe.get_all(
+		"Sales Order",
+		filters=[
+			*scoped,
+			["delivery_date", "<", nowdate()],
+			["status", "not in", SETTLED_STATUSES],
+		],
+		or_filters=or_filters,
+		fields=[{"COUNT": "name", "as": "count"}],
+	)[0]
+
+	return {
+		"count": count,
+		"total": total,
+		"average": total / count if count else 0.0,
+		"past_due": int(past_due.count or 0),
+	}
+
+
+def _with_window(filters, from_date, to_date):
+	"""`filters` with any transaction_date condition swapped for this window.
+
+	The page's own date-range filter is already in `filters`; replacing it here
+	is what lets the same filter set be re-run over the previous period without
+	the two date conditions contradicting each other.
+
+	With no window to substitute there is nothing to replace, and the caller's
+	own date conditions are left alone - stripping them regardless would make
+	a date-filtered request silently report on every order ever placed.
+	"""
+	if not (from_date or to_date):
+		return list(filters)
+
+	scoped = [f for f in filters if f[0] != DATE_FIELD]
+
+	if from_date:
+		scoped.append([DATE_FIELD, ">=", str(from_date)])
+	if to_date:
+		scoped.append([DATE_FIELD, "<=", str(to_date)])
+
+	return scoped
+
+
+def _previous_window(from_date, to_date):
+	"""The equally-long window ending the day before `from_date`."""
+	if not (from_date and to_date):
+		return None, None
+
+	start, end = getdate(from_date), getdate(to_date)
+	span = date_diff(end, start) + 1
+
+	previous_to = add_days(start, -1)
+	return add_days(previous_to, -(span - 1)), previous_to
+
+
+def _pair(current, previous, key):
+	return {"current": current[key], "previous": previous[key] if previous else None}
+
+
+def _parse_list(value):
+	if isinstance(value, str):
+		value = frappe.parse_json(value)
+	return list(value or [])
