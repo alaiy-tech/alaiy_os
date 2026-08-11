@@ -9,6 +9,15 @@ import { Tree, TreeItem, TreeItemLabel } from "@/components/ui/tree";
 import { Button } from "@/components/ui/button";
 import type { ItemGroupNode } from "@/lib/frappe/item-group";
 
+/** Runs a row action without letting the click reach the row's own
+ * expand/collapse handler underneath it. */
+function rowAction(run: () => void) {
+  return (e: React.MouseEvent) => {
+    e.stopPropagation();
+    run();
+  };
+}
+
 export function ItemGroupTreeView({
   tree,
   rootName,
@@ -24,6 +33,12 @@ export function ItemGroupTreeView({
   readonly onRename: (node: ItemGroupNode) => void;
   readonly onDelete: (node: ItemGroupNode, parentName: string) => void;
 }) {
+  // tree.getItems() reads live state off a mutable instance with a stable
+  // reference, so React Compiler would memoize the mapped rows against a
+  // dependency that never changes - freezing the list at the empty array the
+  // async data loader returns on first render. See ItemGroupsView.
+  "use no memo";
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   return (
@@ -39,36 +54,38 @@ export function ItemGroupTreeView({
               <div className="flex items-center justify-between gap-2">
                 <TreeItemLabel
                   className="min-w-0 flex-1 cursor-pointer"
-                  onClick={() => {
-                    if (item.isFolder()) {
-                      if (item.isExpanded()) item.collapse();
-                      else item.expand();
-                    }
-                    setSelectedId((prev) => (prev === item.getId() ? null : item.getId()));
-                  }}
+                  // Only selection here. Expand/collapse is already wired up by
+                  // TreeItem, which spreads headless-tree's own item.getProps()
+                  // onClick onto the row - and this click bubbles up to it.
+                  // Toggling here as well ran both handlers per click, which
+                  // cancelled out and made folders look unexpandable.
+                  onClick={() => setSelectedId((prev) => (prev === item.getId() ? null : item.getId()))}
                 >
                   <span className="truncate">{node?.name ?? item.getItemName()}</span>
                 </TreeItemLabel>
 
                 {isSelected && !isRoot && (
+                  // Every action below stops propagation: these buttons sit
+                  // inside the row, so otherwise each click would also reach
+                  // the row's expand/collapse handler (see TreeItem).
                   <div className="flex flex-none items-center gap-1 pr-1">
-                    <Button variant="outline" size="xs" onClick={() => onEdit(node)}>
+                    <Button variant="outline" size="xs" onClick={rowAction(() => onEdit(node))}>
                       Edit
                     </Button>
                     {node?.is_group ? (
-                      <Button variant="outline" size="xs" onClick={() => onAddChild(node)}>
+                      <Button variant="outline" size="xs" onClick={rowAction(() => onAddChild(node))}>
                         <Plus className="size-3" />
                         Add Child
                       </Button>
                     ) : null}
-                    <Button variant="outline" size="xs" onClick={() => onRename(node)}>
+                    <Button variant="outline" size="xs" onClick={rowAction(() => onRename(node))}>
                       Rename
                     </Button>
                     <Button
                       variant="outline"
                       size="xs"
                       className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => onDelete(node, item.getParent()?.getId() ?? rootName)}
+                      onClick={rowAction(() => onDelete(node, item.getParent()?.getId() ?? rootName))}
                     >
                       Delete
                     </Button>

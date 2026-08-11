@@ -43,6 +43,13 @@ function Tree({
   asChild = false,
   ...props
 }: TreeProps) {
+  // headless-tree hands out mutable tree/item instances whose references stay
+  // stable across updates - they re-render by mutating in place. React
+  // Compiler memoizes on reference identity, so every read below
+  // (getContainerProps/getProps/isExpanded/...) would be frozen at its
+  // first-render value. Opt the tree primitives out of compilation.
+  "use no memo"
+
   const containerProps =
     tree && typeof tree.getContainerProps === "function"
       ? tree.getContainerProps()
@@ -88,6 +95,9 @@ function TreeItem<T = any>({
   children,
   ...props
 }: TreeItemProps<T>) {
+  // See Tree above - item is a stable mutable instance.
+  "use no memo"
+
   const parentContext = useTreeContext<T>()
   const { indent } = parentContext
 
@@ -156,6 +166,9 @@ function TreeItemLabel<T = any>({
   asChild = false,
   ...props
 }: TreeItemLabelProps<T>) {
+  // See Tree above - item is a stable mutable instance.
+  "use no memo"
+
   const { currentItem, toggleIconType } = useTreeContext<T>()
   const item = propItem || currentItem
 
@@ -198,6 +211,9 @@ function TreeItemLabel<T = any>({
 }
 
 function TreeDragLine({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+  // See Tree above - tree is a stable mutable instance.
+  "use no memo"
+
   const { tree } = useTreeContext()
 
   if (!tree || typeof tree.getDragLineStyle !== "function") {
