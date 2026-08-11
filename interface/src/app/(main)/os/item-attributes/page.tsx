@@ -1,30 +1,15 @@
 import { PageHeader } from "@/components/layout/page-header";
-import { readPeriod } from "@/components/list/period";
-import { PeriodToggle } from "@/components/list/period-toggle";
-import { getProductsOverviewServer } from "@/lib/frappe/item-stats.server";
 
-import { ProductKpiCards } from "./_components/product-kpi-cards";
-import Products from "./_components/products";
+import { ItemAttributesView } from "./_components/item-attributes-view";
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
-}) {
-  const period = readPeriod(await searchParams);
-  const overview = await getProductsOverviewServer(period);
-
+export default function Page() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="Products"
-        subtitle="Track units sold, stock levels, and catalog health across your product line."
-        action={<PeriodToggle />}
+        title="Item Attributes"
+        subtitle="Manage the attributes your item variants are built from, and the values each one allows."
       />
-      <ProductKpiCards overview={overview} period={period} />
-      <div>
-        <Products />
-      </div>
+      <ItemAttributesView />
     </div>
   );
 }
