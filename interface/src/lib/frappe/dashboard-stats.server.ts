@@ -1,7 +1,7 @@
 // Server-only fetchers for the OS home dashboard - see item-stats.server.ts for
 // why the server/client split exists. The dashboard renders as a Server
 // Component, so there is no client-side counterpart to this file.
-import type { DashboardOverview, SalesTrend } from "@/types/dashboard";
+import type { DashboardOverview, RecentOrdersResult, SalesTrend, TopProductsOverview } from "@/types/dashboard";
 import type { Period } from "@/types/list";
 
 import { frappeFetch } from "./server";
@@ -33,6 +33,27 @@ export async function getSalesTrendServer(channel?: string | null): Promise<Sale
   const res = await frappeFetch(`/api/method/alaiy_os.api.dashboard_stats.get_sales_trend${query({ channel })}`);
   if (!res.ok) return null;
   const data = (await res.json()) as { message?: SalesTrend };
+  return data.message ?? null;
+}
+
+export async function getTopProductsServer(
+  period: Period,
+  channel?: string | null,
+): Promise<TopProductsOverview | null> {
+  const res = await frappeFetch(
+    `/api/method/alaiy_os.api.dashboard_stats.get_top_products${query({ period, channel })}`,
+  );
+  if (!res.ok) return null;
+  const data = (await res.json()) as { message?: TopProductsOverview };
+  return data.message ?? null;
+}
+
+/** Takes no period: the Recent Orders table is always the latest activity, and
+ * only the channel filter applies to it. */
+export async function getRecentOrdersServer(channel?: string | null): Promise<RecentOrdersResult | null> {
+  const res = await frappeFetch(`/api/method/alaiy_os.api.dashboard_stats.get_recent_orders${query({ channel })}`);
+  if (!res.ok) return null;
+  const data = (await res.json()) as { message?: RecentOrdersResult };
   return data.message ?? null;
 }
 

@@ -12,7 +12,7 @@ Orders page.
 import calendar
 
 import frappe
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import add_days, cint, getdate, nowdate
 
 PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 30, "1Y": 365}
 
@@ -32,6 +32,22 @@ CHANNEL_FIELD = "sales_channel"
 # Stock Reconciliation stores counted vs system qty as Floats, so "matched"
 # means "within a rounding error of each other", not "=".
 QTY_TOLERANCE = 0.001
+
+# The Top Products card lists three products and segments its bar into three
+# categories plus an "Other" remainder - it is a summary strip, not a report.
+TOP_PRODUCT_LIMIT = 3
+TOP_CATEGORY_LIMIT = 3
+OTHER_CATEGORY_LABEL = "Other"
+UNCATEGORISED_LABEL = "Uncategorised"
+
+# The Recent Orders table paginates client-side over one fetched page, so this
+# is how many orders that page holds - "recent", not "all".
+RECENT_ORDERS_LIMIT = 50
+RECENT_ORDERS_MAX = 200
+# outstanding_amount and per_delivered are floats; compare with a little slack
+# rather than against exact 0 / 100.
+AMOUNT_TOLERANCE = 0.005
+DELIVERED_TOLERANCE = 0.01
 
 
 def _has_channel_field():
@@ -300,6 +316,282 @@ def get_sales_channels():
 			"""
 		)
 	]
+
+
+def _invoice_state(order_names):
+	"""Per order: whether a credit note exists against it, and how much of what
+	was invoiced is still outstanding.
+
+	Distinct at invoice level - the link lives on Sales Invoice Item, so a
+	multi-line invoice would otherwise be counted (and its outstanding summed)
+	once per line. Empty when the user cannot read Sales Invoice, which leaves
+	every order reading as Pending rather than leaking a status they can't see.
+	"""
+	if not frappe.has_permission("Sales Invoice", "read"):
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		select distinct
+			sii.sales_order as order_name,
+			si.name as invoice,
+			si.is_return,
+			si.outstanding_amount
+		from `tabSales Invoice Item` sii
+		inner join `tabSales Invoice` si on si.name = sii.parent
+		where si.docstatus = 1
+		  and ifnull(sii.sales_order, '') != ''
+		  and sii.sales_order in %(names)s
+		""",
+		{"names": tuple(order_names)},
+		as_dict=True,
+	)
+
+	state = {}
+	for row in rows:
+		entry = state.setdefault(row.order_name, {"has_return": False, "invoiced": 0, "outstanding": 0.0})
+		if row.is_return:
+			entry["has_return"] = True
+			continue
+		entry["invoiced"] += 1
+		entry["outstanding"] += float(row.outstanding_amount or 0)
+	return state
+
+
+def _returned_orders(order_names):
+	"""Orders with at least one submitted return Delivery Note against them."""
+	if not frappe.has_permission("Delivery Note", "read"):
+		return set()
+
+	rows = frappe.db.sql(
+		"""
+		select distinct dni.against_sales_order as order_name
+		from `tabDelivery Note Item` dni
+		inner join `tabDelivery Note` dn on dn.name = dni.parent
+		where dn.docstatus = 1 and dn.is_return = 1
+		  and ifnull(dni.against_sales_order, '') != ''
+		  and dni.against_sales_order in %(names)s
+		""",
+		{"names": tuple(order_names)},
+	)
+	return {row[0] for row in rows}
+
+
+def _payment_state(entry):
+	"""Refunded beats everything - a credit note against the order is the thing
+	worth surfacing. An order with no invoice at all simply isn't billed yet,
+	which reads as Pending rather than as a third state the card can't render."""
+	if entry and entry["has_return"]:
+		return "Refunded"
+	if not entry or not entry["invoiced"]:
+		return "Pending"
+	return "Paid" if entry["outstanding"] <= AMOUNT_TOLERANCE else "Pending"
+
+
+def _fulfillment_state(order, returned):
+	if order.name in returned:
+		return "Returned"
+	return "Fulfilled" if float(order.per_delivered or 0) >= 100 - DELIVERED_TOLERANCE else "Unfulfilled"
+
+
+@frappe.whitelist()
+def get_recent_orders(channel=None, limit=RECENT_ORDERS_LIMIT):
+	"""The Recent Orders table: the most recently created submitted Sales
+	Orders, each with the payment and fulfillment state the card's badges need.
+
+	Deliberately not period-scoped. The dashboard's period toggle goes down to
+	1D, which would routinely empty a table whose whole point is "latest
+	activity" - an empty table reads as broken rather than as filtered. It does
+	honour the channel filter.
+
+	Payment is derived from the linked Sales Invoices rather than the order's
+	own per_billed, because per_billed means *invoiced*, not paid: a fully
+	invoiced but unpaid order would otherwise show as Paid. Fulfillment uses
+	per_delivered, which ERPNext maintains from Delivery Notes, with a submitted
+	return Delivery Note overriding it as Returned.
+	"""
+	frappe.has_permission("Sales Order", "read", throw=True)
+	channel = _normalise_channel(channel)
+	limit = max(1, min(cint(limit) or RECENT_ORDERS_LIMIT, RECENT_ORDERS_MAX))
+
+	conditions = ["so.docstatus = 1"]
+	channel_condition = _channel_condition(channel)
+	if channel_condition:
+		conditions.append(channel_condition)
+
+	orders = frappe.db.sql(
+		f"""
+		select
+			so.name, so.creation, so.customer, so.customer_name,
+			so.grand_total, so.currency, so.total_qty, so.per_delivered
+		from `tabSales Order` so
+		where {" and ".join(conditions)}
+		order by so.creation desc
+		limit %(limit)s
+		""",
+		{"channel": channel, "limit": limit},
+		as_dict=True,
+	)
+	if not orders:
+		return {"channel": channel, "orders": []}
+
+	names = [order.name for order in orders]
+	invoices = _invoice_state(names)
+	returned = _returned_orders(names)
+
+	return {
+		"channel": channel,
+		"orders": [
+			{
+				"name": order.name,
+				"creation": str(order.creation),
+				"customer_name": order.customer_name or order.customer,
+				"grand_total": float(order.grand_total or 0),
+				"currency": order.currency,
+				"item_count": float(order.total_qty or 0),
+				"payment": _payment_state(invoices.get(order.name)),
+				"fulfillment": _fulfillment_state(order, returned),
+			}
+			for order in orders
+		],
+	}
+
+
+def _root_item_group():
+	"""The Item Group tree's root - the row with no parent, the same definition
+	item_group.get_children() uses for is_root. None on a site with no tree at
+	all, which collapses every category to Uncategorised rather than erroring."""
+	row = frappe.db.sql("select name from `tabItem Group` where ifnull(parent_item_group, '') = '' order by lft limit 1")
+	return row[0][0] if row else None
+
+
+# Submitted Sales Order lines with each item rolled up to its *top-level* Item
+# Group. Item Group is a nested set, so `tl` - the category - is the group whose
+# parent is the tree root and whose [lft, rgt] range contains the item's own
+# group: "Shirts" and "Jackets" both roll up to "Apparel". An item already
+# sitting in a top-level group matches itself; one with no group, a missing Item
+# row, or a group that *is* the root falls through to Uncategorised.
+SOLD_LINES_FROM = """
+	`tabSales Order Item` soi
+	inner join `tabSales Order` so on so.name = soi.parent
+	left join `tabItem` i on i.name = soi.item_code
+	left join `tabItem Group` ig on ig.name = i.item_group
+	left join `tabItem Group` tl on tl.parent_item_group = %(root)s and ig.lft between tl.lft and tl.rgt
+"""
+
+CATEGORY_EXPR = "coalesce(tl.name, %(uncategorised)s)"
+
+
+def _sold_lines_where(channel):
+	conditions = ["so.docstatus = 1", "so.transaction_date >= %(start)s"]
+	channel_condition = _channel_condition(channel)
+	if channel_condition:
+		conditions.append(channel_condition)
+	return " and ".join(conditions)
+
+
+@frappe.whitelist()
+def get_top_products(period="1M", channel=None, limit=TOP_PRODUCT_LIMIT):
+	"""The Top Products card: the best-selling products of the period, the
+	category split behind them, and the share of sales they account for.
+
+	Ranked by revenue rather than units - the card puts a "Share" column next to
+	a currency "Sales" column, and the two should measure the same thing. (The
+	older item_stats.get_top_sku ranks by qty; this deliberately differs.)
+
+	Shares are a percentage of *line-level* sales (sum of Sales Order Item
+	amounts) for the same window, so every share on the card sums consistently.
+	That denominator is slightly below the Total Sales KPI above it, which uses
+	order-level grand_total and so includes tax and shipping.
+
+	`categories` is the top TOP_CATEGORY_LIMIT at their true share plus an
+	"Other" remainder, so the bar fills its width without any segment lying
+	about how big it is.
+	"""
+	frappe.has_permission("Sales Order", "read", throw=True)
+	channel = _normalise_channel(channel)
+	limit = max(1, cint(limit) or TOP_PRODUCT_LIMIT)
+	_, start = _period_bounds(period)
+
+	params = {
+		"start": start,
+		"channel": channel,
+		"root": _root_item_group(),
+		"uncategorised": UNCATEGORISED_LABEL,
+		"limit": limit,
+	}
+	where = _sold_lines_where(channel)
+	empty = {"period": period, "channel": channel, "total_sales": 0.0, "top_share": 0.0,
+	         "categories": [], "products": []}
+
+	category_rows = frappe.db.sql(
+		f"""
+		select {CATEGORY_EXPR} as category, coalesce(sum(soi.amount), 0) as amount
+		from {SOLD_LINES_FROM}
+		where {where}
+		group by {CATEGORY_EXPR}
+		order by amount desc
+		""",
+		params,
+		as_dict=True,
+	)
+
+	total = sum(float(row.amount or 0) for row in category_rows)
+	if total <= 0:
+		return empty
+
+	def share(amount):
+		return round(amount * 100.0 / total, 1)
+
+	categories = [
+		{"name": row.category, "amount": float(row.amount or 0), "share": share(float(row.amount or 0)),
+		 "is_other": False}
+		for row in category_rows[:TOP_CATEGORY_LIMIT]
+	]
+	remainder = total - sum(category["amount"] for category in categories)
+	# Guard the float dust left by summing line amounts, so an exhaustively
+	# covered bar doesn't sprout a 0.0% "Other" sliver.
+	if remainder > 0.005:
+		categories.append(
+			{"name": OTHER_CATEGORY_LABEL, "amount": remainder, "share": share(remainder), "is_other": True}
+		)
+
+	product_rows = frappe.db.sql(
+		f"""
+		select
+			soi.item_code,
+			coalesce(i.item_name, soi.item_code) as item_name,
+			{CATEGORY_EXPR} as category,
+			coalesce(sum(soi.amount), 0) as amount
+		from {SOLD_LINES_FROM}
+		where {where}
+		group by soi.item_code, coalesce(i.item_name, soi.item_code), {CATEGORY_EXPR}
+		order by amount desc
+		limit %(limit)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	products = [
+		{
+			"item_code": row.item_code,
+			"item_name": row.item_name,
+			"category": row.category,
+			"amount": float(row.amount or 0),
+			"share": share(float(row.amount or 0)),
+		}
+		for row in product_rows
+	]
+
+	return {
+		"period": period,
+		"channel": channel,
+		"total_sales": total,
+		"top_share": round(sum(product["share"] for product in products), 1),
+		"categories": categories,
+		"products": products,
+	}
 
 
 def _trend_months(today):
