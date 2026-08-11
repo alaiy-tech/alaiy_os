@@ -8,6 +8,7 @@ import {
   getDashboardOverviewServer,
   getSalesChannelsServer,
   getSalesTrendServer,
+  getTopProductsServer,
 } from "@/lib/frappe/dashboard-stats.server";
 import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
 
@@ -32,9 +33,10 @@ export default async function Page({
   const [user, company, channels] = await Promise.all([getServerUser(), getCompanyInfo(), getSalesChannelsServer()]);
   const channel = toChannelParam(readChannel(resolvedSearchParams, channels));
 
-  const [overview, trend] = await Promise.all([
+  const [overview, trend, topProducts] = await Promise.all([
     getDashboardOverviewServer(period, channel),
     getSalesTrendServer(channel),
+    getTopProductsServer(period, channel),
   ]);
 
   const firstName = user?.fullName.split(" ")[0] ?? "there";
@@ -68,7 +70,7 @@ export default async function Page({
       </div>
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-6">
-          <TopProducts />
+          <TopProducts overview={topProducts} defaultCurrency={company?.defaultCurrency ?? undefined} />
         </div>
 
         <div className="xl:col-span-6">

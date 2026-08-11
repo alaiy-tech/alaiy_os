@@ -37,3 +37,35 @@ export type SalesTrend = {
   channel: string | null;
   points: SalesTrendPoint[];
 };
+
+/** One segment of the Top Products category bar. `is_other` marks the
+ * remainder segment that absorbs every category outside the top few - it gets
+ * a muted colour rather than one from the chart palette. */
+export type TopProductCategory = {
+  name: string;
+  amount: number;
+  share: number;
+  is_other: boolean;
+};
+
+export type TopProductRow = {
+  item_code: string;
+  item_name: string;
+  /** The item's top-level Item Group, rolled up through the group tree. */
+  category: string;
+  amount: number;
+  share: number;
+};
+
+/** `share` values are percentages of `total_sales`, which is line-level sales
+ * (summed Sales Order Item amounts) - slightly below the Total Sales KPI, which
+ * uses order-level grand_total and so includes tax and shipping. */
+export type TopProductsOverview = {
+  period: string;
+  channel: string | null;
+  total_sales: number;
+  /** Combined share of the listed products - the card's headline figure. */
+  top_share: number;
+  categories: TopProductCategory[];
+  products: TopProductRow[];
+};
