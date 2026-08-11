@@ -33,7 +33,7 @@ from frappe.utils import now_datetime
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.engine import llm
 
-DEFAULT_MODEL = "claude-sonnet-5"
+DEFAULT_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_MAX_TURNS = 12
 TITLE_LENGTH = 80
 

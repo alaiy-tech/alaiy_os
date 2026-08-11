@@ -120,7 +120,7 @@ of in the Error Log. Costs one real LLM call.
 
 | key | default | effect |
 |---|---|---|
-| `chat_model` | `claude-sonnet-5` | model for new sessions (per-session override on the record) |
+| `chat_model` | `gemini-3.1-flash-lite` | model for new sessions (per-session override on the record) |
 | `chat_max_turns` | 12 | LLM calls per user message |
 | `chat_tools` | unset | allow-list of tool names; unset = everything the user may call |
 | `chat_system_prompt` | built-in | replaces the whole system prompt |
