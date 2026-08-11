@@ -11,7 +11,8 @@
   "handler_ok",
   "handler_health_detail",
   "parameters_schema",
-  "connector"
+  "connector",
+  "required_permissions"
  ],
  "fields": [
   {
@@ -40,7 +41,7 @@
   },
   {
    "default": "1",
-   "description": "Set by the after_migrate health check. Unchecked means this handler no longer imports or isn't callable — see Handler Health Detail.",
+   "description": "Set by the after_migrate health check. Unchecked means this handler no longer imports or isn't callable \u2014 see Handler Health Detail.",
    "fieldname": "handler_ok",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -67,6 +68,13 @@
    "fieldtype": "Link",
    "label": "Connector",
    "options": "OS Connector Registry"
+  },
+  {
+   "fieldname": "required_permissions",
+   "fieldtype": "Code",
+   "options": "JSON",
+   "label": "Required Permissions",
+   "description": "What this tool must be able to do, e.g. [{\"doctype\": \"Sales Invoice\", \"ptype\": \"read\"}]. Checked against the agent's Run As User."
   }
  ],
  "istable": 1,
