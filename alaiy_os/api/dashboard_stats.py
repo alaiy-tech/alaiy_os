@@ -40,6 +40,15 @@ TOP_CATEGORY_LIMIT = 3
 OTHER_CATEGORY_LABEL = "Other"
 UNCATEGORISED_LABEL = "Uncategorised"
 
+# The Recent Orders table paginates client-side over one fetched page, so this
+# is how many orders that page holds - "recent", not "all".
+RECENT_ORDERS_LIMIT = 50
+RECENT_ORDERS_MAX = 200
+# outstanding_amount and per_delivered are floats; compare with a little slack
+# rather than against exact 0 / 100.
+AMOUNT_TOLERANCE = 0.005
+DELIVERED_TOLERANCE = 0.01
+
 
 def _has_channel_field():
 	return bool(frappe.db.has_column("Sales Order", CHANNEL_FIELD))
@@ -307,6 +316,145 @@ def get_sales_channels():
 			"""
 		)
 	]
+
+
+def _invoice_state(order_names):
+	"""Per order: whether a credit note exists against it, and how much of what
+	was invoiced is still outstanding.
+
+	Distinct at invoice level - the link lives on Sales Invoice Item, so a
+	multi-line invoice would otherwise be counted (and its outstanding summed)
+	once per line. Empty when the user cannot read Sales Invoice, which leaves
+	every order reading as Pending rather than leaking a status they can't see.
+	"""
+	if not frappe.has_permission("Sales Invoice", "read"):
+		return {}
+
+	rows = frappe.db.sql(
+		"""
+		select distinct
+			sii.sales_order as order_name,
+			si.name as invoice,
+			si.is_return,
+			si.outstanding_amount
+		from `tabSales Invoice Item` sii
+		inner join `tabSales Invoice` si on si.name = sii.parent
+		where si.docstatus = 1
+		  and ifnull(sii.sales_order, '') != ''
+		  and sii.sales_order in %(names)s
+		""",
+		{"names": tuple(order_names)},
+		as_dict=True,
+	)
+
+	state = {}
+	for row in rows:
+		entry = state.setdefault(row.order_name, {"has_return": False, "invoiced": 0, "outstanding": 0.0})
+		if row.is_return:
+			entry["has_return"] = True
+			continue
+		entry["invoiced"] += 1
+		entry["outstanding"] += float(row.outstanding_amount or 0)
+	return state
+
+
+def _returned_orders(order_names):
+	"""Orders with at least one submitted return Delivery Note against them."""
+	if not frappe.has_permission("Delivery Note", "read"):
+		return set()
+
+	rows = frappe.db.sql(
+		"""
+		select distinct dni.against_sales_order as order_name
+		from `tabDelivery Note Item` dni
+		inner join `tabDelivery Note` dn on dn.name = dni.parent
+		where dn.docstatus = 1 and dn.is_return = 1
+		  and ifnull(dni.against_sales_order, '') != ''
+		  and dni.against_sales_order in %(names)s
+		""",
+		{"names": tuple(order_names)},
+	)
+	return {row[0] for row in rows}
+
+
+def _payment_state(entry):
+	"""Refunded beats everything - a credit note against the order is the thing
+	worth surfacing. An order with no invoice at all simply isn't billed yet,
+	which reads as Pending rather than as a third state the card can't render."""
+	if entry and entry["has_return"]:
+		return "Refunded"
+	if not entry or not entry["invoiced"]:
+		return "Pending"
+	return "Paid" if entry["outstanding"] <= AMOUNT_TOLERANCE else "Pending"
+
+
+def _fulfillment_state(order, returned):
+	if order.name in returned:
+		return "Returned"
+	return "Fulfilled" if float(order.per_delivered or 0) >= 100 - DELIVERED_TOLERANCE else "Unfulfilled"
+
+
+@frappe.whitelist()
+def get_recent_orders(channel=None, limit=RECENT_ORDERS_LIMIT):
+	"""The Recent Orders table: the most recently created submitted Sales
+	Orders, each with the payment and fulfillment state the card's badges need.
+
+	Deliberately not period-scoped. The dashboard's period toggle goes down to
+	1D, which would routinely empty a table whose whole point is "latest
+	activity" - an empty table reads as broken rather than as filtered. It does
+	honour the channel filter.
+
+	Payment is derived from the linked Sales Invoices rather than the order's
+	own per_billed, because per_billed means *invoiced*, not paid: a fully
+	invoiced but unpaid order would otherwise show as Paid. Fulfillment uses
+	per_delivered, which ERPNext maintains from Delivery Notes, with a submitted
+	return Delivery Note overriding it as Returned.
+	"""
+	frappe.has_permission("Sales Order", "read", throw=True)
+	channel = _normalise_channel(channel)
+	limit = max(1, min(cint(limit) or RECENT_ORDERS_LIMIT, RECENT_ORDERS_MAX))
+
+	conditions = ["so.docstatus = 1"]
+	channel_condition = _channel_condition(channel)
+	if channel_condition:
+		conditions.append(channel_condition)
+
+	orders = frappe.db.sql(
+		f"""
+		select
+			so.name, so.creation, so.customer, so.customer_name,
+			so.grand_total, so.currency, so.total_qty, so.per_delivered
+		from `tabSales Order` so
+		where {" and ".join(conditions)}
+		order by so.creation desc
+		limit %(limit)s
+		""",
+		{"channel": channel, "limit": limit},
+		as_dict=True,
+	)
+	if not orders:
+		return {"channel": channel, "orders": []}
+
+	names = [order.name for order in orders]
+	invoices = _invoice_state(names)
+	returned = _returned_orders(names)
+
+	return {
+		"channel": channel,
+		"orders": [
+			{
+				"name": order.name,
+				"creation": str(order.creation),
+				"customer_name": order.customer_name or order.customer,
+				"grand_total": float(order.grand_total or 0),
+				"currency": order.currency,
+				"item_count": float(order.total_qty or 0),
+				"payment": _payment_state(invoices.get(order.name)),
+				"fulfillment": _fulfillment_state(order, returned),
+			}
+			for order in orders
+		],
+	}
 
 
 def _root_item_group():

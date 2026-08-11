@@ -6,10 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
   getDashboardOverviewServer,
+  getRecentOrdersServer,
   getSalesChannelsServer,
   getSalesTrendServer,
   getTopProductsServer,
 } from "@/lib/frappe/dashboard-stats.server";
+import { getStockMixServer } from "@/lib/frappe/item-stats.server";
 import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
 
 import { readChannel, toChannelParam } from "./_components/channel";
@@ -33,10 +35,14 @@ export default async function Page({
   const [user, company, channels] = await Promise.all([getServerUser(), getCompanyInfo(), getSalesChannelsServer()]);
   const channel = toChannelParam(readChannel(resolvedSearchParams, channels));
 
-  const [overview, trend, topProducts] = await Promise.all([
+  // Stock and recent orders take no period: stock is point-in-time, and
+  // "recent" means latest activity rather than activity within the window.
+  const [overview, trend, topProducts, stockMix, recentOrders] = await Promise.all([
     getDashboardOverviewServer(period, channel),
     getSalesTrendServer(channel),
     getTopProductsServer(period, channel),
+    getStockMixServer(),
+    getRecentOrdersServer(channel),
   ]);
 
   const firstName = user?.fullName.split(" ")[0] ?? "there";
@@ -74,11 +80,11 @@ export default async function Page({
         </div>
 
         <div className="xl:col-span-6">
-          <Inventory />
+          <Inventory mix={stockMix} />
         </div>
       </div>
       <div className="xl:col-span-12">
-        <RecentOrders />
+        <RecentOrders orders={recentOrders?.orders ?? []} defaultCurrency={company?.defaultCurrency ?? undefined} />
       </div>
     </div>
   );
