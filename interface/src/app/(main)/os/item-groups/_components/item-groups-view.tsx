@@ -22,6 +22,14 @@ type DialogState =
   | { kind: "delete"; name: string; parentName: string };
 
 export function ItemGroupsView({ rootName }: { readonly rootName: string }) {
+  // useTree() hands back one mutable instance whose identity never changes -
+  // it re-renders by mutating itself and bumping internal state. React
+  // Compiler keys its memo cache on reference identity, so it would cache the
+  // <ItemGroupTreeView> element on first render and React would then bail out
+  // of ever re-rendering the subtree, leaving the async-loaded tree
+  // permanently empty. Opt this component out of compilation.
+  "use no memo";
+
   const [dialog, setDialog] = useState<DialogState>({ kind: "none" });
 
   const tree = useTree<ItemGroupNode>({

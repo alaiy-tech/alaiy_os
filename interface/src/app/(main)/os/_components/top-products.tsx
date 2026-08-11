@@ -2,53 +2,60 @@ import { ArrowUpRight } from "lucide-react";
 
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { formatCurrency } from "@/lib/utils";
+import type { TopProductCategory, TopProductsOverview } from "@/types/dashboard";
 
-const categories = [
-  {
-    name: "Apparel",
-    share: 44,
-    color: "var(--chart-3)",
-  },
-  {
-    name: "Accessories",
-    share: 32,
-    color: "var(--chart-2)",
-  },
-  {
-    name: "Home",
-    share: 24,
-    color: "var(--chart-1)",
-  },
-] as const;
+/** Category colours come from the chart palette in listed (descending) order;
+ * the "Other" remainder stays muted so it never reads as a real category. */
+const CATEGORY_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)", "var(--chart-4)"] as const;
 
-const products = [
-  {
-    name: "Linen Overshirt",
-    category: "Apparel",
-    share: "31%",
-    sales: "$14,820",
-  },
-  {
-    name: "Everyday Tote",
-    category: "Accessories",
-    share: "24%",
-    sales: "$11,460",
-  },
-  {
-    name: "Ceramic Planter",
-    category: "Home",
-    share: "18%",
-    sales: "$8,930",
-  },
-] as const;
+function categoryColor(category: TopProductCategory, index: number): string {
+  return category.is_other ? "var(--muted-foreground)" : CATEGORY_COLORS[index % CATEGORY_COLORS.length];
+}
 
-export function TopProducts() {
+function EmptyState({ message }: { message: string }) {
   return (
     <Card className="h-full">
       <CardHeader>
         <CardTitle className="font-normal text-muted-foreground text-sm">Top Products</CardTitle>
         <CardDescription className="text-foreground text-xl tabular-nums leading-none tracking-tight">
-          73% of sales
+          —
+        </CardDescription>
+        <CardAction>
+          <ArrowUpRight className="size-4" />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <p className="text-muted-foreground text-sm">{message}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Pure presentational Server Component - `overview` is fetched server-side in
+ * page.tsx (see dashboard-stats.server.ts) and handed down already resolved.
+ * `defaultCurrency` is the org's default currency, resolved by the caller. */
+export function TopProducts({
+  overview,
+  defaultCurrency,
+}: {
+  overview: TopProductsOverview | null;
+  defaultCurrency?: string;
+}) {
+  if (!overview) {
+    return <EmptyState message="Could not load top products. Make sure you're signed in and try again." />;
+  }
+
+  if (overview.products.length === 0) {
+    return <EmptyState message="No sales in this period." />;
+  }
+
+  return (
+    <Card className="h-full">
+      <CardHeader>
+        <CardTitle className="font-normal text-muted-foreground text-sm">Top Products</CardTitle>
+        <CardDescription className="text-foreground text-xl tabular-nums leading-none tracking-tight">
+          {overview.top_share.toFixed(0)}% of sales
         </CardDescription>
         <CardAction>
           <ArrowUpRight className="size-4" />
@@ -58,13 +65,13 @@ export function TopProducts() {
       <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2">
           <div aria-label="Sales by category" className="flex h-2 gap-1 overflow-hidden bg-muted" role="img">
-            {categories.map((category) => (
+            {overview.categories.map((category, index) => (
               <div
                 aria-hidden="true"
                 key={category.name}
                 className="rounded-md"
                 style={{
-                  backgroundColor: category.color,
+                  backgroundColor: categoryColor(category, index),
                   width: `${category.share}%`,
                 }}
               />
@@ -72,9 +79,13 @@ export function TopProducts() {
           </div>
 
           <div className="flex flex-wrap gap-4">
-            {categories.map((category) => (
+            {overview.categories.map((category, index) => (
               <div className="flex items-center gap-1" key={category.name}>
-                <span aria-hidden="true" className="size-2 rounded-full" style={{ backgroundColor: category.color }} />
+                <span
+                  aria-hidden="true"
+                  className="size-2 rounded-full"
+                  style={{ backgroundColor: categoryColor(category, index) }}
+                />
                 <span className="text-muted-foreground text-xs">{category.name}</span>
               </div>
             ))}
@@ -88,14 +99,16 @@ export function TopProducts() {
           <div className="text-muted-foreground text-xs">Share</div>
           <div className="text-muted-foreground text-xs">Sales</div>
 
-          {products.map((product) => (
-            <div className="contents text-sm" key={product.name}>
+          {overview.products.map((product) => (
+            <div className="contents text-sm" key={product.item_code}>
               <div className="min-w-0">
-                <div className="truncate font-medium">{product.name}</div>
+                <div className="truncate font-medium">{product.item_name}</div>
                 <div className="text-muted-foreground text-xs">{product.category}</div>
               </div>
-              <div className="self-center text-muted-foreground tabular-nums">{product.share}</div>
-              <div className="self-center font-medium tabular-nums">{product.sales}</div>
+              <div className="self-center text-muted-foreground tabular-nums">{product.share.toFixed(0)}%</div>
+              <div className="self-center font-medium tabular-nums">
+                {formatCurrency(product.amount, { currency: defaultCurrency, noDecimals: true })}
+              </div>
             </div>
           ))}
         </div>

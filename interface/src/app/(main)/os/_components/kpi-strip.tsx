@@ -1,203 +1,189 @@
-"use client";
-
-import { format, parse } from "date-fns";
 import { ArrowUpRight, DollarSign, PackageCheck, ReceiptText, RotateCcw, ShoppingBag, Users } from "lucide-react";
-import { Area, Bar, CartesianGrid, ComposedChart, XAxis, YAxis } from "recharts";
 
+import { PERIOD_LABEL, type Period } from "@/components/list/period";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { cn, formatCurrency } from "@/lib/utils";
+import type { DashboardOverview, SalesTrend, StockAccuracy } from "@/types/dashboard";
+import type { PeriodComparison } from "@/types/list";
 
-const revenueBucketRanges = ["01-05", "06-10", "11-15", "16-20", "21-25", "26-31"] as const;
-const profitMultipliers = [0.24, 0.28, 0.26] as const;
+import { SalesOverviewChart } from "./sales-overview-chart";
 
-const revenueBucketValues = [
-  [4820, 5150, 5060, 5520, 5990, 6880],
-  [5140, 5360, 5520, 5860, 6120, 6720],
-  [4920, 4680, 5150, 5360, 5720, 6150],
-  [5480, 5920, 5660, 6180, 6340, 6660],
-  [5840, 6220, 6480, 6110, 6680, 7230],
-  [6280, 6740, 6960, 7120, 6780, 7240],
-  [6820, 7240, 7680, 7410, 7920, 7810],
-  [6040, 6420, 6150, 6860, 7080, 7090],
-  [5860, 6120, 6340, 6080, 6620, 6900],
-  [6520, 6840, 7060, 7420, 7160, 8280],
-  [6980, 7320, 7640, 7160, 8040, 8620],
-  [6900, 7400, 8100, 8600, 8200, 9360],
-] as const;
-
-const monthFormatter = new Intl.DateTimeFormat("en-US", { month: "short" });
-
-function getRollingRevenueBuckets() {
-  const currentMonth = new Date();
-  currentMonth.setDate(1);
-
-  return revenueBucketValues.map((values, index) => {
-    const monthDate = new Date(currentMonth);
-    monthDate.setMonth(currentMonth.getMonth() - (revenueBucketValues.length - 1 - index));
-
-    return {
-      month: `${monthFormatter.format(monthDate)} ${String(monthDate.getFullYear()).slice(-2)}`,
-      values,
-    };
-  });
+function pctChange(current: number, previous: number): number {
+  if (previous === 0) return current === 0 ? 0 : 100;
+  return ((current - previous) / previous) * 100;
 }
 
-const revenueOverviewData = getRollingRevenueBuckets().flatMap(({ month, values }) =>
-  values.map((revenue, index) => ({
-    period: `${month} ${revenueBucketRanges[index]}`,
-    profit: Math.round(revenue * profitMultipliers[index % profitMultipliers.length]),
-    revenue,
-  })),
-);
-
-const revenueOverviewConfig = {
-  revenue: {
-    label: "Revenue",
-    color: "var(--foreground)",
-  },
-  profit: {
-    label: "Profit",
-    color: "var(--muted-foreground)",
-  },
-} satisfies ChartConfig;
-
-function formatMonthTick(value: string) {
-  const parts = value.split(" ");
-  const range = parts.at(-1);
-  const month = parts.slice(0, -1).join(" ");
-
-  return range === "11-15" ? month : "";
+function formatPct(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(1)}%`;
 }
 
-function formatTooltipLabel(value: string) {
-  const parts = value.split(" ");
-  const range = parts.at(-1);
-  const month = parse(parts.slice(0, -1).join(" "), "MMM yy", new Date());
-  const [start, end] = String(range).split("-");
-  const lastDayOfMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const startDate = new Date(month.getFullYear(), month.getMonth(), Number(start));
-  const endDate = new Date(month.getFullYear(), month.getMonth(), Math.min(Number(end), lastDayOfMonth));
-
-  return `${format(month, "MMM")} ${format(startDate, "do")} - ${format(endDate, "do")}, ${format(month, "yyyy")}`;
+function StatCard({
+  label,
+  icon,
+  value,
+  delta,
+  className,
+}: {
+  label: string;
+  icon: React.ReactNode;
+  value: string;
+  delta: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Card className={cn("h-full rounded-none border-0 border-border ring-0", className)}>
+      <CardHeader>
+        <CardTitle className="font-normal text-sm">{label}</CardTitle>
+        <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
+          {value}
+        </CardDescription>
+        <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">{icon}</CardAction>
+      </CardHeader>
+      <CardContent>
+        <div className="text-sm">{delta}</div>
+      </CardContent>
+    </Card>
+  );
 }
 
-function formatCurrencyTooltipValue(value: unknown) {
-  return typeof value === "number" ? `$${value.toLocaleString()}` : String(value ?? "");
+/** The period-over-period line under a figure. `higherIsBetter` flips the
+ * colour for metrics where growth is bad (returns), so a rising return count
+ * never reads as green. */
+function PeriodDelta({
+  comparison,
+  period,
+  higherIsBetter = true,
+}: {
+  comparison: PeriodComparison;
+  period: Period;
+  higherIsBetter?: boolean;
+}) {
+  const isUp = comparison.current - comparison.previous >= 0;
+  const isGood = isUp === higherIsBetter;
+
+  return (
+    <>
+      <span className={isGood ? "text-green-700 dark:text-green-300" : "text-destructive"}>
+        {formatPct(pctChange(comparison.current, comparison.previous))}
+      </span>
+      <span className="text-muted-foreground"> vs last {PERIOD_LABEL[period]}</span>
+    </>
+  );
 }
 
-export function KpiStrip() {
+/** Stock accuracy is quoted in percentage points, not as a percentage change of
+ * a percentage - "+2.4 pts" is what an ops lead reads; "+2.5%" of 96% is not. */
+function AuditDelta({ accuracy }: { accuracy: StockAccuracy }) {
+  if (accuracy.previous === null) {
+    return <span className="text-muted-foreground">First recorded audit</span>;
+  }
+
+  const diff = accuracy.current - accuracy.previous;
+
+  return (
+    <>
+      <span className={diff >= 0 ? "text-green-700 dark:text-green-300" : "text-destructive"}>
+        {diff >= 0 ? "+" : ""}
+        {diff.toFixed(1)} pts
+      </span>
+      <span className="text-muted-foreground"> vs last audit</span>
+    </>
+  );
+}
+
+const UNAVAILABLE = <span className="text-muted-foreground">Not available</span>;
+
+/** Pure presentational Server Component - `overview`/`trend` are fetched
+ * server-side in page.tsx (see dashboard-stats.server.ts) and handed down
+ * already resolved, so only the chart underneath needs a client boundary.
+ * `defaultCurrency` is the org's default currency, resolved by the caller. */
+export function KpiStrip({
+  overview,
+  trend,
+  period,
+  defaultCurrency,
+}: {
+  overview: DashboardOverview | null;
+  trend: SalesTrend | null;
+  period: Period;
+  defaultCurrency?: string;
+}) {
+  if (!overview) {
+    return (
+      <div className="rounded-xl bg-card p-6 ring-1 ring-foreground/10 xl:col-span-12">
+        <p className="text-muted-foreground text-sm">
+          Could not load the dashboard overview. Make sure you&apos;re signed in and try again.
+        </p>
+      </div>
+    );
+  }
+
+  const formatMoney = (value: number) => formatCurrency(value, { currency: defaultCurrency });
+  const formatCount = (value: number) => Math.round(value).toLocaleString();
+
   return (
     <div className="h-full overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 xl:col-span-12">
       <div>
         <div className="grid grid-cols-1 xl:grid-cols-12">
           <div className="grid grid-cols-1 md:grid-cols-2 md:grid-rows-3 xl:col-span-5 xl:border-r">
-            <Card className="h-full rounded-none border-0 border-border border-b ring-0 md:border-r">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Total Sales</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  $48,560.00
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <DollarSign className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-green-700 dark:text-green-300">+15.8%</span>
-                  <span className="text-muted-foreground"> vs last week</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Total Sales"
+              className="border-b md:border-r"
+              icon={<DollarSign className="size-3 text-foreground" />}
+              value={formatMoney(overview.total_sales.current)}
+              delta={<PeriodDelta comparison={overview.total_sales} period={period} />}
+            />
 
-            <Card className="h-full rounded-none border-0 border-border border-b ring-0">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Total Orders</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  379
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <ShoppingBag className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-green-700 dark:text-green-300">+8.3%</span>
-                  <span className="text-muted-foreground"> vs last week</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Total Orders"
+              className="border-b"
+              icon={<ShoppingBag className="size-3 text-foreground" />}
+              value={formatCount(overview.total_orders.current)}
+              delta={<PeriodDelta comparison={overview.total_orders} period={period} />}
+            />
 
-            <Card className="h-full rounded-none border-0 border-border border-b ring-0 md:border-r">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Customer Growth</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  820
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <Users className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-green-700 dark:text-green-300">+12.5%</span>
-                  <span className="text-muted-foreground"> vs last month</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Customer Growth"
+              className="border-b md:border-r"
+              icon={<Users className="size-3 text-foreground" />}
+              value={formatCount(overview.customer_growth.current)}
+              delta={<PeriodDelta comparison={overview.customer_growth} period={period} />}
+            />
 
-            <Card className="h-full rounded-none border-0 border-border border-b ring-0">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Average Order</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  $128
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <ReceiptText className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-destructive">-$4.20</span>
-                  <span className="text-muted-foreground"> vs last week</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Average Order"
+              className="border-b"
+              icon={<ReceiptText className="size-3 text-foreground" />}
+              value={formatMoney(overview.average_order.current)}
+              delta={<PeriodDelta comparison={overview.average_order} period={period} />}
+            />
 
-            <Card className="h-full rounded-none border-0 border-border border-b ring-0 md:border-r md:border-b-0">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Return Requests</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  18
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <RotateCcw className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-destructive">+0.6%</span>
-                  <span className="text-muted-foreground"> vs last month</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Return Requests"
+              className="border-b md:border-r md:border-b-0"
+              icon={<RotateCcw className="size-3 text-foreground" />}
+              value={overview.return_requests ? formatCount(overview.return_requests.current) : "—"}
+              delta={
+                overview.return_requests ? (
+                  <PeriodDelta comparison={overview.return_requests} period={period} higherIsBetter={false} />
+                ) : (
+                  UNAVAILABLE
+                )
+              }
+            />
 
-            <Card className="h-full rounded-none border-0 ring-0">
-              <CardHeader>
-                <CardTitle className="font-normal text-sm">Stock Accuracy</CardTitle>
-                <CardDescription className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-                  97%
-                </CardDescription>
-                <CardAction className="grid size-6 place-items-center rounded-sm bg-muted">
-                  <PackageCheck className="size-3 text-foreground" />
-                </CardAction>
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm">
-                  <span className="text-green-700 dark:text-green-300">+2.4 pts</span>
-                  <span className="text-muted-foreground"> vs last audit</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              label="Stock Accuracy"
+              icon={<PackageCheck className="size-3 text-foreground" />}
+              value={overview.stock_accuracy ? `${overview.stock_accuracy.current.toFixed(0)}%` : "—"}
+              delta={
+                overview.stock_accuracy ? (
+                  <AuditDelta accuracy={overview.stock_accuracy} />
+                ) : (
+                  <span className="text-muted-foreground">No stock audits yet</span>
+                )
+              }
+            />
           </div>
 
           <Card className="h-full rounded-none border-0 ring-0 xl:col-span-7">
@@ -209,93 +195,7 @@ export function KpiStrip() {
             </CardHeader>
 
             <CardContent>
-              <ChartContainer config={revenueOverviewConfig} className="h-74 w-full">
-                <ComposedChart
-                  accessibilityLayer
-                  data={revenueOverviewData}
-                  margin={{ bottom: 0, left: 0, right: 0, top: 0 }}
-                >
-                  <defs>
-                    <filter id="sales-line-glow" x="-20%" y="-20%" width="140%" height="140%">
-                      <feGaussianBlur stdDeviation="4" result="blur" />
-                      <feFlood floodColor="var(--color-revenue)" floodOpacity="0.35" />
-                      <feComposite in2="blur" operator="in" />
-                      <feMerge>
-                        <feMergeNode />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  <CartesianGrid yAxisId="profit" vertical={false} />
-                  <XAxis
-                    dataKey="period"
-                    axisLine={false}
-                    height={30}
-                    interval={0}
-                    minTickGap={0}
-                    tick={{ fontSize: 10 }}
-                    tickLine={false}
-                    tickMargin={8}
-                    tickFormatter={(value) => formatMonthTick(String(value))}
-                  />
-                  <YAxis yAxisId="revenue" hide domain={[3000, 10_000]} />
-                  <YAxis yAxisId="profit" hide domain={[0, 6000]} />
-                  <ChartTooltip
-                    content={
-                      <ChartTooltipContent
-                        className="w-40"
-                        labelFormatter={(value) => formatTooltipLabel(String(value))}
-                        formatter={(value, name, item) => (
-                          <>
-                            <div
-                              className="size-2.5 shrink-0 rounded-[2px]"
-                              style={{
-                                backgroundColor: item.color,
-                              }}
-                            />
-                            <div className="flex flex-1 items-center justify-between leading-none">
-                              <span className="text-muted-foreground">{String(name ?? "")}</span>
-                              <span className="font-medium font-mono text-foreground tabular-nums">
-                                {formatCurrencyTooltipValue(value)}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                      />
-                    }
-                    cursor={{
-                      stroke: "var(--border)",
-                      strokeDasharray: "4 4",
-                    }}
-                  />
-                  <Bar
-                    yAxisId="profit"
-                    barSize={4}
-                    dataKey="profit"
-                    fill="var(--color-profit)"
-                    name="Profit"
-                    opacity={0.18}
-                    radius={[6, 6, 0, 0]}
-                  />
-                  <Area
-                    yAxisId="revenue"
-                    dataKey="revenue"
-                    fill="none"
-                    filter="url(#sales-line-glow)"
-                    name="Revenue"
-                    stroke="var(--color-revenue)"
-                    strokeWidth={1.8}
-                    type="linear"
-                    activeDot={{
-                      r: 4,
-                      fill: "var(--background)",
-                      stroke: "var(--color-revenue)",
-                      strokeWidth: 2,
-                    }}
-                    dot={false}
-                  />
-                </ComposedChart>
-              </ChartContainer>
+              <SalesOverviewChart points={trend?.points ?? []} defaultCurrency={defaultCurrency} />
             </CardContent>
           </Card>
         </div>
