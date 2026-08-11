@@ -12,7 +12,7 @@ Orders page.
 import calendar
 
 import frappe
-from frappe.utils import add_days, getdate, nowdate
+from frappe.utils import add_days, cint, getdate, nowdate
 
 PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 30, "1Y": 365}
 
@@ -32,6 +32,13 @@ CHANNEL_FIELD = "sales_channel"
 # Stock Reconciliation stores counted vs system qty as Floats, so "matched"
 # means "within a rounding error of each other", not "=".
 QTY_TOLERANCE = 0.001
+
+# The Top Products card lists three products and segments its bar into three
+# categories plus an "Other" remainder - it is a summary strip, not a report.
+TOP_PRODUCT_LIMIT = 3
+TOP_CATEGORY_LIMIT = 3
+OTHER_CATEGORY_LABEL = "Other"
+UNCATEGORISED_LABEL = "Uncategorised"
 
 
 def _has_channel_field():
@@ -300,6 +307,143 @@ def get_sales_channels():
 			"""
 		)
 	]
+
+
+def _root_item_group():
+	"""The Item Group tree's root - the row with no parent, the same definition
+	item_group.get_children() uses for is_root. None on a site with no tree at
+	all, which collapses every category to Uncategorised rather than erroring."""
+	row = frappe.db.sql("select name from `tabItem Group` where ifnull(parent_item_group, '') = '' order by lft limit 1")
+	return row[0][0] if row else None
+
+
+# Submitted Sales Order lines with each item rolled up to its *top-level* Item
+# Group. Item Group is a nested set, so `tl` - the category - is the group whose
+# parent is the tree root and whose [lft, rgt] range contains the item's own
+# group: "Shirts" and "Jackets" both roll up to "Apparel". An item already
+# sitting in a top-level group matches itself; one with no group, a missing Item
+# row, or a group that *is* the root falls through to Uncategorised.
+SOLD_LINES_FROM = """
+	`tabSales Order Item` soi
+	inner join `tabSales Order` so on so.name = soi.parent
+	left join `tabItem` i on i.name = soi.item_code
+	left join `tabItem Group` ig on ig.name = i.item_group
+	left join `tabItem Group` tl on tl.parent_item_group = %(root)s and ig.lft between tl.lft and tl.rgt
+"""
+
+CATEGORY_EXPR = "coalesce(tl.name, %(uncategorised)s)"
+
+
+def _sold_lines_where(channel):
+	conditions = ["so.docstatus = 1", "so.transaction_date >= %(start)s"]
+	channel_condition = _channel_condition(channel)
+	if channel_condition:
+		conditions.append(channel_condition)
+	return " and ".join(conditions)
+
+
+@frappe.whitelist()
+def get_top_products(period="1M", channel=None, limit=TOP_PRODUCT_LIMIT):
+	"""The Top Products card: the best-selling products of the period, the
+	category split behind them, and the share of sales they account for.
+
+	Ranked by revenue rather than units - the card puts a "Share" column next to
+	a currency "Sales" column, and the two should measure the same thing. (The
+	older item_stats.get_top_sku ranks by qty; this deliberately differs.)
+
+	Shares are a percentage of *line-level* sales (sum of Sales Order Item
+	amounts) for the same window, so every share on the card sums consistently.
+	That denominator is slightly below the Total Sales KPI above it, which uses
+	order-level grand_total and so includes tax and shipping.
+
+	`categories` is the top TOP_CATEGORY_LIMIT at their true share plus an
+	"Other" remainder, so the bar fills its width without any segment lying
+	about how big it is.
+	"""
+	frappe.has_permission("Sales Order", "read", throw=True)
+	channel = _normalise_channel(channel)
+	limit = max(1, cint(limit) or TOP_PRODUCT_LIMIT)
+	_, start = _period_bounds(period)
+
+	params = {
+		"start": start,
+		"channel": channel,
+		"root": _root_item_group(),
+		"uncategorised": UNCATEGORISED_LABEL,
+		"limit": limit,
+	}
+	where = _sold_lines_where(channel)
+	empty = {"period": period, "channel": channel, "total_sales": 0.0, "top_share": 0.0,
+	         "categories": [], "products": []}
+
+	category_rows = frappe.db.sql(
+		f"""
+		select {CATEGORY_EXPR} as category, coalesce(sum(soi.amount), 0) as amount
+		from {SOLD_LINES_FROM}
+		where {where}
+		group by {CATEGORY_EXPR}
+		order by amount desc
+		""",
+		params,
+		as_dict=True,
+	)
+
+	total = sum(float(row.amount or 0) for row in category_rows)
+	if total <= 0:
+		return empty
+
+	def share(amount):
+		return round(amount * 100.0 / total, 1)
+
+	categories = [
+		{"name": row.category, "amount": float(row.amount or 0), "share": share(float(row.amount or 0)),
+		 "is_other": False}
+		for row in category_rows[:TOP_CATEGORY_LIMIT]
+	]
+	remainder = total - sum(category["amount"] for category in categories)
+	# Guard the float dust left by summing line amounts, so an exhaustively
+	# covered bar doesn't sprout a 0.0% "Other" sliver.
+	if remainder > 0.005:
+		categories.append(
+			{"name": OTHER_CATEGORY_LABEL, "amount": remainder, "share": share(remainder), "is_other": True}
+		)
+
+	product_rows = frappe.db.sql(
+		f"""
+		select
+			soi.item_code,
+			coalesce(i.item_name, soi.item_code) as item_name,
+			{CATEGORY_EXPR} as category,
+			coalesce(sum(soi.amount), 0) as amount
+		from {SOLD_LINES_FROM}
+		where {where}
+		group by soi.item_code, coalesce(i.item_name, soi.item_code), {CATEGORY_EXPR}
+		order by amount desc
+		limit %(limit)s
+		""",
+		params,
+		as_dict=True,
+	)
+
+	products = [
+		{
+			"item_code": row.item_code,
+			"item_name": row.item_name,
+			"category": row.category,
+			"amount": float(row.amount or 0),
+			"share": share(float(row.amount or 0)),
+		}
+		for row in product_rows
+	]
+
+	return {
+		"period": period,
+		"channel": channel,
+		"total_sales": total,
+		"top_share": round(sum(product["share"] for product in products), 1),
+		"categories": categories,
+		"products": products,
+	}
 
 
 def _trend_months(today):
