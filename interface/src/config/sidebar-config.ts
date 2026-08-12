@@ -151,7 +151,7 @@ export const sidebarItems: NavGroup[] = [
             id: "sales-orders",
             title: "Sales Orders",
             icon: ScrollText,
-            url: "/os/sales-orders",
+            url: "/os/sales/orders",
           },
           {
             id: "sales-invoices",
