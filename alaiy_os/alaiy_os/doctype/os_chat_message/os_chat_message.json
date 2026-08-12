@@ -11,7 +11,8 @@
   "column_break_1",
   "role",
   "text",
-  "blocks"
+  "blocks",
+  "attachments"
  ],
  "fields": [
   {
@@ -54,6 +55,13 @@
    "fieldname": "blocks",
    "fieldtype": "Code",
    "label": "Blocks (JSON)",
+   "options": "JSON"
+  },
+  {
+   "description": "Files sent with this message: [{file_name, file_url, file_size, chars}]. Denormalised for display, like `text` — the model reads the contents from the leading blocks, not from here. Also tells `runner._history` how many leading blocks are attachments.",
+   "fieldname": "attachments",
+   "fieldtype": "Code",
+   "label": "Attachments (JSON)",
    "options": "JSON"
   }
  ],
