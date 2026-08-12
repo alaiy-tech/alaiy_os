@@ -196,7 +196,7 @@ export const sidebarItems: NavGroup[] = [
             id: "purchase-orders",
             title: "Purchase Orders",
             icon: ShoppingBag,
-            url: "/os/purchase-orders",
+            url: "/os/procurement/purchase-orders",
           },
           {
             id: "purchase-receipts",

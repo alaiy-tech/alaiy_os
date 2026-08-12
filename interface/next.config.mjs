@@ -18,6 +18,12 @@ const nextConfig = {
         destination: "/os/sales/orders",
         permanent: false,
       },
+      // Same for Purchase Orders, now under /os/procurement/.
+      {
+        source: "/os/purchase-orders",
+        destination: "/os/procurement/purchase-orders",
+        permanent: false,
+      },
     ];
   },
 };
