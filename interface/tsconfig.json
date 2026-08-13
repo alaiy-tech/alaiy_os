@@ -14,7 +14,31 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+
+      // The outward platform contract. `@/*` stays the base's own internal
+      // alias; these are what a contributing Frappe app's interface/ imports,
+      // and they resolve inside a composed workspace because the workspace is a
+      // copy of this app. One alias per bucket, wildcarded rather than pointing
+      // at hand-written barrels, so the public surface never has to be
+      // enumerated (and re-enumerated) as the base grows, and a contributed
+      // screen's import reads one-for-one with the base's own:
+      //   base:      @/components/ui/button
+      //   connector: @alaiy-os/ui/button
+      // Dependency direction is one-way by construction: nothing under src/ may
+      // import a contributing app. See interface/CONNECTOR_TO_BASE_UI_COMPOSITION.md.
+      "@alaiy-os/ui/*": ["./src/components/ui/*"],
+      "@alaiy-os/layout/*": ["./src/components/layout/*"],
+      "@alaiy-os/list/*": ["./src/components/list/*"],
+      "@alaiy-os/menu/*": ["./src/components/menu/*"],
+      "@alaiy-os/popover/*": ["./src/components/popover/*"],
+      "@alaiy-os/frappe/*": ["./src/lib/frappe/*"],
+      "@alaiy-os/hooks/*": ["./src/hooks/*"],
+      "@alaiy-os/stores/*": ["./src/stores/*"],
+      "@alaiy-os/config/*": ["./src/config/*"],
+      "@alaiy-os/types/*": ["./src/types/*"],
+      "@alaiy-os/constants/*": ["./src/constants/*"],
+      "@alaiy-os/utils": ["./src/lib/utils"]
     },
 
     "plugins": [
