@@ -27,7 +27,8 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | method | args | returns |
 |---|---|---|
 | `create_session` | `title?`, `model?` | `{session, title, model, status}` |
-| `send_message` | `session`, `text?`, `attachments?` | `{seq, status}` — queues the turn, returns immediately |
+| `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?` | `{seq, status}` — queues the turn, returns immediately |
+| `list_skills` | — | the `/` command catalogue |
 | `get_messages` | `session`, `after=0` | `{status, error, messages[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
 | `delete_session` | `session` | `{deleted}` |
@@ -39,12 +40,46 @@ The flow is: `create_session` once, then per question `send_message` → poll
 `get_messages(after=<highest seq seen>)` until `status` leaves `Running`.
 Messages arrive as they are committed, so tool calls show up before the answer.
 
-A message is `{seq, role, text, attachments[], tool_calls[], tool_errors[]}`.
+A message is `{seq, role, text, attachments[], skill, tool_calls[], tool_errors[]}`.
 `tool_calls` is `{id, name, input}` per tool the assistant invoked; a tool's
 *result* is not returned — it is raw JSON the model has already summarised in its
 reply, and can be megabytes. Read `OS Chat Message.blocks` directly if you need
 it. `attachments` is `{file_name, file_url, file_size, chars}` per file sent with
 that message — enough to draw a chip, not the contents.
+
+## Skills (`/`)
+
+A skill is an `OS Agent Registry` row that ticked `chat_skill` and set a
+`skill_slug` — so `list_skills` is a query, not a second registry, and an agent
+app declares its skills in the same `agent_meta` manifest it already writes.
+
+`send_message(skill="daily-digest")` runs that agent to completion **before**
+the chat model's first call, and injects its output as a tool result:
+
+```
+user      "/daily-digest"                        skill_used = daily-digest
+assistant [tool_use name="skill:daily-digest"]   ┐ written by skills.run_skill
+user      [tool_result <the agent's JSON>]       ┘
+assistant "GMV was ₹4.2L yesterday, up 8%…"      ← the normal _loop
+```
+
+Reusing the tool round-trip shape means nothing new has to render, `_trim`
+keeps the pair together, and the model turns schema-validated JSON into prose —
+which is why chat responses can stay markdown instead of needing a block format
+for tiles and tables. Follow-ups work because the numbers are in the history.
+
+Skills take **no arguments**: the agent runs on its own defaults and the user
+refines conversationally in the next message.
+
+The gate is not `OS Agent Run`'s permission (System Manager only — that would
+put skills out of reach of the managers they are for). `run_turn` has already
+pinned the worker to the session's owner, so the agent's tool handlers read as
+that user with their row-level permissions applied. `chat_skill` is therefore a
+**claim about the agent**: every tool enforces its own permissions and none of
+them write. Tick it deliberately.
+
+`engine.executor.run_now()` is what runs the agent in-process. Enqueuing a child
+job and polling for it would deadlock a single-worker bench.
 
 ## Attachments
 
@@ -204,6 +239,12 @@ of in the Error Log. Costs one real LLM call.
 | `chat_max_turns` | 12 | LLM calls per user message |
 | `chat_tools` | unset | allow-list of tool names; unset = everything the user may call |
 | `chat_system_prompt` | built-in | replaces the whole system prompt |
+
+To *add* to the prompt rather than replace it — a deployment's currency, date
+format, marketplaces, role map — a tenant app registers the `chat_system_context`
+hook (a dotted path to a no-argument callable returning a paragraph). Several
+apps may each contribute one. `chat_system_prompt` overrides everything,
+including those, which is why it is checked first.
 
 The provider key itself is not here — that is `ai_api_key` / `ai_base_url` on
 the `ai_client` seam (see `engine/AI_CLIENT.md`), shared with batch agents.

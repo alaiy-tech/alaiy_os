@@ -8,6 +8,7 @@ GET  /api/method/alaiy_os.api.chat.get_messages    -> messages after a cursor + 
 GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
+GET  /api/method/alaiy_os.api.chat.list_skills     -> the `/` command catalogue
 
 `send_message` returns as soon as the turn is queued; the client then polls
 `get_messages` with the highest seq it has until status leaves "Running".
@@ -21,7 +22,7 @@ import json
 import frappe
 from frappe.utils.file_manager import save_file
 
-from alaiy_os.chat import attachments, runner, tools
+from alaiy_os.chat import attachments, runner, skills, tools
 
 
 @frappe.whitelist()
@@ -49,11 +50,16 @@ def list_sessions(limit=50):
 
 
 @frappe.whitelist()
-def send_message(session, text=None, attachments=None):
+def send_message(session, text=None, attachments=None, skill=None, screen=None):
+	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
+
+	An unknown skill throws here rather than on the worker, so the picker gets a
+	real error instead of a conversation that quietly answers the wrong thing.
+	"""
 	# start_turn does its own check_permission("write") — the session's own
 	# permission is the gate, since a chat can only reach what its owner can. It
 	# also validates every attachment name against that session.
-	seq = runner.start_turn(session, text, attachments=attachments)
+	seq = runner.start_turn(session, text, attachments=attachments, skill=skill, screen=screen)
 	return {"seq": seq, "status": "Running"}
 
 
@@ -148,7 +154,7 @@ def get_messages(session, after=0):
 	rows = frappe.get_all(
 		"OS Chat Message",
 		filters={"session": session, "seq": (">", int(after))},
-		fields=["name", "seq", "role", "text", "blocks", "attachments", "creation"],
+		fields=["name", "seq", "role", "text", "blocks", "attachments", "skill_used", "creation"],
 		order_by="seq asc",
 	)
 
@@ -173,6 +179,16 @@ def delete_session(session):
 def list_tools():
 	"""What the assistant can do *for this user* — for the UI and for support."""
 	return [{"name": spec["name"], "description": spec["description"]} for spec in tools.tool_specs()]
+
+
+@frappe.whitelist()
+def list_skills():
+	"""The `/` picker's catalogue: [{slug, label, description, icon}].
+
+	Every enabled agent that opted into `chat_skill`. Invoke one by passing its
+	slug to `send_message` — see `chat/skills.py` for what that does to the thread.
+	"""
+	return skills.catalogue()
 
 
 def _present(row):
@@ -202,6 +218,7 @@ def _present(row):
 		"role": row.role,
 		"text": row.text or "",
 		"attachments": json.loads(row.attachments or "[]"),
+		"skill": row.skill_used,
 		"tool_calls": tool_calls,
 		"tool_errors": tool_errors,
 		"creation": row.creation,

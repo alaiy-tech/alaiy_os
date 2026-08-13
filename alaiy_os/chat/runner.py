@@ -31,6 +31,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from alaiy_os.chat import attachments as chat_attachments
+from alaiy_os.chat import skills as chat_skills
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.engine import llm
 
@@ -64,13 +65,20 @@ def default_model():
 
 
 
-def start_turn(session, text, attachments=None):
+def start_turn(session, text, attachments=None, skill=None, screen=None):
 	"""Append the user's message and enqueue the turn. Returns the message seq.
 
 	`attachments` is a list of `OS Chat Attachment` names staged by
 	`api.chat.upload_attachment`. Their extracted text is inlined ahead of the
 	user's own words as ordinary text blocks — the model never sees a file, only
 	a document quoted into the conversation.
+
+	`skill` is an `OS Agent Registry` skill slug (see `chat/skills.py`). It is
+	resolved here so an unknown slug is a 417 on the send rather than a failure
+	that only shows up in the thread a minute later, but it is *run* on the
+	worker — the agent behind it makes its own LLM calls.
+
+	`screen` is whatever route the client was on, recorded on the message.
 
 	Safe to call from a web request — it does no LLM work itself. The files were
 	already parsed at upload time, so nothing expensive happens here.
@@ -81,6 +89,14 @@ def start_turn(session, text, attachments=None):
 		frappe.throw("This chat is still working on the previous message.")
 
 	text = (text or "").strip()
+	if skill:
+		skill = str(skill).strip().lstrip("/").lower()
+		chat_skills.resolve(skill)
+		# The message needs words: it is what the user sees in their own bubble,
+		# what names the session in the rail, and what the model reads as the
+		# request the tool result is answering.
+		text = text or f"/{skill}"
+
 	att_blocks, meta, consumed = _attachment_blocks(session, attachments)
 	if not text and not att_blocks:
 		frappe.throw("Message is empty.")
@@ -89,7 +105,7 @@ def start_turn(session, text, attachments=None):
 	# `text=text` and not `_text_of(blocks)`: the attachment content must stay
 	# out of the denormalised column, or a whole PDF ends up rendered in the
 	# user's chat bubble and sliced into the session title below.
-	seq = _append(session, "user", blocks, text=text, attachments=meta)
+	seq = _append(session, "user", blocks, text=text, attachments=meta, skill=skill, screen=screen)
 
 	if consumed:
 		# The staging rows have done their job — the message's blocks are now
@@ -135,6 +151,12 @@ def run_turn(session):
 		frappe.set_user(doc.owner)
 
 	try:
+		skill = _pending_skill(doc.name)
+		if skill:
+			# Writes the tool_use/tool_result pair, so by the time _loop reads the
+			# history the agent's output is the last thing in it and the model's
+			# first call is the one that narrates it.
+			chat_skills.run_skill(doc.name, skill, _append)
 		_loop(doc)
 	except Exception:
 		# Messages already written stay written — unlike a batch run, the
@@ -151,6 +173,25 @@ def run_turn(session):
 
 	doc.reload()
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
+
+
+def _pending_skill(session):
+	"""The slug to dispatch before this turn's first LLM call, if any.
+
+	Read from the last stored message rather than passed through the enqueue,
+	because the enqueue is deduplicated on the session (see `start_turn`): a
+	second send whose job was dropped must still have its skill run by whichever
+	job wins. Once `run_skill` has written its pair the last message is a
+	tool_result, so this cannot dispatch the same skill twice.
+	"""
+	last = frappe.db.get_value(
+		"OS Chat Message",
+		{"session": session},
+		["role", "skill_used"],
+		order_by="seq desc",
+		as_dict=True,
+	)
+	return last.skill_used if last and last.role == "user" else None
 
 
 # ── The loop ─────────────────────────────────────────────────────────────────
@@ -358,7 +399,7 @@ def _elide_old_attachments(rows):
 
 
 # ── Persistence ──────────────────────────────────────────────────────────────
-def _append(session, role, blocks, text=None, attachments=None):
+def _append(session, role, blocks, text=None, attachments=None, skill=None, screen=None):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
 	seq = (last or 0) + 1
@@ -371,6 +412,8 @@ def _append(session, role, blocks, text=None, attachments=None):
 			"text": text,
 			"blocks": json.dumps(blocks, default=str),
 			"attachments": json.dumps(attachments) if attachments else None,
+			"skill_used": skill,
+			"screen": screen,
 		}
 	).insert(ignore_permissions=True)
 	return seq
@@ -442,7 +485,7 @@ def _system_prompt():
 	roles = ", ".join(sorted(r for r in frappe.get_roles(user) if r not in ("All", "Guest")))
 	company = frappe.defaults.get_global_default("company") or "the company"
 
-	return (
+	prompt = (
 		"You are Alaiy, the assistant built into Alaiy OS — the e-commerce operations "
 		f"system {company} runs its catalogue, stock, orders and sales channels on.\n\n"
 		f"You are talking to {full_name} ({user}), whose roles are: {roles or 'none'}.\n"
@@ -455,6 +498,40 @@ def _system_prompt():
 		"- A tool may refuse on permissions. That is the system working; explain what "
 		"the user would need, do not look for another route to the same effect.\n"
 		"- Never invent figures. If you have not read a number with a tool, say so.\n\n"
-		"Answer in plain prose. Be concise and specific — cite the document names and "
-		"numbers you actually retrieved."
+		"Answer in plain prose, formatted as markdown — a table when you are reporting "
+		"rows, bold for the figures that matter. Be concise and specific: cite the "
+		"document names and numbers you actually retrieved."
 	)
+
+	extra = _tenant_context()
+	return f"{prompt}\n\n{extra}" if extra else prompt
+
+
+def _tenant_context():
+	"""Deployment-specific context appended to the built-in prompt.
+
+	The seam for a tenant app to say what only it knows — currency, date format,
+	which marketplaces exist, what its role names mean. Declared in the tenant's
+	own `hooks.py`:
+
+	    chat_system_context = ["alaiy_os_globali.chat_context.system_context"]
+
+	Each entry is a dotted path to a callable taking no arguments and returning a
+	string (or None to contribute nothing — how an app opts out per user or per
+	site). Appending rather than replacing is the whole point: the safety rules
+	above are not a tenant's to drop, and several apps can each contribute a
+	paragraph. `chat_system_prompt` in site_config is the escape hatch that
+	*does* replace everything, this included — it is checked first, on purpose.
+	"""
+	parts = []
+	for entry in frappe.get_hooks("chat_system_context") or []:
+		try:
+			value = frappe.get_attr(entry)()
+		except Exception:
+			# One tenant app's broken hook must not take the whole assistant
+			# down — the prompt is still usable without its paragraph.
+			frappe.log_error(title=f"chat_system_context hook failed: {entry}")
+			continue
+		if value:
+			parts.append(str(value).strip())
+	return "\n\n".join(parts)

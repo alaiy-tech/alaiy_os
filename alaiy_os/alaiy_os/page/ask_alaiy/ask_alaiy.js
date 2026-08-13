@@ -74,6 +74,11 @@ class AlaiyAskPage {
 		// spinner or an error) before the server has given it a name.
 		this.pending = new Map();
 		this.upload_seq = 0;
+		// The `/` catalogue, fetched once on the first slash. null = not yet
+		// asked; [] = asked and this site has no skills.
+		this.skills = null;
+		this.skill_matches = [];
+		this.skill_index = 0;
 
 		this._ensure_styles();
 		this._render();
@@ -370,6 +375,33 @@ class AlaiyAskPage {
 			.ask-alaiy-attach:disabled { opacity: .35; cursor: default; background: none; }
 			.ask-alaiy-file-input { display: none; }
 
+			/* ── Skill picker ────────────────────────────────────────────────
+			   Opens above the composer on "/". Positioned relative to the wrap
+			   so it floats over the thread instead of pushing the composer down
+			   — the input must not move while the user is typing into it. */
+			.ask-alaiy-composer-wrap { position: relative; }
+			.ask-alaiy-skills {
+				position: absolute; left: 28px; right: 28px; bottom: 100%;
+				margin-bottom: 8px; z-index: 5; overflow: hidden auto; max-height: 260px;
+				background: var(--s-white);
+				border: var(--s-border-width) var(--s-border-style) var(--s-border);
+				border-radius: var(--s-radius-lg); box-shadow: var(--shadow-md);
+			}
+			.ask-alaiy-skill {
+				display: block; width: 100%; text-align: start; border: none; background: none;
+				cursor: pointer; padding: 9px 14px; font-family: var(--s-font); color: var(--s-ink);
+				border-bottom: var(--s-border-width) var(--s-border-style) var(--s-border);
+			}
+			.ask-alaiy-skill:last-child { border-bottom: none; }
+			.ask-alaiy-skill.is-active, .ask-alaiy-skill:hover { background: var(--s-hover); }
+			.ask-alaiy-skill-slug { font-size: 13.5px; font-weight: 600; }
+			.ask-alaiy-skill-label { font-size: 13.5px; color: var(--s-muted); margin-inline-start: 8px; }
+			.ask-alaiy-skill-desc {
+				display: block; font-size: 11.5px; color: var(--s-muted); margin-top: 2px;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			.ask-alaiy-skills-empty { padding: 10px 14px; font-size: 12.5px; color: var(--s-muted); }
+
 			/* ── Attachment chips ────────────────────────────────────────────
 			   The tray sits above the composer while files are staged; the same
 			   chip markup is reused inside a sent message, where it is inert. */
@@ -470,6 +502,7 @@ class AlaiyAskPage {
 						<div class="ask-alaiy-thread"></div>
 					</div>
 					<div class="ask-alaiy-composer-wrap">
+						<div class="ask-alaiy-skills" role="listbox" aria-label="${__("Skills")}" hidden></div>
 						<div class="ask-alaiy-tray" aria-live="polite"></div>
 						<div class="ask-alaiy-composer">
 							<button type="button" class="ask-alaiy-attach"
@@ -498,6 +531,7 @@ class AlaiyAskPage {
 		this.$tray = this.$shell.find(".ask-alaiy-composer-wrap .ask-alaiy-tray");
 		this.$attach = this.$shell.find(".ask-alaiy-attach");
 		this.$file_input = this.$shell.find(".ask-alaiy-file-input");
+		this.$skills = this.$shell.find(".ask-alaiy-skills");
 
 		this._show_welcome();
 	}
@@ -513,11 +547,20 @@ class AlaiyAskPage {
 
 		this.$input.on("input", () => {
 			this._sync_send();
+			this._sync_skills();
 			autoGrow();
 		});
 		this.$input.on("focus", () => $composer.addClass("is-focused"));
-		this.$input.on("blur", () => $composer.removeClass("is-focused"));
+		this.$input.on("blur", () => {
+			$composer.removeClass("is-focused");
+			// A click on a skill row blurs the textarea before it fires, so the
+			// picker cannot close synchronously or the mousedown lands on nothing.
+			setTimeout(() => this._close_skills(), 150);
+		});
 		this.$input.on("keydown", (e) => {
+			// The picker owns the arrow keys and Enter while it is open — the
+			// same bargain every command palette makes.
+			if (this._skills_open() && this._skill_keydown(e)) return;
 			if (e.key === "Enter" && !e.shiftKey) {
 				e.preventDefault();
 				this._submit();
@@ -587,8 +630,128 @@ class AlaiyAskPage {
 	_submit() {
 		const text = (this.$input.val() || "").trim();
 		if (!this._can_send()) return;
+		// Typing a slug in full and pressing Enter should run the skill, whether
+		// or not the picker was still showing — otherwise "/daily-digest" is
+		// sent to the model as a line of prose it can do nothing with.
+		const skill = this._exact_skill(text);
 		this.$input.val("").trigger("input").focus();
-		this._send(text);
+		this._close_skills();
+		this._send(text, skill);
+	}
+
+	// ── Skill picker ────────────────────────────────────────────────────────
+	/** The partial slug being typed, or null when this is not a `/` command.
+	 *
+	 * Only a message that is *entirely* a slash command counts. A slash inside
+	 * a sentence ("check 24/7 coverage") is text, and a slug that already has a
+	 * space after it is a sentence too — skills take no arguments, so there is
+	 * nothing to complete past that point. */
+	_skill_query() {
+		const value = this.$input.val() || "";
+		const match = /^\/([a-z0-9-]*)$/.exec(value.trimStart());
+		return match ? match[1] : null;
+	}
+
+	_exact_skill(text) {
+		const slug = /^\/([a-z0-9-]+)$/.exec(text);
+		if (!slug || !this.skills) return null;
+		return this.skills.some((s) => s.slug === slug[1]) ? slug[1] : null;
+	}
+
+	_skills_open() {
+		return !this.$skills.prop("hidden");
+	}
+
+	async _sync_skills() {
+		const query = this._skill_query();
+		if (query === null) return this._close_skills();
+
+		if (this.skills === null) {
+			// One fetch per page load. A failure is not worth an error banner —
+			// the user can still type their question — so it degrades to "this
+			// site has no skills" and will not be retried in a tight loop.
+			try {
+				this.skills = await frappe.xcall("alaiy_os.api.chat.list_skills");
+			} catch (e) {
+				this.skills = [];
+			}
+			// The user may have typed on past the slash while that was in flight.
+			if (this._skill_query() === null) return this._close_skills();
+		}
+
+		this.skill_matches = this.skills.filter(
+			(s) => s.slug.includes(query) || (s.label || "").toLowerCase().includes(query),
+		);
+		this.skill_index = 0;
+		this._draw_skills();
+	}
+
+	_draw_skills() {
+		this.$skills.empty().prop("hidden", false);
+
+		if (!this.skill_matches.length) {
+			this.$skills.append(
+				$('<div class="ask-alaiy-skills-empty"></div>').text(
+					this.skills.length ? __("No matching skill.") : __("No skills are set up on this site."),
+				),
+			);
+			return;
+		}
+
+		this.skill_matches.forEach((skill, i) => {
+			const $row = $('<button type="button" class="ask-alaiy-skill" role="option"></button>')
+				.toggleClass("is-active", i === this.skill_index)
+				.appendTo(this.$skills);
+			$('<span class="ask-alaiy-skill-slug"></span>').text("/" + skill.slug).appendTo($row);
+			$('<span class="ask-alaiy-skill-label"></span>').text(skill.label || "").appendTo($row);
+			if (skill.description) {
+				$('<span class="ask-alaiy-skill-desc"></span>').text(skill.description).appendTo($row);
+			}
+			// mousedown, not click: the textarea's blur fires first on click and
+			// would have closed the picker out from under the pointer.
+			$row.on("mousedown", (e) => {
+				e.preventDefault();
+				this._run_skill(skill);
+			});
+		});
+	}
+
+	_skill_keydown(e) {
+		const last = this.skill_matches.length - 1;
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			if (last < 0) return true;
+			const step = e.key === "ArrowDown" ? 1 : -1;
+			this.skill_index = (this.skill_index + step + this.skill_matches.length) % this.skill_matches.length;
+			this._draw_skills();
+			return true;
+		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			this._close_skills();
+			return true;
+		}
+		if (e.key === "Enter" || e.key === "Tab") {
+			const chosen = this.skill_matches[this.skill_index];
+			if (!chosen) return false;
+			e.preventDefault();
+			this._run_skill(chosen);
+			return true;
+		}
+		return false;
+	}
+
+	_run_skill(skill) {
+		this._close_skills();
+		if (this.running) return;
+		this.$input.val("").trigger("input").focus();
+		this._send("/" + skill.slug, skill.slug);
+	}
+
+	_close_skills() {
+		this.$skills.empty().prop("hidden", true);
+		this.skill_matches = [];
+		this.skill_index = 0;
 	}
 
 	/** Ready to send: not mid-turn, and there is either something typed or at
@@ -791,7 +954,7 @@ class AlaiyAskPage {
 	}
 
 	// ── Conversation ────────────────────────────────────────────────────────
-	async _send(text) {
+	async _send(text, skill) {
 		const attached = this._ready_attachments();
 
 		this._clear_welcome();
@@ -806,6 +969,11 @@ class AlaiyAskPage {
 				session: session,
 				text: text,
 				attachments: JSON.stringify(attached.map((a) => a.name)),
+				skill: skill || null,
+				// This page IS the assistant, so there is no other screen to
+				// report. A host embedding the panel alongside a list view would
+				// pass its own route here.
+				screen: "ask-alaiy",
 			});
 			// Skip past our own message: it is already on screen.
 			this.last_seq = sent.seq;
@@ -919,8 +1087,12 @@ class AlaiyAskPage {
 				.appendTo($trail);
 
 			const $summary = $("<summary></summary>").appendTo($step);
+			// A `/skill` dispatch arrives as a tool call named "skill:<slug>"
+			// (see chat/skills.py). Show it as the command the user typed rather
+			// than as a tool they have never heard of.
+			const name = String(call.name || "");
 			$('<span class="ask-alaiy-step-name"></span>')
-				.text(String(call.name || "").replace(/_/g, " "))
+				.text(name.startsWith("skill:") ? "/" + name.slice(6) : name.replace(/_/g, " "))
 				.appendTo($summary);
 			if (bad) $summary.append(document.createTextNode(" · " + __("refused")));
 			if (args.length) $summary.append(`<span class="ask-alaiy-step-caret">${this._icon("caret")}</span>`);

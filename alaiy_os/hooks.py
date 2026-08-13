@@ -59,6 +59,15 @@ assistant_tools = [
 # no conditional logic is needed anywhere in agent or executor code.
 ai_client = "alaiy_os.engine.ai_client.get_ai_client"
 
+# Ask Alaiy's tenant-context seam. A list hook: each entry is a dotted path to a
+# no-argument callable returning a paragraph appended to the chat's system
+# prompt — currency, date format, which marketplaces exist, what the role names
+# mean. A deployment app declares its own; alaiy_os registers none, because
+# there is nothing tenant-specific to say about a bare Alaiy OS. See
+# runner._tenant_context() in chat/runner.py.
+#
+# chat_system_context = ["alaiy_os_globali.chat_context.system_context"]
+
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
