@@ -34,7 +34,14 @@ export default async function Layout({
   if (!user) {
     const headersList = await headers();
     const pathname = headersList.get("x-pathname") ?? "/os";
-    redirect(`/auth/login?next=${encodeURIComponent(pathname)}`);
+    // Via /auth/expired rather than straight to the login page: getting here
+    // means the request carried a `sid` that proxy.ts accepted (or it would have
+    // been turned away before this rendered) and that Frappe then disowned.
+    // Sending that cookie back to /auth/login lets proxy.ts bounce it to /os,
+    // which renders, fails here the same way, and redirects again — a loop, with
+    // every server fetch on the page 403ing on each lap. The route handler
+    // clears the cookie first, so the two checks can no longer disagree.
+    redirect(`/auth/expired?next=${encodeURIComponent(pathname)}`);
   }
 
   return (
