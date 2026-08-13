@@ -1,4 +1,22 @@
-@import "tailwindcss";
+/* Scan our own source and nothing else.
+ *
+ * Tailwind's automatic source detection crawls the project directory and skips
+ * whatever git ignores — which makes the generated CSS depend on where the app
+ * happens to be checked out. It holds here (this tree sits in a repo whose
+ * .gitignore covers node_modules and .next) and breaks anywhere it doesn't: in a
+ * composed workspace under devbench/builds, git ignores that whole directory, so
+ * no nested .gitignore applies, and Tailwind reads .next/dev/cache/turbopack/*.sst
+ * — Turbopack's *binary* cache, which holds serialized copies of these files. It
+ * extracts mangled candidates from them and emits CSS like
+ * `.gap-\[-��Q\(var\(��A\)\)\]`, which then fails to parse:
+ * "Parsing CSS source code failed / Unexpected token Id".
+ *
+ * Naming the sources pins the output to this app's actual code wherever it is
+ * built. It also stops node_modules being scanned when git isn't there to
+ * exclude it, which was adding ~170KB of other people's utilities to the bundle.
+ */
+@import "tailwindcss" source(none);
+@source "../**/*.{ts,tsx}";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
