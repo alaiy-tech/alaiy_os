@@ -1257,12 +1257,20 @@ The first connector through this architecture is
   generated in a workspace.
 * [src/config/sidebar-config.ts](src/config/sidebar-config.ts) — merges
   contributions into its groups by label.
+* [src/lib/frappe/connectors.ts](src/lib/frappe/connectors.ts) — a typed client
+  for `alaiy_os.api.connectors`, which is generic over `OS Connector Registry`:
+  it reads and writes whatever settings DocType a connector registered and runs
+  that connector's own `test_method`. A connector's settings screen therefore
+  needs no Python of its own, and the base needs no knowledge of which
+  connectors exist. [src/lib/frappe/link.ts](src/lib/frappe/link.ts) goes with it,
+  for Link fields whose target DocType isn't known until runtime.
 
 **`devbench`** — `lib/interface.py` + `devbench.py compose <client>` (§11).
 
 **`alaiy_os_connector_nayaglobal`** — `interface/` with `interface.config.json`,
-the two screens under `/os/procurement/nayaglobal/{wishlist,cart}`, and
-`src/lib/nayaglobal/` over its own whitelisted methods.
+three screens under `/os/procurement/nayaglobal/{wishlist,cart,settings}`, and
+`src/lib/nayaglobal/` over its own whitelisted methods. Working this connector
+involves the Desk at no point: Settings replaces its Desk form too.
 
 Verified by composing the `commerce` client (base + this connector): Turbopack
 compiles it, the connector's routes appear in the build's route table alongside
@@ -1279,20 +1287,27 @@ the base's, and `.next/standalone/server.js` is produced.
   symlinked: Turbopack treats the project directory as a filesystem root and
   rejects a symlink pointing out of it. Costs seconds and no disk. A deployment
   runs `npm ci` in the workspace instead, per §22's no-runtime-filesystem rule.
-* **Linking out to the Desk.** `FRAPPE_URL` is server-side only, so a client
-  component can't build a Desk URL. The connector ships a route handler
-  (`/api/connectors/nayaglobal/settings`) that redirects server-side — which also
-  shows that a contributing app can contribute API routes, not just pages.
+* **A connector owns its settings screen, not the base.** The obvious home for
+  connector settings is a base-side `/os/settings/connectors/<id>` rendering a
+  form off field metadata. It isn't: a connector's settings are the one screen
+  most in need of that connector's own vocabulary — which of two places the API
+  URL is really coming from, what "enabled" costs, that the wishlist is read
+  live. The generic API stays in the base; the screen ships with the app whose
+  fields it explains. That also keeps the "no Desk" promise reachable one
+  connector at a time, rather than blocked on a base-side panel.
 
 ## Not done yet
 
 * The 25 pre-existing base type errors (§21). Until they are fixed, a composed
   build only passes with `typescript.ignoreBuildErrors`, and the "platform
   upgrade breaks a client at compile time" guarantee is theoretical.
-* A connector settings screen in the OS UI — the base has no
-  `/os/settings/connectors` route at all yet, and the only reference to one is in
-  the dead `src/navigation/sidebar/sidebar-items.ts`. Until it exists, the
-  connector's "not connected" banner points at the Desk form.
+* A base-side connectors *index* — somewhere to see every registered connector
+  and its status at a glance. `get_all_connectors` already returns exactly that;
+  nothing renders it. Individual connectors don't need it (each ships its own
+  settings screen), so this is a convenience, not a blocker.
+* The other Desk surface this connector still has: **NayaGlobal Log**, contributed
+  to the Desk sidebar via `alaiy_os_sidebar_log_items`. Same treatment as
+  Settings would finish the job.
 * The CI lint rule enforcing the dependency direction (§19).
 * Deployment wiring: `npm ci` + PM2 from a composed workspace (§20) is described
   but not scripted.
