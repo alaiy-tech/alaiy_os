@@ -151,7 +151,7 @@ export const sidebarItems: NavGroup[] = [
             id: "sales-orders",
             title: "Sales Orders",
             icon: ScrollText,
-            url: "/os/sales-orders",
+            url: "/os/sales/orders",
           },
           {
             id: "sales-invoices",
@@ -196,7 +196,7 @@ export const sidebarItems: NavGroup[] = [
             id: "purchase-orders",
             title: "Purchase Orders",
             icon: ShoppingBag,
-            url: "/os/purchase-orders",
+            url: "/os/procurement/purchase-orders",
           },
           {
             id: "purchase-receipts",
