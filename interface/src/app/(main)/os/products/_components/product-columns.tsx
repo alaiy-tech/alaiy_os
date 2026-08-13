@@ -117,7 +117,13 @@ export function buildProductColumns({
       header: ({ table }) => (
         <Checkbox
           aria-label="Select all products"
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
       ),

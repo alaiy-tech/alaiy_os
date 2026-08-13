@@ -43,28 +43,33 @@ function getSubItemGroup(groupLabel: string | undefined, itemTitle: string) {
 
 const searchItems: SearchItem[] = sidebarItems.flatMap((group) =>
   group.items.flatMap((item) => {
-    if (item.subItems) {
-      return item.subItems.map((sub) => ({
-        id: sub.id,
-        group: getSubItemGroup(group.label, item.title),
-        label: sub.title,
-        url: sub.url,
-        icon: item.icon,
-        disabled: sub.disabled,
-        newTab: sub.newTab,
-      }));
+    // `"url" in item`, not `if (item.subItems)`: NavMainItem is a union of a link
+    // and a parent, and a parent's `subItems` is a required array — an empty one
+    // is still truthy, so a falsy check cannot rule the parent out and `item.url`
+    // stays unavailable in the else branch. Testing for the property narrows the
+    // union properly, in both directions.
+    if ("url" in item) {
+      return [
+        {
+          id: item.id,
+          group: group.label ?? "Other",
+          label: item.title,
+          url: item.url,
+          icon: item.icon,
+          disabled: item.disabled,
+          newTab: item.newTab,
+        },
+      ];
     }
-    return [
-      {
-        id: item.id,
-        group: group.label ?? "Other",
-        label: item.title,
-        url: item.url,
-        icon: item.icon,
-        disabled: item.disabled,
-        newTab: item.newTab,
-      },
-    ];
+    return item.subItems.map((sub) => ({
+      id: sub.id,
+      group: getSubItemGroup(group.label, item.title),
+      label: sub.title,
+      url: sub.url,
+      icon: item.icon,
+      disabled: sub.disabled,
+      newTab: sub.newTab,
+    }));
   }),
 );
 

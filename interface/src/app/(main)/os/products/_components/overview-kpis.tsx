@@ -13,13 +13,12 @@ import {
   CardHeader,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  getProductsOverview,
-  type PeriodComparison,
-  type ProductsOverview,
-  type SalesPeriod,
-} from "@/lib/frappe/item-stats";
+import { getProductsOverview } from "@/lib/frappe/item-stats";
 import { cn } from "@/lib/utils";
+// item-stats re-exported none of these; they live with the other shared list and
+// product types, and `SalesPeriod` is the same set of windows as `Period`.
+import type { PeriodComparison, Period as SalesPeriod } from "@/types/list";
+import type { ProductsOverview } from "@/types/products";
 
 const PERIODS: SalesPeriod[] = ["1D", "1W", "1M", "1Y"];
 const PERIOD_LABEL: Record<SalesPeriod, string> = {

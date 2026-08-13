@@ -90,7 +90,13 @@ export const recentOrdersColumns: ColumnDef<OrderRow>[] = [
       <div className="w-10">
         <Checkbox
           aria-label="Select all orders"
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
       </div>
