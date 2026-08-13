@@ -18,13 +18,53 @@ from alaiy_os.engine.factory import build_runnable
 
 def execute_agent(agent, payload=None, trigger_type="Manual"):
 	"""Create a Run for `agent` and enqueue it. Returns the Run name."""
+	_assert_runnable(agent)
+	run = _new_run(agent, payload, trigger_type)
+
+	frappe.enqueue(
+		"alaiy_os.engine.executor.run_queued",
+		queue="long",
+		run=run,
+		enqueue_after_commit=True,
+	)
+	return run
+
+
+def run_now(agent, payload=None, trigger_type="Manual"):
+	"""Create a Run for `agent` and execute it in this process. Returns the Run name.
+
+	The synchronous twin of `execute_agent`, for a caller that is *already* on a
+	worker and needs the result before it can continue — Ask Alaiy's `/skill`
+	dispatch, which has to put the agent's output into the conversation before
+	the chat model can narrate it (see `chat/skills.py`).
+
+	Enqueuing from inside a job and then polling for the child would deadlock a
+	single-worker bench, so this does not enqueue. The trade is that the caller
+	owns the wait: never call this from a web request.
+
+	Failure is not raised — `run_queued` records it on the Run and returns, the
+	same as for a queued run. Read the Run's `status` to find out what happened.
+	"""
+	_assert_runnable(agent)
+	run = _new_run(agent, payload, trigger_type)
+	# `run_queued` reloads the Run and commits as it goes, so the row has to be
+	# durable before it starts — the same guarantee `enqueue_after_commit` gives
+	# the queued path.
+	frappe.db.commit()
+	run_queued(run)
+	return run
+
+
+def _assert_runnable(agent):
 	enabled = frappe.db.get_value("OS Agent Registry", agent, "is_enabled")
 	if enabled is None:
 		frappe.throw(f"Agent {agent} does not exist.")
 	if not enabled:
 		frappe.throw(f"Agent {agent} is disabled.")
 
-	run = frappe.get_doc(
+
+def _new_run(agent, payload, trigger_type):
+	doc = frappe.get_doc(
 		{
 			"doctype": "OS Agent Run",
 			"agent": agent,
@@ -33,14 +73,7 @@ def execute_agent(agent, payload=None, trigger_type="Manual"):
 			"input": json.dumps(payload, indent=1) if payload is not None else None,
 		}
 	).insert(ignore_permissions=True)
-
-	frappe.enqueue(
-		"alaiy_os.engine.executor.run_queued",
-		queue="long",
-		run=run.name,
-		enqueue_after_commit=True,
-	)
-	return run.name
+	return doc.name
 
 
 def run_queued(run):

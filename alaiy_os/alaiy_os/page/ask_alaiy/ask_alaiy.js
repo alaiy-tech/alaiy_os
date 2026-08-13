@@ -54,6 +54,13 @@ frappe.pages["ask-alaiy"].on_page_show = function (wrapper) {
 const POLL_INTERVAL_MS = 1000;
 const NEAR_BOTTOM_PX = 120;
 
+// Mirrors chat/attachments.py SUPPORTED. Only a hint to the file picker — the
+// server re-checks, since this attribute is trivially bypassed and the
+// browser-supplied content type is not evidence of anything.
+const ACCEPT_ATTRIBUTE =
+	".pdf,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.yaml,.yml,.py,.js,.ts,.sql,.log,.xml,.html,.htm,.css,.ini,.cfg,.toml";
+const MAX_ATTACHMENTS = 5;
+
 class AlaiyAskPage {
 	constructor(page) {
 		this.page = page;
@@ -63,6 +70,15 @@ class AlaiyAskPage {
 		this.poll_timer = null;
 		this.sessions = [];
 		this.query = "";
+		// Staged uploads, keyed by a client id so a chip exists (and can show a
+		// spinner or an error) before the server has given it a name.
+		this.pending = new Map();
+		this.upload_seq = 0;
+		// The `/` catalogue, fetched once on the first slash. null = not yet
+		// asked; [] = asked and this site has no skills.
+		this.skills = null;
+		this.skill_matches = [];
+		this.skill_index = 0;
 
 		this._ensure_styles();
 		this._render();
@@ -349,6 +365,91 @@ class AlaiyAskPage {
 			.ask-alaiy-hint {
 				margin: 7px 4px 0; font-size: 11.5px; color: var(--s-muted); text-align: center;
 			}
+			.ask-alaiy-attach {
+				flex: none; width: 36px; height: 36px; border-radius: 50%; border: none;
+				background: none; cursor: pointer; color: var(--s-muted);
+				display: flex; align-items: center; justify-content: center;
+				transition: background .12s, color .12s;
+			}
+			.ask-alaiy-attach:hover { background: var(--s-hover); color: var(--s-ink); }
+			.ask-alaiy-attach:disabled { opacity: .35; cursor: default; background: none; }
+			.ask-alaiy-file-input { display: none; }
+
+			/* ── Skill picker ────────────────────────────────────────────────
+			   Opens above the composer on "/". Positioned relative to the wrap
+			   so it floats over the thread instead of pushing the composer down
+			   — the input must not move while the user is typing into it. */
+			.ask-alaiy-composer-wrap { position: relative; }
+			.ask-alaiy-skills {
+				position: absolute; left: 28px; right: 28px; bottom: 100%;
+				margin-bottom: 8px; z-index: 5; overflow: hidden auto; max-height: 260px;
+				background: var(--s-white);
+				border: var(--s-border-width) var(--s-border-style) var(--s-border);
+				border-radius: var(--s-radius-lg); box-shadow: var(--shadow-md);
+			}
+			.ask-alaiy-skill {
+				display: block; width: 100%; text-align: start; border: none; background: none;
+				cursor: pointer; padding: 9px 14px; font-family: var(--s-font); color: var(--s-ink);
+				border-bottom: var(--s-border-width) var(--s-border-style) var(--s-border);
+			}
+			.ask-alaiy-skill:last-child { border-bottom: none; }
+			.ask-alaiy-skill.is-active, .ask-alaiy-skill:hover { background: var(--s-hover); }
+			.ask-alaiy-skill-slug { font-size: 13.5px; font-weight: 600; }
+			.ask-alaiy-skill-label { font-size: 13.5px; color: var(--s-muted); margin-inline-start: 8px; }
+			.ask-alaiy-skill-desc {
+				display: block; font-size: 11.5px; color: var(--s-muted); margin-top: 2px;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			.ask-alaiy-skills-empty { padding: 10px 14px; font-size: 12.5px; color: var(--s-muted); }
+
+			/* ── Attachment chips ────────────────────────────────────────────
+			   The tray sits above the composer while files are staged; the same
+			   chip markup is reused inside a sent message, where it is inert. */
+			.ask-alaiy-tray {
+				display: flex; flex-wrap: wrap; gap: 7px; margin: 0 0 8px;
+			}
+			.ask-alaiy-tray:empty { display: none; }
+			.ask-alaiy-file {
+				display: inline-flex; align-items: center; gap: 7px; max-width: 260px;
+				padding: 6px 9px; background: var(--s-cream);
+				border: var(--s-border-width) var(--s-border-style) var(--s-border);
+				border-radius: var(--s-radius-sm);
+				font-family: var(--s-font); font-size: 12.5px; color: var(--s-ink);
+			}
+			.ask-alaiy-file-icon { flex: none; display: flex; color: var(--s-muted); }
+			.ask-alaiy-file-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+			.ask-alaiy-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+			.ask-alaiy-file-meta { font-size: 11px; color: var(--s-muted); }
+			.ask-alaiy-file.is-error {
+				border-color: var(--s-red); color: var(--s-red); background: var(--s-white);
+			}
+			.ask-alaiy-file.is-error .ask-alaiy-file-icon,
+			.ask-alaiy-file.is-error .ask-alaiy-file-meta { color: var(--s-red); }
+			.ask-alaiy-file-remove {
+				flex: none; border: none; background: none; cursor: pointer; padding: 2px;
+				border-radius: var(--s-radius-sm); color: var(--s-muted); display: flex;
+			}
+			.ask-alaiy-file-remove:hover { background: var(--s-hover); color: var(--s-ink); }
+			/* Spinner shares the icon slot, so a chip does not resize when it lands. */
+			.ask-alaiy-file-spinner {
+				flex: none; width: 14px; height: 14px; border-radius: 50%;
+				border: 1.9px solid var(--s-border); border-top-color: var(--s-black);
+				animation: ask-alaiy-spin .7s linear infinite;
+			}
+			@keyframes ask-alaiy-spin { to { transform: rotate(360deg); } }
+
+			/* Chips attached to a sent message, above the user's bubble. */
+			.ask-alaiy-turn.is-user .ask-alaiy-tray { justify-content: flex-end; margin-bottom: 6px; }
+			.ask-alaiy-turn.is-user .ask-alaiy-file { background: var(--s-white); }
+			.ask-alaiy-file-link { color: inherit; text-decoration: none; }
+			.ask-alaiy-file-link:hover .ask-alaiy-file-name { text-decoration: underline; }
+
+			/* Drag-and-drop target: the whole thread, so the user does not have
+			   to hit the small paperclip. */
+			.ask-alaiy-main.is-dropping .ask-alaiy-scroll {
+				outline: 2px dashed var(--s-black); outline-offset: -10px;
+				border-radius: var(--s-radius-lg);
+			}
 
 			@media (max-width: 900px) {
 				.ask-alaiy-rail { display: none; }
@@ -370,6 +471,10 @@ class AlaiyAskPage {
 			caret: '<path d="M9 6l6 6-6 6"/>',
 			spark: '<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>',
 			warn: '<path d="M12 3l9 16H3z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+			paperclip:
+				'<path d="M21 11.5l-8.8 8.8a5 5 0 01-7.1-7.1l9-9a3.3 3.3 0 014.7 4.7l-9 9a1.7 1.7 0 01-2.4-2.4l8.3-8.3"/>',
+			file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/>',
+			close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 		};
 		return (
 			`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ` +
@@ -397,12 +502,20 @@ class AlaiyAskPage {
 						<div class="ask-alaiy-thread"></div>
 					</div>
 					<div class="ask-alaiy-composer-wrap">
+						<div class="ask-alaiy-skills" role="listbox" aria-label="${__("Skills")}" hidden></div>
+						<div class="ask-alaiy-tray" aria-live="polite"></div>
 						<div class="ask-alaiy-composer">
+							<button type="button" class="ask-alaiy-attach"
+								aria-label="${__("Attach a file")}" title="${__(
+									"Attach a PDF, spreadsheet, CSV or text file",
+								)}">${this._icon("paperclip")}</button>
 							<textarea rows="1" placeholder="${__("Ask about stock, orders, listings…")}"
 								aria-label="${__("Message Alaiy")}"></textarea>
 							<button type="button" class="btn btn-primary ask-alaiy-send"
 								aria-label="${__("Send")}" disabled>${this._icon("send")}</button>
 						</div>
+						<input type="file" class="ask-alaiy-file-input" multiple
+							accept="${ACCEPT_ATTRIBUTE}" aria-hidden="true" tabindex="-1">
 						<p class="ask-alaiy-hint">${__("Alaiy reads live business data. Check anything it changes.")}</p>
 					</div>
 				</div>
@@ -415,6 +528,10 @@ class AlaiyAskPage {
 		this.$thread = this.$shell.find(".ask-alaiy-thread");
 		this.$input = this.$shell.find(".ask-alaiy-composer textarea");
 		this.$send = this.$shell.find(".ask-alaiy-send");
+		this.$tray = this.$shell.find(".ask-alaiy-composer-wrap .ask-alaiy-tray");
+		this.$attach = this.$shell.find(".ask-alaiy-attach");
+		this.$file_input = this.$shell.find(".ask-alaiy-file-input");
+		this.$skills = this.$shell.find(".ask-alaiy-skills");
 
 		this._show_welcome();
 	}
@@ -429,18 +546,75 @@ class AlaiyAskPage {
 		};
 
 		this.$input.on("input", () => {
-			this.$send.prop("disabled", this.running || !this.$input.val().trim());
+			this._sync_send();
+			this._sync_skills();
 			autoGrow();
 		});
 		this.$input.on("focus", () => $composer.addClass("is-focused"));
-		this.$input.on("blur", () => $composer.removeClass("is-focused"));
+		this.$input.on("blur", () => {
+			$composer.removeClass("is-focused");
+			// A click on a skill row blurs the textarea before it fires, so the
+			// picker cannot close synchronously or the mousedown lands on nothing.
+			setTimeout(() => this._close_skills(), 150);
+		});
 		this.$input.on("keydown", (e) => {
+			// The picker owns the arrow keys and Enter while it is open — the
+			// same bargain every command palette makes.
+			if (this._skills_open() && this._skill_keydown(e)) return;
 			if (e.key === "Enter" && !e.shiftKey) {
 				e.preventDefault();
 				this._submit();
 			}
 		});
 		this.$send.on("click", () => this._submit());
+
+		// ── Attachments ────────────────────────────────────────────────────
+		this.$attach.on("click", () => this.$file_input.trigger("click"));
+		this.$file_input.on("change", (e) => {
+			this._upload_files(e.target.files);
+			// Reset, or picking the same file twice in a row fires no change.
+			e.target.value = "";
+		});
+
+		this.$input.on("paste", (e) => {
+			const files = (e.originalEvent.clipboardData || {}).files;
+			if (files && files.length) {
+				// Pasted a file, not text — let it become an attachment rather
+				// than dumping a filename into the textarea.
+				e.preventDefault();
+				this._upload_files(files);
+			}
+		});
+
+		// Drop anywhere on the conversation. dragenter/dragleave fire for every
+		// child element, so the counter is what keeps the outline from
+		// flickering as the pointer crosses message boundaries.
+		const $main = this.$shell.find(".ask-alaiy-main");
+		let drag_depth = 0;
+		const has_files = (e) =>
+			Array.from(e.originalEvent.dataTransfer.types || []).includes("Files");
+
+		$main.on("dragenter dragover", (e) => {
+			if (!has_files(e)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			if (e.type === "dragenter" && drag_depth++ === 0) $main.addClass("is-dropping");
+		});
+		$main.on("dragleave", (e) => {
+			if (!has_files(e)) return;
+			if (--drag_depth <= 0) {
+				drag_depth = 0;
+				$main.removeClass("is-dropping");
+			}
+		});
+		$main.on("drop", (e) => {
+			if (!has_files(e)) return;
+			e.preventDefault();
+			e.stopPropagation();
+			drag_depth = 0;
+			$main.removeClass("is-dropping");
+			this._upload_files(e.originalEvent.dataTransfer.files);
+		});
 
 		this.$search.on("focus", () => $searchBox.addClass("is-focused"));
 		this.$search.on("blur", () => $searchBox.removeClass("is-focused"));
@@ -455,25 +629,351 @@ class AlaiyAskPage {
 
 	_submit() {
 		const text = (this.$input.val() || "").trim();
-		if (!text || this.running) return;
+		if (!this._can_send()) return;
+		// Typing a slug in full and pressing Enter should run the skill, whether
+		// or not the picker was still showing — otherwise "/daily-digest" is
+		// sent to the model as a line of prose it can do nothing with.
+		const skill = this._exact_skill(text);
 		this.$input.val("").trigger("input").focus();
-		this._send(text);
+		this._close_skills();
+		this._send(text, skill);
+	}
+
+	// ── Skill picker ────────────────────────────────────────────────────────
+	/** The partial slug being typed, or null when this is not a `/` command.
+	 *
+	 * Only a message that is *entirely* a slash command counts. A slash inside
+	 * a sentence ("check 24/7 coverage") is text, and a slug that already has a
+	 * space after it is a sentence too — skills take no arguments, so there is
+	 * nothing to complete past that point. */
+	_skill_query() {
+		const value = this.$input.val() || "";
+		const match = /^\/([a-z0-9-]*)$/.exec(value.trimStart());
+		return match ? match[1] : null;
+	}
+
+	_exact_skill(text) {
+		const slug = /^\/([a-z0-9-]+)$/.exec(text);
+		if (!slug || !this.skills) return null;
+		return this.skills.some((s) => s.slug === slug[1]) ? slug[1] : null;
+	}
+
+	_skills_open() {
+		return !this.$skills.prop("hidden");
+	}
+
+	async _sync_skills() {
+		const query = this._skill_query();
+		if (query === null) return this._close_skills();
+
+		if (this.skills === null) {
+			// One fetch per page load. A failure is not worth an error banner —
+			// the user can still type their question — so it degrades to "this
+			// site has no skills" and will not be retried in a tight loop.
+			try {
+				this.skills = await frappe.xcall("alaiy_os.api.chat.list_skills");
+			} catch (e) {
+				this.skills = [];
+			}
+			// The user may have typed on past the slash while that was in flight.
+			if (this._skill_query() === null) return this._close_skills();
+		}
+
+		this.skill_matches = this.skills.filter(
+			(s) => s.slug.includes(query) || (s.label || "").toLowerCase().includes(query),
+		);
+		this.skill_index = 0;
+		this._draw_skills();
+	}
+
+	_draw_skills() {
+		this.$skills.empty().prop("hidden", false);
+
+		if (!this.skill_matches.length) {
+			this.$skills.append(
+				$('<div class="ask-alaiy-skills-empty"></div>').text(
+					this.skills.length ? __("No matching skill.") : __("No skills are set up on this site."),
+				),
+			);
+			return;
+		}
+
+		this.skill_matches.forEach((skill, i) => {
+			const $row = $('<button type="button" class="ask-alaiy-skill" role="option"></button>')
+				.toggleClass("is-active", i === this.skill_index)
+				.appendTo(this.$skills);
+			$('<span class="ask-alaiy-skill-slug"></span>').text("/" + skill.slug).appendTo($row);
+			$('<span class="ask-alaiy-skill-label"></span>').text(skill.label || "").appendTo($row);
+			if (skill.description) {
+				$('<span class="ask-alaiy-skill-desc"></span>').text(skill.description).appendTo($row);
+			}
+			// mousedown, not click: the textarea's blur fires first on click and
+			// would have closed the picker out from under the pointer.
+			$row.on("mousedown", (e) => {
+				e.preventDefault();
+				this._run_skill(skill);
+			});
+		});
+	}
+
+	_skill_keydown(e) {
+		const last = this.skill_matches.length - 1;
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			if (last < 0) return true;
+			const step = e.key === "ArrowDown" ? 1 : -1;
+			this.skill_index = (this.skill_index + step + this.skill_matches.length) % this.skill_matches.length;
+			this._draw_skills();
+			return true;
+		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			this._close_skills();
+			return true;
+		}
+		if (e.key === "Enter" || e.key === "Tab") {
+			const chosen = this.skill_matches[this.skill_index];
+			if (!chosen) return false;
+			e.preventDefault();
+			this._run_skill(chosen);
+			return true;
+		}
+		return false;
+	}
+
+	_run_skill(skill) {
+		this._close_skills();
+		if (this.running) return;
+		this.$input.val("").trigger("input").focus();
+		this._send("/" + skill.slug, skill.slug);
+	}
+
+	_close_skills() {
+		this.$skills.empty().prop("hidden", true);
+		this.skill_matches = [];
+		this.skill_index = 0;
+	}
+
+	/** Ready to send: not mid-turn, and there is either something typed or at
+	 * least one attachment that finished uploading. A file on its own is a
+	 * legitimate message — "what do you make of this?" is implied. */
+	_can_send() {
+		if (this.running) return false;
+		if ((this.$input.val() || "").trim()) return true;
+		return this._ready_attachments().length > 0;
+	}
+
+	_ready_attachments() {
+		return Array.from(this.pending.values()).filter((a) => a.name);
+	}
+
+	_sync_send() {
+		this.$send.prop("disabled", !this._can_send());
+	}
+
+	// ── Attachments ─────────────────────────────────────────────────────────
+	/** The session id, creating the session if this is the first thing to
+	 * happen in it. Attaching a file needs somewhere to put it, so a chat that
+	 * starts with an upload rather than a message has to be created here. */
+	async _ensure_session() {
+		if (!this.session) {
+			const created = await frappe.xcall("alaiy_os.api.chat.create_session");
+			this.session = created.session;
+		}
+		return this.session;
+	}
+
+	/** Upload each picked file independently, so one rejection does not lose
+	 * the others and each chip carries its own progress and error. */
+	async _upload_files(files) {
+		const picked = Array.from(files || []);
+		if (!picked.length || this.running) return;
+
+		const room = MAX_ATTACHMENTS - this.pending.size;
+		if (room <= 0) {
+			frappe.show_alert({
+				message: __("You can attach up to {0} files to one message.", [MAX_ATTACHMENTS]),
+				indicator: "orange",
+			});
+			return;
+		}
+		if (picked.length > room) {
+			frappe.show_alert({
+				message: __("Only the first {0} files were attached — the limit is {1} per message.", [
+					room,
+					MAX_ATTACHMENTS,
+				]),
+				indicator: "orange",
+			});
+		}
+
+		let session;
+		try {
+			session = await this._ensure_session();
+		} catch (e) {
+			this._show_error(this._error_text(e, __("Could not start a chat for this file.")));
+			return;
+		}
+
+		picked.slice(0, room).forEach((file) => this._upload_one(session, file));
+	}
+
+	async _upload_one(session, file) {
+		const id = `up-${++this.upload_seq}`;
+		this.pending.set(id, { id, file_name: file.name, file_size: file.size, uploading: true });
+		this._draw_tray();
+
+		try {
+			const body = new FormData();
+			body.append("file", file);
+
+			// Not frappe.xcall: this is multipart, and xcall serialises to form
+			// fields. The CSRF token has to be sent by hand for the same reason.
+			const response = await fetch(
+				`/api/method/alaiy_os.api.chat.upload_attachment?session=${encodeURIComponent(session)}`,
+				{
+					method: "POST",
+					headers: { "X-Frappe-CSRF-Token": frappe.csrf_token },
+					credentials: "same-origin",
+					body: body,
+				},
+			);
+			const payload = await response.json();
+			if (!response.ok) throw payload;
+
+			// A chat opened while this was in flight — the file belongs to a
+			// session no longer on screen.
+			if (this.session !== session || !this.pending.has(id)) return;
+
+			this.pending.set(id, { id, uploading: false, ...payload.message });
+		} catch (e) {
+			if (this.session !== session || !this.pending.has(id)) return;
+			this.pending.set(id, {
+				id,
+				file_name: file.name,
+				file_size: file.size,
+				uploading: false,
+				error: this._upload_error(e),
+			});
+		}
+
+		this._draw_tray();
+	}
+
+	/** Frappe reports a thrown message in _server_messages, as a JSON array of
+	 * JSON strings. Anything else is a network or gateway failure. */
+	_upload_error(e) {
+		try {
+			const messages = JSON.parse(e._server_messages || "[]");
+			const first = JSON.parse(messages[0]);
+			// frappe.throw wraps the message in markup. It is rendered into a
+			// chip with .text(), so strip the tags rather than trusting them.
+			const plain = (first.message || "").replace(/<[^>]*>/g, "").trim();
+			if (plain) return plain;
+		} catch (_) {
+			// Not a Frappe error payload — fall through.
+		}
+		return (e && e.message) || __("Upload failed.");
+	}
+
+	async _remove_attachment(id) {
+		const entry = this.pending.get(id);
+		this.pending.delete(id);
+		this._draw_tray();
+
+		// A failed upload never produced a row, and one still in flight will
+		// find itself dropped when it lands (see the guards in _upload_one).
+		if (entry && entry.name) {
+			try {
+				await frappe.xcall("alaiy_os.api.chat.delete_attachment", { attachment: entry.name });
+			} catch (e) {
+				// The chip is already gone and the file is unreferenced; the
+				// session's own delete will collect it. Not worth interrupting.
+			}
+		}
+	}
+
+	_draw_tray() {
+		this.$tray.empty();
+		this.pending.forEach((entry) => {
+			this.$tray.append(
+				this._file_chip(entry, {
+					onRemove: () => this._remove_attachment(entry.id),
+				}),
+			);
+		});
+		this.$attach.prop("disabled", this.running || this.pending.size >= MAX_ATTACHMENTS);
+		this._sync_send();
+	}
+
+	/** One file, as a chip. Used both in the composer tray (removable, may be
+	 * mid-upload or failed) and above a sent message (inert, links to the
+	 * stored file). */
+	_file_chip(entry, options) {
+		const opts = options || {};
+		const $chip = $('<div class="ask-alaiy-file"></div>');
+		if (entry.error) $chip.addClass("is-error");
+
+		$chip.append(
+			entry.uploading
+				? '<div class="ask-alaiy-file-spinner" role="progressbar"></div>'
+				: `<span class="ask-alaiy-file-icon">${this._icon("file")}</span>`,
+		);
+
+		const $text = $('<div class="ask-alaiy-file-text"></div>').appendTo($chip);
+		$('<div class="ask-alaiy-file-name"></div>').text(entry.file_name || "").appendTo($text);
+		$('<div class="ask-alaiy-file-meta"></div>')
+			.text(this._file_meta(entry))
+			.appendTo($text);
+
+		if (entry.file_url && !opts.onRemove) {
+			// Sent messages link to the stored file; it is private, so only the
+			// people who can read the chat can open it.
+			$text.wrap($('<a class="ask-alaiy-file-link" target="_blank" rel="noopener"></a>').attr("href", entry.file_url));
+		}
+
+		if (opts.onRemove) {
+			$(`<button type="button" class="ask-alaiy-file-remove" aria-label="${__("Remove")}">
+					${this._icon("close")}
+				</button>`)
+				.on("click", opts.onRemove)
+				.appendTo($chip);
+		}
+
+		return $chip;
+	}
+
+	_file_meta(entry) {
+		if (entry.error) return entry.error;
+		if (entry.uploading) return __("Reading…");
+		const size = frappe.form.formatters.FileSize(entry.file_size || 0);
+		// Characters, not bytes, is what decides how much of the file the model
+		// actually sees — a 4 MB PDF of scans and a 4 MB PDF of text are very
+		// different inputs.
+		return entry.chars ? `${size} · ${__("{0} characters read", [entry.chars])}` : size;
 	}
 
 	// ── Conversation ────────────────────────────────────────────────────────
-	async _send(text) {
+	async _send(text, skill) {
+		const attached = this._ready_attachments();
+
 		this._clear_welcome();
-		this._add(this._user_turn(text));
+		this._add(this._user_turn(text, attached));
+		this.pending.clear();
+		this._draw_tray();
 		this._set_running(true);
 
 		try {
-			if (!this.session) {
-				const created = await frappe.xcall("alaiy_os.api.chat.create_session");
-				this.session = created.session;
-			}
+			const session = await this._ensure_session();
 			const sent = await frappe.xcall("alaiy_os.api.chat.send_message", {
-				session: this.session,
+				session: session,
 				text: text,
+				attachments: JSON.stringify(attached.map((a) => a.name)),
+				skill: skill || null,
+				// This page IS the assistant, so there is no other screen to
+				// report. A host embedding the panel alongside a list view would
+				// pass its own route here.
+				screen: "ask-alaiy",
 			});
 			// Skip past our own message: it is already on screen.
 			this.last_seq = sent.seq;
@@ -528,10 +1028,18 @@ class AlaiyAskPage {
 	}
 
 	// ── Rendering ───────────────────────────────────────────────────────────
-	_user_turn(text) {
-		return $('<div class="ask-alaiy-turn is-user"></div>').append(
-			$('<div class="ask-alaiy-user-bubble"></div>').text(text),
-		);
+	_user_turn(text, attachments) {
+		const $turn = $('<div class="ask-alaiy-turn is-user"></div>');
+
+		const files = attachments || [];
+		if (files.length) {
+			const $tray = $('<div class="ask-alaiy-tray"></div>').appendTo($turn);
+			files.forEach((file) => $tray.append(this._file_chip(file, {})));
+		}
+		// An attachment-only message has no bubble — the chips are the message.
+		if (text) $turn.append($('<div class="ask-alaiy-user-bubble"></div>').text(text));
+
+		return $turn;
 	}
 
 	/** A tool round-trip is an assistant message of tool_use blocks followed by
@@ -540,8 +1048,10 @@ class AlaiyAskPage {
 	_draw(message) {
 		if (message.role === "user") {
 			// Replayed history (loading an old chat) reaches here; a message
-			// just typed is already on screen.
-			if (message.text) this._add(this._user_turn(message.text));
+			// just typed is already on screen. Tool-result messages have
+			// neither text nor files and draw nothing.
+			const files = message.attachments || [];
+			if (message.text || files.length) this._add(this._user_turn(message.text, files));
 			return;
 		}
 
@@ -577,8 +1087,12 @@ class AlaiyAskPage {
 				.appendTo($trail);
 
 			const $summary = $("<summary></summary>").appendTo($step);
+			// A `/skill` dispatch arrives as a tool call named "skill:<slug>"
+			// (see chat/skills.py). Show it as the command the user typed rather
+			// than as a tool they have never heard of.
+			const name = String(call.name || "");
 			$('<span class="ask-alaiy-step-name"></span>')
-				.text(String(call.name || "").replace(/_/g, " "))
+				.text(name.startsWith("skill:") ? "/" + name.slice(6) : name.replace(/_/g, " "))
 				.appendTo($summary);
 			if (bad) $summary.append(document.createTextNode(" · " + __("refused")));
 			if (args.length) $summary.append(`<span class="ask-alaiy-step-caret">${this._icon("caret")}</span>`);
@@ -746,7 +1260,8 @@ class AlaiyAskPage {
 
 	_set_running(running) {
 		this.running = running;
-		this.$send.prop("disabled", running || !(this.$input.val() || "").trim());
+		this._sync_send();
+		this.$attach.prop("disabled", running || this.pending.size >= MAX_ATTACHMENTS);
 		this.$thread.find(".ask-alaiy-typing-turn").remove();
 		if (running) {
 			this.$thread.append(`
@@ -947,6 +1462,11 @@ class AlaiyAskPage {
 		// database, this page just stops following them.
 		this.session = null;
 		this.last_seq = 0;
+		// Staged uploads belong to the session being left behind. Dropping them
+		// from the tray is enough — they are attached to that session and go
+		// with it if it is ever deleted.
+		this.pending.clear();
+		this._draw_tray();
 		this._set_running(false);
 		this.$thread.empty();
 		this.rail_failed = false;

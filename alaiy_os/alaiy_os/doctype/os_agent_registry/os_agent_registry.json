@@ -17,6 +17,9 @@
   "run_as_user",
   "settings_doctype",
   "page",
+  "chat_skill",
+  "skill_slug",
+  "skill_label",
   "engine_section",
   "model",
   "max_turns",
@@ -95,6 +98,28 @@
    "fieldtype": "Link",
    "label": "Page",
    "options": "Page"
+  },
+  {
+   "default": "0",
+   "description": "Expose this agent in Ask Alaiy as a <code>/</code> skill. A skill runs with NO payload and for ANY user who can chat — the OS Agent Run permission is not the gate, because it grants System Manager only. Tick this only when every tool on this agent enforces its own permissions (read via <code>frappe.get_list</code>, never <code>get_all</code>) and none of them write.",
+   "fieldname": "chat_skill",
+   "fieldtype": "Check",
+   "label": "Available as Chat Skill"
+  },
+  {
+   "depends_on": "chat_skill",
+   "description": "What the user types after the slash, e.g. <code>daily-digest</code>. Lowercase letters, digits and hyphens.",
+   "fieldname": "skill_slug",
+   "fieldtype": "Data",
+   "label": "Skill Slug",
+   "mandatory_depends_on": "chat_skill"
+  },
+  {
+   "depends_on": "chat_skill",
+   "description": "Name shown in the skill picker. Defaults to Agent Name.",
+   "fieldname": "skill_label",
+   "fieldtype": "Data",
+   "label": "Skill Label"
   },
   {
    "fieldname": "engine_section",

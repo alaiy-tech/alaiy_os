@@ -38,7 +38,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Trigger Type",
-   "options": "Manual\nAPI\nScheduled\nDoc Event"
+   "options": "Manual\nAPI\nScheduled\nDoc Event\nChat"
   },
   {
    "default": "Queued",

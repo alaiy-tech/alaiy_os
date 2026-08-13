@@ -30,6 +30,8 @@ import traceback
 import frappe
 from frappe.utils import now_datetime
 
+from alaiy_os.chat import attachments as chat_attachments
+from alaiy_os.chat import skills as chat_skills
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.engine import llm
 
@@ -47,6 +49,14 @@ MAX_TOOL_RESULT_CHARS = 20_000
 # messages fall off the front; see `_history`.
 MAX_HISTORY_MESSAGES = 60
 
+# How many *inlined* attachment-bearing user messages keep their file contents
+# on replay. Within one turn the document has to be re-sent on every iteration
+# of `_loop` — the model needs it while it works through its tool calls — but
+# carrying it across later turns forever is pure cost. Attachments passed as
+# tool pointers are exempt: they are already tiny, and eliding one would strip
+# the file_url the model needs to read it again. See `_elide_old_attachments`.
+ATTACHMENT_MEMORY = 1
+
 
 # ── Entry points ─────────────────────────────────────────────────────────────
 def default_model():
@@ -55,10 +65,23 @@ def default_model():
 
 
 
-def start_turn(session, text):
+def start_turn(session, text, attachments=None, skill=None, screen=None):
 	"""Append the user's message and enqueue the turn. Returns the message seq.
 
-	Safe to call from a web request — it does no LLM work itself.
+	`attachments` is a list of `OS Chat Attachment` names staged by
+	`api.chat.upload_attachment`. Their extracted text is inlined ahead of the
+	user's own words as ordinary text blocks — the model never sees a file, only
+	a document quoted into the conversation.
+
+	`skill` is an `OS Agent Registry` skill slug (see `chat/skills.py`). It is
+	resolved here so an unknown slug is a 417 on the send rather than a failure
+	that only shows up in the thread a minute later, but it is *run* on the
+	worker — the agent behind it makes its own LLM calls.
+
+	`screen` is whatever route the client was on, recorded on the message.
+
+	Safe to call from a web request — it does no LLM work itself. The files were
+	already parsed at upload time, so nothing expensive happens here.
 	"""
 	doc = frappe.get_doc("OS Chat Session", session)
 	doc.check_permission("write")
@@ -66,14 +89,35 @@ def start_turn(session, text):
 		frappe.throw("This chat is still working on the previous message.")
 
 	text = (text or "").strip()
-	if not text:
+	if skill:
+		skill = str(skill).strip().lstrip("/").lower()
+		chat_skills.resolve(skill)
+		# The message needs words: it is what the user sees in their own bubble,
+		# what names the session in the rail, and what the model reads as the
+		# request the tool result is answering.
+		text = text or f"/{skill}"
+
+	att_blocks, meta, consumed = _attachment_blocks(session, attachments)
+	if not text and not att_blocks:
 		frappe.throw("Message is empty.")
 
-	seq = _append(session, "user", [{"type": "text", "text": text}], text=text)
+	blocks = att_blocks + ([{"type": "text", "text": text}] if text else [])
+	# `text=text` and not `_text_of(blocks)`: the attachment content must stay
+	# out of the denormalised column, or a whole PDF ends up rendered in the
+	# user's chat bubble and sliced into the session title below.
+	seq = _append(session, "user", blocks, text=text, attachments=meta, skill=skill, screen=screen)
+
+	if consumed:
+		# The staging rows have done their job — the message's blocks are now
+		# the record of what was sent. Raw delete: the uploaded Files are
+		# attached to the session, not to these rows, so they stay put and the
+		# sent message's chips keep working.
+		frappe.db.delete("OS Chat Attachment", {"name": ("in", consumed)})
 
 	updates = {"status": "Running", "error": None, "last_activity": now_datetime()}
 	if not doc.title:
-		updates["title"] = text[:TITLE_LENGTH]
+		# An attachment-only message still deserves a name in the rail.
+		updates["title"] = (text or meta[0]["file_name"])[:TITLE_LENGTH]
 	doc.db_set(updates)
 
 	frappe.enqueue(
@@ -107,6 +151,12 @@ def run_turn(session):
 		frappe.set_user(doc.owner)
 
 	try:
+		skill = _pending_skill(doc.name)
+		if skill:
+			# Writes the tool_use/tool_result pair, so by the time _loop reads the
+			# history the agent's output is the last thing in it and the model's
+			# first call is the one that narrates it.
+			chat_skills.run_skill(doc.name, skill, _append)
 		_loop(doc)
 	except Exception:
 		# Messages already written stay written — unlike a batch run, the
@@ -123,6 +173,25 @@ def run_turn(session):
 
 	doc.reload()
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
+
+
+def _pending_skill(session):
+	"""The slug to dispatch before this turn's first LLM call, if any.
+
+	Read from the last stored message rather than passed through the enqueue,
+	because the enqueue is deduplicated on the session (see `start_turn`): a
+	second send whose job was dropped must still have its skill run by whichever
+	job wins. Once `run_skill` has written its pair the last message is a
+	tool_result, so this cannot dispatch the same skill twice.
+	"""
+	last = frappe.db.get_value(
+		"OS Chat Message",
+		{"session": session},
+		["role", "skill_used"],
+		order_by="seq desc",
+		as_dict=True,
+	)
+	return last.skill_used if last and last.role == "user" else None
 
 
 # ── The loop ─────────────────────────────────────────────────────────────────
@@ -190,8 +259,147 @@ def _truncate(text):
 	return text[:MAX_TOOL_RESULT_CHARS] + f"\n… [truncated, {len(text)} chars total]"
 
 
+# ── Attachments ──────────────────────────────────────────────────────────────
+def _attachment_blocks(session, names):
+	"""Resolve staged uploads into (blocks, display meta, consumed row names).
+
+	Two modes, decided once here by whether this user can call FAC's file reader:
+
+	  - "tool": the block is a pointer and the model calls `extract_file_content`
+	    to read the file itself. Preferred — it costs a few dozen tokens instead
+	    of up to 20k, puts no ceiling on how much of the file is reachable, and
+	    picks up table extraction and OCR that this module does not do.
+	  - "inline": the extracted text goes straight into the block. The fallback
+	    for a site without FAC, or with the data_science plugin off — which is
+	    most of the point, since FAC is deliberately optional (see tools.py).
+
+	The choice is recorded per attachment in the meta rather than re-derived,
+	because a block already written must keep meaning what it meant: whether the
+	tool was available when the message was sent is not the same question as
+	whether it is available now.
+
+	The blocks always come first in the message and always number `len(meta)` —
+	`_elide_old_attachments` relies on that to find them again by position
+	rather than by sniffing their text.
+	"""
+	names = names or []
+	if isinstance(names, str):
+		names = json.loads(names or "[]")
+	if not names:
+		return [], [], []
+
+	# Resolved once: tool_specs() re-queries FAC's registry on every call.
+	available = {spec["name"] for spec in chat_tools.tool_specs()}
+	use_tool = chat_attachments.FILE_TOOL in available
+	can_run_code = use_tool and chat_attachments.CODE_TOOL in available
+
+	if len(names) > chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE:
+		frappe.throw(
+			f"Attach at most {chat_attachments.MAX_ATTACHMENTS_PER_MESSAGE} files to one message."
+		)
+
+	blocks, meta, consumed = [], [], []
+	budget = chat_attachments.MAX_CHARS_PER_MESSAGE
+
+	for name in names:
+		row = frappe.db.get_value(
+			"OS Chat Attachment",
+			name,
+			[
+				"name",
+				"owner",
+				"session",
+				"file",
+				"file_name",
+				"file_size",
+				"char_count",
+				"extracted_text",
+			],
+			as_dict=True,
+		)
+		# The session match is the real check — it is the session's own
+		# permission (already asserted by the caller) that authorises the read.
+		# The owner match is cheap depth on top of it. Nothing here trusts a
+		# client-supplied file_url: `save_file` de-duplicates by content hash,
+		# so one URL can belong to several users' uploads.
+		if not row or row.session != session or row.owner != frappe.session.user:
+			frappe.throw("That attachment is not available on this chat.")
+
+		entry = {
+			"file_name": row.file_name,
+			"file_url": frappe.db.get_value("File", row.file, "file_url") if row.file else None,
+			"file_size": row.file_size,
+			"mode": "tool" if use_tool else "inline",
+		}
+		consumed.append(row.name)
+
+		if use_tool:
+			# Nothing is quoted into the message, so the char budget does not
+			# apply — five pointers cost less than one inlined page.
+			entry["chars"] = row.char_count or 0
+			meta.append(entry)
+			blocks.append(chat_attachments.pointer_block(entry, can_run_code=can_run_code))
+			continue
+
+		text = row.extracted_text or ""
+		if len(text) > budget:
+			text = text[:budget] + f"\n… [truncated, {len(row.extracted_text)} chars total]"
+		budget -= len(text)
+
+		entry["chars"] = len(text)
+		meta.append(entry)
+		blocks.append(chat_attachments.render_block(row.file_name, text))
+
+		if budget <= 0:
+			# Everything after this would be an empty quotation. Better to send
+			# fewer whole files than several empty ones.
+			break
+
+	return blocks, meta, consumed
+
+
+def _elide_old_attachments(rows):
+	"""Strip file contents from all but the most recent attachment-bearing turn.
+
+	`_loop` re-reads the history on every iteration, so an attachment is re-sent
+	on each pass of the current turn — unavoidable, the model is still working
+	with it. What is avoidable is carrying every document the session has ever
+	seen into every future turn. Older ones collapse to a named stub the model
+	can ask the user to re-attach.
+	"""
+	messages = []
+	kept = 0
+	# Newest first, so "the most recent N" is just a counter.
+	for row in reversed(rows):
+		blocks = json.loads(row.blocks or "[]")
+		meta = json.loads(row.attachments or "[]")
+
+		# Only inlined attachments are worth eliding. A "tool" attachment is
+		# already a pointer costing a few dozen tokens, and stubbing it would
+		# destroy the file_url — the model's only route back to a file it may
+		# well be asked about again several turns later.
+		inlined = [m for m in meta if m.get("mode") != "tool"]
+
+		if inlined:
+			if kept < ATTACHMENT_MEMORY:
+				kept += 1
+			else:
+				# Attachment blocks are the first len(meta) entries — see
+				# `_attachment_blocks`. Positional, so nothing depends on
+				# parsing the text back out.
+				blocks = [
+					chat_attachments.stub_block(m) if m.get("mode") != "tool" else block
+					for m, block in zip(meta, blocks)
+				] + blocks[len(meta) :]
+
+		messages.append({"role": row.role, "content": blocks})
+
+	messages.reverse()
+	return messages
+
+
 # ── Persistence ──────────────────────────────────────────────────────────────
-def _append(session, role, blocks, text=None):
+def _append(session, role, blocks, text=None, attachments=None, skill=None, screen=None):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
 	seq = (last or 0) + 1
@@ -203,6 +411,9 @@ def _append(session, role, blocks, text=None):
 			"role": role,
 			"text": text,
 			"blocks": json.dumps(blocks, default=str),
+			"attachments": json.dumps(attachments) if attachments else None,
+			"skill_used": skill,
+			"screen": screen,
 		}
 	).insert(ignore_permissions=True)
 	return seq
@@ -213,11 +424,10 @@ def _history(session):
 	rows = frappe.get_all(
 		"OS Chat Message",
 		filters={"session": session},
-		fields=["role", "blocks"],
+		fields=["role", "blocks", "attachments"],
 		order_by="seq asc",
 	)
-	messages = [{"role": row.role, "content": json.loads(row.blocks)} for row in rows]
-	return _trim(messages)
+	return _trim(_elide_old_attachments(rows))
 
 
 def _trim(messages):
@@ -275,7 +485,7 @@ def _system_prompt():
 	roles = ", ".join(sorted(r for r in frappe.get_roles(user) if r not in ("All", "Guest")))
 	company = frappe.defaults.get_global_default("company") or "the company"
 
-	return (
+	prompt = (
 		"You are Alaiy, the assistant built into Alaiy OS — the e-commerce operations "
 		f"system {company} runs its catalogue, stock, orders and sales channels on.\n\n"
 		f"You are talking to {full_name} ({user}), whose roles are: {roles or 'none'}.\n"
@@ -288,6 +498,40 @@ def _system_prompt():
 		"- A tool may refuse on permissions. That is the system working; explain what "
 		"the user would need, do not look for another route to the same effect.\n"
 		"- Never invent figures. If you have not read a number with a tool, say so.\n\n"
-		"Answer in plain prose. Be concise and specific — cite the document names and "
-		"numbers you actually retrieved."
+		"Answer in plain prose, formatted as markdown — a table when you are reporting "
+		"rows, bold for the figures that matter. Be concise and specific: cite the "
+		"document names and numbers you actually retrieved."
 	)
+
+	extra = _tenant_context()
+	return f"{prompt}\n\n{extra}" if extra else prompt
+
+
+def _tenant_context():
+	"""Deployment-specific context appended to the built-in prompt.
+
+	The seam for a tenant app to say what only it knows — currency, date format,
+	which marketplaces exist, what its role names mean. Declared in the tenant's
+	own `hooks.py`:
+
+	    chat_system_context = ["alaiy_os_globali.chat_context.system_context"]
+
+	Each entry is a dotted path to a callable taking no arguments and returning a
+	string (or None to contribute nothing — how an app opts out per user or per
+	site). Appending rather than replacing is the whole point: the safety rules
+	above are not a tenant's to drop, and several apps can each contribute a
+	paragraph. `chat_system_prompt` in site_config is the escape hatch that
+	*does* replace everything, this included — it is checked first, on purpose.
+	"""
+	parts = []
+	for entry in frappe.get_hooks("chat_system_context") or []:
+		try:
+			value = frappe.get_attr(entry)()
+		except Exception:
+			# One tenant app's broken hook must not take the whole assistant
+			# down — the prompt is still usable without its paragraph.
+			frappe.log_error(title=f"chat_system_context hook failed: {entry}")
+			continue
+		if value:
+			parts.append(str(value).strip())
+	return "\n\n".join(parts)

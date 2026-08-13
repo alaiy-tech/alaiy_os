@@ -10,8 +10,11 @@
   "seq",
   "column_break_1",
   "role",
+  "skill_used",
+  "screen",
   "text",
-  "blocks"
+  "blocks",
+  "attachments"
  ],
  "fields": [
   {
@@ -44,6 +47,18 @@
    "reqd": 1
   },
   {
+   "description": "Set on a user message sent as a `/skill`: the OS Agent Registry skill_slug that was invoked. `runner.run_turn` reads it to decide whether the turn opens with an agent dispatch.",
+   "fieldname": "skill_used",
+   "fieldtype": "Data",
+   "label": "Skill Used"
+  },
+  {
+   "description": "Which screen the user was on when they sent this, as the client reported it (e.g. `orders`, `item/ABC-1`). Recorded for context and analytics; nothing dispatches on it.",
+   "fieldname": "screen",
+   "fieldtype": "Data",
+   "label": "Screen"
+  },
+  {
    "description": "Concatenated text blocks, denormalised for display. Empty for a tool-only message.",
    "fieldname": "text",
    "fieldtype": "Long Text",
@@ -54,6 +69,13 @@
    "fieldname": "blocks",
    "fieldtype": "Code",
    "label": "Blocks (JSON)",
+   "options": "JSON"
+  },
+  {
+   "description": "Files sent with this message: [{file_name, file_url, file_size, chars}]. Denormalised for display, like `text` — the model reads the contents from the leading blocks, not from here. Also tells `runner._history` how many leading blocks are attachments.",
+   "fieldname": "attachments",
+   "fieldtype": "Code",
+   "label": "Attachments (JSON)",
    "options": "JSON"
   }
  ],
