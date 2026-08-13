@@ -122,7 +122,13 @@ export const usersColumns: ColumnDef<UserRow>[] = [
       <div className="flex items-center justify-center">
         <Checkbox
           aria-label="Select all users"
-          checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
+          checked={
+            table.getIsAllPageRowsSelected()
+              ? true
+              : table.getIsSomePageRowsSelected()
+                ? "indeterminate"
+                : false
+          }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
       </div>
