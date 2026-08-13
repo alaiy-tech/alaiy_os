@@ -35,6 +35,19 @@ fixtures = [
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
 
+# OS Agent Run is an append-only audit log of what an agent did. Like Frappe's
+# own Communication / Activity Log / Version, it must never *block* deletion of
+# the thing it references: without this, an agent app that has run even once
+# cannot be uninstalled, because its own unregister() hits
+#
+#     LinkExistsError: Cannot delete ... OS Agent Registry <id> is linked with
+#     OS Agent Run RUN-...
+#
+# and the uninstall aborts. Deleting the registry row deliberately leaves the
+# run rows intact — each keeps its agent id, transcript, output and token
+# counts, so the audit trail survives with only the Link left dangling.
+ignore_links_on_delete = ["OS Agent Run"]
+
 # ── MCP tools (Frappe Assistant Core) ────────────────────────────────────────
 # These are dotted-path STRINGS. Frappe never imports them; only FAC's
 # custom_tools plugin resolves them, and only when FAC is installed. So this

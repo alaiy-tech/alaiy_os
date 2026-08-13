@@ -7,16 +7,22 @@ import { PaginationFooter } from "@/components/layout/pagination-footer";
 import { Separator } from "@/components/ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import type { SalesOrderRow } from "@/types/sales-orders";
+import type { PurchaseOrderRow } from "@/types/purchase-orders";
 
-export function SalesOrderTable({
+export function PurchaseOrderTable({
   table,
   isLoading,
   totalCount,
+  emptyMessage = "No results.",
+  onRowClick,
 }: {
-  table: TableType<SalesOrderRow>;
+  table: TableType<PurchaseOrderRow>;
   isLoading: boolean;
   totalCount: number;
+  /** Worded for the active status tab — "No orders to receive" says more than
+   * "No results" when the user is standing on the To Receive tab. */
+  emptyMessage?: string;
+  onRowClick?: (row: PurchaseOrderRow) => void;
 }) {
   const columnSizing = table.getState().columnSizing;
 
@@ -26,6 +32,49 @@ export function SalesOrderTable({
   function widthFor(columnId: string, fixedSize: number): number | undefined {
     if (columnId === "select") return fixedSize;
     return columnSizing[columnId];
+  }
+
+  function messageRow(message: string) {
+    return (
+      <TableRow>
+        <TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center text-muted-foreground">
+          {message}
+        </TableCell>
+      </TableRow>
+    );
+  }
+
+  function renderBody() {
+    if (isLoading) return messageRow("Loading orders…");
+
+    const rows = table.getRowModel().rows;
+    if (!rows.length) return messageRow(emptyMessage);
+
+    return rows.map((row) => (
+      <TableRow
+        key={row.id}
+        className={cn("border-border/60 hover:bg-muted/40", onRowClick && "cursor-pointer")}
+        data-state={row.getIsSelected() && "selected"}
+        onClick={(event) => {
+          // The row is a click target, but it also contains real controls —
+          // the select checkbox and the PO # link. Let those handle their own
+          // clicks rather than navigating out from under them.
+          if (!onRowClick) return;
+          if ((event.target as HTMLElement).closest("a,button,input,[role='checkbox']")) return;
+          onRowClick(row.original);
+        }}
+      >
+        {row.getVisibleCells().map((cell) => (
+          <TableCell
+            key={cell.id}
+            className="px-3 py-3 align-middle"
+            style={{ width: widthFor(cell.column.id, cell.column.getSize()) }}
+          >
+            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+          </TableCell>
+        ))}
+      </TableRow>
+    ));
   }
 
   return (
@@ -60,42 +109,7 @@ export function SalesOrderTable({
             ))}
           </TableHeader>
 
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell
-                  colSpan={table.getVisibleLeafColumns().length}
-                  className="h-24 text-center text-muted-foreground"
-                >
-                  Loading orders…
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="border-border/60 hover:bg-muted/40"
-                  data-state={row.getIsSelected() && "selected"}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className="px-3 py-3 align-middle"
-                      style={{ width: widthFor(cell.column.id, cell.column.getSize()) }}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center">
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
+          <TableBody>{renderBody()}</TableBody>
         </Table>
       </div>
 

@@ -14,6 +14,7 @@
   "description",
   "icon",
   "surface_section",
+  "run_as_user",
   "settings_doctype",
   "page",
   "chat_skill",
@@ -48,7 +49,7 @@
    "reqd": 1
   },
   {
-   "description": "Optional — shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",
+   "description": "Optional \u2014 shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",
    "fieldname": "agent_avatar",
    "fieldtype": "Attach Image",
    "label": "Avatar"
@@ -76,6 +77,13 @@
    "fieldname": "surface_section",
    "fieldtype": "Section Break",
    "label": "Surface"
+  },
+  {
+   "fieldname": "run_as_user",
+   "fieldtype": "Link",
+   "options": "User",
+   "label": "Run As User",
+   "description": "The agent executes as this user, so every tool read is scoped by their Roles and row-level permissions. Leave empty to run as Administrator, which sees the whole site."
   },
   {
    "description": "Settings DocType shipped by the agent app (API keys, toggles).",
@@ -128,7 +136,7 @@
   },
   {
    "default": "8",
-   "description": "Safety cap on LLM ↔ tool round-trips per run.",
+   "description": "Safety cap on LLM \u2194 tool round-trips per run.",
    "fieldname": "max_turns",
    "fieldtype": "Int",
    "label": "Max Turns"

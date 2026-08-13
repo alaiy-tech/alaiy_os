@@ -12,6 +12,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from alaiy_os.engine import llm
+from alaiy_os.engine.context import agent_run
 from alaiy_os.engine.factory import build_runnable
 
 
@@ -80,8 +81,20 @@ def run_queued(run):
 	doc = frappe.get_doc("OS Agent Run", run)
 	doc.db_set({"status": "Running", "started_at": now_datetime()}, commit=True)
 
+	# Adopt the agent's service user, so every tool read inside this run is
+	# scoped by that user's Roles and row-level permissions instead of seeing
+	# the whole site. Unset means Administrator, which is the old behaviour and
+	# is site-wide — deliberately explicit rather than implied.
+	run_as = frappe.db.get_value("OS Agent Registry", doc.agent, "run_as_user")
+	if run_as:
+		frappe.set_user(run_as)
+
 	try:
-		result = _run_loop(doc)
+		# Publish which agent is spending so the AI client can attribute usage
+		# per agent. The spend still comes from the site's single shared pool —
+		# this labels it, it does not budget it.
+		with agent_run(agent_id=doc.agent, run=doc.name, trigger=doc.trigger_type):
+			result = _run_loop(doc)
 	except Exception as exc:
 		# The conversation so far, when the loop got far enough to have one —
 		# without it a failed run is undebuggable (the whole reason it failed is
@@ -158,8 +171,25 @@ def _dispatch_tools(agent, content, usage):
 	for block in content:
 		if block["type"] != "tool_use":
 			continue
+		handler = agent.handlers.get(block["name"])
+		if handler is None:
+			# The model invented a tool. The common case is a pseudo-tool like
+			# "none"/"done" used to signal it has finished — models reach for one
+			# when a prompt tells them to stop calling tools. Answering that with
+			# a traceback teaches nothing and costs real tokens: it is echoed back
+			# on every following turn, and the model usually just tries again,
+			# burning the turn budget. Say what exists and how to finish instead.
+			results.append(_tool_result(
+				block["id"],
+				f"Unknown tool {block['name']!r}. Available tools: "
+				f"{', '.join(sorted(agent.handlers))}. "
+				"If you already have what you need, reply with your final answer "
+				"instead of calling a tool.",
+				is_error=True,
+			))
+			continue
 		try:
-			value = agent.handlers[block["name"]](**(block["input"] or {}))
+			value = handler(**(block["input"] or {}))
 			if isinstance(value, dict) and "_usage" in value:
 				tool_usage = value.pop("_usage")
 				usage["image_tokens"] += tool_usage.get("image_tokens", 0)

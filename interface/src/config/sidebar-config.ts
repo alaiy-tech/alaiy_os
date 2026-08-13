@@ -21,48 +21,21 @@ import {
   Truck,
   Users,
   Warehouse,
-  type LucideIcon,
 } from "lucide-react";
 
-export type NavBadge = "new" | "soon";
+import { contributedNav } from "./contributed-nav";
+import type { NavGroup, NavMainItem } from "./nav-types";
 
-export interface NavSubItem {
-  id: string;
-  title: string;
-  url: string;
-  icon?: LucideIcon;
-  badge?: NavBadge;
-  disabled?: boolean;
-  newTab?: boolean;
-}
+export type {
+  NavBadge,
+  NavGroup,
+  NavMainItem,
+  NavMainLinkItem,
+  NavMainParentItem,
+  NavSubItem,
+} from "./nav-types";
 
-interface NavItemBase {
-  id: string;
-  title: string;
-  icon?: LucideIcon;
-  badge?: NavBadge;
-  disabled?: boolean;
-  newTab?: boolean;
-}
-
-export interface NavMainLinkItem extends NavItemBase {
-  url: string;
-  subItems?: never;
-}
-
-export interface NavMainParentItem extends NavItemBase {
-  subItems: NavSubItem[];
-}
-
-export type NavMainItem = NavMainLinkItem | NavMainParentItem;
-
-export interface NavGroup {
-  id: number;
-  label?: string;
-  items: NavMainItem[];
-}
-
-export const sidebarItems: NavGroup[] = [
+const baseSidebarItems: NavGroup[] = [
   {
     id: 1,
     label: "OS",
@@ -151,7 +124,7 @@ export const sidebarItems: NavGroup[] = [
             id: "sales-orders",
             title: "Sales Orders",
             icon: ScrollText,
-            url: "/os/sales-orders",
+            url: "/os/sales/orders",
           },
           {
             id: "sales-invoices",
@@ -196,7 +169,7 @@ export const sidebarItems: NavGroup[] = [
             id: "purchase-orders",
             title: "Purchase Orders",
             icon: ShoppingBag,
-            url: "/os/purchase-orders",
+            url: "/os/procurement/purchase-orders",
           },
           {
             id: "purchase-receipts",
@@ -340,3 +313,40 @@ export const sidebarItems: NavGroup[] = [
     ],
   },
 ];
+
+/**
+ * Fold the contributing apps' nav entries into the base's groups.
+ *
+ * Matched by group `label`, so a connector asking for "Procurement" lands inside
+ * the group the base already renders instead of opening a second one; an
+ * unrecognised label appends a new group after the base's, which is what makes a
+ * client able to add a whole section the base has never heard of.
+ *
+ * A contributed item whose `id` already exists in the target group replaces it,
+ * rather than rendering twice — the composer is where an id collision is
+ * reported, because a duplicate is a packaging mistake, not something worth
+ * crashing a sidebar over.
+ */
+function withContributions(groups: NavGroup[]): NavGroup[] {
+  if (contributedNav.length === 0) return groups;
+
+  const merged = groups.map((group) => ({ ...group, items: [...group.items] }));
+  let nextId = Math.max(0, ...merged.map((group) => group.id)) + 1;
+
+  for (const contribution of contributedNav) {
+    let target = merged.find((group) => group.label === contribution.group);
+    if (!target) {
+      target = { id: nextId++, label: contribution.group, items: [] };
+      merged.push(target);
+    }
+    for (const item of contribution.items) {
+      const existing = target.items.findIndex((candidate: NavMainItem) => candidate.id === item.id);
+      if (existing === -1) target.items.push(item);
+      else target.items[existing] = item;
+    }
+  }
+
+  return merged;
+}
+
+export const sidebarItems: NavGroup[] = withContributions(baseSidebarItems);
