@@ -18,11 +18,13 @@ export function ProductTable({
   isLoading,
   totalCount,
   expandedIds,
+  onRowClick,
 }: {
   table: TableType<ProductRow>;
   isLoading: boolean;
   totalCount: number;
   expandedIds: Set<string>;
+  onRowClick?: (row: ProductRow) => void;
 }) {
   const columnSizing = table.getState().columnSizing;
 
@@ -81,8 +83,17 @@ export function ProductTable({
               table.getRowModel().rows.map((row) => (
                 <Fragment key={row.id}>
                   <TableRow
-                    className="border-border/60 hover:bg-muted/40"
+                    className={cn("border-border/60 hover:bg-muted/40", onRowClick && "cursor-pointer")}
                     data-state={row.getIsSelected() && "selected"}
+                    onClick={(event) => {
+                      // The row is a click target, but it also contains real
+                      // controls — the select checkbox, the variant expander and
+                      // the ID/name links. Let those handle their own clicks
+                      // rather than navigating out from under them.
+                      if (!onRowClick) return;
+                      if ((event.target as HTMLElement).closest("a,button,input,[role='checkbox']")) return;
+                      onRowClick(row.original);
+                    }}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <TableCell

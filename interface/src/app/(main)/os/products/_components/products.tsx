@@ -3,6 +3,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useRouter } from "next/navigation";
+
 import {
   type ColumnSizingState,
   getCoreRowModel,
@@ -34,6 +36,7 @@ import {
   IMAGE_COLUMN_FIELDNAME,
   ITEM_DOCTYPE,
   MIN_VISIBLE_COLUMNS,
+  productHref,
   SYNTHETIC_COLUMN_FIELDS,
 } from "@/constants/products";
 import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
@@ -49,6 +52,7 @@ import { ProductTable } from "./product-table";
 type ViewMode = "list" | "grid";
 
 export default function Products() {
+  const router = useRouter();
   const { meta } = useDoctypeMeta(ITEM_DOCTYPE);
 
   const { value: columnPrefs, update: setColumnPrefs } = useListPreference<ColumnPrefs>("products:columns", {
@@ -157,6 +161,7 @@ export default function Products() {
         expandedIds,
         onToggleExpand: toggleExpand,
         currency: defaultCurrency,
+        detailHref: productHref,
       }),
     [columnPrefs.columnOrder, fieldsByName, expandedIds, toggleExpand, defaultCurrency],
   );
@@ -269,7 +274,13 @@ export default function Products() {
         </div>
 
         {view === "list" ? (
-          <ProductTable table={table} isLoading={isLoading} totalCount={totalCount} expandedIds={expandedIds} />
+          <ProductTable
+            table={table}
+            isLoading={isLoading}
+            totalCount={totalCount}
+            expandedIds={expandedIds}
+            onRowClick={(row) => router.push(productHref(row.name))}
+          />
         ) : (
           <>
             <ProductGrid rows={rows} isLoading={isLoading} />

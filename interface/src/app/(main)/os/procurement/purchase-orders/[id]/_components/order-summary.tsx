@@ -2,11 +2,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { DEFAULT_STATUS_BADGE_CLASS, STATUS_BADGE_CLASS } from "@/constants/purchase-orders";
+import { formatDate, labelOr } from "@/lib/format";
 import { isReceiptPastDue } from "@/lib/purchase-orders";
 import { cn } from "@/lib/utils";
 import type { PurchaseOrderHeader } from "@/types/purchase-orders";
-
-import { formatDate, labelOr } from "./format";
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

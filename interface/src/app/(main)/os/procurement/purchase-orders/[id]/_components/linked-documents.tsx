@@ -2,10 +2,9 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { DEFAULT_STATUS_BADGE_CLASS, LINKED_DOC_BADGE_CLASS } from "@/constants/purchase-orders";
+import { formatDate } from "@/lib/format";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { LinkedPurchaseInvoice, LinkedPurchaseReceipt } from "@/types/purchase-orders";
-
-import { formatDate } from "./format";
 
 /** A draft carries no status of its own worth showing (ERPNext leaves it as
  * "Draft"), and a return is worth calling out next to the document it

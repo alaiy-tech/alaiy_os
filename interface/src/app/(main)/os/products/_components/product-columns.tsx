@@ -1,6 +1,8 @@
 "use client";
 "use no memo";
 
+import Link from "next/link";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import { ChevronRight } from "lucide-react";
 
@@ -14,19 +16,11 @@ import {
   ITEM_CODE_COLUMN_FIELDNAME,
   STATUS_BADGE_CLASS,
 } from "@/constants/products";
+import { getProductStatus } from "@/lib/products";
 import { cn, formatFieldLabel } from "@/lib/utils";
-import type { ProductRow, ProductStatus } from "@/types/products";
+import type { ProductRow } from "@/types/products";
 
-/** Not a real Item field - derived from disabled/has_variants/variant_of, in
- * that priority order, since a disabled template is still "Disabled" first. */
-export function getProductStatus(row: ProductRow): ProductStatus {
-  if (row.disabled) return "Disabled";
-  if (row.has_variants) return "Template";
-  if (row.variant_of) return "Variant";
-  return "Active";
-}
-
-function ItemNameCell({ row, showItemCode }: { row: ProductRow; showItemCode: boolean }) {
+function ItemNameCell({ row, showItemCode, href }: { row: ProductRow; showItemCode: boolean; href: string }) {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
@@ -37,9 +31,9 @@ function ItemNameCell({ row, showItemCode }: { row: ProductRow; showItemCode: bo
         )}
       </div>
       <div className="flex min-w-0 flex-col">
-        <span className="block truncate font-medium" title={row.item_name}>
+        <Link href={href} className="block truncate font-medium hover:underline" title={row.item_name}>
           {row.item_name}
-        </span>
+        </Link>
         {showItemCode && row.item_code && (
           <span className="block truncate text-muted-foreground text-xs" title={row.item_code}>
             {row.item_code}
@@ -56,12 +50,14 @@ export function buildProductColumns({
   expandedIds,
   onToggleExpand,
   currency,
+  detailHref,
 }: {
   columnOrder: string[];
   fieldsByName: Map<string, DocFieldMeta>;
   expandedIds: Set<string>;
   onToggleExpand: (row: ProductRow) => void;
   currency?: string;
+  detailHref: (name: string) => string;
 }): ColumnDef<ProductRow>[] {
   const showItemCode = columnOrder.includes(ITEM_CODE_COLUMN_FIELDNAME);
 
@@ -98,7 +94,9 @@ export function buildProductColumns({
           accessorKey: "item_name",
           header: label,
           size: 240,
-          cell: ({ row }) => <ItemNameCell row={row.original} showItemCode={showItemCode} />,
+          cell: ({ row }) => (
+            <ItemNameCell row={row.original} showItemCode={showItemCode} href={detailHref(row.original.name)} />
+          ),
         };
       }
 
@@ -107,7 +105,9 @@ export function buildProductColumns({
         accessorKey: fieldname,
         header: label,
         size: 160,
-        cell: ({ getValue }) => <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} currency={currency} />,
+        cell: ({ getValue }) => (
+          <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} currency={currency} />
+        ),
       };
     });
 
@@ -118,11 +118,7 @@ export function buildProductColumns({
         <Checkbox
           aria-label="Select all products"
           checked={
-            table.getIsAllPageRowsSelected()
-              ? true
-              : table.getIsSomePageRowsSelected()
-                ? "indeterminate"
-                : false
+            table.getIsAllPageRowsSelected() ? true : table.getIsSomePageRowsSelected() ? "indeterminate" : false
           }
           onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         />
@@ -165,11 +161,16 @@ export function buildProductColumns({
       accessorKey: ID_COLUMN_FIELDNAME,
       header: "ID",
       size: 140,
-      cell: ({ getValue }) => (
-        <span className="block truncate font-medium" title={String(getValue())}>
-          {String(getValue())}
-        </span>
-      ),
+      // A real link alongside the row-level click handler, so the item can be
+      // opened in a new tab and reached by keyboard.
+      cell: ({ getValue }) => {
+        const name = String(getValue());
+        return (
+          <Link href={detailHref(name)} className="block truncate font-medium hover:underline" title={name}>
+            {name}
+          </Link>
+        );
+      },
       enableHiding: false,
     },
     ...dynamicColumns,
