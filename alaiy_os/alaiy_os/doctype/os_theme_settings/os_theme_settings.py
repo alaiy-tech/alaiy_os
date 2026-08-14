@@ -229,7 +229,7 @@ textarea.form-control, .like-disabled-input, .ql-editor {
  * own design. */
 .modal-body { padding: 0 !important; }
 /* Same pin, literal 0 forever — the Ctrl+K command palette's own wrapper
- * (.navbar-modal-wrapper, see frappe/public/js/frappe/ui/toolbar/awesome_bar.js). */
+ * (.navbar-modal-wrapper, see frappe/public/js/frappe/primitive/toolbar/awesome_bar.js). */
 .navbar-modal-wrapper { margin: 0 !important; }
 .layout-main-section { padding: var(--s-page-pad) !important; }
 .frappe-control { margin-bottom: var(--s-field-gap) !important; }

@@ -75,7 +75,7 @@ function redirectBareDeskToHome() {
 }
 
 // The sidebar's "Desktop" (home) menu item calls frappe.set_route("/desk")
-// directly (frappe/public/js/frappe/ui/sidebar/sidebar_header.js). Frappe
+// directly (frappe/public/js/frappe/primitive/sidebar/sidebar_header.js). Frappe
 // fully renders that bare route -- there's nothing mapped to it, hence the
 // "Page not found" flash -- and only AFTER that render does
 // router.on("change") fire, which is what redirectBareDeskToHome() above
