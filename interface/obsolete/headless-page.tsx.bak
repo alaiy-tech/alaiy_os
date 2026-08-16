@@ -1,0 +1,40 @@
+import type { Metadata } from "next";
+
+import { ComingSoon } from "@/ui-runtime/fallback/coming-soon";
+import { InvalidPageConfig } from "@/ui-runtime/fallback/invalid-page-config";
+import { resolvePage } from "@/ui-runtime/resolve-page";
+import { getPageStore } from "@/ui-runtime/store/json-file-page-store";
+
+const PAGE_ID = "headless";
+
+/**
+ * `/os/headless` - the same dashboard as `/os`, same fetchers, same data,
+ * composed through the UI runtime (`src/ui-runtime/`) and the dashboard
+ * feature (`src/features/dashboard/`) instead of hardcoded JSX. See
+ * `interface/UI_RUNTIME.md`. `/os/page.tsx` itself is untouched.
+ *
+ * Its config now lives at `public/ui-config/headless.json`, read through the
+ * same `resolvePage` pipeline the dynamic `/os/[...page]` catch-all uses -
+ * this route stays a real, hand-placed `page.tsx` (not absorbed into the
+ * catch-all), it just no longer bundles its JSON at build time.
+ */
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const result = await resolvePage(PAGE_ID, await searchParams);
+
+  if (result.status === "not-found") return <ComingSoon />;
+  if (result.status === "invalid") return <InvalidPageConfig errors={result.errors} />;
+  return result.node;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const config = await getPageStore().getPageById(PAGE_ID);
+    return config?.metadata ? { title: config.metadata.title, description: config.metadata.description } : {};
+  } catch {
+    return {};
+  }
+}
