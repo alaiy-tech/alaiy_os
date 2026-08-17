@@ -937,6 +937,12 @@ class AlaiyAskPage {
 			if (!now || now.term !== query.term) return;
 		}
 
+		// No sources registered at all: this site has not opted into mentions, so
+		// "@" is just a character in a sentence and must behave as it always did.
+		// Distinct from a site that *has* sources and matched nothing, which is
+		// worth saying out loud — see `_draw_mentions`.
+		if (!groups.length) return this._close_mentions();
+
 		this.mention_options = groups.reduce((all, g) => all.concat(g.options || []), []);
 		this.mention_index = 0;
 
@@ -959,15 +965,13 @@ class AlaiyAskPage {
 
 		if (!this.mention_options.length) {
 			// Which of the two empty states this is matters: "keep typing" and
-			// "there is nothing here" ask for opposite things from the user.
+			// "there is nothing here" ask for opposite things from the user. The
+			// third case — no sources on this site — never reaches here; the
+			// picker does not open at all.
 			const waiting = groups.some((g) => term.length < (g.min_chars || 0));
 			this.$mentions.append(
 				$('<div class="ask-alaiy-mentions-empty"></div>').text(
-					groups.length === 0
-						? __("Nothing can be mentioned on this site yet.")
-						: waiting
-							? __("Keep typing to search brands and items.")
-							: __("Nothing matches."),
+					waiting ? __("Keep typing to search.") : __("Nothing matches."),
 				),
 			);
 			return;
