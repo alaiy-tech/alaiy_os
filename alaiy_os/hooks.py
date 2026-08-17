@@ -81,6 +81,16 @@ ai_client = "alaiy_os.engine.ai_client.get_ai_client"
 #
 # chat_system_context = ["alaiy_os_globali.chat_context.system_context"]
 
+# Ask Alaiy's `@` mention seam. Also a list hook: each entry is a dotted path to
+# a no-argument callable returning the sources a deployment lets people mention —
+# its brands, its SKUs, its marketplaces, its date vocabulary — each with a
+# search and a resolve. alaiy_os registers none on purpose: a bare Alaiy OS has
+# no opinion about which doctype holds a customer's brands, and guessing one in
+# core would be a hardcoded assumption every deployment then has to work around.
+# See chat/mentions.py for the contract.
+#
+# chat_mention_sources = ["alaiy_os_globali.chat_mentions.sources"]
+
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
