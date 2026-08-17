@@ -27,8 +27,9 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | method | args | returns |
 |---|---|---|
 | `create_session` | `title?`, `model?` | `{session, title, model, status}` |
-| `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?` | `{seq, status}` — queues the turn, returns immediately |
+| `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_skills` | — | the `/` command catalogue |
+| `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
 | `get_messages` | `session`, `after=0` | `{status, error, messages[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
 | `delete_session` | `session` | `{deleted}` |
@@ -40,12 +41,75 @@ The flow is: `create_session` once, then per question `send_message` → poll
 `get_messages(after=<highest seq seen>)` until `status` leaves `Running`.
 Messages arrive as they are committed, so tool calls show up before the answer.
 
-A message is `{seq, role, text, attachments[], skill, tool_calls[], tool_errors[]}`.
+A message is
+`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[]}`.
 `tool_calls` is `{id, name, input}` per tool the assistant invoked; a tool's
 *result* is not returned — it is raw JSON the model has already summarised in its
 reply, and can be megabytes. Read `OS Chat Message.blocks` directly if you need
 it. `attachments` is `{file_name, file_url, file_size, chars}` per file sent with
-that message — enough to draw a chip, not the contents.
+that message — enough to draw a chip, not the contents. `mentions` is
+`{kind, value, label, sublabel, icon, hint, …}` per record named with `@`.
+
+## Mentions (`@`)
+
+Typing `@` in the composer opens a picker over the records a deployment lets
+people name — brands, SKUs, marketplace channels, date windows. Choosing one
+inserts a visible token *and* remembers the record behind it, which
+`send_message(mentions=[{kind, value}])` carries to the turn.
+
+What the model gets is a block ahead of the user's question:
+
+```
+<mentions>
+The user named these records explicitly. Use these exact values as tool
+arguments and filters — do not look them up by name again, and do not work out
+any dates yourself; they are already resolved below.
+- brand: "Royal Canin" — filter Brand = "ROYAL-CANIN"
+- date: "last month" — 2026-07-01 to 2026-07-31 inclusive
+</mentions>
+```
+
+The date line is most of the value. `_system_prompt` tells the model today's
+date, which is an *invitation* to calendar arithmetic; a mention replaces the
+invitation with the answer.
+
+**Core ships no sources.** Which doctype holds a customer's brands is a fact
+about the customer, so `list_mentions` returns whatever the
+`chat_mention_sources` hook provides and nothing otherwise — a site with no
+provider gets a picker that opens empty rather than a hardcoded guess. Each hook
+entry is a dotted path to a no-argument callable returning sources of
+`{kind, label, min_chars, search, resolve}`; see `chat/mentions.py` for the
+contract and `alaiy_os_globali/chat_mentions.py` for a real one.
+
+`min_chars` is what lets one endpoint serve both access patterns from one client
+code path: a small fixed set declares 0 and populates on a bare `@`, while
+anything with a LIKE behind it declares 2 and is not called at all until then.
+The client draws the groups it is given and knows nothing about which is which.
+
+**`resolve` is not `search`.** A picker's output is a claim, so every mention is
+re-resolved server-side on send: the label and any dates are rebuilt from the
+source, and only `kind` and `value` are read from the client. The gap between
+searching and sending can be minutes, a permission change, or a hand-written
+request. A mention that fails to resolve is **dropped silently** — unlike a
+skill slug, which throws. A skill is the user's whole intent; a mention is one
+hint among several, and killing the message over a stale one answers nothing.
+
+Two ordering constraints, both load-bearing:
+
+- The mention block goes **after** the attachment blocks, never before.
+  `_elide_old_attachments` finds attachments by position — the first
+  `len(attachments)` blocks — so anything inserted ahead makes it stub the wrong
+  one.
+- Mentions are **never elided** from history, unlike inlined attachments. A
+  mention block is a handful of tokens naming a few records, and dropping it
+  would make "and how did that brand do the month before?" unanswerable three
+  turns later — exactly the follow-up mentions exist to make cheap.
+
+In the composer a token is plain text, so the visible words and the record
+behind them are two parallel records the user can pull apart by editing. The
+client reconciles at submit rather than tracking offsets: a broken token stops
+being a mention and goes on as prose. The model still reads the words either
+way; only the resolved record is lost.
 
 ## Skills (`/`)
 
@@ -245,6 +309,10 @@ format, marketplaces, role map — a tenant app registers the `chat_system_conte
 hook (a dotted path to a no-argument callable returning a paragraph). Several
 apps may each contribute one. `chat_system_prompt` overrides everything,
 including those, which is why it is checked first.
+
+The other tenant seam is `chat_mention_sources` — what a user can name with `@`
+(see **Mentions** above). Same shape, same reason: what is true of one
+customer's business belongs in that customer's app.
 
 The provider key itself is not here — that is `ai_api_key` / `ai_base_url` on
 the `ai_client` seam (see `engine/AI_CLIENT.md`), shared with batch agents.

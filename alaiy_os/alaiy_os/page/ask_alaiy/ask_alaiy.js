@@ -61,6 +61,31 @@ const ACCEPT_ATTRIBUTE =
 	".pdf,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.yaml,.yml,.py,.js,.ts,.sql,.log,.xml,.html,.htm,.css,.ini,.cfg,.toml";
 const MAX_ATTACHMENTS = 5;
 
+// The `@` token being typed, matched against the text LEFT OF THE CARET — `$`
+// on that slice is what "the caret is at the end of this token" means, and it
+// is why a mention works mid-sentence where a `/` skill only works alone.
+//
+// The leading boundary group is what stops "prajwal@alaiy.com" from opening a
+// picker: the character before the `@` must be the start of the line or
+// punctuation, never a word character.
+//
+// Spaces inside the term are allowed, up to two, so "Royal Canin" keeps
+// matching as it is typed. That is unavoidable for real record names and it is
+// also the one loose end here — see `_sync_mentions`, which closes the picker
+// once a multi-word term stops matching anything, so typing prose after a
+// mention does not leave a dead menu open.
+const MENTION_RE = /(?:^|[\s(\[{,;:"'“‘])@([^\s@]{0,40}(?:[ ][^\s@]{0,40}){0,2})?$/;
+
+// Every keystroke asks the server (the catalogue is per-query and can be
+// thousands of items), so unlike the `/` picker this one is debounced. Short
+// enough to feel live, long enough that holding a key down is one request.
+const MENTION_DEBOUNCE_MS = 120;
+
+// Keys that move the caret without changing the value, so `input` never fires.
+// ArrowUp/Down are listed for the closed case only: while the picker is open it
+// has already consumed them at keydown, so the caret has not moved.
+const CARET_KEYS = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"];
+
 class AlaiyAskPage {
 	constructor(page) {
 		this.page = page;
@@ -79,6 +104,25 @@ class AlaiyAskPage {
 		this.skills = null;
 		this.skill_matches = [];
 		this.skill_index = 0;
+		// The `@` picker. Unlike skills, the options depend on what is typed, so
+		// they are cached per query rather than fetched once. `mention_options`
+		// is the flattened list the arrow keys walk — the group headings are
+		// drawn from the response but are not selectable.
+		this.mention_options = [];
+		this.mention_index = 0;
+		this.mention_groups = [];
+		this.mention_term = "";
+		this.mention_cache = new Map();
+		// Bumped per request so a slow response for an earlier query cannot
+		// overwrite the menu for the one being typed now.
+		this.mention_req = 0;
+		// The structured identity behind each token inserted into the composer.
+		// Reconciled against the final text on submit — see `_collect_mentions`.
+		this.mentions = [];
+		this._sync_mentions = frappe.utils.debounce(
+			() => this._sync_mentions_now(),
+			MENTION_DEBOUNCE_MS,
+		);
 
 		this._ensure_styles();
 		this._render();
@@ -375,12 +419,17 @@ class AlaiyAskPage {
 			.ask-alaiy-attach:disabled { opacity: .35; cursor: default; background: none; }
 			.ask-alaiy-file-input { display: none; }
 
-			/* ── Skill picker ────────────────────────────────────────────────
-			   Opens above the composer on "/". Positioned relative to the wrap
-			   so it floats over the thread instead of pushing the composer down
-			   — the input must not move while the user is typing into it. */
+			/* ── Pickers ─────────────────────────────────────────────────────
+			   Both open above the composer — "/" for skills, "@" for data
+			   points. Positioned relative to the wrap so they float over the
+			   thread instead of pushing the composer down: the input must not
+			   move while the user is typing into it.
+
+			   One shared rule rather than two, because they occupy the same slot
+			   and only ever one is open at a time (see _sync_mentions) — two
+			   copies would be two things to keep in step. */
 			.ask-alaiy-composer-wrap { position: relative; }
-			.ask-alaiy-skills {
+			.ask-alaiy-skills, .ask-alaiy-mentions {
 				position: absolute; left: 28px; right: 28px; bottom: 100%;
 				margin-bottom: 8px; z-index: 5; overflow: hidden auto; max-height: 260px;
 				background: var(--s-white);
@@ -401,6 +450,49 @@ class AlaiyAskPage {
 				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 			}
 			.ask-alaiy-skills-empty { padding: 10px 14px; font-size: 12.5px; color: var(--s-muted); }
+
+			/* ── Mention picker ──────────────────────────────────────────────
+			   Grouped, because "@ro" legitimately matches a brand and a SKU at
+			   once and which one was meant is the whole question. Headings stick
+			   so the group a row belongs to stays on screen while scrolling. */
+			.ask-alaiy-mention-group {
+				position: sticky; top: 0; z-index: 1; background: var(--s-white);
+				padding: 8px 14px 3px; font-family: var(--s-font); font-size: 11px;
+				font-weight: var(--s-medium-weight); text-transform: uppercase;
+				letter-spacing: var(--s-heading-tracking); color: var(--s-muted);
+			}
+			.ask-alaiy-mention {
+				display: flex; align-items: center; gap: 9px; width: 100%; text-align: start;
+				border: none; background: none; cursor: pointer; padding: 8px 14px;
+				font-family: var(--s-font); color: var(--s-ink);
+			}
+			.ask-alaiy-mention.is-active, .ask-alaiy-mention:hover { background: var(--s-hover); }
+			.ask-alaiy-mention-icon { flex: none; display: flex; color: var(--s-muted); }
+			.ask-alaiy-mention-text { min-width: 0; }
+			.ask-alaiy-mention-label {
+				display: block; font-size: 13.5px; font-weight: 600;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			.ask-alaiy-mention-sub {
+				display: block; font-size: 11.5px; color: var(--s-muted); margin-top: 1px;
+				overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+			}
+			.ask-alaiy-mentions-empty { padding: 10px 14px; font-size: 12.5px; color: var(--s-muted); }
+
+			/* A sent mention, inside the user's own bubble. Quiet on purpose: it
+			   marks which words the assistant was given as a record, and the
+			   sentence still has to read as a sentence.
+
+			   Weight and an underline rather than a background: the bubble is
+			   --s-black with --s-on-black text, so any panel colour would be a
+			   high-contrast block sitting in the middle of a sentence. currentColor
+			   is also the one "palette" that cannot be wrong in a theme we have
+			   not seen. */
+			.ask-alaiy-chip-mention {
+				font-weight: var(--s-medium-weight);
+				text-decoration: underline; text-decoration-style: dotted;
+				text-underline-offset: 2px;
+			}
 
 			/* ── Attachment chips ────────────────────────────────────────────
 			   The tray sits above the composer while files are staged; the same
@@ -475,10 +567,19 @@ class AlaiyAskPage {
 				'<path d="M21 11.5l-8.8 8.8a5 5 0 01-7.1-7.1l9-9a3.3 3.3 0 014.7 4.7l-9 9a1.7 1.7 0 01-2.4-2.4l8.3-8.3"/>',
 			file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/>',
 			close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+			// Mention kinds. A mention source picks one of these by name; an
+			// unrecognised name draws nothing rather than breaking the row, so a
+			// deployment can add a kind without needing a path here first.
+			at: '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 006 0v-1a9 9 0 10-3.5 7.1"/>',
+			tag: '<path d="M20.6 13.4l-7.2 7.2a2 2 0 01-2.8 0l-7-7V4h9.6l7.4 7.4a1.4 1.4 0 010 2z"/><path d="M7.5 7.5h.01"/>',
+			box: '<path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/>',
+			store: '<path d="M3 9l1.5-5h15L21 9"/><path d="M4 9v11h16V9"/><path d="M9 20v-6h6v6"/>',
+			calendar:
+				'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18"/><path d="M8 3v4"/><path d="M16 3v4"/>',
 		};
 		return (
 			`<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" ` +
-			`stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`
+			`stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${paths[name] || ""}</svg>`
 		);
 	}
 
@@ -503,6 +604,9 @@ class AlaiyAskPage {
 					</div>
 					<div class="ask-alaiy-composer-wrap">
 						<div class="ask-alaiy-skills" role="listbox" aria-label="${__("Skills")}" hidden></div>
+						<div class="ask-alaiy-mentions" role="listbox" aria-label="${__(
+							"Data points",
+						)}" hidden></div>
 						<div class="ask-alaiy-tray" aria-live="polite"></div>
 						<div class="ask-alaiy-composer">
 							<button type="button" class="ask-alaiy-attach"
@@ -532,6 +636,7 @@ class AlaiyAskPage {
 		this.$attach = this.$shell.find(".ask-alaiy-attach");
 		this.$file_input = this.$shell.find(".ask-alaiy-file-input");
 		this.$skills = this.$shell.find(".ask-alaiy-skills");
+		this.$mentions = this.$shell.find(".ask-alaiy-mentions");
 
 		this._show_welcome();
 	}
@@ -540,26 +645,44 @@ class AlaiyAskPage {
 		const $composer = this.$shell.find(".ask-alaiy-composer");
 		const $searchBox = this.$shell.find(".ask-alaiy-search");
 
+		// Kept on the instance as well: `_apply_mention` needs to resize without
+		// firing `input`, which would re-open the picker it just closed.
 		const autoGrow = () => {
 			this.$input.css("height", "auto");
 			this.$input.css("height", Math.min(this.$input[0].scrollHeight, 200) + "px");
 		};
+		this._autogrow = autoGrow;
 
 		this.$input.on("input", () => {
 			this._sync_send();
 			this._sync_skills();
+			this._sync_mentions();
 			autoGrow();
 		});
+		// A mention is matched against the caret, not the end of the value, so
+		// moving the caret changes the answer — and neither an arrow key nor a
+		// click fires `input`. The `/` picker never needed this because a slash
+		// command is the whole message.
+		this.$input.on("keyup", (e) => {
+			if (CARET_KEYS.includes(e.key)) this._sync_mentions();
+		});
+		this.$input.on("click", () => this._sync_mentions());
 		this.$input.on("focus", () => $composer.addClass("is-focused"));
 		this.$input.on("blur", () => {
 			$composer.removeClass("is-focused");
-			// A click on a skill row blurs the textarea before it fires, so the
-			// picker cannot close synchronously or the mousedown lands on nothing.
-			setTimeout(() => this._close_skills(), 150);
+			// A click on a picker row blurs the textarea before it fires, so the
+			// pickers cannot close synchronously or the mousedown lands on nothing.
+			setTimeout(() => {
+				this._close_skills();
+				this._close_mentions();
+			}, 150);
 		});
 		this.$input.on("keydown", (e) => {
-			// The picker owns the arrow keys and Enter while it is open — the
-			// same bargain every command palette makes.
+			// Whichever picker is open owns the arrow keys and Enter — the same
+			// bargain every command palette makes. Mentions get first refusal
+			// only because they are the one that can be open mid-sentence; the
+			// two are mutually exclusive, so the order is a formality.
+			if (this._mentions_open() && this._mention_keydown(e)) return;
 			if (this._skills_open() && this._skill_keydown(e)) return;
 			if (e.key === "Enter" && !e.shiftKey) {
 				e.preventDefault();
@@ -634,9 +757,14 @@ class AlaiyAskPage {
 		// or not the picker was still showing — otherwise "/daily-digest" is
 		// sent to the model as a line of prose it can do nothing with.
 		const skill = this._exact_skill(text);
+		// Read before the textarea is cleared — reconciliation needs the text the
+		// user actually sent, not an empty box.
+		const mentions = this._collect_mentions(text);
 		this.$input.val("").trigger("input").focus();
+		this.mentions = [];
 		this._close_skills();
-		this._send(text, skill);
+		this._close_mentions();
+		this._send(text, skill, mentions);
 	}
 
 	// ── Skill picker ────────────────────────────────────────────────────────
@@ -743,6 +871,7 @@ class AlaiyAskPage {
 
 	_run_skill(skill) {
 		this._close_skills();
+		this._close_mentions();
 		if (this.running) return;
 		this.$input.val("").trigger("input").focus();
 		this._send("/" + skill.slug, skill.slug);
@@ -752,6 +881,234 @@ class AlaiyAskPage {
 		this.$skills.empty().prop("hidden", true);
 		this.skill_matches = [];
 		this.skill_index = 0;
+	}
+
+	// ── Mention picker ──────────────────────────────────────────────────────
+	/** The `@` token under the caret: `{term, start, end}`, or null.
+	 *
+	 * An object rather than a string, because unlike a skill slug the empty
+	 * term is meaningful — a bare `@` is a request for the whole menu — and the
+	 * span has to come back too, so selecting a row can replace exactly the
+	 * token that was typed and leave the rest of the sentence alone. */
+	_mention_query() {
+		const el = this.$input[0];
+		const caret = el.selectionStart;
+		// A selection rather than a caret: the user is about to replace text,
+		// not extend a token.
+		if (caret !== el.selectionEnd) return null;
+		const match = MENTION_RE.exec((el.value || "").slice(0, caret));
+		if (!match) return null;
+		return {
+			term: match[1] || "",
+			start: match.index + match[0].indexOf("@"),
+			end: caret,
+		};
+	}
+
+	_mentions_open() {
+		return !this.$mentions.prop("hidden");
+	}
+
+	async _sync_mentions_now() {
+		const query = this._mention_query();
+		// The two pickers share one slot above the composer. A `/` command wins:
+		// it is the whole message, so there is no mention to be typing.
+		if (!query || this._skill_query() !== null) return this._close_mentions();
+
+		let groups = this.mention_cache.get(query.term);
+		if (!groups) {
+			const req = ++this.mention_req;
+			try {
+				const data = await frappe.xcall("alaiy_os.api.chat.list_mentions", {
+					q: query.term,
+				});
+				groups = data.groups || [];
+				this.mention_cache.set(query.term, groups);
+			} catch (e) {
+				// Same bargain as the skill catalogue: the user can still type
+				// their question, so this is not worth an error banner. Not
+				// cached either — the next keystroke retries.
+				groups = [];
+			}
+			// A slower response for an earlier query, or the user typed past the
+			// mention while this was in flight.
+			if (req !== this.mention_req) return;
+			const now = this._mention_query();
+			if (!now || now.term !== query.term) return;
+		}
+
+		this.mention_options = groups.reduce((all, g) => all.concat(g.options || []), []);
+		this.mention_index = 0;
+
+		// Multi-word terms are allowed so "Royal Canin" keeps matching, which
+		// means ordinary prose after a mention also keeps matching. Nothing found
+		// and a space in the term is the signal that the user has moved on from
+		// picking and is just writing — so get out of their way.
+		if (!this.mention_options.length && query.term.includes(" ")) {
+			return this._close_mentions();
+		}
+
+		this._draw_mentions(groups, query.term);
+	}
+
+	_draw_mentions(groups, term) {
+		// Kept so moving the selection can redraw without re-querying.
+		this.mention_groups = groups;
+		this.mention_term = term;
+		this.$mentions.empty().prop("hidden", false);
+
+		if (!this.mention_options.length) {
+			// Which of the two empty states this is matters: "keep typing" and
+			// "there is nothing here" ask for opposite things from the user.
+			const waiting = groups.some((g) => term.length < (g.min_chars || 0));
+			this.$mentions.append(
+				$('<div class="ask-alaiy-mentions-empty"></div>').text(
+					groups.length === 0
+						? __("Nothing can be mentioned on this site yet.")
+						: waiting
+							? __("Keep typing to search brands and items.")
+							: __("Nothing matches."),
+				),
+			);
+			return;
+		}
+
+		// The flat index the arrow keys walk, counted across groups — headings
+		// are not selectable, so it is not the same as a row's position here.
+		let flat = 0;
+		groups.forEach((group) => {
+			const options = group.options || [];
+			if (!options.length) return;
+			$('<div class="ask-alaiy-mention-group"></div>')
+				.text(group.label || group.kind)
+				.appendTo(this.$mentions);
+
+			options.forEach((option) => {
+				const index = flat++;
+				const $row = $('<button type="button" class="ask-alaiy-mention" role="option"></button>')
+					.toggleClass("is-active", index === this.mention_index)
+					.appendTo(this.$mentions);
+				$(`<span class="ask-alaiy-mention-icon">${this._icon(option.icon)}</span>`).appendTo($row);
+				const $text = $('<span class="ask-alaiy-mention-text"></span>').appendTo($row);
+				$('<span class="ask-alaiy-mention-label"></span>').text(option.label).appendTo($text);
+				if (option.sublabel) {
+					$('<span class="ask-alaiy-mention-sub"></span>').text(option.sublabel).appendTo($text);
+				}
+				// mousedown, not click: the textarea's blur fires first on click
+				// and would have closed the picker out from under the pointer.
+				$row.on("mousedown", (e) => {
+					e.preventDefault();
+					this._apply_mention(option);
+				});
+			});
+		});
+
+		// Arrowing down a long list must not leave the selection off-screen.
+		const $active = this.$mentions.find(".is-active")[0];
+		if ($active) $active.scrollIntoView({ block: "nearest" });
+	}
+
+	_mention_keydown(e) {
+		const count = this.mention_options.length;
+		if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+			e.preventDefault();
+			if (!count) return true;
+			const step = e.key === "ArrowDown" ? 1 : -1;
+			this.mention_index = (this.mention_index + step + count) % count;
+			// Redraws what is already on screen — moving the selection is not a
+			// reason to ask the server anything.
+			this._draw_mentions(this.mention_groups, this.mention_term);
+			return true;
+		}
+		if (e.key === "Escape") {
+			e.preventDefault();
+			this._close_mentions();
+			return true;
+		}
+		if (e.key === "Enter" || e.key === "Tab") {
+			const chosen = this.mention_options[this.mention_index];
+			if (!chosen) return false;
+			e.preventDefault();
+			this._apply_mention(chosen);
+			return true;
+		}
+		return false;
+	}
+
+	/** Replace the typed token with the chosen record's label, and remember what
+	 * it stands for. */
+	_apply_mention(option) {
+		const query = this._mention_query();
+		this._close_mentions();
+		if (!query) return;
+
+		const el = this.$input[0];
+		const value = el.value;
+		const token = "@" + option.label;
+		const tail = value.slice(query.end);
+		// A space after the token, so the next character does not re-open the
+		// picker — unless the sentence already continues with one, which is the
+		// mid-sentence case and would otherwise gain a double space.
+		const gap = /^\s/.test(tail) ? "" : " ";
+		// Splice [start, end) — `end` is the caret, not the end of the value, so
+		// completing in the middle of a sentence leaves the tail intact.
+		el.value = value.slice(0, query.start) + token + gap + tail;
+		const caret = query.start + token.length + gap.length;
+		el.setSelectionRange(caret, caret);
+
+		this.mentions.push({ kind: option.kind, value: option.value, token: token });
+
+		// Deliberately NOT `.trigger("input")`. The token now ends in a space, and
+		// the trigger regex tolerates trailing spaces so that multi-word names
+		// keep matching as they are typed — which means an input event here would
+		// re-open the picker on "Royal Canin " the instant it was chosen. So do
+		// the two things the input handler would have done, and nothing else.
+		this._sync_send();
+		this._autogrow();
+		this.$input.focus();
+	}
+
+	_close_mentions() {
+		this.$mentions.empty().prop("hidden", true);
+		this.mention_options = [];
+		this.mention_index = 0;
+	}
+
+	/** The mentions still genuinely present in the message being sent.
+	 *
+	 * The composer is a plain textarea, so a token has no identity of its own —
+	 * the visible words and the record behind them are two parallel records that
+	 * the user can pull apart by editing. Rather than track offsets through every
+	 * keystroke, reconcile once here: a token the user broke stops being a
+	 * mention and goes on as the prose it already looks like. The model still
+	 * reads the words either way; only the resolved record is lost.
+	 *
+	 * Deduplicated on kind+value, so mentioning the same brand twice sends it
+	 * once. Two different records that render to the same label are genuinely
+	 * indistinguishable in plain text and collapse — the cost of not using a
+	 * contenteditable, which would buy that back at the price of breaking
+	 * `.val()`, the auto-grow measurement and the paste handler. */
+	_collect_mentions(text) {
+		const seen = new Set();
+		return this.mentions.filter((m) => {
+			const key = m.kind + " " + m.value;
+			if (seen.has(key) || !text.includes(m.token)) return false;
+			seen.add(key);
+			return true;
+		});
+	}
+
+	/** The user's own text with its mention tokens marked.
+	 *
+	 * Escape first, then add our markup — never the other way round. The tokens
+	 * come from record labels, which are data. */
+	_mention_html(text, mentions) {
+		let html = frappe.utils.escape_html(text);
+		(mentions || []).forEach((m) => {
+			const token = frappe.utils.escape_html(m.token);
+			html = html.split(token).join(`<span class="ask-alaiy-chip-mention">${token}</span>`);
+		});
+		return html;
 	}
 
 	/** Ready to send: not mid-turn, and there is either something typed or at
@@ -954,11 +1311,11 @@ class AlaiyAskPage {
 	}
 
 	// ── Conversation ────────────────────────────────────────────────────────
-	async _send(text, skill) {
+	async _send(text, skill, mentions) {
 		const attached = this._ready_attachments();
 
 		this._clear_welcome();
-		this._add(this._user_turn(text, attached));
+		this._add(this._user_turn(text, attached, mentions));
 		this.pending.clear();
 		this._draw_tray();
 		this._set_running(true);
@@ -969,6 +1326,10 @@ class AlaiyAskPage {
 				session: session,
 				text: text,
 				attachments: JSON.stringify(attached.map((a) => a.name)),
+				// Only kind and value are read server-side; the label and any
+				// dates are rebuilt there, so what is sent is a reference and
+				// not a claim about what the record says.
+				mentions: JSON.stringify(mentions || []),
 				skill: skill || null,
 				// This page IS the assistant, so there is no other screen to
 				// report. A host embedding the panel alongside a list view would
@@ -1028,7 +1389,7 @@ class AlaiyAskPage {
 	}
 
 	// ── Rendering ───────────────────────────────────────────────────────────
-	_user_turn(text, attachments) {
+	_user_turn(text, attachments, mentions) {
 		const $turn = $('<div class="ask-alaiy-turn is-user"></div>');
 
 		const files = attachments || [];
@@ -1037,7 +1398,13 @@ class AlaiyAskPage {
 			files.forEach((file) => $tray.append(this._file_chip(file, {})));
 		}
 		// An attachment-only message has no bubble — the chips are the message.
-		if (text) $turn.append($('<div class="ask-alaiy-user-bubble"></div>').text(text));
+		if (text) {
+			// `.html`, not `.text`, so mention tokens can be marked — which is
+			// why `_mention_html` escapes before adding any markup of its own.
+			$turn.append(
+				$('<div class="ask-alaiy-user-bubble"></div>').html(this._mention_html(text, mentions)),
+			);
+		}
 
 		return $turn;
 	}
@@ -1051,7 +1418,12 @@ class AlaiyAskPage {
 			// just typed is already on screen. Tool-result messages have
 			// neither text nor files and draw nothing.
 			const files = message.attachments || [];
-			if (message.text || files.length) this._add(this._user_turn(message.text, files));
+			// The stored mentions are what make a reopened chat look like the one
+			// that was sent — the tokens are marked again from the record, not
+			// re-guessed out of the text.
+			if (message.text || files.length) {
+				this._add(this._user_turn(message.text, files, message.mentions));
+			}
 			return;
 		}
 
@@ -1467,6 +1839,11 @@ class AlaiyAskPage {
 		// with it if it is ever deleted.
 		this.pending.clear();
 		this._draw_tray();
+		// Whatever was half-composed belongs to the chat being left. The query
+		// cache is kept: it is a catalogue, not conversation state, and survives
+		// for the life of the page exactly as `this.skills` does.
+		this.mentions = [];
+		this._close_mentions();
 		this._set_running(false);
 		this.$thread.empty();
 		this.rail_failed = false;

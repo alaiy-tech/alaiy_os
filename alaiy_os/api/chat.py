@@ -9,6 +9,7 @@ GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
 GET  /api/method/alaiy_os.api.chat.list_skills     -> the `/` command catalogue
+GET  /api/method/alaiy_os.api.chat.list_mentions   -> the `@` picker's options
 
 `send_message` returns as soon as the turn is queued; the client then polls
 `get_messages` with the highest seq it has until status leaves "Running".
@@ -22,7 +23,12 @@ import json
 import frappe
 from frappe.utils.file_manager import save_file
 
-from alaiy_os.chat import attachments, runner, skills, tools
+# `mentions` is aliased because `send_message` already takes a parameter of that
+# name, exactly as it does for `attachments` — a bare import would be shadowed
+# inside the one function that needs it most.
+from alaiy_os.chat import attachments
+from alaiy_os.chat import mentions as chat_mentions
+from alaiy_os.chat import runner, skills, tools
 
 
 @frappe.whitelist()
@@ -50,16 +56,22 @@ def list_sessions(limit=50):
 
 
 @frappe.whitelist()
-def send_message(session, text=None, attachments=None, skill=None, screen=None):
+def send_message(session, text=None, attachments=None, skill=None, screen=None, mentions=None):
 	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
 
 	An unknown skill throws here rather than on the worker, so the picker gets a
 	real error instead of a conversation that quietly answers the wrong thing.
+
+	`mentions` is `[{kind, value}]` from `list_mentions` — the records the user
+	picked with `@`. Each is re-resolved server-side, so only `kind` and `value`
+	are read; anything else the client sends is rebuilt or discarded.
 	"""
 	# start_turn does its own check_permission("write") — the session's own
 	# permission is the gate, since a chat can only reach what its owner can. It
 	# also validates every attachment name against that session.
-	seq = runner.start_turn(session, text, attachments=attachments, skill=skill, screen=screen)
+	seq = runner.start_turn(
+		session, text, attachments=attachments, skill=skill, screen=screen, mentions=mentions
+	)
 	return {"seq": seq, "status": "Running"}
 
 
@@ -154,7 +166,17 @@ def get_messages(session, after=0):
 	rows = frappe.get_all(
 		"OS Chat Message",
 		filters={"session": session, "seq": (">", int(after))},
-		fields=["name", "seq", "role", "text", "blocks", "attachments", "skill_used", "creation"],
+		fields=[
+			"name",
+			"seq",
+			"role",
+			"text",
+			"blocks",
+			"attachments",
+			"mentions",
+			"skill_used",
+			"creation",
+		],
 		order_by="seq asc",
 	)
 
@@ -191,6 +213,18 @@ def list_skills():
 	return skills.catalogue()
 
 
+@frappe.whitelist()
+def list_mentions(q=None, kind=None):
+	"""The `@` picker's options for `q`: {query, groups[]}.
+
+	One call covers every kind this site has a source for, so a client draws the
+	groups it is given and needs no knowledge of which are backed by a query.
+	Safe to call on every keystroke — see `chat/mentions.py` for what decides
+	whether a group's search actually runs.
+	"""
+	return chat_mentions.catalogue(q, kind)
+
+
 def _present(row):
 	"""One stored message in the shape the UI renders.
 
@@ -200,9 +234,10 @@ def _present(row):
 	failed. Tool *results* are deliberately not sent: they are raw JSON the
 	model has already summarised in its reply, and can be megabytes.
 
-	Attachments come from their own denormalised column rather than being read
-	back out of `blocks`, where they are indistinguishable from any other text
-	block — and where the payload is the whole document rather than a chip.
+	Attachments and mentions come from their own denormalised columns rather than
+	being read back out of `blocks`, where they are indistinguishable from any
+	other text block — and where the payload is the whole document, or the
+	model's briefing, rather than a chip.
 	"""
 	blocks = json.loads(row.blocks or "[]")
 	tool_calls = [
@@ -218,6 +253,7 @@ def _present(row):
 		"role": row.role,
 		"text": row.text or "",
 		"attachments": json.loads(row.attachments or "[]"),
+		"mentions": json.loads(row.mentions or "[]"),
 		"skill": row.skill_used,
 		"tool_calls": tool_calls,
 		"tool_errors": tool_errors,
