@@ -31,6 +31,7 @@ import frappe
 from frappe.utils import now_datetime
 
 from alaiy_os.chat import attachments as chat_attachments
+from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import skills as chat_skills
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.engine import llm
@@ -57,6 +58,11 @@ MAX_HISTORY_MESSAGES = 60
 # the file_url the model needs to read it again. See `_elide_old_attachments`.
 ATTACHMENT_MEMORY = 1
 
+# Mentions have no equivalent and are never elided: a mention block is a handful
+# of tokens naming a few records, not a document. Dropping it from history would
+# make "and how did that brand do the month before?" unanswerable three turns on,
+# which is exactly the follow-up mentions exist to make cheap.
+
 
 # ── Entry points ─────────────────────────────────────────────────────────────
 def default_model():
@@ -65,7 +71,7 @@ def default_model():
 
 
 
-def start_turn(session, text, attachments=None, skill=None, screen=None):
+def start_turn(session, text, attachments=None, skill=None, screen=None, mentions=None):
 	"""Append the user's message and enqueue the turn. Returns the message seq.
 
 	`attachments` is a list of `OS Chat Attachment` names staged by
@@ -77,6 +83,12 @@ def start_turn(session, text, attachments=None, skill=None, screen=None):
 	resolved here so an unknown slug is a 417 on the send rather than a failure
 	that only shows up in the thread a minute later, but it is *run* on the
 	worker — the agent behind it makes its own LLM calls.
+
+	`mentions` is what the user picked with `@` (see `chat/mentions.py`), as
+	`[{kind, value}]`. Every one is re-resolved against its source here, so the
+	label and dates that reach the model are the site's rather than the client's,
+	and a stale pick is dropped rather than believed. Unlike `skill`, that never
+	throws: the user's own words still say what they were asking about.
 
 	`screen` is whatever route the client was on, recorded on the message.
 
@@ -101,11 +113,28 @@ def start_turn(session, text, attachments=None, skill=None, screen=None):
 	if not text and not att_blocks:
 		frappe.throw("Message is empty.")
 
-	blocks = att_blocks + ([{"type": "text", "text": text}] if text else [])
+	mention_meta = chat_mentions.resolve(mentions)
+	mention_block = chat_mentions.context_block(mention_meta)
+
+	# Attachment blocks MUST stay strictly first: `_elide_old_attachments` finds
+	# them by position — the first `len(meta)` entries — and zips the meta
+	# against them. Anything inserted ahead would make it stub the wrong block.
+	# So mentions go after the documents and before the question they qualify.
+	blocks = att_blocks + ([mention_block] if mention_block else [])
 	# `text=text` and not `_text_of(blocks)`: the attachment content must stay
 	# out of the denormalised column, or a whole PDF ends up rendered in the
 	# user's chat bubble and sliced into the session title below.
-	seq = _append(session, "user", blocks, text=text, attachments=meta, skill=skill, screen=screen)
+	blocks += [{"type": "text", "text": text}] if text else []
+	seq = _append(
+		session,
+		"user",
+		blocks,
+		text=text,
+		attachments=meta,
+		mentions=mention_meta,
+		skill=skill,
+		screen=screen,
+	)
 
 	if consumed:
 		# The staging rows have done their job — the message's blocks are now
@@ -399,7 +428,9 @@ def _elide_old_attachments(rows):
 
 
 # ── Persistence ──────────────────────────────────────────────────────────────
-def _append(session, role, blocks, text=None, attachments=None, skill=None, screen=None):
+def _append(
+	session, role, blocks, text=None, attachments=None, mentions=None, skill=None, screen=None
+):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
 	seq = (last or 0) + 1
@@ -412,6 +443,7 @@ def _append(session, role, blocks, text=None, attachments=None, skill=None, scre
 			"text": text,
 			"blocks": json.dumps(blocks, default=str),
 			"attachments": json.dumps(attachments) if attachments else None,
+			"mentions": json.dumps(mentions) if mentions else None,
 			"skill_used": skill,
 			"screen": screen,
 		}

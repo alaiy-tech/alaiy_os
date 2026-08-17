@@ -14,7 +14,8 @@
   "screen",
   "text",
   "blocks",
-  "attachments"
+  "attachments",
+  "mentions"
  ],
  "fields": [
   {
@@ -77,10 +78,17 @@
    "fieldtype": "Code",
    "label": "Attachments (JSON)",
    "options": "JSON"
+  },
+  {
+   "description": "Records the user named with `@`: [{kind, value, label, hint, …}]. Denormalised for display, like `attachments` — the model reads them from a block ahead of the question, not from here. Written by `chat/mentions.resolve`, so every value was re-checked against its source at send time; the client's own labels and dates are never stored.",
+   "fieldname": "mentions",
+   "fieldtype": "Code",
+   "label": "Mentions (JSON)",
+   "options": "JSON"
   }
  ],
  "links": [],
- "modified": "2026-08-10 00:00:00.000000",
+ "modified": "2026-08-17 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Chat Message",
