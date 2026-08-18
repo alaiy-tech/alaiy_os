@@ -1,11 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { formatQty, labelOr } from "@/lib/format";
 import { outstandingQty } from "@/lib/purchase-orders";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { PurchaseOrderLine } from "@/types/purchase-orders";
-
-import { formatQty, labelOr } from "./format";
 
 /** Received and Billed are shown against the ordered qty rather than alone, so
  * a line reads as "3 of 10" without the reader holding the Qty column in their

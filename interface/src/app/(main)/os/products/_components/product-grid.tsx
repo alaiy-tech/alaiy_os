@@ -1,3 +1,6 @@
+import Link from "next/link";
+
+import { productHref } from "@/constants/products";
 import type { ProductRow } from "@/types/products";
 
 import { ImageCarousel } from "./image-carousel";
@@ -23,9 +26,16 @@ export function ProductGrid({ rows, isLoading }: { rows: ProductRow[]; isLoading
            * exposes a gallery of attached files for an item. */}
           <ImageCarousel images={row.image ? [row.image] : []} alt={row.item_name} />
           <div className="flex flex-col gap-0.5 p-3">
-            <span className="truncate font-medium text-sm" title={row.item_name}>
+            {/* The name is the link rather than the whole card: the carousel's
+             * own prev/next buttons sit inside the card and cannot live inside
+             * an anchor. */}
+            <Link
+              href={productHref(row.name)}
+              className="truncate font-medium text-sm hover:underline"
+              title={row.item_name}
+            >
               {row.item_name}
-            </span>
+            </Link>
             <span className="truncate text-muted-foreground text-xs" title={row.item_group}>
               {row.item_group}
             </span>

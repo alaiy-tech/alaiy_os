@@ -2,7 +2,10 @@
 
 import { useEffect, useState } from "react";
 
+import Link from "next/link";
+
 import { Spinner } from "@/components/ui/spinner";
+import { productHref } from "@/constants/products";
 import { getItemVariants, type ItemVariant } from "@/lib/frappe/item-variants";
 
 function VariantAttributes({ attributes }: { attributes: ItemVariant["attributes"] }) {
@@ -73,7 +76,9 @@ export function VariantRows({
                       )}
                     </div>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-medium">{v.item_name}</div>
+                      <Link href={productHref(v.name)} className="block truncate text-sm font-medium hover:underline">
+                        {v.item_name}
+                      </Link>
                       <div className="truncate text-muted-foreground text-xs">{v.item_code}</div>
                     </div>
                   </div>

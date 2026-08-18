@@ -3,6 +3,15 @@ import type { ProductStatus } from "@/types/products";
 
 export const ITEM_DOCTYPE = "Item";
 
+// Kept here rather than in the list component so the detail page (a Server
+// Component) can reach them without importing a "use client" module for the
+// sake of a string.
+export const PRODUCT_BASE_PATH = "/os/products";
+
+export function productHref(name: string): string {
+  return `${PRODUCT_BASE_PATH}/${encodeURIComponent(name)}`;
+}
+
 // status is derived (see getProductStatus), not a real DocField from
 // alaiy_os.api.list_view.get_doctype_fields, but still needs to be pickable
 // as a column.

@@ -1,9 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { labelOr } from "@/lib/format";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { PurchaseOrderTax, PurchaseOrderTotals } from "@/types/purchase-orders";
-
-import { labelOr } from "./format";
 
 function Line({
   label,
