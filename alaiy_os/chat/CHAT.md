@@ -310,9 +310,27 @@ hook (a dotted path to a no-argument callable returning a paragraph). Several
 apps may each contribute one. `chat_system_prompt` overrides everything,
 including those, which is why it is checked first.
 
-The other tenant seam is `chat_mention_sources` — what a user can name with `@`
-(see **Mentions** above). Same shape, same reason: what is true of one
-customer's business belongs in that customer's app.
+The other tenant seams are `chat_mention_sources` — what a user can name with
+`@` (see **Mentions** above) — and `chat_tool_sources` / `chat_skill_filter`,
+which decide what the assistant may *read*.
+
+Those last two exist because FAC's checks are Frappe's: a role holds a
+doctype's read permission or it does not. A deployment scoping rows more
+narrowly than that — brands assigned per user, where the brand hangs off the
+Item behind an order line rather than the order — cannot express it in the
+registry, so a generic tool hands such a user the whole dataset. A source may
+narrow the tool list, and may contribute tools of its own that apply the
+deployment's real scoping. `chat_skill_filter` does the same for `/skills`.
+
+Both **fail closed**, unlike the two hooks above: a broken source leaves the
+assistant with no tools rather than the unscoped set, because degrading open
+there is a disclosure and not a cosmetic loss. Symptom is an assistant that
+says it has no tools; cause is in the Error Log under the source's name. See
+`tools.py` and `skills.py` for the full contract.
+
+`chat_tools` in site_config composes with them, and applies first: a site that
+pins that list is stating the complete surface, so a tenant-contributed tool
+has to be named there too before anyone can reach it.
 
 The provider key itself is not here — that is `ai_api_key` / `ai_base_url` on
 the `ai_client` seam (see `engine/AI_CLIENT.md`), shared with batch agents.

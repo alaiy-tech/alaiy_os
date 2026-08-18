@@ -43,11 +43,26 @@ to the session's owner, so every tool handler executes as that user and its
 `chat_skill` a claim about the agent — "every tool here enforces its own
 permissions and none of them write" — which is why it is opt-in per agent and
 says so on the field.
+
+That claim is only as good as the row-level permissions behind it. Where a
+deployment's access rules are narrower than Frappe's — brands assigned per user,
+say — an agent's `get_list` reads do not express them, and its output is
+site-wide however it was triggered. `chat_skill_filter` lets that deployment say
+so:
+
+    chat_skill_filter = ["alaiy_os_globali.chat_skills.filter_skills"]
+
+Each entry is a dotted path to `fn(slugs: list[str]) -> list[str]`. Intersect
+only — a filter may hide a skill, never reveal one — and fail closed: an entry
+that raises hides every skill rather than falling back to the full list, for the
+same reason `chat.tools` does (see that module's docstring).
 """
 
 import frappe
 
 from alaiy_os.engine import executor
+
+HOOK = "chat_skill_filter"
 
 # The agent's output is already a compact summary object; the cap is a backstop
 # against a Text-format agent that returns a whole report, matching the ceiling
@@ -56,12 +71,13 @@ MAX_OUTPUT_CHARS = 20_000
 
 
 def catalogue():
-	"""Every skill on this site, for the `/` picker.
+	"""Every skill this user may run, for the `/` picker.
 
-	Not filtered by user: the agents are opt-in read-only (see the module
-	docstring) and their tools do their own permission filtering, so a skill a
-	user may not get much out of returns a thin answer rather than being hidden.
-	Hiding it would need a per-agent permission model that does not exist yet.
+	Core has no per-agent permission model of its own: the agents are opt-in
+	read-only (see the module docstring) and their tools do their own permission
+	filtering, so by default a skill a user gets little out of returns a thin
+	answer rather than being hidden. A deployment whose scoping the agents
+	cannot express narrows the list through `chat_skill_filter`.
 	"""
 	rows = frappe.get_all(
 		"OS Agent Registry",
@@ -69,6 +85,7 @@ def catalogue():
 		fields=["name", "agent_name", "skill_slug", "skill_label", "description", "icon"],
 		order_by="skill_slug asc",
 	)
+	permitted = _permitted([row.skill_slug for row in rows])
 	return [
 		{
 			"slug": row.skill_slug,
@@ -77,18 +94,38 @@ def catalogue():
 			"icon": row.icon,
 		}
 		for row in rows
+		if row.skill_slug in permitted
 	]
 
 
 def resolve(slug):
-	"""The agent name behind a slug. Throws with a usable message if there isn't one."""
+	"""The agent name behind a slug. Throws with a usable message if there isn't one.
+
+	Both entry points land here — `runner.start_turn` validating what the client
+	sent, and `run_skill` in the worker — so this is where a filtered slug has to
+	be refused, not just hidden from the picker. A skill the caller may not run
+	gets the same message as one that does not exist: the difference is not
+	theirs to learn by probing.
+	"""
 	slug = (slug or "").strip().lstrip("/").lower()
 	agent = frappe.db.get_value(
 		"OS Agent Registry", {"skill_slug": slug, "chat_skill": 1, "is_enabled": 1}, "name"
 	)
-	if not agent:
+	if not agent or slug not in _permitted([slug]):
 		frappe.throw(f"There is no skill called /{slug}.")
 	return agent
+
+
+def _permitted(slugs):
+	"""`slugs` narrowed by every registered filter. Empty if one of them fails."""
+	for entry in frappe.get_hooks(HOOK) or []:
+		try:
+			kept = set(frappe.get_attr(entry)(list(slugs)) or [])
+		except Exception:
+			frappe.log_error(title=f"Chat skill filter {entry} failed")
+			return set()
+		slugs = [slug for slug in slugs if slug in kept]
+	return set(slugs)
 
 
 def run_skill(session, slug, append):
