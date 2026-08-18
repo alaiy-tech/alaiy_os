@@ -28,6 +28,7 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/in
 import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { productExtension } from "@/config/product-extension";
 import {
   BASE_FIELDS,
   COMPULSORY_COLUMNS,
@@ -51,12 +52,36 @@ import { ProductTable } from "./product-table";
 
 type ViewMode = "list" | "grid";
 
+/**
+ * The columns to open on, and the fields to always fetch.
+ *
+ * A contributing app's list replaces the base's outright rather than merging:
+ * an app that reshapes Item usually wants its own identifiers *instead of* the
+ * generic ones, and a merge would leave the user to remove what it displaced. A
+ * list that could never be saved from the Columns popover is a packaging
+ * mistake in that app, so it is ignored here rather than rendered — the table
+ * stays usable and the app's own build is where that gets caught.
+ */
+const contributedColumns = productExtension?.defaultColumns;
+const initialColumnOrder =
+  contributedColumns &&
+  contributedColumns.length >= MIN_VISIBLE_COLUMNS &&
+  COMPULSORY_COLUMNS.every((column) => contributedColumns.includes(column))
+    ? contributedColumns
+    : DEFAULT_COLUMN_ORDER;
+
+// What the extension's status / hasChildren rules read, whether or not the user
+// has those fields on screen as columns.
+const contributedFields = productExtension?.requiredFields ?? [];
+
+const quickFilters = productExtension?.quickFilters ?? [];
+
 export default function Products() {
   const router = useRouter();
   const { meta } = useDoctypeMeta(ITEM_DOCTYPE);
 
   const { value: columnPrefs, update: setColumnPrefs } = useListPreference<ColumnPrefs>("products:columns", {
-    columnOrder: DEFAULT_COLUMN_ORDER,
+    columnOrder: initialColumnOrder,
   });
   const { value: filterRows, update: setFilterRows } = useListPreference<FilterRow[]>("products:filters", []);
 
@@ -69,6 +94,7 @@ export default function Products() {
     pageSize: 10,
   });
   const [rowSelection, setRowSelection] = useState({});
+  const [quickFilterId, setQuickFilterId] = useState<string>(quickFilters[0]?.id ?? "");
   const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [columnsOpen, setColumnsOpen] = useState(false);
@@ -100,8 +126,13 @@ export default function Products() {
     let cancelled = false;
     setIsLoading(true);
 
-    const fields = Array.from(new Set([...BASE_FIELDS, ...columnPrefs.columnOrder.filter((f) => f !== "status")]));
-    const filters = toFrappeFilters(filterRows);
+    const fields = Array.from(
+      new Set([...BASE_FIELDS, ...contributedFields, ...columnPrefs.columnOrder.filter((f) => f !== "status")]),
+    );
+    // The quick filter narrows what the user's own filters already select, so
+    // the two are ANDed rather than one replacing the other.
+    const quickFilter = quickFilters.find((candidate) => candidate.id === quickFilterId);
+    const filters = [...toFrappeFilters(filterRows), ...(quickFilter?.filters ?? [])];
     const orFilters: Array<[string, string, unknown]> | undefined = search
       ? [
           ["item_name", "like", `%${search}%`],
@@ -140,7 +171,7 @@ export default function Products() {
     return () => {
       cancelled = true;
     };
-  }, [columnPrefs.columnOrder, filterRows, search, sorting, pagination.pageIndex, pagination.pageSize]);
+  }, [columnPrefs.columnOrder, filterRows, quickFilterId, search, sorting, pagination.pageIndex, pagination.pageSize]);
 
   const toggleExpand = useCallback((row: ProductRow) => {
     setExpandedIds((prev) => {
@@ -261,6 +292,24 @@ export default function Products() {
         <div className="flex items-center justify-between gap-3 px-4 pt-4">
           {selectedIds.length > 0 && <SelectionActionsMenu selectedIds={selectedIds} entityLabel="product" />}
 
+          {quickFilters.length > 0 && (
+            <Tabs
+              value={quickFilterId}
+              onValueChange={(value) => {
+                setQuickFilterId(value);
+                setPagination((p) => ({ ...p, pageIndex: 0 }));
+              }}
+            >
+              <TabsList>
+                {quickFilters.map((filter) => (
+                  <TabsTrigger key={filter.id} value={filter.id}>
+                    {filter.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          )}
+
           <Tabs value={view} onValueChange={(value) => setView(value as ViewMode)} className="ml-auto">
             <TabsList>
               <TabsTrigger value="list" aria-label="List view">
@@ -280,6 +329,7 @@ export default function Products() {
             totalCount={totalCount}
             expandedIds={expandedIds}
             onRowClick={(row) => router.push(productHref(row.name))}
+            currency={defaultCurrency}
           />
         ) : (
           <>
