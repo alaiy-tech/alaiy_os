@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { cn } from "@/lib/utils";
 import type { ProductRow } from "@/types/products";
 
-import { VariantRows } from "./variant-rows";
+import { hasProductChildren, ProductChildRows } from "./product-child-rows";
 
 export function ProductTable({
   table,
@@ -19,12 +19,14 @@ export function ProductTable({
   totalCount,
   expandedIds,
   onRowClick,
+  currency,
 }: {
   table: TableType<ProductRow>;
   isLoading: boolean;
   totalCount: number;
   expandedIds: Set<string>;
   onRowClick?: (row: ProductRow) => void;
+  currency?: string;
 }) {
   const columnSizing = table.getState().columnSizing;
 
@@ -105,8 +107,8 @@ export function ProductTable({
                       </TableCell>
                     ))}
                   </TableRow>
-                  {Boolean(row.original.has_variants) && expandedIds.has(row.original.name) && (
-                    <VariantRows templateItemCode={row.original.item_code} colSpan={row.getVisibleCells().length} />
+                  {hasProductChildren(row.original) && expandedIds.has(row.original.name) && (
+                    <ProductChildRows row={row.original} colSpan={row.getVisibleCells().length} currency={currency} />
                   )}
                 </Fragment>
               ))

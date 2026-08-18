@@ -826,6 +826,67 @@ without knowing who supplied it, the same shape as `connector_meta.py` on the
 Python side — the app declares, the platform consumes generically. Two apps
 contributing the same nav id to the same group is a compose-time error.
 
+## 16.1 Extending a base screen
+
+Adding a route is the easy half. The hard half is a base screen that is *wrong*
+for one deployment — not missing something, wrong — because that app's Frappe
+side reshaped the DocType it renders.
+
+The live example is `Item`. `alaiy_os_nayaglobal` adds `ng_parent_item`,
+described in its own `setup/custom_fields.py` as a "flat variant model —
+replaces ERPNext native variant_of". So on a NayaGlobal site every Item leaves
+`has_variants` and `variant_of` unset, and the base's Products screen — which
+derives both its status badge and its expand affordance from exactly those two
+fields — shows tens of thousands of SKUs in one flat list where everything reads
+"Active" and nothing expands. No amount of *adding* fixes that.
+
+`overrides` can fix it, and is the wrong tool: the client ends up owning a copy
+of the base's table, and every later improvement to it has to be re-applied by
+hand. That is §22's "forking the base" at file granularity.
+
+So the base offers extension points, declared the same way nav is:
+
+```json
+{
+    "app": "alaiy_os_nayaglobal",
+    "platformVersion": "2.2.0",
+    "extensions": { "products": "src/lib/nayaglobal/product-extension.ts" }
+}
+```
+
+| Point | Generated into | Contract |
+| --- | --- | --- |
+| `products` | `src/config/contributed-products.ts` | [`ProductExtension`](src/config/product-extension-types.ts) |
+
+The contract is a set of optional questions — which columns to open on, what a
+row's status is, whether it has children and how to load them, which quick
+filters to offer. Every omission falls back to the base's own behaviour, which
+is also exactly what a deployment with no contributing app gets. Nothing under
+the base's `src/` names an app, and the contributing app ships no copy of a base
+file:
+
+```ts
+// alaiy_os_nayaglobal/interface/src/lib/nayaglobal/product-extension.ts
+export const productExtension: ProductExtension = {
+    app: "alaiy_os_nayaglobal",
+    defaultColumns: ["item_name", "ng_offer_id", "ng_sku_id", "ng_usd_price", "ng_month_sold", "status"],
+    requiredFields: ["ng_is_parent", "ng_parent_item"],
+    status: (row) => (row.ng_is_parent ? { label: "Offer" } : row.ng_parent_item ? { label: "SKU" } : null),
+    hasChildren: (row) => Boolean(row.ng_is_parent),
+    loadChildren: (row) => fetchOfferSkus(row.name),
+};
+```
+
+Unlike `nav`, this is a module rather than JSON, and it has to be: a status rule
+and a child loader are behaviour. The composer therefore *imports* the declared
+module into the generated file instead of re-emitting what it declared.
+
+A point the base does not offer is a compose-time error naming the ones it does.
+Adding a new point is a base change — a types module, a generated file that
+ships empty, and the screen consulting it — which is deliberately more work than
+declaring an override, because an extension point is a public contract and an
+override is one app's problem.
+
 ---
 
 # 17. Frappe Runtime Data

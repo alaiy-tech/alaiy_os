@@ -10,6 +10,7 @@ import { GenericCell } from "@/components/generic-cell";
 import type { DocFieldMeta } from "@/components/list/types";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { productExtension } from "@/config/product-extension";
 import {
   ID_COLUMN_FIELDNAME,
   IMAGE_COLUMN_FIELDNAME,
@@ -19,6 +20,8 @@ import {
 import { getProductStatus } from "@/lib/products";
 import { cn, formatFieldLabel } from "@/lib/utils";
 import type { ProductRow } from "@/types/products";
+
+import { hasProductChildren } from "./product-child-rows";
 
 function ItemNameCell({ row, showItemCode, href }: { row: ProductRow; showItemCode: boolean; href: string }) {
   return (
@@ -78,6 +81,20 @@ export function buildProductColumns({
           header: "Status",
           size: 120,
           cell: ({ row }) => {
+            // A contributing app whose Frappe side reshapes Item decides what a
+            // status means there; null means it has no opinion on this row and
+            // the base's own derivation stands.
+            const contributed = productExtension?.status?.(row.original);
+            if (contributed) {
+              return (
+                <Badge
+                  variant="outline"
+                  className={cn("border-0 font-medium", contributed.className ?? "bg-muted text-muted-foreground")}
+                >
+                  {contributed.label}
+                </Badge>
+              );
+            }
             const status = getProductStatus(row.original);
             return (
               <Badge variant="outline" className={cn("border-0 font-medium", STATUS_BADGE_CLASS[status])}>
@@ -139,7 +156,7 @@ export function buildProductColumns({
       id: "expand",
       header: "",
       cell: ({ row }) =>
-        row.original.has_variants ? (
+        hasProductChildren(row.original) ? (
           <button
             type="button"
             onClick={() => onToggleExpand(row.original)}
