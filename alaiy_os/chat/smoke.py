@@ -32,7 +32,11 @@ def run(question=None, user=None, keep=False):
 	for spec in specs:
 		print(f"  - {spec['name']}")
 	if not specs:
-		print("  (none — is frappe_assistant_core installed and its tools enabled?)")
+		print(
+			"  (none — is frappe_assistant_core installed and its tools enabled? "
+			"an empty list is also how a broken chat_tool_sources hook fails, so "
+			"check the Error Log before assuming this user is simply scoped out)"
+		)
 
 	session = frappe.get_doc(
 		{"doctype": "OS Chat Session", "model": runner.default_model(), "status": "Idle"}

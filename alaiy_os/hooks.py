@@ -91,6 +91,22 @@ ai_client = "alaiy_os.engine.ai_client.get_ai_client"
 #
 # chat_mention_sources = ["alaiy_os_globali.chat_mentions.sources"]
 
+# Ask Alaiy's tool seam. A list hook whose entries return a source that may
+# narrow the tool surface and contribute tools of its own. It exists because
+# FAC's checks are Frappe's — a role reads a doctype or it does not — and a
+# deployment scoping rows more narrowly than that (brands assigned per user)
+# cannot express it through the registry. Unlike the two hooks above, this one
+# fails CLOSED: a broken source leaves the chat with no tools rather than the
+# unscoped set. See chat/tools.py for the contract and the reasoning.
+#
+# chat_tool_sources = ["alaiy_os_globali.chat_tools.source"]
+
+# The same seam for `/skills`. Each entry narrows the runnable slug list for the
+# current user — for a deployment whose agents compute figures wider than the
+# caller may see. Also intersect-only, also fails closed. See chat/skills.py.
+#
+# chat_skill_filter = ["alaiy_os_globali.chat_skills.filter_skills"]
+
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
