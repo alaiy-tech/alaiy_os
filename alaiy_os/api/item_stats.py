@@ -6,6 +6,10 @@ from frappe.utils import add_days, cint, getdate, nowdate
 # counts as a unit "sold" on the Products KPI strip.
 PERIOD_DAYS = {"1D": 1, "1W": 7, "1M": 30, "1Y": 365}
 
+# At or below this many units on hand (summed across warehouses) an item counts
+# as "low stock" rather than "in stock" on the dashboard's Inventory gauge.
+LOW_STOCK_QTY = 10
+
 # On-hand history is reconstructed from Stock Ledger Entry (there's no
 # materialized daily snapshot), which is one window-function query per
 # sample point - kept coarser for 1Y so a full year doesn't mean 365
@@ -44,33 +48,44 @@ def get_units_sold(period="1M"):
 
 @frappe.whitelist()
 def get_stock_mix():
-	"""Out of stock (<=0) / low stock (<=10) / in stock (>10), counted per
-	Item summed across all warehouses. Stock items with no Bin row at all
-	(never transacted) are still counted, as 0 on-hand."""
+	"""Out of stock (<=0) / low stock (<=LOW_STOCK_QTY) / in stock (above it),
+	counted per Item summed across all warehouses. Stock items with no Bin row
+	at all (never transacted) are still counted, as 0 on-hand.
+
+	The bucketing is deliberately done in SQL, not in Python. The inner query is
+	one row per Item, so on a large catalog that result set *is* the cost of this
+	call - transferring millions of rows and building a dict for each one, to
+	end up with three integers. Aggregating outside the subquery returns exactly
+	one row whatever the catalog size.
+	"""
 	frappe.has_permission("Item", "read", throw=True)
 
-	rows = frappe.db.sql(
+	row = frappe.db.sql(
 		"""
-		select i.item_code, coalesce(sum(b.actual_qty), 0) as qty
-		from `tabItem` i
-		left join `tabBin` b on b.item_code = i.item_code
-		where i.is_stock_item = 1 and i.disabled = 0
-		group by i.item_code
+		select
+			coalesce(sum(case when q.qty <= 0 then 1 else 0 end), 0) as out_of_stock,
+			coalesce(sum(case when q.qty > 0 and q.qty <= %(low)s then 1 else 0 end), 0) as low_stock,
+			coalesce(sum(case when q.qty > %(low)s then 1 else 0 end), 0) as in_stock
+		from (
+			select i.item_code, coalesce(sum(b.actual_qty), 0) as qty
+			from `tabItem` i
+			left join `tabBin` b on b.item_code = i.item_code
+			where i.is_stock_item = 1 and i.disabled = 0
+			group by i.item_code
+		) q
 		""",
+		{"low": LOW_STOCK_QTY},
 		as_dict=True,
 	)
 
-	out_of_stock = low_stock = in_stock = 0
-	for r in rows:
-		qty = r.qty or 0
-		if qty <= 0:
-			out_of_stock += 1
-		elif qty <= 10:
-			low_stock += 1
-		else:
-			in_stock += 1
+	if not row:
+		return {"out_of_stock": 0, "low_stock": 0, "in_stock": 0}
 
-	return {"out_of_stock": out_of_stock, "low_stock": low_stock, "in_stock": in_stock}
+	return {
+		"out_of_stock": cint(row[0].out_of_stock),
+		"low_stock": cint(row[0].low_stock),
+		"in_stock": cint(row[0].in_stock),
+	}
 
 
 def _on_hand_as_of(date):
@@ -171,8 +186,22 @@ def get_products_overview(period="1M"):
 	on_hand_now = _on_hand_as_of(today)
 	on_hand_before = _on_hand_as_of(period_start)
 
-	active_now = frappe.db.count("Item", {"disabled": 0})
-	active_before = frappe.db.count("Item", {"disabled": 0, "creation": ["<=", period_start]})
+	# One pass over the enabled items, not two. As two `frappe.db.count` calls
+	# these were separate full scans of `tabItem` differing only in the
+	# `creation` bound, which on a large catalog is two scans too many.
+	active = frappe.db.sql(
+		"""
+		select
+			count(*) as active_now,
+			coalesce(sum(case when creation <= %(period_start)s then 1 else 0 end), 0) as active_before
+		from `tabItem`
+		where disabled = 0
+		""",
+		{"period_start": period_start},
+		as_dict=True,
+	)
+	active_now = cint(active[0].active_now) if active else 0
+	active_before = cint(active[0].active_before) if active else 0
 
 	return {
 		"period": period,
