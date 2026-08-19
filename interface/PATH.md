@@ -55,7 +55,9 @@ Legend: `→` redirect target · `[id]` dynamic segment · `[...path]` catch-all
 │   │   ├── /os/settings/organisation         company profile
 │   │   ├── /os/settings/users                users
 │   │   ├── /os/settings/roles                roles and permissions
-│   │   └── /os/settings/themes               theme and appearance
+│   │   ├── /os/settings/themes               theme and appearance
+│   │   └── /os/settings/logs                 what installed apps recorded calling out;
+│   │                                         one source per alaiy_os_sidebar_log_items entry
 │   │
 │   └── /os/<anything else>                   catch-all: "This section will be added in
 │                                             future updates", inside the dashboard shell
