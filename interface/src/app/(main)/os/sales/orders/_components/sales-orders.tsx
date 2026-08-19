@@ -35,9 +35,11 @@ import {
   EMPTY_STATE_BY_TAB,
   ID_COLUMN_FIELDNAME,
   MIN_VISIBLE_COLUMNS,
+  SALES_ORDER_BASE_PATH,
   SALES_ORDER_DOCTYPE,
   STATUS_TAB_LABEL,
   STATUS_TABS,
+  salesOrderHref,
 } from "@/constants/sales-orders";
 import { useDoctypeMeta } from "@/hooks/use-doctype-meta";
 import { useListPreference } from "@/hooks/use-list-preference";
@@ -51,12 +53,6 @@ import { CustomerFilter } from "./customer-filter";
 import { buildSalesOrderColumns } from "./sales-order-columns";
 import { SalesOrderKpiCards } from "./sales-order-kpi-cards";
 import { SalesOrderTable } from "./sales-order-table";
-
-export const SALES_ORDER_BASE_PATH = "/os/sales/orders";
-
-function detailHref(name: string): string {
-  return `${SALES_ORDER_BASE_PATH}/${encodeURIComponent(name)}`;
-}
 
 export function SalesOrders() {
   const router = useRouter();
@@ -200,7 +196,7 @@ export function SalesOrders() {
         columnOrder: columnPrefs.columnOrder,
         fieldsByName,
         currency: defaultCurrency,
-        detailHref,
+        detailHref: salesOrderHref,
       }),
     [columnPrefs.columnOrder, fieldsByName, defaultCurrency],
   );
@@ -348,7 +344,7 @@ export function SalesOrders() {
             isLoading={isLoading}
             totalCount={totalCount}
             emptyMessage={EMPTY_STATE_BY_TAB[statusTab] ?? "No orders found."}
-            onRowClick={(row) => router.push(detailHref(row.name))}
+            onRowClick={(row) => router.push(salesOrderHref(row.name))}
           />
         </CardContent>
       </Card>
