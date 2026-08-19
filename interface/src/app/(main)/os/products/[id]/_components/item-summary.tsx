@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ITEM_IMAGE_REFERRER_POLICY } from "@/constants/products";
 import { formatDate } from "@/lib/format";
 import { formatCurrency } from "@/lib/utils";
 import type { ItemDetailHeader } from "@/types/products";
@@ -67,7 +68,12 @@ export function ItemSummary({ item, currency }: { item: ItemDetailHeader; curren
         <div className="flex gap-4">
           <div className="flex size-28 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
             {item.image ? (
-              <img src={item.image} alt={item.item_name} className="size-full object-cover" />
+              <img
+                src={item.image}
+                alt={item.item_name}
+                referrerPolicy={ITEM_IMAGE_REFERRER_POLICY}
+                className="size-full object-cover"
+              />
             ) : (
               <span className="text-muted-foreground text-xs">No image</span>
             )}

@@ -15,6 +15,7 @@ import {
   ID_COLUMN_FIELDNAME,
   IMAGE_COLUMN_FIELDNAME,
   ITEM_CODE_COLUMN_FIELDNAME,
+  ITEM_IMAGE_REFERRER_POLICY,
   STATUS_BADGE_CLASS,
 } from "@/constants/products";
 import { getProductStatus } from "@/lib/products";
@@ -28,7 +29,13 @@ function ItemNameCell({ row, showItemCode, href }: { row: ProductRow; showItemCo
     <div className="flex items-center gap-2.5">
       <div className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-md border bg-muted">
         {row.image ? (
-          <img src={String(row.image)} alt={row.item_name} className="size-full object-cover" />
+          <img
+            src={String(row.image)}
+            alt={row.item_name}
+            loading="lazy"
+            referrerPolicy={ITEM_IMAGE_REFERRER_POLICY}
+            className="size-full object-cover"
+          />
         ) : (
           <span className="text-[10px] text-muted-foreground">No img</span>
         )}

@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { productHref } from "@/constants/products";
+import { ITEM_IMAGE_REFERRER_POLICY, productHref } from "@/constants/products";
 import type { ItemVariant } from "@/lib/frappe/item-variants";
 import { formatCurrency } from "@/lib/utils";
 import type { ItemAttributeRow, ItemDetail } from "@/types/products";
@@ -30,7 +30,13 @@ function VariantLine({ variant, currency }: { variant: ItemVariant; currency?: s
       <div className="flex min-w-0 items-center gap-3">
         <div className="flex size-8 flex-none items-center justify-center overflow-hidden rounded-md border bg-muted">
           {variant.image ? (
-            <img src={variant.image} alt={variant.item_name} className="size-full object-cover" />
+            <img
+              src={variant.image}
+              alt={variant.item_name}
+              loading="lazy"
+              referrerPolicy={ITEM_IMAGE_REFERRER_POLICY}
+              className="size-full object-cover"
+            />
           ) : (
             <span className="text-[9px] text-muted-foreground">No img</span>
           )}

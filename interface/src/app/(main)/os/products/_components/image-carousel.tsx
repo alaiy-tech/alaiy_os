@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
+import { ITEM_IMAGE_REFERRER_POLICY } from "@/constants/products";
 import { cn } from "@/lib/utils";
 
 /** Single image renders plainly; 2+ get prev/next controls and dot
@@ -22,7 +23,12 @@ export function ImageCarousel({ images, alt }: { images: string[]; alt: string }
 
   return (
     <div className="group relative aspect-square w-full overflow-hidden bg-muted">
-      <img src={validImages[index]} alt={alt} className="size-full object-cover" />
+      <img
+        src={validImages[index]}
+        alt={alt}
+        referrerPolicy={ITEM_IMAGE_REFERRER_POLICY}
+        className="size-full object-cover"
+      />
       {validImages.length > 1 && (
         <>
           <button

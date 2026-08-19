@@ -12,6 +12,26 @@ export function productHref(name: string): string {
   return `${PRODUCT_BASE_PATH}/${encodeURIComponent(name)}`;
 }
 
+/**
+ * The referrer policy every <img> rendering an `Item.image` has to carry.
+ *
+ * That field is not always a file on this site. A connector that imports products
+ * stores the supplier's own image URL rather than copying the bytes across, so the
+ * src can point at a supplier or marketplace CDN — and several of those hosts run
+ * hotlink protection that answers 403 to a request carrying a cross-origin Referer,
+ * leaving a broken thumbnail with nothing in the UI to explain it.
+ *
+ * Set inline on the element, never patched on afterwards: by the time a script could
+ * stamp the attribute the browser has already started the fetch that leaked the
+ * Referer, so it would take clearing and re-setting src to reload under the new
+ * policy — a second request to recover from a 403 that need not have happened.
+ *
+ * Named rather than inlined so the reason lives in one place and every Item image in
+ * the app greps back to it. Item images only; a first-party asset (the org logo, the
+ * sidebar mark) has no reason to withhold its referrer.
+ */
+export const ITEM_IMAGE_REFERRER_POLICY = "no-referrer";
+
 // status is derived (see getProductStatus), not a real DocField from
 // alaiy_os.api.list_view.get_doctype_fields, but still needs to be pickable
 // as a column.

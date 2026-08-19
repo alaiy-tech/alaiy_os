@@ -58,6 +58,13 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    the same fix (`public/js/item.js`, wired through the `doctype_js` hook)
    still present alongside it — both currently run on the Item form.
 
+   None of that reaches `interface/`, which loads no desk JS. There the
+   policy is set inline on each Item `<img>` from
+   `ITEM_IMAGE_REFERRER_POLICY` (`src/constants/products.ts`), which is
+   better than the observer rather than a workaround for its absence: the
+   attribute is present on the first fetch, so no image ever leaks a
+   `Referer` or needs a reload to recover from a 403.
+
 ## Access control
 
 There are two real mechanisms — not three, and no `boot_session` hook exists
