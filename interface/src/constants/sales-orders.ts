@@ -1,5 +1,11 @@
 export const SALES_ORDER_DOCTYPE = "Sales Order";
 
+export const SALES_ORDER_BASE_PATH = "/os/sales/orders";
+
+export function salesOrderHref(name: string): string {
+  return `${SALES_ORDER_BASE_PATH}/${encodeURIComponent(name)}`;
+}
+
 // Always fetched regardless of columnOrder - name for row identity and the
 // detail link, status and delivery_date because the Delivery Date cell needs
 // both to decide whether it is overdue even when Status is hidden.
@@ -83,3 +89,27 @@ export const STATUS_BADGE_CLASS: Record<string, string> = {
 };
 
 export const DEFAULT_STATUS_BADGE_CLASS = "bg-muted text-muted-foreground";
+
+// Status colours for the Delivery Notes and Sales Invoices raised against an
+// order. Kept apart from STATUS_BADGE_CLASS above because the same word means
+// different things across the two: a Sales Order "To Bill" is mid-flight,
+// while an invoice's "Unpaid" is the one that wants attention.
+export const LINKED_DOC_BADGE_CLASS: Record<string, string> = {
+  Draft: "bg-muted text-muted-foreground",
+  Completed: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+  Paid: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
+  "To Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
+  Unpaid: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
+  Overdue: "bg-destructive/10 text-destructive",
+  Cancelled: "bg-destructive/10 text-destructive",
+  Return: "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+  "Credit Note Issued": "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+};
+
+// The lifecycle strip on the detail page. Deliberately five fixed steps rather
+// than the doctype's own status list: Sales Order statuses are not a sequence
+// (an order sits in "To Deliver and Bill" while it is partway through both
+// steps at once), and a progress bar has to be able to say where the order is.
+export const PROGRESS_STEPS = ["Draft", "Confirmed", "To Deliver", "To Bill", "Completed"] as const;
+
+export type ProgressStep = (typeof PROGRESS_STEPS)[number];

@@ -35,7 +35,15 @@ Legend: `→` redirect target · `[id]` dynamic segment · `[...path]` catch-all
 │   │
 │   ├── /os/sales
 │   │   └── /os/sales/orders                  Sales Order list
-│   │       └── /os/sales/orders/new          → Frappe desk /app/sales-order/new
+│   │       ├── /os/sales/orders/new          → Frappe desk /app/sales-order/new
+│   │       └── .../[id]                      Sales Order detail — progress, lines, delivery,
+│   │           │                             billing, payment schedule, totals, docstatus
+│   │           │                             actions (404 if unknown)
+│   │           └── .../[id]/print            → Frappe desk /printview for this order
+│   │
+│   ├── /os/open/[doctype]/[name]             → Frappe desk form for one document, for the
+│   │                                         doctypes with no page here yet (Delivery Note,
+│   │                                         Sales Invoice, Customer). Anything else 404s.
 │   │
 │   ├── /os/procurement
 │   │   └── /os/procurement/purchase-orders   Purchase Order list
@@ -74,8 +82,9 @@ being cached permanently):
 | `/os/purchase-orders` | `/os/procurement/purchase-orders` |
 
 `/` redirects to `/os` from `src/app/page.tsx` rather than from the config, and
-`/os/sales/orders/new` and `/os/procurement/purchase-orders/new` redirect out to
-the Frappe desk from route handlers — the bench URL is server-only config, so
+`/os/sales/orders/new`, `/os/sales/orders/[id]/print`,
+`/os/open/[doctype]/[name]` and `/os/procurement/purchase-orders/new` redirect
+out to the Frappe desk from route handlers — the bench URL is server-only config, so
 resolving it on the server keeps the Frappe origin out of the client bundle.
 
 ## Who can reach what
