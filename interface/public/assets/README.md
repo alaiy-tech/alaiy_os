@@ -25,9 +25,9 @@ A client app (`alaiy_os_<client>`) replaces the `client-logo-*` files and leaves
 | `images/logo-hor.png` | PNG, transparent | 427 × 128 | [`src/app/(main)/auth/layout.tsx`](<../../src/app/(main)/auth/layout.tsx>) — sign-in panel, rendered at 175 × 35 and forced to white with `brightness-0 invert` |
 | `images/logo-square.png` | PNG, transparent | 512 × 512 | [`src/app/loading.tsx`](../../src/app/loading.tsx) — route-loading splash, rendered at 64 × 64 with `animate-pulse` |
 | `images/client-logo-hor.png` | PNG, transparent | 427 × 128 | [`src/components/layout/app-sidebar.tsx`](../../src/components/layout/app-sidebar.tsx) — sidebar header, rendered at 87.5 × 17.5 |
-| `images/client-logo-square.png` | PNG, transparent | 512 × 512 | **Nothing.** See [Open slots](#open-slots). |
+| `images/client-logo-square.png` | PNG, transparent | 512 × 512 | **Nothing** — see #198. |
 | `images/favicon/icon.png` | PNG, opaque | 512 × 512 | [`src/app/layout.tsx`](../../src/app/layout.tsx) via `metadata.icons.icon` |
-| `images/wave.svg` | SVG | — | [`ask-alaiy-background.tsx`](<../../src/app/(main)/os/ask-alaiy/_components/ask-alaiy-background.tsx>) — **but the path is wrong, see below** |
+| `images/wave.svg` | SVG | — | [`ask-alaiy-background.tsx`](<../../src/app/(main)/os/ask-alaiy/_components/ask-alaiy-background.tsx>) — **but the consuming path is wrong, see #193** |
 
 ## Open slots
 
@@ -51,17 +51,16 @@ existing PNGs with SVGs as a welcome change rather than a required one. If a
 logo is replaced with an SVG, update the `src` in the consuming file listed
 above; the `width`/`height` props can stay.
 
-## Known issues
+## Open issues
 
-- **`wave.svg` is unreachable.** `ask-alaiy-background.tsx` requests
+Two known problems with what is on disk today, both filed:
+
+- **#193** — `wave.svg` is unreachable. `ask-alaiy-background.tsx` requests
   `/wave.svg`, but the file is at `/assets/images/wave.svg` and no
-  `public/wave.svg` exists — the Ask Alaiy background has never rendered. Fix
-  is a one-line path correction in that component (tracked in
-  [DESIGN.md § Known divergences](../../DESIGN.md#known-divergences)).
-- **`client-logo-square.png` is unused.** It is the square counterpart to the
-  sidebar's horizontal client logo and is the natural source for the
-  `client-logo-mark` slot above. Either wire it up or drop it — right now it is
-  512 × 512 of dead weight in every build.
+  `public/wave.svg` exists, so the Ask Alaiy background has never rendered.
+- **#198** — `client-logo-square.png` is referenced from nowhere, and the
+  sidebar keeps showing the horizontal wordmark when collapsed to `3rem`
+  because no icon-only mark exists. The two resolve together.
 
 ## Adding an asset
 

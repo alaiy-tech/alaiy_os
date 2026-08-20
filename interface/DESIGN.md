@@ -8,9 +8,13 @@ The source of truth is the code, not this file: tokens are declared in
 primitives live in `src/components/ui/`, and the status colour maps live in
 `src/constants/`. This document records what those files currently say and why,
 so a new page can match the existing ones without reverse-engineering them
-first. Where the app is internally inconsistent it is said so plainly under
-[Known divergences](#known-divergences) rather than papered over — that section
-is the to-do list, everything above it is the rule.
+first.
+
+Where the code is inconsistent with itself, the cleanup is tracked as an issue
+under the [`design-system`](https://github.com/alaiy-tech/alaiy_os/labels/design-system)
+label rather than described here, so this file stays a statement of the rule
+rather than a to-do list. Check that label before "fixing" something that looks
+wrong — it is probably already filed, with the reasoning and the intended fix.
 
 Route inventory is in [PATH.md](./PATH.md). Composing a connector's UI on top of
 these primitives is in
@@ -28,7 +32,6 @@ these primitives is in
 - [Spacing & grid](#spacing--grid)
 - [Radius, ring, shadow](#radius-ring-shadow)
 - [Motion](#motion)
-- [Known divergences](#known-divergences)
 
 ## Where the theme lives
 
@@ -48,9 +51,9 @@ Two rules follow from this that are easy to trip over:
 
 1. **A token only becomes a utility if `@theme inline` maps it.** Declaring
    `--foo` in a preset does nothing on its own; `bg-foo` needs
-   `--color-foo: var(--foo)` inside `@theme inline`. See the sidebar bug in
-   [Known divergences](#known-divergences) for what this looks like when it
-   goes wrong.
+   `--color-foo: var(--foo)` inside `@theme inline`. Getting this wrong fails
+   silently — the utility resolves to whatever the default theme says, with no
+   error. See #192 for a live example.
 2. **Dark mode is a class, not a media query** —
    `@custom-variant dark (&:is(.dark *))`. The `dark:` prefix keys off a `.dark`
    ancestor, which `ThemeBootScript` (`src/scripts/theme-boot.tsx`) sets before
@@ -150,9 +153,10 @@ The palette above has one semantic colour: `--destructive`. Green, amber, blue,
 orange, and violet states are written as **raw Tailwind palette classes** in the
 status maps under `src/constants/`, not as tokens. That is the current
 convention and new code should follow it — see
-[Status pills / badges](#status-pills--badges) for the exact strings, and
-[Known divergences](#known-divergences) for why promoting them to tokens is
-worth doing but out of scope here.
+[Status pills / badges](#status-pills--badges) for the exact strings.
+
+Promoting them to real tokens, so that a preset can restyle its own status
+colours (which today it cannot), is tracked in #194.
 
 ## Theme presets
 
@@ -391,9 +395,10 @@ On a detail page, `title` is the document name and `subtitle` is the doctype
 (`title={order.name} subtitle="Sales Order"`), with the action slot holding the
 docstatus actions plus a back link.
 
-Several pages still hand-roll `<h1 className="text-3xl …">` instead —
-see [Known divergences](#known-divergences). `PageHeader` is the rule; those are
-the exceptions to be cleaned up, not precedent.
+Several pages still hand-roll `<h1 className="text-3xl …">` instead, so two
+title sizes and two heading levels are currently in use; converting them is
+tracked in #196. `PageHeader` is the rule — those are the exceptions to be
+cleaned up, not precedent.
 
 ### KPI row
 
@@ -682,55 +687,3 @@ Rules:
   `overscroll-behavior: none`.
 - Respect the print path: `[data-print-root]` is hidden on screen and is the
   only thing shown in `@media print`, at a fixed 8.5in × 11in Letter page.
-
-## Known divergences
-
-Real inconsistencies in the code as of this document. Listed so nobody copies
-them forward, and so the cleanup is tracked. **None are fixed by this
-document** — each needs its own change and, where colour is involved, design
-sign-off.
-
-1. **The `alaiy-os` preset's sidebar colours never apply.** The preset sets
-   `--sidebar-background`, but `@theme inline` in `globals.css` maps
-   `--color-sidebar: var(--sidebar)`. Nothing reads `--sidebar-background`, so
-   `bg-sidebar` falls through to the default near-white instead of the intended
-   warm paper tone. The other three presets all use the bare `--sidebar`
-   correctly. The preset's own header comment explains the choice as matching
-   "this app's `tailwind.config.ts`" — a file that does not exist in this app.
-   Fix: rename to `--sidebar` in `src/styles/presets/alaiy-os.css` (both
-   blocks). Visible colour change, so it wants design review.
-
-2. **`/wave.svg` 404s.** `ask-alaiy-background.tsx` requests `/wave.svg`, but
-   the file is at `public/assets/images/wave.svg` and there is no
-   `public/wave.svg`. The Ask Alaiy background image has never rendered. Fix is
-   a one-line path correction.
-
-3. **No `--success` / `--warning` tokens.** Green and amber states are raw
-   palette classes duplicated across five maps in `src/constants/`. Promoting
-   them to semantic tokens (with per-preset values) would let a preset restyle
-   its own status colours, which today it cannot. Wants tokens added to
-   `globals.css` *and* all four presets, plus a migration of every map — and
-   verification across all five presets × light/dark.
-
-4. **`--destructive-foreground` is unmapped.** `alaiy-os` defines it; the
-   default theme and the other three presets do not, and `@theme inline` never
-   maps it. `text-destructive-foreground` is therefore not a usable utility.
-   The `destructive` button and badge variants sidestep this by tinting
-   (`bg-destructive/10 text-destructive`) rather than filling.
-
-5. **Page titles disagree.** `PageHeader` renders an `h2` at `text-2xl`, but
-   Item Groups, Roles, Organisation, Theme, and the dashboard greeting
-   hand-roll an `h1` at `text-3xl`. Two different page-title sizes and two
-   different heading levels are in use. `PageHeader` should win; adopting it
-   also fixes the heading hierarchy, since a page should open with an `h1`.
-
-6. **Currency columns are not right-aligned.** `GenericCell` applies
-   `tabular-nums` to `Currency`, `Int`, `Float`, and `Percent`, but no
-   `text-right`. Right-aligning numeric columns is the usual convention and is
-   worth doing — it is a table-wide change (header and cell must move together),
-   not a `GenericCell` one-liner.
-
-7. **Unused assets.** `public/assets/images/client-logo-square.png` is
-   referenced nowhere, and the sidebar shows the same horizontal logo when
-   collapsed to `3rem` because no icon-only mark exists. See
-   [public/assets/README.md](./public/assets/README.md).

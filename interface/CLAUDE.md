@@ -66,9 +66,13 @@ existing formatting rather than reformatting files you did not otherwise touch.
 
 ## Before proposing a change
 
-`DESIGN.md` ends with a **Known divergences** section listing real
-inconsistencies in the current code (a dead sidebar token in the `alaiy-os`
-preset, a 404ing background image, inconsistent page-title sizes, and more).
-Check it before "fixing" something that looks wrong — it may already be
-documented and deliberately deferred, and each entry names what the fix needs.
-Do not copy those patterns forward into new code.
+The code is not uniform, and the known gaps are already filed under the
+[`design-system`](https://github.com/alaiy-tech/alaiy_os/labels/design-system)
+label — a dead sidebar token in the `alaiy-os` preset, a 404ing background
+image, status colours that no preset can restyle, two different page-title
+sizes, and more. Check that label before "fixing" something that looks wrong:
+it is probably known, with the reasoning and intended fix written down, and
+some of it is deliberately deferred pending design sign-off.
+
+Do not copy those patterns forward into new code — follow DESIGN.md, which
+describes the intended rule rather than the current average.
