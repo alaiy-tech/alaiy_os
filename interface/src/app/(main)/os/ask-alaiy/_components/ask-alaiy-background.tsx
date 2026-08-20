@@ -11,7 +11,7 @@ export function AskAlaiyBackground({ className }: { readonly className?: string 
       )}
     >
       <Image
-        src="/wave.svg"
+        src="/assets/images/wave.svg"
         alt=""
         width={700}
         height={700}
