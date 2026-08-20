@@ -53,7 +53,10 @@ Two rules follow from this that are easy to trip over:
    `--foo` in a preset does nothing on its own; `bg-foo` needs
    `--color-foo: var(--foo)` inside `@theme inline`. Getting this wrong fails
    silently — the utility resolves to whatever the default theme says, with no
-   error. See #192 for a live example.
+   error and nothing in the diff to notice. The `alaiy-os` preset shipped its
+   sidebar as `--sidebar-background` for exactly this reason and rendered the
+   default near-white until #192; check the `@theme inline` block before adding
+   or renaming a token.
 2. **Dark mode is a class, not a media query** —
    `@custom-variant dark (&:is(.dark *))`. The `dark:` prefix keys off a `.dark`
    ancestor, which `ThemeBootScript` (`src/scripts/theme-boot.tsx`) sets before

@@ -16,11 +16,13 @@ preset renders pixel-identical to what's already running).
   line, highlights" per DESIGN_TOKENS.md), destructive = the danger-fg red
   (#B4232A) used for delete actions throughout the app.
 - --radius kept at 0.5rem to match the value already live in index.css.
-- --sidebar-* uses the "-background" suffix (--sidebar-background, not
-  --sidebar) because that's the exact variable name this app's
-  tailwind.config.ts already reads (`sidebar: { DEFAULT: "hsl(var(--sidebar-background))" ... }`)
-  - using the newer bare "--sidebar" name from the original template would
-    silently not apply.
+- --sidebar is the bare name, matching `--color-sidebar: var(--sidebar)` in
+  globals.css. This preset originally shipped it as --sidebar-background, on
+  the assumption that a tailwind.config.ts read that name - this app is
+  Tailwind v4 and has no such file, so nothing read it and the sidebar fell
+  back to the default near-white for as long as the preset existed. A token
+  only exists here if `@theme inline` maps it; check that block before adding
+  or renaming one.
 - --chart-1..5 didn't exist in this app yet (it has its own differently-named
   chart tokens for one specific chart) - these five are a fresh, coherent set
   built from colors already used elsewhere in the app: primary navy, the
@@ -65,7 +67,7 @@ preset renders pixel-identical to what's already running).
   --chart-4: oklch(0.7615 0.1233 81.4746);  /* amber - warning/low-stock dot */
   --chart-5: oklch(0.5021 0.1800 24.6103);  /* danger red */
   --text-primary: oklch(0.2284 0.0384 282.9324);
-  --sidebar-background: oklch(0.9651 0.0074 80.7210);
+  --sidebar: oklch(0.9651 0.0074 80.7210);
   --sidebar-foreground: oklch(0.2284 0.0384 282.9324);
   --sidebar-primary: oklch(0.3028 0.0765 245.1957);
   --sidebar-primary-foreground: oklch(1.0000 0.0000 89.8756);
@@ -112,7 +114,7 @@ preset renders pixel-identical to what's already running).
   --chart-4: oklch(0.7615 0.1233 81.4746);
   --chart-5: oklch(0.5021 0.1800 24.6103);
   --text-primary: oklch(0.2284 0.0384 282.9324);
-  --sidebar-background: oklch(95.84% 0.02083 79.039);
+  --sidebar: oklch(95.84% 0.02083 79.039);
   --sidebar-foreground: oklch(0.2284 0.0384 282.9324);
   --sidebar-primary: oklch(0.3028 0.0765 245.1957);
   --sidebar-primary-foreground: oklch(1.0000 0.0000 89.8756);
