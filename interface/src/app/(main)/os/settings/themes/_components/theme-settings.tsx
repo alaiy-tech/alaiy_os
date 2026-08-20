@@ -3,6 +3,7 @@
 import { Check } from "lucide-react";
 import { useShallow } from "zustand/react/shallow";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -70,15 +71,15 @@ export function ThemeSettings() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold tracking-tight">Theme</h1>
-          <p className="text-muted-foreground text-sm">Customize the look, feel, and layout of your workspace.</p>
-        </div>
-        <Button type="button" variant="outline" onClick={resetPreferences}>
-          Restore Defaults
-        </Button>
-      </div>
+      <PageHeader
+        title="Theme"
+        subtitle="Customize the look, feel, and layout of your workspace."
+        action={
+          <Button type="button" variant="outline" onClick={resetPreferences}>
+            Restore Defaults
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader className="border-b">

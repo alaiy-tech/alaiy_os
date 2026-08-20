@@ -13,6 +13,7 @@ import {
 } from "@tanstack/react-table";
 import { AlertTriangle, ChevronRight, FileUp, Search } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
@@ -82,20 +83,19 @@ export function Roles({ roles }: { roles: Role[] }) {
 
   return (
     <div className="flex h-full flex-col gap-4">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold  tracking-tight">Roles & Permissions</h1>
-          <p className="text-muted-foreground text-sm">Manage access roles and permissions across your organization.</p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Button size="sm" variant="outline">
-            <FileUp data-icon="inline-start" />
-            Import JSON
-          </Button>
-          <Button size="sm">Create role</Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Roles & Permissions"
+        subtitle="Manage access roles and permissions across your organization."
+        action={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline">
+              <FileUp data-icon="inline-start" />
+              Import JSON
+            </Button>
+            <Button size="sm">Create role</Button>
+          </div>
+        }
+      />
 
       <Tabs className="h-full gap-4" defaultValue="roles">
         <TabsList
