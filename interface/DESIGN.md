@@ -53,7 +53,10 @@ Two rules follow from this that are easy to trip over:
    `--foo` in a preset does nothing on its own; `bg-foo` needs
    `--color-foo: var(--foo)` inside `@theme inline`. Getting this wrong fails
    silently — the utility resolves to whatever the default theme says, with no
-   error. See #192 for a live example.
+   error and nothing in the diff to notice. The `alaiy-os` preset shipped its
+   sidebar as `--sidebar-background` for exactly this reason and rendered the
+   default near-white until #192; check the `@theme inline` block before adding
+   or renaming a token.
 2. **Dark mode is a class, not a media query** —
    `@custom-variant dark (&:is(.dark *))`. The `dark:` prefix keys off a `.dark`
    ancestor, which `ThemeBootScript` (`src/scripts/theme-boot.tsx`) sets before
@@ -115,6 +118,7 @@ illustration and the *role* as the contract.
 | `--accent` | `bg-accent` | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` | Hover/active surface. **Neutral, not a brand colour** — see the note below. |
 | `--accent-foreground` | `text-accent-foreground` | `oklch(0.205 0 0)` | `oklch(0.985 0 0)` | Text on `--accent`. |
 | `--destructive` | `bg-destructive` `text-destructive` | `oklch(0.577 0.245 27.325)` | `oklch(0.704 0.191 22.216)` | Error, danger, cancelled, overdue. |
+| `--destructive-foreground` | `text-destructive-foreground` | `oklch(0.985 0 0)` | `oklch(0.205 0 0)` | Text on a solid `--destructive` fill. Flips light/dark like `--primary-foreground`, because the destructive red is dark in light mode and light in dark mode. |
 | `--border` | `border-border` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` | Default border. Applied globally via `* { @apply border-border }`. |
 | `--input` | `border-input` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 15%)` | Form control borders; also `bg-input/30` for dark outline buttons. |
 | `--ring` | `ring-ring` | `oklch(0.708 0 0)` | `oklch(0.556 0 0)` | Focus rings. Global default `outline-ring/50`. |
@@ -608,7 +612,10 @@ change the other.
 (default), `h-9` (`lg`), plus `icon`/`icon-xs`/`icon-sm`/`icon-lg` squares.
 List-page toolbars use `sm`. Variants: `default` (primary fill), `outline`
 (toolbar default), `secondary`, `ghost`, `destructive` (a tinted
-`bg-destructive/10 text-destructive`, **not** a solid red fill), `link`.
+`bg-destructive/10 text-destructive`, **not** a solid red fill), `link`. A solid
+fill is available if a confirm-delete action ever needs one —
+`bg-destructive text-destructive-foreground`, contrast-checked per preset — but
+nothing uses it today and the tint is the house style.
 Bare lucide icons auto-size to `size-4`; no explicit class needed.
 
 ### Cards
