@@ -9,3 +9,4 @@ alaiy_os/desktop_icon/
 alaiy_os/workspace/
 .DS_Store
 /node_modules
+test.sh
