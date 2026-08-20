@@ -27,7 +27,7 @@ A client app (`alaiy_os_<client>`) replaces the `client-logo-*` files and leaves
 | `images/client-logo-hor.png` | PNG, transparent | 427 × 128 | [`src/components/layout/app-sidebar.tsx`](../../src/components/layout/app-sidebar.tsx) — sidebar header, rendered at 87.5 × 17.5 |
 | `images/client-logo-square.png` | PNG, transparent | 512 × 512 | **Nothing** — see #198. |
 | `images/favicon/icon.png` | PNG, opaque | 512 × 512 | [`src/app/layout.tsx`](../../src/app/layout.tsx) via `metadata.icons.icon` |
-| `images/wave.svg` | SVG | — | [`ask-alaiy-background.tsx`](<../../src/app/(main)/os/ask-alaiy/_components/ask-alaiy-background.tsx>) — **but the consuming path is wrong, see #193** |
+| `images/wave.svg` | SVG | — | [`ask-alaiy-background.tsx`](<../../src/app/(main)/os/ask-alaiy/_components/ask-alaiy-background.tsx>) — decorative background on Ask Alaiy, `opacity-15 dark:opacity-20` |
 
 ## Open slots
 
@@ -53,11 +53,6 @@ above; the `width`/`height` props can stay.
 
 ## Open issues
 
-Two known problems with what is on disk today, both filed:
-
-- **#193** — `wave.svg` is unreachable. `ask-alaiy-background.tsx` requests
-  `/wave.svg`, but the file is at `/assets/images/wave.svg` and no
-  `public/wave.svg` exists, so the Ask Alaiy background has never rendered.
 - **#198** — `client-logo-square.png` is referenced from nowhere, and the
   sidebar keeps showing the horizontal wordmark when collapsed to `3rem`
   because no icon-only mark exists. The two resolve together.
