@@ -592,9 +592,16 @@ whole tree.
 
 One trap: `useTree()` returns a single mutable instance whose identity never
 changes, which React Compiler will happily cache forever, leaving the tree
-permanently empty. Any component holding a tree instance needs the
-`"use no memo"` directive. The same applies to components holding a TanStack
-table instance — every list component in this app carries `"use no memo"`.
+permanently empty. Any component that touches a tree instance needs the
+`"use no memo"` directive, and the same goes for a TanStack table instance.
+
+**"Touches" includes receiving one as a prop, not just calling the hook.** A
+presentational child that reads `table.getState()` is exactly as affected as
+the component that created the table: the guard React Compiler emits is an
+identity check on the instance, which never fails, so the read happens once on
+first render and the value is pinned forever. The pagination footer was frozen
+to first-page state this way (#206). Every component in this app that creates
+*or* receives one of these instances carries the directive.
 
 ### Empty state
 
