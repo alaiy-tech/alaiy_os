@@ -2,19 +2,21 @@
 // source of truth) - this module keeps the filter-building logic that
 // operates on them, re-exporting what existing imports of
 // "@/components/list/types" still expect.
-import { DATE_OPERATORS, NUMERIC_OPERATORS, SELECT_OPERATORS, TEXT_OPERATORS } from "@/constants/list";
+import {
+  DATE_OPERATORS,
+  isNumericFieldtype,
+  NUMERIC_OPERATORS,
+  SELECT_OPERATORS,
+  TEXT_OPERATORS,
+} from "@/constants/list";
 import type { FilterOperator, FilterRow } from "@/types/list";
 
 export { OPERATOR_LABELS } from "@/constants/list";
 export type { ColumnPrefs, DocFieldMeta, FilterOperator, FilterRow } from "@/types/list";
 
 export function operatorsForFieldtype(fieldtype: string | undefined): FilterOperator[] {
+  if (isNumericFieldtype(fieldtype)) return NUMERIC_OPERATORS;
   switch (fieldtype) {
-    case "Int":
-    case "Float":
-    case "Currency":
-    case "Percent":
-      return NUMERIC_OPERATORS;
     case "Date":
     case "Datetime":
       return DATE_OPERATORS;

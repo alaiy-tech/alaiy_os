@@ -9,6 +9,7 @@ import { GenericCell } from "@/components/generic-cell";
 import type { DocFieldMeta } from "@/components/list/types";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
+import { isNumericFieldtype } from "@/constants/list";
 import {
   DEFAULT_STATUS_BADGE_CLASS,
   ID_COLUMN_FIELDNAME,
@@ -96,6 +97,9 @@ export function buildSalesOrderColumns({
         accessorKey: fieldname,
         header: label,
         size: 160,
+        // Numbers a user scans down a column read better flush right, where
+        // tabular-nums can line the digits up against each other.
+        meta: isNumericFieldtype(field?.fieldtype) ? { align: "right" as const } : undefined,
         cell: ({ getValue }) => (
           <GenericCell value={getValue()} fieldtype={field?.fieldtype ?? "Data"} currency={currency} />
         ),

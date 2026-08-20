@@ -67,7 +67,7 @@ export function PurchaseOrderTable({
         {row.getVisibleCells().map((cell) => (
           <TableCell
             key={cell.id}
-            className="px-3 py-3 align-middle"
+            className={cn("px-3 py-3 align-middle", cell.column.columnDef.meta?.align === "right" && "text-right")}
             style={{ width: widthFor(cell.column.id, cell.column.getSize()) }}
           >
             {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -87,7 +87,10 @@ export function PurchaseOrderTable({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="relative py-3 font-medium select-none"
+                    className={cn(
+                      "relative py-3 font-medium select-none",
+                      header.column.columnDef.meta?.align === "right" && "text-right",
+                    )}
                     style={{ width: widthFor(header.column.id, header.getSize()) }}
                   >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}

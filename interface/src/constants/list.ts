@@ -26,6 +26,15 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   "is not": "Is not set",
 };
 
+/** Frappe fieldtypes that hold a number a user might compare down a column.
+ * Drives both the filter operators offered for a field and the right-alignment
+ * of its table column, so the two can't drift apart. */
+export const NUMERIC_FIELDTYPES = ["Int", "Float", "Currency", "Percent"] as const;
+
+export function isNumericFieldtype(fieldtype: string | undefined): boolean {
+  return NUMERIC_FIELDTYPES.includes(fieldtype as (typeof NUMERIC_FIELDTYPES)[number]);
+}
+
 export const NUMERIC_OPERATORS: FilterOperator[] = ["=", "!=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const DATE_OPERATORS: FilterOperator[] = ["=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const SELECT_OPERATORS: FilterOperator[] = ["=", "!=", "in", "not in", "is", "is not"];
