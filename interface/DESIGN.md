@@ -212,8 +212,8 @@ Tailwind's default scale. Ranked by how much of the app actually uses each step:
 | `text-base` | 1rem | `CardTitle`. |
 | `text-lg` | 1.125rem | Effectively unused — one occurrence. Don't reach for it. |
 | `text-xl` | 1.25rem | Section headings inside dense settings panels. |
-| `text-2xl` | 1.5rem | `PageHeader` title, KPI metric values, `not-found` headings. |
-| `text-3xl` | 1.875rem | Dashboard greeting, settings page `h1`s, large KPI figures (`kpi-strip`, `metric-cards`). |
+| `text-2xl` | 1.5rem | **Every page title**, via `PageHeader`. Also KPI metric values and `not-found` headings. |
+| `text-3xl` | 1.875rem | Large KPI figures only (`kpi-strip`, `metric-cards`, `overview-kpis`). Not a page-title size — see `PageHeader`. |
 | `text-4xl` | 2.25rem | Ask Alaiy hero, `unauthorized` at `sm:` and up. Nothing else. |
 
 Arbitrary sizes (`text-[10px]`, `[11px]`, `[12px]`, `[13px]`) appear about 17
@@ -411,19 +411,22 @@ Always `PageHeader` from `src/components/layout/page-header.tsx`:
 <PageHeader title="Sales Orders" subtitle="Track order volume, value, and delivery commitments." action={…} />
 ```
 
-It renders `text-2xl font-semibold tracking-tight` for the title,
+It renders the page's `h1` at `text-2xl font-semibold tracking-tight`,
 `text-muted-foreground text-sm` for the subtitle, and right-aligns `action` on
 `sm:` and up (stacking below on mobile). It is presentational and has no
 `"use client"`, so a Server Component can render it directly.
 
+**Use it exactly once per page, and use it for every page.** It is the `h1`, so
+a second one would leave the page with two top-level headings, and a page
+without one leaves a screen-reader user navigating by heading with no title.
+Section headings *inside* a page are `CardTitle` or a plain `h2` — never another
+`PageHeader`. Every route under `/os` goes through it; the only hand-rolled
+headings left are the `not-found` screens and the Ask Alaiy hero, which are not
+page headers.
+
 On a detail page, `title` is the document name and `subtitle` is the doctype
 (`title={order.name} subtitle="Sales Order"`), with the action slot holding the
 docstatus actions plus a back link.
-
-Several pages still hand-roll `<h1 className="text-3xl …">` instead, so two
-title sizes and two heading levels are currently in use; converting them is
-tracked in #196. `PageHeader` is the rule — those are the exceptions to be
-cleaned up, not precedent.
 
 ### KPI row
 

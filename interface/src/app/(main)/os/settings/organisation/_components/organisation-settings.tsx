@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { UploadCloud } from "lucide-react";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -165,15 +166,15 @@ export function OrganisationSettings() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col items-start gap-4 sm:flex-row sm:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold tracking-tight">Organisation</h1>
-          <p className="text-muted-foreground text-sm">Manage your company's identity and branding.</p>
-        </div>
-        <Button type="button" onClick={handleSave} disabled={isLoading || isSaving || !info}>
-          {isSaving ? "Saving…" : "Save Changes"}
-        </Button>
-      </div>x
+      <PageHeader
+        title="Organisation"
+        subtitle="Manage your company's identity and branding."
+        action={
+          <Button type="button" onClick={handleSave} disabled={isLoading || isSaving || !info}>
+            {isSaving ? "Saving…" : "Save Changes"}
+          </Button>
+        }
+      />
 
       <Card>
         <CardHeader className="border-b">
