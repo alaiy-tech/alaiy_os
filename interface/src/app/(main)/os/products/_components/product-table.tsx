@@ -49,7 +49,10 @@ export function ProductTable({
                 {headerGroup.headers.map((header) => (
                   <TableHead
                     key={header.id}
-                    className="relative py-4 font-normal select-none"
+                    className={cn(
+                      "relative py-4 font-normal select-none",
+                      header.column.columnDef.meta?.align === "right" && "text-right",
+                    )}
                     style={{ width: widthFor(header.column.id, header.getSize()) }}
                   >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
@@ -100,7 +103,10 @@ export function ProductTable({
                     {row.getVisibleCells().map((cell) => (
                       <TableCell
                         key={cell.id}
-                        className="px-3 py-3 align-middle"
+                        className={cn(
+                          "px-3 py-3 align-middle",
+                          cell.column.columnDef.meta?.align === "right" && "text-right",
+                        )}
                         style={{ width: widthFor(cell.column.id, cell.column.getSize()) }}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

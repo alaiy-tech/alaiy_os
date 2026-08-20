@@ -53,7 +53,10 @@ Two rules follow from this that are easy to trip over:
    `--foo` in a preset does nothing on its own; `bg-foo` needs
    `--color-foo: var(--foo)` inside `@theme inline`. Getting this wrong fails
    silently — the utility resolves to whatever the default theme says, with no
-   error. See #192 for a live example.
+   error and nothing in the diff to notice. The `alaiy-os` preset shipped its
+   sidebar as `--sidebar-background` for exactly this reason and rendered the
+   default near-white until #192; check the `@theme inline` block before adding
+   or renaming a token.
 2. **Dark mode is a class, not a media query** —
    `@custom-variant dark (&:is(.dark *))`. The `dark:` prefix keys off a `.dark`
    ancestor, which `ThemeBootScript` (`src/scripts/theme-boot.tsx`) sets before
@@ -119,6 +122,7 @@ illustration and the *role* as the contract.
 | `--success` / `--success-foreground` | `bg-success` `text-success-foreground` | green-500 / green-700 | green-500 / green-300 | Status tone: settled well. |
 | `--warning` / `--warning-foreground` | `bg-warning` `text-warning-foreground` | amber-500 / amber-700 | amber-500 / amber-300 | Status tone: needs attention. Also the overdue cell highlight. |
 | `--caution` / `--caution-foreground` | `bg-caution` `text-caution-foreground` | orange-500 / orange-700 | orange-500 / orange-300 | Status tone: reversal or exception. |
+| `--destructive-foreground` | `text-destructive-foreground` | `oklch(0.985 0 0)` | `oklch(0.205 0 0)` | Text on a solid `--destructive` fill. Flips light/dark like `--primary-foreground`, because the destructive red is dark in light mode and light in dark mode. |
 | `--border` | `border-border` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` | Default border. Applied globally via `* { @apply border-border }`. |
 | `--input` | `border-input` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 15%)` | Form control borders; also `bg-input/30` for dark outline buttons. |
 | `--ring` | `ring-ring` | `oklch(0.708 0 0)` | `oklch(0.556 0 0)` | Focus rings. Global default `outline-ring/50`. |
@@ -217,8 +221,8 @@ Tailwind's default scale. Ranked by how much of the app actually uses each step:
 | `text-base` | 1rem | `CardTitle`. |
 | `text-lg` | 1.125rem | Effectively unused — one occurrence. Don't reach for it. |
 | `text-xl` | 1.25rem | Section headings inside dense settings panels. |
-| `text-2xl` | 1.5rem | `PageHeader` title, KPI metric values, `not-found` headings. |
-| `text-3xl` | 1.875rem | Dashboard greeting, settings page `h1`s, large KPI figures (`kpi-strip`, `metric-cards`). |
+| `text-2xl` | 1.5rem | **Every page title**, via `PageHeader`. Also KPI metric values and `not-found` headings. |
+| `text-3xl` | 1.875rem | Large KPI figures only (`kpi-strip`, `metric-cards`, `overview-kpis`). Not a page-title size — see `PageHeader`. |
 | `text-4xl` | 2.25rem | Ask Alaiy hero, `unauthorized` at `sm:` and up. Nothing else. |
 
 Arbitrary sizes (`text-[10px]`, `[11px]`, `[12px]`, `[13px]`) appear about 17
@@ -242,6 +246,18 @@ Any figure a user might compare down a column gets `tabular-nums`. `GenericCell`
 applies it for `Currency`, `Int`, `Float`, and `Percent`; KPI values do the
 same. Currency strings always come from `formatCurrency()` in `@/lib/utils` —
 never `toLocaleString` with a hand-written symbol.
+
+In a **table**, those same four fieldtypes are also **right-aligned**, header
+and cell together, so `tabular-nums` has an edge to line the digits up against.
+The single source of truth is `isNumericFieldtype()` in `src/constants/list.ts`,
+which also decides which filter operators a field is offered — so alignment and
+filtering can't drift apart. A column builder sets `meta: { align: "right" }`
+and the table applies `text-right` to both `TableHead` and `TableCell` from that
+one value.
+
+Alignment lives on the **column**, not in `GenericCell`: the same renderer is
+used inside detail-page cards and totals panels, where a right-aligned figure
+would be wrong.
 
 ```tsx
 const { defaultCurrency } = useCompany();
@@ -389,6 +405,15 @@ From `src/components/ui/sidebar.tsx`:
 `SidebarFooter` (`NavUser`). Nav is config-driven — add a route by editing
 `sidebar-config.ts`, not by hand-writing menu items.
 
+The header logo swaps with the collapse state: `client-logo-hor.png` when
+expanded, `client-logo-square.png` at 32 × 32 on the `3rem` icon rail. Both
+images stay in the markup and are toggled with `hidden` — `display: none`, so
+the inactive one leaves the accessibility tree too — via
+`group-data-[collapsible=icon]:`. `SidebarMenuButton` forces `p-2` when
+collapsed, which would leave only 16px for the mark, so the logo row overrides
+it with `group-data-[collapsible=icon]:p-0!`. Note the `client-logo-*` prefix:
+that is the deploying client's brand, overridden per client app, not Alaiy's.
+
 ### Page header
 
 Always `PageHeader` from `src/components/layout/page-header.tsx`:
@@ -397,19 +422,22 @@ Always `PageHeader` from `src/components/layout/page-header.tsx`:
 <PageHeader title="Sales Orders" subtitle="Track order volume, value, and delivery commitments." action={…} />
 ```
 
-It renders `text-2xl font-semibold tracking-tight` for the title,
+It renders the page's `h1` at `text-2xl font-semibold tracking-tight`,
 `text-muted-foreground text-sm` for the subtitle, and right-aligns `action` on
 `sm:` and up (stacking below on mobile). It is presentational and has no
 `"use client"`, so a Server Component can render it directly.
 
+**Use it exactly once per page, and use it for every page.** It is the `h1`, so
+a second one would leave the page with two top-level headings, and a page
+without one leaves a screen-reader user navigating by heading with no title.
+Section headings *inside* a page are `CardTitle` or a plain `h2` — never another
+`PageHeader`. Every route under `/os` goes through it; the only hand-rolled
+headings left are the `not-found` screens and the Ask Alaiy hero, which are not
+page headers.
+
 On a detail page, `title` is the document name and `subtitle` is the doctype
 (`title={order.name} subtitle="Sales Order"`), with the action slot holding the
 docstatus actions plus a back link.
-
-Several pages still hand-roll `<h1 className="text-3xl …">` instead, so two
-title sizes and two heading levels are currently in use; converting them is
-tracked in #196. `PageHeader` is the rule — those are the exceptions to be
-cleaned up, not precedent.
 
 ### KPI row
 
@@ -509,6 +537,7 @@ From `SalesOrderTable` / `sales-order-columns.tsx`:
 | Concern | Rule |
 |---|---|
 | Cell padding | `px-4` (via `**:data-[slot='table-cell']:px-4`), `py-3`, `align-middle` |
+| Alignment | Left by default. Numeric fieldtypes (`Currency`, `Int`, `Float`, `Percent`) are `text-right` on **both** the header and the cell, driven by `meta.align` on the column definition |
 | Header | `py-3 font-medium select-none`, `[&_tr]:border-t` |
 | Row | `border-border/60 hover:bg-muted/40`, `cursor-pointer` only when clickable |
 | Column widths | Only `select` is fixed (36px). Data columns stay unset so the browser fills the width, unless the user has dragged a resize handle. |
@@ -610,7 +639,10 @@ change the other.
 (default), `h-9` (`lg`), plus `icon`/`icon-xs`/`icon-sm`/`icon-lg` squares.
 List-page toolbars use `sm`. Variants: `default` (primary fill), `outline`
 (toolbar default), `secondary`, `ghost`, `destructive` (a tinted
-`bg-destructive/10 text-destructive`, **not** a solid red fill), `link`.
+`bg-destructive/10 text-destructive`, **not** a solid red fill), `link`. A solid
+fill is available if a confirm-delete action ever needs one —
+`bg-destructive text-destructive-foreground`, contrast-checked per preset — but
+nothing uses it today and the tint is the house style.
 Bare lucide icons auto-size to `size-4`; no explicit class needed.
 
 ### Cards

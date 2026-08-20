@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { Settings2 } from "lucide-react";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { readPeriod } from "@/components/list/period";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -49,22 +50,21 @@ export default async function Page({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-semibold leading-none tracking-tight">Welcome, {firstName}!</h1>
-          <p className="text-muted-foreground text-sm">{formattedDate}</p>
-        </div>
+      <PageHeader
+        title={`Welcome, ${firstName}!`}
+        subtitle={formattedDate}
+        action={
+          <div className="flex flex-wrap items-end justify-end gap-2">
+            <DashboardFilters channels={channels} />
 
-        <div className="flex flex-wrap items-end justify-end gap-2 lg:w-fit">
-          <DashboardFilters channels={channels} />
+            <Separator orientation="vertical" />
 
-          <Separator orientation="vertical" />
-
-          <Button size="icon-sm" variant="outline">
-            <Settings2 />
-          </Button>
-        </div>
-      </div>
+            <Button size="icon-sm" variant="outline">
+              <Settings2 />
+            </Button>
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <KpiStrip

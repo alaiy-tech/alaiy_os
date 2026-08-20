@@ -51,6 +51,14 @@ export const STATUS_TONE = {
    * token nobody can reuse. Promote it if a second use ever appears. */
   structural: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
 } as const;
+/** Frappe fieldtypes that hold a number a user might compare down a column.
+ * Drives both the filter operators offered for a field and the right-alignment
+ * of its table column, so the two can't drift apart. */
+export const NUMERIC_FIELDTYPES = ["Int", "Float", "Currency", "Percent"] as const;
+
+export function isNumericFieldtype(fieldtype: string | undefined): boolean {
+  return NUMERIC_FIELDTYPES.includes(fieldtype as (typeof NUMERIC_FIELDTYPES)[number]);
+}
 
 export const NUMERIC_OPERATORS: FilterOperator[] = ["=", "!=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const DATE_OPERATORS: FilterOperator[] = ["=", ">", "<", ">=", "<=", "between", "is", "is not"];

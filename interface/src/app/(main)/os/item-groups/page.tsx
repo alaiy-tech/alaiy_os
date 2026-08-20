@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/layout/page-header";
 import { getRootItemGroup } from "@/lib/frappe/server";
 
 import { ItemGroupsView } from "./_components/item-groups-view";
@@ -7,10 +8,7 @@ export default async function Page() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-semibold leading-none tracking-tight">Item Groups</h1>
-        <p className="text-muted-foreground text-sm">Organize your catalog into a category hierarchy.</p>
-      </div>
+      <PageHeader title="Item Groups" subtitle="Organize your catalog into a category hierarchy." />
       {root ? (
         <ItemGroupsView rootName={root.name} />
       ) : (
