@@ -1,3 +1,5 @@
+import { STATUS_TONE } from "@/constants/list";
+
 export const SALES_ORDER_DOCTYPE = "Sales Order";
 
 export const SALES_ORDER_BASE_PATH = "/os/sales/orders";
@@ -77,33 +79,33 @@ export const MIN_VISIBLE_COLUMNS = 4;
 // will have used all of them, but this covers actual values with color once
 // they show up. Anything else (a custom status) falls back to a neutral tone.
 export const STATUS_BADGE_CLASS: Record<string, string> = {
-  Draft: "bg-muted text-muted-foreground",
-  "On Hold": "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  "To Pay": "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-  "To Deliver and Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  "To Deliver": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  "To Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Completed: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Cancelled: "bg-destructive/10 text-destructive",
-  Closed: "bg-muted text-muted-foreground",
+  Draft: STATUS_TONE.neutral,
+  "On Hold": STATUS_TONE.warning,
+  "To Pay": STATUS_TONE.caution,
+  "To Deliver and Bill": STATUS_TONE.info,
+  "To Deliver": STATUS_TONE.info,
+  "To Bill": STATUS_TONE.info,
+  Completed: STATUS_TONE.success,
+  Cancelled: STATUS_TONE.destructive,
+  Closed: STATUS_TONE.neutral,
 };
 
-export const DEFAULT_STATUS_BADGE_CLASS = "bg-muted text-muted-foreground";
+export const DEFAULT_STATUS_BADGE_CLASS = STATUS_TONE.neutral;
 
 // Status colours for the Delivery Notes and Sales Invoices raised against an
 // order. Kept apart from STATUS_BADGE_CLASS above because the same word means
 // different things across the two: a Sales Order "To Bill" is mid-flight,
 // while an invoice's "Unpaid" is the one that wants attention.
 export const LINKED_DOC_BADGE_CLASS: Record<string, string> = {
-  Draft: "bg-muted text-muted-foreground",
-  Completed: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Paid: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  "To Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Unpaid: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  Overdue: "bg-destructive/10 text-destructive",
-  Cancelled: "bg-destructive/10 text-destructive",
-  Return: "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-  "Credit Note Issued": "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
+  Draft: STATUS_TONE.neutral,
+  Completed: STATUS_TONE.success,
+  Paid: STATUS_TONE.success,
+  "To Bill": STATUS_TONE.info,
+  Unpaid: STATUS_TONE.warning,
+  Overdue: STATUS_TONE.destructive,
+  Cancelled: STATUS_TONE.destructive,
+  Return: STATUS_TONE.caution,
+  "Credit Note Issued": STATUS_TONE.caution,
 };
 
 // The lifecycle strip on the detail page. Deliberately five fixed steps rather

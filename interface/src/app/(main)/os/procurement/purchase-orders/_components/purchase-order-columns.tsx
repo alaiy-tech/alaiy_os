@@ -80,7 +80,7 @@ export function buildPurchaseOrderColumns({
               <span
                 className={cn(
                   "inline-flex rounded px-1.5 py-0.5",
-                  pastDue && "bg-amber-500/15 font-medium text-amber-700 dark:text-amber-300",
+                  pastDue && "bg-warning/15 font-medium text-warning-foreground",
                 )}
                 title={pastDue ? "Receipt is past due" : undefined}
               >

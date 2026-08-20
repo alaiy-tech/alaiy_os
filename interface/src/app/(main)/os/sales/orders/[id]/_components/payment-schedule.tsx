@@ -86,7 +86,7 @@ export function PaymentSchedule({ terms, currency }: { terms: SalesOrderPaymentT
                           className={cn(
                             "border-0 font-medium",
                             paid
-                              ? "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300"
+                              ? "bg-success/10 text-success-foreground dark:bg-success/15"
                               : "bg-muted text-muted-foreground",
                           )}
                         >

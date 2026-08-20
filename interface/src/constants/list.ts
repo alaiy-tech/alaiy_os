@@ -26,6 +26,32 @@ export const OPERATOR_LABELS: Record<FilterOperator, string> = {
   "is not": "Is not set",
 };
 
+/** The status-pill vocabulary, defined once. Every doctype's status map picks
+ * from these rather than writing colour classes, so a tone can be retuned in
+ * one place instead of across five maps.
+ *
+ * A tone is a tinted fill plus a text colour: `bg-<tone>/10` in light mode,
+ * `/15` in dark (the darker ground needs a stronger tint to read), with
+ * `--<tone>-foreground` flipping to a lighter step in dark mode. */
+export const STATUS_TONE = {
+  /** Not started, or parked. Also the fallback for an unrecognised status. */
+  neutral: "bg-muted text-muted-foreground",
+  /** In flight, nothing wrong. */
+  info: "bg-info/10 text-info-foreground dark:bg-info/15",
+  /** Settled well. */
+  success: "bg-success/10 text-success-foreground dark:bg-success/15",
+  /** Needs attention, not yet failed. */
+  warning: "bg-warning/10 text-warning-foreground dark:bg-warning/15",
+  /** A reversal or exception. */
+  caution: "bg-caution/10 text-caution-foreground dark:bg-caution/15",
+  /** Failed or void. */
+  destructive: "bg-destructive/10 text-destructive",
+  /** Not a lifecycle state but a classification - only Item "Variant" uses it.
+   * Left as a raw palette pair: a token for a single call site would be a
+   * token nobody can reuse. Promote it if a second use ever appears. */
+  structural: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
+} as const;
+
 export const NUMERIC_OPERATORS: FilterOperator[] = ["=", "!=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const DATE_OPERATORS: FilterOperator[] = ["=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const SELECT_OPERATORS: FilterOperator[] = ["=", "!=", "in", "not in", "is", "is not"];

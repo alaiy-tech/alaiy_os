@@ -1,3 +1,5 @@
+import { STATUS_TONE } from "@/constants/list";
+
 export const PURCHASE_ORDER_DOCTYPE = "Purchase Order";
 
 // Kept here rather than in the list component so the detail page (a Server
@@ -83,32 +85,32 @@ export const MIN_VISIBLE_COLUMNS = 4;
 // will have used all of them, but this covers actual values with color once
 // they show up. Anything else (a custom status) falls back to a neutral tone.
 export const STATUS_BADGE_CLASS: Record<string, string> = {
-  Draft: "bg-muted text-muted-foreground",
-  "On Hold": "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  "To Receive and Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  "To Receive": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  "To Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Delivered: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Completed: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Cancelled: "bg-destructive/10 text-destructive",
-  Closed: "bg-muted text-muted-foreground",
+  Draft: STATUS_TONE.neutral,
+  "On Hold": STATUS_TONE.warning,
+  "To Receive and Bill": STATUS_TONE.info,
+  "To Receive": STATUS_TONE.info,
+  "To Bill": STATUS_TONE.info,
+  Delivered: STATUS_TONE.success,
+  Completed: STATUS_TONE.success,
+  Cancelled: STATUS_TONE.destructive,
+  Closed: STATUS_TONE.neutral,
 };
 
-export const DEFAULT_STATUS_BADGE_CLASS = "bg-muted text-muted-foreground";
+export const DEFAULT_STATUS_BADGE_CLASS = STATUS_TONE.neutral;
 
 // Purchase Receipt / Purchase Invoice statuses, for the linked-document
 // tables on the detail page. Both doctypes share a vocabulary with the
 // accounting side of the app (Unpaid, Overdue, Return, ...), so their colours
 // are kept separate from the order's own.
 export const LINKED_DOC_BADGE_CLASS: Record<string, string> = {
-  Draft: "bg-muted text-muted-foreground",
-  Completed: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Paid: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  "To Bill": "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Unpaid: "bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300",
-  Overdue: "bg-destructive/10 text-destructive",
-  Cancelled: "bg-destructive/10 text-destructive",
-  Return: "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-  "Debit Note Issued": "bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300",
-  Closed: "bg-muted text-muted-foreground",
+  Draft: STATUS_TONE.neutral,
+  Completed: STATUS_TONE.success,
+  Paid: STATUS_TONE.success,
+  "To Bill": STATUS_TONE.info,
+  Unpaid: STATUS_TONE.warning,
+  Overdue: STATUS_TONE.destructive,
+  Cancelled: STATUS_TONE.destructive,
+  Return: STATUS_TONE.caution,
+  "Debit Note Issued": STATUS_TONE.caution,
+  Closed: STATUS_TONE.neutral,
 };
