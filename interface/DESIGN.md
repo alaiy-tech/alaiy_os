@@ -238,6 +238,18 @@ applies it for `Currency`, `Int`, `Float`, and `Percent`; KPI values do the
 same. Currency strings always come from `formatCurrency()` in `@/lib/utils` —
 never `toLocaleString` with a hand-written symbol.
 
+In a **table**, those same four fieldtypes are also **right-aligned**, header
+and cell together, so `tabular-nums` has an edge to line the digits up against.
+The single source of truth is `isNumericFieldtype()` in `src/constants/list.ts`,
+which also decides which filter operators a field is offered — so alignment and
+filtering can't drift apart. A column builder sets `meta: { align: "right" }`
+and the table applies `text-right` to both `TableHead` and `TableCell` from that
+one value.
+
+Alignment lives on the **column**, not in `GenericCell`: the same renderer is
+used inside detail-page cards and totals panels, where a right-aligned figure
+would be wrong.
+
 ```tsx
 const { defaultCurrency } = useCompany();
 formatCurrency(value, { currency: defaultCurrency });
@@ -511,6 +523,7 @@ From `SalesOrderTable` / `sales-order-columns.tsx`:
 | Concern | Rule |
 |---|---|
 | Cell padding | `px-4` (via `**:data-[slot='table-cell']:px-4`), `py-3`, `align-middle` |
+| Alignment | Left by default. Numeric fieldtypes (`Currency`, `Int`, `Float`, `Percent`) are `text-right` on **both** the header and the cell, driven by `meta.align` on the column definition |
 | Header | `py-3 font-medium select-none`, `[&_tr]:border-t` |
 | Row | `border-border/60 hover:bg-muted/40`, `cursor-pointer` only when clickable |
 | Column widths | Only `select` is fixed (36px). Data columns stay unset so the browser fills the width, unless the user has dragged a resize handle. |
