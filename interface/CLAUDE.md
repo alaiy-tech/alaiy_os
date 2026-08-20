@@ -30,10 +30,13 @@ Zustand · Biome. Data comes from Frappe through `src/lib/frappe/`.
   of them.
 - **`--accent` is a neutral hover surface, not the brand colour.** Brand navy is
   `--primary`; brand blue is `--ring` (focus rings only).
-- **`"use no memo"` is required** in any component holding a TanStack Table or
-  `@headless-tree` instance. React Compiler caches on reference identity, and
-  those instances mutate in place — without the directive the subtree never
-  re-renders and the table or tree stays permanently empty.
+- **`"use no memo"` is required** in any component that touches a TanStack
+  Table or `@headless-tree` instance — **including one received as a prop**,
+  not just the component calling the hook. React Compiler caches on reference
+  identity and those instances mutate in place, so without the directive the
+  subtree never re-renders: a table or tree stays permanently empty, and a
+  child reading `table.getState()` is pinned to whatever it saw on the first
+  render (see #206).
 - **Status colours live in `src/constants/<entity>.ts`**, never inline, and
   always with a neutral `DEFAULT_*_BADGE_CLASS` fallback so an unrecognised
   status from a client site degrades to a grey pill.

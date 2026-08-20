@@ -1,4 +1,13 @@
 "use client";
+"use no memo";
+
+// This component reads pageIndex/pageSize off the table instance, and
+// useReactTable hands back one mutable object whose identity never changes.
+// React Compiler caches on reference identity, so without "use no memo" it
+// evaluates table.getState() once and pins the footer to first-page state for
+// good: "Page 1 of N" never moves, Previous never re-enables, Next never
+// disables, and the per-page select keeps reporting 10. sales-orders.tsx and
+// the list tables carry the directive for the same reason.
 
 import type { Table as TableType } from "@tanstack/react-table";
 
