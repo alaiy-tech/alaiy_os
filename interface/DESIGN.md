@@ -118,6 +118,10 @@ illustration and the *role* as the contract.
 | `--accent` | `bg-accent` | `oklch(0.97 0 0)` | `oklch(0.269 0 0)` | Hover/active surface. **Neutral, not a brand colour** — see the note below. |
 | `--accent-foreground` | `text-accent-foreground` | `oklch(0.205 0 0)` | `oklch(0.985 0 0)` | Text on `--accent`. |
 | `--destructive` | `bg-destructive` `text-destructive` | `oklch(0.577 0.245 27.325)` | `oklch(0.704 0.191 22.216)` | Error, danger, cancelled, overdue. |
+| `--info` / `--info-foreground` | `bg-info` `text-info-foreground` | blue-500 / blue-700 | blue-500 / blue-300 | Status tone: in flight. |
+| `--success` / `--success-foreground` | `bg-success` `text-success-foreground` | green-500 / green-700 | green-500 / green-300 | Status tone: settled well. |
+| `--warning` / `--warning-foreground` | `bg-warning` `text-warning-foreground` | amber-500 / amber-700 | amber-500 / amber-300 | Status tone: needs attention. Also the overdue cell highlight. |
+| `--caution` / `--caution-foreground` | `bg-caution` `text-caution-foreground` | orange-500 / orange-700 | orange-500 / orange-300 | Status tone: reversal or exception. |
 | `--destructive-foreground` | `text-destructive-foreground` | `oklch(0.985 0 0)` | `oklch(0.205 0 0)` | Text on a solid `--destructive` fill. Flips light/dark like `--primary-foreground`, because the destructive red is dark in light mode and light in dark mode. |
 | `--border` | `border-border` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 10%)` | Default border. Applied globally via `* { @apply border-border }`. |
 | `--input` | `border-input` | `oklch(0.922 0 0)` | `oklch(1 0 0 / 15%)` | Form control borders; also `bg-input/30` for dark outline buttons. |
@@ -151,16 +155,21 @@ is explicit that a bright blue hover was removed on purpose: *"accent = a
 neutral warm gray (NOT the bright blue — that's reserved for focus rings
 only)"*. Do not reintroduce a coloured hover.
 
-### There are no `--success` / `--warning` tokens
+### Status tones are tokens, and paired
 
-The palette above has one semantic colour: `--destructive`. Green, amber, blue,
-orange, and violet states are written as **raw Tailwind palette classes** in the
-status maps under `src/constants/`, not as tokens. That is the current
-convention and new code should follow it — see
-[Status pills / badges](#status-pills--badges) for the exact strings.
+Each status tone is **two** tokens, not one: `--<tone>` is the fill hue and
+`--<tone>-foreground` is the text on it. A pill tints the fill rather than
+filling it — `bg-success/10` in light mode, `/15` in dark, because the darker
+ground needs a stronger tint to read at the same weight — while the text colour
+steps darker in light mode and lighter in dark.
 
-Promoting them to real tokens, so that a preset can restyle its own status
-colours (which today it cannot), is tracked in #194.
+Their values are the Tailwind palette steps the status maps used to hardcode,
+so nothing changed on screen when they were introduced. What changed is that a
+**preset can now override them**; none does yet, so every preset currently
+shows the same status colours.
+
+Never write a raw `bg-green-*` / `bg-amber-*` pair for a status. Use
+[`STATUS_TONE`](#the-colour-vocabulary).
 
 ## Theme presets
 
@@ -283,23 +292,25 @@ chip, counts).
 
 ### The colour vocabulary
 
-Six tones, each a `bg-<hue>-500/10 text-<hue>-700` pair with a `dark:` variant
-at `/15` and `-300`. Reuse these strings verbatim.
+Seven tones, defined once as `STATUS_TONE` in `src/constants/list.ts`. Refer to
+them by key — never re-spell the classes, and never invent an eighth tone
+without design sign-off.
 
-| Tone | Classes | Means |
+| `STATUS_TONE` key | Renders | Means |
 |---|---|---|
-| Neutral | `bg-muted text-muted-foreground` | Not started, or parked: `Draft`, `Closed`, `Disabled`. The fallback for any unrecognised status. |
-| Blue | `bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300` | In flight, nothing wrong: `To Deliver`, `To Receive`, `To Bill`, `Template`. |
-| Green | `bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300` | Settled well: `Completed`, `Delivered`, `Paid`, `Active`. |
-| Amber | `bg-amber-500/10 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300` | Needs attention, not yet failed: `On Hold`, `Unpaid`. |
-| Orange | `bg-orange-500/10 text-orange-700 dark:bg-orange-500/15 dark:text-orange-300` | Reversal or exception: `Return`, `Credit Note Issued`, `Debit Note Issued`, `To Pay`. |
-| Violet | `bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300` | Structural, not a lifecycle state: `Variant`. |
-| Destructive | `bg-destructive/10 text-destructive` | Failed or void: `Cancelled`, `Overdue`. Token-based, so no `dark:` variant needed. |
+| `neutral` | `bg-muted text-muted-foreground` | Not started, or parked: `Draft`, `Closed`, `Disabled`. The fallback for any unrecognised status. |
+| `info` | `bg-info/10 text-info-foreground dark:bg-info/15` | In flight, nothing wrong: `To Deliver`, `To Receive`, `To Bill`, `Template`. |
+| `success` | `bg-success/10 …` | Settled well: `Completed`, `Delivered`, `Paid`, `Active`. |
+| `warning` | `bg-warning/10 …` | Needs attention, not yet failed: `On Hold`, `Unpaid`. |
+| `caution` | `bg-caution/10 …` | Reversal or exception: `Return`, `Credit Note Issued`, `Debit Note Issued`, `To Pay`. |
+| `destructive` | `bg-destructive/10 text-destructive` | Failed or void: `Cancelled`, `Overdue`. One token, since the red reads on both grounds. |
+| `structural` | raw violet palette pair | Not a lifecycle state but a classification: `Variant`. The one tone with a single call site, so it has no token of its own — promote it if a second use appears. |
 
 ### The maps
 
 Each list owns its own map plus a `DEFAULT_*` fallback, and a `getStatusBadgeClass()`
-helper that does the lookup. Two facts drive the duplication:
+helper that does the lookup. The maps hold `STATUS_TONE` keys, not classes, so
+retuning a tone is a one-line change. Two facts drive the remaining duplication:
 
 - **Sales and Purchase vocabularies differ** (`To Deliver` vs `To Receive`), so
   they cannot share one map.

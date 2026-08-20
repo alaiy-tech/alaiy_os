@@ -1,3 +1,4 @@
+import { STATUS_TONE } from "@/constants/list";
 import type { DocFieldMeta } from "@/types/list";
 import type { ProductStatus } from "@/types/products";
 
@@ -89,10 +90,10 @@ export const COMPULSORY_COLUMNS = ["item_name", "status"];
 export const MIN_VISIBLE_COLUMNS = 4;
 
 export const STATUS_BADGE_CLASS: Record<ProductStatus, string> = {
-  Active: "bg-green-500/10 text-green-700 dark:bg-green-500/15 dark:text-green-300",
-  Template: "bg-blue-500/10 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300",
-  Variant: "bg-violet-500/10 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300",
-  Disabled: "bg-muted text-muted-foreground",
+  Active: STATUS_TONE.success,
+  Template: STATUS_TONE.info,
+  Variant: STATUS_TONE.structural,
+  Disabled: STATUS_TONE.neutral,
 };
 
 // Default cards-per-row for the grid view at its largest breakpoint.
