@@ -378,6 +378,15 @@ From `src/components/ui/sidebar.tsx`:
 `SidebarFooter` (`NavUser`). Nav is config-driven — add a route by editing
 `sidebar-config.ts`, not by hand-writing menu items.
 
+The header logo swaps with the collapse state: `client-logo-hor.png` when
+expanded, `client-logo-square.png` at 32 × 32 on the `3rem` icon rail. Both
+images stay in the markup and are toggled with `hidden` — `display: none`, so
+the inactive one leaves the accessibility tree too — via
+`group-data-[collapsible=icon]:`. `SidebarMenuButton` forces `p-2` when
+collapsed, which would leave only 16px for the mark, so the logo row overrides
+it with `group-data-[collapsible=icon]:p-0!`. Note the `client-logo-*` prefix:
+that is the deploying client's brand, overridden per client app, not Alaiy's.
+
 ### Page header
 
 Always `PageHeader` from `src/components/layout/page-header.tsx`:

@@ -25,7 +25,7 @@ A client app (`alaiy_os_<client>`) replaces the `client-logo-*` files and leaves
 | `images/logo-hor.png` | PNG, transparent | 427 × 128 | [`src/app/(main)/auth/layout.tsx`](<../../src/app/(main)/auth/layout.tsx>) — sign-in panel, rendered at 175 × 35 and forced to white with `brightness-0 invert` |
 | `images/logo-square.png` | PNG, transparent | 512 × 512 | [`src/app/loading.tsx`](../../src/app/loading.tsx) — route-loading splash, rendered at 64 × 64 with `animate-pulse` |
 | `images/client-logo-hor.png` | PNG, transparent | 427 × 128 | [`src/components/layout/app-sidebar.tsx`](../../src/components/layout/app-sidebar.tsx) — sidebar header, rendered at 87.5 × 17.5 |
-| `images/client-logo-square.png` | PNG, transparent | 512 × 512 | **Nothing** — see #198. |
+| `images/client-logo-square.png` | PNG, transparent | 512 × 512 | [`src/components/layout/app-sidebar.tsx`](../../src/components/layout/app-sidebar.tsx) — sidebar header when **collapsed** to the `3rem` icon rail, rendered at 32 × 32 |
 | `images/favicon/icon.png` | PNG, opaque | 512 × 512 | [`src/app/layout.tsx`](../../src/app/layout.tsx) via `metadata.icons.icon` |
 | `images/wave.svg` | SVG | — | [`ask-alaiy-background.tsx`](<../../src/app/(main)/os/ask-alaiy/_components/ask-alaiy-background.tsx>) — **but the consuming path is wrong, see #193** |
 
@@ -37,7 +37,8 @@ design ownership before it lands.
 
 | File | Format | Dimensions | Why it is wanted |
 |---|---|---|---|
-| `images/logo-mark.png` | PNG, transparent | 512 × 512 | Icon-only Alaiy mark for the **collapsed sidebar**. The sidebar narrows to `3rem` in `icon` mode (the default) and currently keeps showing the full horizontal logo, which is unreadable at that width. A `client-logo-mark.png` counterpart is wanted for the same reason. |
+| `images/client-logo-mark.png` | PNG or SVG, transparent | square, legible at 32px | A **true icon-only** client mark. The collapsed sidebar now shows `client-logo-square.png` — square, so it fits the rail far better than the horizontal logo did, but it is still the stacked "alaiy OS" wordmark, i.e. two lines of type at 32 × 32. A single-glyph mark would read properly at that size. Drop-in: one `src` change in `app-sidebar.tsx`. |
+| `images/logo-mark.png` | PNG or SVG, transparent | square, legible at 32px | The same for Alaiy's own branding, if a surface ever needs a collapsed Alaiy mark. Nothing needs it today. |
 | `og-image.png` | PNG | 1200 × 630 | Open Graph / social share card. `metadata` in `src/app/layout.tsx` sets no `openGraph.images`, so a shared link previews blank. |
 | `images/favicon/icon.svg` | SVG | square, ≥ 32 safe | Vector favicon, for crisp rendering on hi-dpi tabs alongside the existing PNG. |
 | `images/favicon/apple-icon.png` | PNG, opaque | 180 × 180 | iOS home-screen icon. Next.js picks it up from `metadata.icons.apple`. |
@@ -46,21 +47,16 @@ design ownership before it lands.
 
 The four live logos are PNG because that is what the design team supplied. SVG
 would be better — it scales for free and the collapsed-sidebar mark needs to be
-legible at 24px — so **prefer SVG for anything new**, and treat replacing the
+legible at 32px — so **prefer SVG for anything new**, and treat replacing the
 existing PNGs with SVGs as a welcome change rather than a required one. If a
 logo is replaced with an SVG, update the `src` in the consuming file listed
 above; the `width`/`height` props can stay.
 
 ## Open issues
 
-Two known problems with what is on disk today, both filed:
-
 - **#193** — `wave.svg` is unreachable. `ask-alaiy-background.tsx` requests
   `/wave.svg`, but the file is at `/assets/images/wave.svg` and no
   `public/wave.svg` exists, so the Ask Alaiy background has never rendered.
-- **#198** — `client-logo-square.png` is referenced from nowhere, and the
-  sidebar keeps showing the horizontal wordmark when collapsed to `3rem`
-  because no icon-only mark exists. The two resolve together.
 
 ## Adding an asset
 
