@@ -1318,6 +1318,12 @@ The first connector through this architecture is
   generated in a workspace.
 * [src/config/sidebar-config.ts](src/config/sidebar-config.ts) — merges
   contributions into its groups by label.
+* [src/app/(main)/os/settings/connectors/page.tsx](src/app/\(main\)/os/settings/connectors/page.tsx)
+  — Settings → Connectors, a card per row in `OS Connector Registry`, each
+  linking to `/os/settings/connectors/<connector_id>`. The base ships the index
+  and none of the screens behind it; a connector that registers without one
+  shows up here as a card whose link goes nowhere, which is the point of having
+  an index.
 * [src/lib/frappe/connectors.ts](src/lib/frappe/connectors.ts) — a typed client
   for `alaiy_os.api.connectors`, which is generic over `OS Connector Registry`:
   it reads and writes whatever settings DocType a connector registered and runs
@@ -1329,8 +1335,9 @@ The first connector through this architecture is
 **`devbench`** — `lib/interface.py` + `devbench.py compose <client>` (§11).
 
 **`alaiy_os_connector_nayaglobal`** — `interface/` with `interface.config.json`,
-three screens under `/os/procurement/nayaglobal/{wishlist,cart,settings}`, and
-`src/lib/nayaglobal/` over its own whitelisted methods. Working this connector
+two screens under `/os/procurement/nayaglobal/{wishlist,cart}`, its settings
+screen at `/os/settings/connectors/nayaglobal`, and `src/lib/nayaglobal/` over
+its own whitelisted methods. Working this connector
 involves the Desk at no point: Settings replaces its Desk form too.
 
 Verified by composing the `commerce` client (base + this connector): Turbopack
@@ -1348,24 +1355,26 @@ the base's, and `.next/standalone/server.js` is produced.
   symlinked: Turbopack treats the project directory as a filesystem root and
   rejects a symlink pointing out of it. Costs seconds and no disk. A deployment
   runs `npm ci` in the workspace instead, per §22's no-runtime-filesystem rule.
-* **A connector owns its settings screen, not the base.** The obvious home for
-  connector settings is a base-side `/os/settings/connectors/<id>` rendering a
-  form off field metadata. It isn't: a connector's settings are the one screen
-  most in need of that connector's own vocabulary — which of two places the API
-  URL is really coming from, what "enabled" costs, that the wishlist is read
-  live. The generic API stays in the base; the screen ships with the app whose
-  fields it explains. That also keeps the "no Desk" promise reachable one
-  connector at a time, rather than blocked on a base-side panel.
+* **A connector owns its settings screen, not the base — but the base owns the
+  route it lands on.** The obvious home for connector settings is a base-side
+  `/os/settings/connectors/<id>` rendering a form off field metadata. Half of
+  that is right. A connector's settings are the one screen most in need of that
+  connector's own vocabulary — which of two places the API URL is really coming
+  from, what "enabled" costs, that the wishlist is read live — so the generic
+  API stays in the base and the *screen* ships with the app whose fields it
+  explains. What the base does own is the address: a connector's settings screen
+  belongs at `src/app/(main)/os/settings/connectors/<connector_id>/page.tsx`, so
+  every connector is found in the same place under Settings instead of wherever
+  its other screens happened to live. The base renders the index over that
+  namespace; the connectors fill it in. That also keeps the "no Desk"
+  promise reachable one connector at a time, rather than blocked on a base-side
+  panel.
 
 ## Not done yet
 
 * The 25 pre-existing base type errors (§21). Until they are fixed, a composed
   build only passes with `typescript.ignoreBuildErrors`, and the "platform
   upgrade breaks a client at compile time" guarantee is theoretical.
-* A base-side connectors *index* — somewhere to see every registered connector
-  and its status at a glance. `get_all_connectors` already returns exactly that;
-  nothing renders it. Individual connectors don't need it (each ships its own
-  settings screen), so this is a convenience, not a blocker.
 * The other Desk surface this connector still has: **NayaGlobal Log**, contributed
   to the Desk sidebar via `alaiy_os_sidebar_log_items`. Same treatment as
   Settings would finish the job.
