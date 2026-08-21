@@ -575,6 +575,94 @@ the page header's action slot, not in a sticky footer. State that changes what
 the document *means* — cancelled, amended — is an `Alert` directly under the
 header, not a pill buried in the body.
 
+#### Media-led detail page
+
+The Item page (`src/app/(main)/os/products/[id]/`) is the second shape, for a
+document whose photograph is part of the answer. Same header and same
+Server-Component rules; a different body:
+
+```
+div.flex.flex-col.gap-6
+├── PageHeader                       title=item_name, subtitle="Item · <code>", action=[status, back]
+├── grid.gap-6                       lg:[240px_1fr]  ·  xl:[300px_1fr_300px]
+│   ├── col 1, rows 1-2, sticky      ItemGallery          (drops to row 1 of a single column below lg)
+│   ├── col 2, row 1                 ItemOverview + ItemVariantPanel
+│   ├── col 3, rows 1-2, sticky      ItemCommerceBox      (under the middle column at lg)
+│   └── col 2, row 2                 ItemSectionNav + ItemSpecs
+├── StockLevels                      full width, outside the grid
+└── ItemPrices                       full width, outside the grid
+```
+
+What is different from the Sales Order shape, and why:
+
+- **Sections, not Cards.** `PageSection` (an `h2`, an optional right-aligned
+  count, and the content) instead of `Card`/`CardTitle`. The page reads as one
+  document with a media column beside it, and a frame per band fought both the
+  sticky columns and the tables that run edge to edge inside them. Tables get
+  `overflow-hidden rounded-xl border` in place of the card they used to sit in.
+- **Two sticky columns.** Both outer columns `row-span` the middle column's two
+  rows and stick, so the price and the stock state stay on screen while the
+  description, variants and specifications scroll past. Stickiness stops where
+  the grid does, which is why the wide stock and pricing tables are outside it.
+- **Offsets come from `DETAIL_STICKY_TOP` and `DETAIL_SCROLL_MARGIN`** in
+  `constants/products.ts`, both measured off `--dashboard-header-height`. The
+  shell header sticks at `top-0` under the default `navbar_style`, so anything
+  else that sticks — or any heading a jump link lands on — has to clear it.
+- **`position: sticky` needs the shell to not be a scroll container.** The
+  content wrapper in `(main)/os/layout.tsx` is `overflow-x-clip`, not
+  `overflow-x-hidden`: `hidden` on one axis computes the other to `auto`, which
+  made that div a scrollport that never scrolls and silently disabled every
+  sticky descendant on every page. Don't change it back.
+- **Every grid child carries `min-w-0`.** A grid item's automatic minimum size is
+  its min-content width, so one wide descendant grows its track past the grid,
+  and the shell clips the surplus rather than scrolling it.
+- **A jump nav, not tabs.** `ItemSectionNav` scroll-spies the sections in
+  `ITEM_DETAIL_SECTIONS` and highlights whichever is crossing the middle of the
+  viewport. It only scrolls — every section stays in the DOM, so find-in-page and
+  a `#item-pricing` deep link both still work.
+
+#### Editing in place
+
+The Item page writes as well as reads, through two client components that every
+edit surface on it goes through — `EditableField` for a value, `EditableToggle`
+for a Check. The rules they encode are worth following on the next page that
+becomes editable:
+
+- **The affordance is visible, not hover-only.** Each editable value carries a
+  muted pencil that strengthens on hover, and the value itself is the click
+  target. An affordance that only appears on hover cannot be seen before it is
+  found and does not exist at all on a touch screen — the first cut of this page
+  hid the pencil at `opacity-0` and read as entirely read-only.
+- **One field, one write, no form.** A value is read-only until it is clicked,
+  and Save writes that field alone. There is no page-level dirty state
+  and no Save bar, because a catalogue edit is a correction to one field rather
+  than a form submission. A Check has no edit mode at all: the flip *is* the
+  write, since a boolean has one other state and an intermediate step around it
+  would be ceremony.
+- **A refused write keeps the editor open with the draft intact.** The stored
+  value was never replaced, so there is nothing to roll back — but closing the
+  editor would throw away what was typed and leave the operator unsure which
+  value is now live. Frappe's own message is the toast, via `frappeErrorMessage`
+  in `lib/frappe/error-message.ts`; never a generic "Request failed".
+- **`router.refresh()` after a successful save.** The page is a Server
+  Component and half of what it shows is derived — the status badge from
+  `disabled`, the stock pill from `is_stock_item`, the gallery from the variants
+  — so re-rendering the route is the only thing that keeps those honest. Between
+  the save and the refresh the control shows what was written, so nothing
+  flashes back to the old value.
+- **Permission decides the affordance, the server decides the write.**
+  `can_write.item` from `get_item_detail` is what makes the page render as plain
+  values for a reader, and `update_item` re-checks the permission regardless: a
+  client flag is a hint. The same split applies to *which* fields — the
+  `WRITABLE_FIELDS` allowlist lives in `alaiy_os/api/item.py`, so the request
+  decides values and never which fields.
+- **A field the page will not write says why.** `item_code` is the docname,
+  `valuation_rate` is derived from stock movements — both keep their row with
+  the reason on hover, rather than being dropped so the table looks tidy.
+- **Warn before a lossy save.** `Item.description` is stored as HTML and edited
+  here as text; where the stored value contains markup the editor says so before
+  it is replaced.
+
 ### Tree page
 
 Item Groups (`src/app/(main)/os/item-groups/`) is the only tree today:

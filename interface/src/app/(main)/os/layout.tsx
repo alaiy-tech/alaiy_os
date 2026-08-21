@@ -92,7 +92,16 @@ export default async function Layout({
           </div>
         </header>
         {/* Pages can set data-content-padding="false" to render full-bleed app layouts. */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
+        {/* overflow-x-clip, not overflow-x-hidden: `hidden` on one axis computes
+            the other to `auto`, which makes this div a scroll container — and a
+            scroll container that never scrolls (its height is always its
+            content's) is the nearest scrollport for anything sticky inside it,
+            so every `position: sticky` on every page silently did nothing.
+            `clip` leaves the vertical axis `visible`, so sticky resolves against
+            the page scroll instead, while still keeping a wide table from
+            pushing the sidebar off screen. Same class the SidebarInset above
+            already uses. */}
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-clip p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
           {children}
         </div>
       </SidebarInset>

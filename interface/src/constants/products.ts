@@ -1,6 +1,6 @@
 import { STATUS_TONE } from "@/constants/list";
 import type { DocFieldMeta } from "@/types/list";
-import type { ProductStatus } from "@/types/products";
+import type { ItemStockState, ProductStatus } from "@/types/products";
 
 export const ITEM_DOCTYPE = "Item";
 
@@ -95,6 +95,50 @@ export const STATUS_BADGE_CLASS: Record<ProductStatus, string> = {
   Variant: STATUS_TONE.structural,
   Disabled: STATUS_TONE.neutral,
 };
+
+export const STOCK_STATE_BADGE_CLASS: Record<ItemStockState, string> = {
+  "In Stock": STATUS_TONE.success,
+  "Low Stock": STATUS_TONE.warning,
+  "Out of Stock": STATUS_TONE.destructive,
+  "Not Tracked": STATUS_TONE.neutral,
+};
+
+export const DEFAULT_STOCK_STATE_BADGE_CLASS = STATUS_TONE.neutral;
+
+export function getStockStateBadgeClass(state: ItemStockState): string {
+  return STOCK_STATE_BADGE_CLASS[state] ?? DEFAULT_STOCK_STATE_BADGE_CLASS;
+}
+
+/**
+ * How far the detail page's sticky columns and jump-to sections clear the top
+ * of the viewport.
+ *
+ * The shell's header is `h-12` and, under the default `navbar_style=sticky`,
+ * sticks at `top-0` with a translucent background - so anything else that
+ * sticks has to start below it or slide underneath. `--dashboard-header-height`
+ * is declared on the SidebarInset (see (main)/os/layout.tsx), which every page
+ * renders inside, and the extra spacing is the content padding so a stuck
+ * column keeps the same gap it had before it stuck.
+ *
+ * Written as class strings rather than a bare value because Tailwind only emits
+ * a utility it can see in the source, and the `@source` glob in globals.css
+ * covers this file.
+ */
+export const DETAIL_STICKY_TOP = "top-[calc(var(--dashboard-header-height)+--spacing(4))]";
+export const DETAIL_SCROLL_MARGIN = "scroll-mt-[calc(var(--dashboard-header-height)+--spacing(16))]";
+
+/**
+ * The item page's jump-to nav, in the order the sections appear.
+ *
+ * Only the bands below the fold are listed: the media, description and variants
+ * sit at the top of the page, so a link to them would scroll a reader backwards
+ * to what they have already passed. Ids match the `id` each PageSection renders.
+ */
+export const ITEM_DETAIL_SECTIONS = [
+  { id: "item-specifications", label: "Specifications" },
+  { id: "item-stock", label: "Stock" },
+  { id: "item-pricing", label: "Pricing" },
+] as const;
 
 // Default cards-per-row for the grid view at its largest breakpoint.
 export const GRID_CARDS_PER_ROW = 6;
