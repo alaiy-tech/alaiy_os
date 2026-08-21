@@ -9,6 +9,7 @@ import {
   Package,
   PackageSearch,
   Palette,
+  Plug,
   ReceiptText,
   Scale,
   ScrollText,
@@ -267,18 +268,12 @@ const baseSidebarItems: NavGroup[] = [
         url: "/os/settings/roles",
         icon: Shield,
       },
-      //  {
-      //   id: "ai",
-      //   title: "Connectors",
-      //   icon: Sparkles,
-      //   subItems: [
-      //     {
-      //       id: "agents",
-      //       title: "Agents",
-      //       url: "/os/settings/agents",
-      //     },
-      //   ],
-      // },
+      {
+        id: "connectors",
+        title: "Connectors",
+        url: "/os/settings/connectors",
+        icon: Plug,
+      },
       // {
       //   id: "ai",
       //   title: "AI",
