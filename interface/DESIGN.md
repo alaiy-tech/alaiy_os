@@ -575,6 +575,52 @@ the page header's action slot, not in a sticky footer. State that changes what
 the document *means* — cancelled, amended — is an `Alert` directly under the
 header, not a pill buried in the body.
 
+#### Media-led detail page
+
+The Item page (`src/app/(main)/os/products/[id]/`) is the second shape, for a
+document whose photograph is part of the answer. Same header and same
+Server-Component rules; a different body:
+
+```
+div.flex.flex-col.gap-6
+├── PageHeader                       title=item_name, subtitle="Item · <code>", action=[status, back]
+├── grid.gap-6                       lg:[240px_1fr]  ·  xl:[300px_1fr_300px]
+│   ├── col 1, rows 1-2, sticky      ItemGallery          (drops to row 1 of a single column below lg)
+│   ├── col 2, row 1                 ItemOverview + ItemVariantPanel
+│   ├── col 3, rows 1-2, sticky      ItemCommerceBox      (under the middle column at lg)
+│   └── col 2, row 2                 ItemSectionNav + ItemSpecs
+├── StockLevels                      full width, outside the grid
+└── ItemPrices                       full width, outside the grid
+```
+
+What is different from the Sales Order shape, and why:
+
+- **Sections, not Cards.** `PageSection` (an `h2`, an optional right-aligned
+  count, and the content) instead of `Card`/`CardTitle`. The page reads as one
+  document with a media column beside it, and a frame per band fought both the
+  sticky columns and the tables that run edge to edge inside them. Tables get
+  `overflow-hidden rounded-xl border` in place of the card they used to sit in.
+- **Two sticky columns.** Both outer columns `row-span` the middle column's two
+  rows and stick, so the price and the stock state stay on screen while the
+  description, variants and specifications scroll past. Stickiness stops where
+  the grid does, which is why the wide stock and pricing tables are outside it.
+- **Offsets come from `DETAIL_STICKY_TOP` and `DETAIL_SCROLL_MARGIN`** in
+  `constants/products.ts`, both measured off `--dashboard-header-height`. The
+  shell header sticks at `top-0` under the default `navbar_style`, so anything
+  else that sticks — or any heading a jump link lands on — has to clear it.
+- **`position: sticky` needs the shell to not be a scroll container.** The
+  content wrapper in `(main)/os/layout.tsx` is `overflow-x-clip`, not
+  `overflow-x-hidden`: `hidden` on one axis computes the other to `auto`, which
+  made that div a scrollport that never scrolls and silently disabled every
+  sticky descendant on every page. Don't change it back.
+- **Every grid child carries `min-w-0`.** A grid item's automatic minimum size is
+  its min-content width, so one wide descendant grows its track past the grid,
+  and the shell clips the surplus rather than scrolling it.
+- **A jump nav, not tabs.** `ItemSectionNav` scroll-spies the sections in
+  `ITEM_DETAIL_SECTIONS` and highlights whichever is crossing the middle of the
+  viewport. It only scrolls — every section stays in the DOM, so find-in-page and
+  a `#item-pricing` deep link both still work.
+
 ### Tree page
 
 Item Groups (`src/app/(main)/os/item-groups/`) is the only tree today:

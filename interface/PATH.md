@@ -29,6 +29,9 @@ Legend: `→` redirect target · `[id]` dynamic segment · `[...path]` catch-all
 │   ├── /os/ask-alaiy                         Ask Alaiy chat
 │   │
 │   ├── /os/products                          item catalog + product KPIs   ?period=
+│   │   └── .../[id]                          Item detail — gallery, description, variants,
+│   │                                         specifications, per-warehouse stock, price
+│   │                                         lists (404 if unknown)
 │   ├── /os/item-groups                       catalog category hierarchy
 │   ├── /os/item-attributes                   variant attributes and their allowed values
 │   ├── /os/customers                         customer metrics and performance overview

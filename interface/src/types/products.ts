@@ -14,6 +14,11 @@ export type ProductRow = ItemRow & {
 
 export type ProductStatus = "Disabled" | "Template" | "Variant" | "Active";
 
+/** Derived from is_stock_item plus the item's summed Bin quantities - see
+ * getItemStockState. Not an Item field, and deliberately only four words: it
+ * answers "can I sell this today", not "how much is there". */
+export type ItemStockState = "In Stock" | "Low Stock" | "Out of Stock" | "Not Tracked";
+
 export type ProductsOverview = {
   period: string;
   units_sold: PeriodComparison;

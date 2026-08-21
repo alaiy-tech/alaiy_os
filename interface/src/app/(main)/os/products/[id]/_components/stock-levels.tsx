@@ -1,8 +1,9 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatQty } from "@/lib/format";
 import { formatCurrency } from "@/lib/utils";
 import type { ItemDetail, ItemStockRow, ItemStockTotals } from "@/types/products";
+
+import { PageSection } from "./page-section";
 
 function Metric({ label, value }: { label: string; value: string }) {
   return (
@@ -13,13 +14,9 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Message({ children }: { children: React.ReactNode }) {
-  return <div className="px-6 pb-6 text-muted-foreground text-sm">{children}</div>;
-}
-
 function StockTable({ bins, totals, currency }: { bins: ItemStockRow[]; totals: ItemStockTotals; currency?: string }) {
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-hidden rounded-xl border">
       <Table className="w-full **:data-[slot='table-cell']:px-4 **:data-[slot='table-head']:px-4">
         <TableHeader>
           <TableRow>
@@ -92,35 +89,28 @@ export function StockLevels({
   const { bins, totals } = stock;
 
   return (
-    <Card className="gap-0">
-      <CardHeader className="border-b pb-4">
-        <CardTitle className="font-normal text-muted-foreground text-sm">Stock</CardTitle>
-        <CardDescription className="text-foreground text-xl tabular-nums leading-none tracking-tight">
-          {canRead ? `${formatQty(totals.actual_qty)} on hand` : "Not shown"}
-        </CardDescription>
-      </CardHeader>
+    <PageSection id="item-stock" title="Stock" meta={canRead ? `${formatQty(totals.actual_qty)} on hand` : "Not shown"}>
+      {canRead && bins.length > 0 && (
+        <>
+          <div className="grid grid-cols-2 gap-4 rounded-xl border p-4 sm:grid-cols-4">
+            <Metric label="Reserved" value={formatQty(totals.reserved_qty)} />
+            <Metric label="Ordered" value={formatQty(totals.ordered_qty)} />
+            <Metric label="Projected" value={formatQty(totals.projected_qty)} />
+            <Metric label="Stock Value" value={formatCurrency(totals.stock_value, { currency })} />
+          </div>
+          <StockTable bins={bins} totals={totals} currency={currency} />
+        </>
+      )}
 
-      <CardContent className="flex flex-col gap-4 px-0 pt-4">
-        {canRead && bins.length > 0 && (
-          <>
-            <div className="grid grid-cols-2 gap-4 px-6 sm:grid-cols-4">
-              <Metric label="Reserved" value={formatQty(totals.reserved_qty)} />
-              <Metric label="Ordered" value={formatQty(totals.ordered_qty)} />
-              <Metric label="Projected" value={formatQty(totals.projected_qty)} />
-              <Metric label="Stock Value" value={formatCurrency(totals.stock_value, { currency })} />
-            </div>
-            <StockTable bins={bins} totals={totals} currency={currency} />
-          </>
-        )}
-
-        {!canRead && <Message>You don&apos;t have permission to view stock levels.</Message>}
-        {canRead && bins.length === 0 && !isStockItem && (
-          <Message>This is not a stock item, so no stock is tracked against it.</Message>
-        )}
-        {canRead && bins.length === 0 && isStockItem && (
-          <Message>This item has never been transacted in any warehouse.</Message>
-        )}
-      </CardContent>
-    </Card>
+      {!canRead && (
+        <p className="text-muted-foreground text-sm">You don&apos;t have permission to view stock levels.</p>
+      )}
+      {canRead && bins.length === 0 && !isStockItem && (
+        <p className="text-muted-foreground text-sm">This is not a stock item, so no stock is tracked against it.</p>
+      )}
+      {canRead && bins.length === 0 && isStockItem && (
+        <p className="text-muted-foreground text-sm">This item has never been transacted in any warehouse.</p>
+      )}
+    </PageSection>
   );
 }

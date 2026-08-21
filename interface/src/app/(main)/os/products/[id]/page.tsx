@@ -6,15 +6,19 @@ import { ArrowLeft } from "lucide-react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { PRODUCT_BASE_PATH, STATUS_BADGE_CLASS } from "@/constants/products";
+import { DETAIL_STICKY_TOP, PRODUCT_BASE_PATH, STATUS_BADGE_CLASS } from "@/constants/products";
 import { getItemDetailServer } from "@/lib/frappe/item-detail.server";
 import { getCompanyInfo } from "@/lib/frappe/server";
-import { getProductStatus } from "@/lib/products";
+import { getProductStatus, itemGalleryImages } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
+import { ItemCommerceBox } from "./_components/item-commerce-box";
+import { ItemGallery } from "./_components/item-gallery";
+import { ItemOverview } from "./_components/item-overview";
 import { ItemPrices } from "./_components/item-prices";
-import { hasItemRelations, ItemRelations } from "./_components/item-relations";
-import { ItemSummary } from "./_components/item-summary";
+import { ItemSectionNav } from "./_components/item-section-nav";
+import { ItemSpecs } from "./_components/item-specs";
+import { hasVariantContext, ItemVariantPanel } from "./_components/item-variants";
 import { StockLevels } from "./_components/stock-levels";
 
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
@@ -30,12 +34,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // the company's currency — unlike an Item Price row, which carries the
   // currency of the price list it belongs to and is formatted from that.
   const currency = company?.defaultCurrency ?? undefined;
+  const gallery = itemGalleryImages(item, detail.variants);
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-6">
       <PageHeader
         title={item.item_name}
-        subtitle={item.item_code}
+        subtitle={`Item · ${item.item_code}`}
         action={
           <div className="flex items-center gap-3">
             <Badge variant="outline" className={cn("border-0 font-medium", STATUS_BADGE_CLASS[status])}>
@@ -50,17 +55,63 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-        <div className={hasItemRelations(detail) ? "xl:col-span-7" : "xl:col-span-12"}>
-          <ItemSummary item={item} currency={currency} />
+      {/* Three columns from xl: the media (sticky, left), what the item is
+       * (middle, natural height), and the commerce panel (sticky, right). Both
+       * outer columns row-span the middle column's two rows so they stay put
+       * while the description, variants and specifications scroll past them,
+       * unsticking only where the grid ends and the full-width stock and
+       * pricing tables begin.
+       *
+       * At lg the commerce panel drops under the middle column's first row
+       * rather than squeezing a third track into ~300px, and below lg the whole
+       * thing is plain DOM order: media, overview, commerce, sections.
+       *
+       * Every direct child carries min-w-0. A grid item's automatic minimum size
+       * is its min-content width, so one wide descendant (a table, a long
+       * unbroken item code) would grow its track past the grid's own width — and
+       * the shell clips its horizontal overflow, so that surplus is cut off
+       * rather than scrollable. */}
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,240px)_minmax(0,1fr)] xl:grid-cols-[minmax(0,300px)_minmax(0,1fr)_minmax(0,300px)]">
+        <div
+          className={cn(
+            "min-w-0 lg:col-start-1 lg:row-span-3 lg:row-start-1 lg:self-start xl:row-span-2",
+            "lg:sticky",
+            DETAIL_STICKY_TOP,
+          )}
+        >
+          <ItemGallery images={gallery} alt={item.item_name} />
         </div>
-        {hasItemRelations(detail) && (
-          <div className="xl:col-span-5">
-            <ItemRelations detail={detail} currency={currency} />
-          </div>
-        )}
+
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1">
+          <ItemOverview item={item} />
+          {hasVariantContext(detail) && <ItemVariantPanel detail={detail} currency={currency} />}
+        </div>
+
+        <div
+          className={cn(
+            "min-w-0 lg:col-start-2 lg:row-start-2 xl:col-start-3 xl:row-span-2 xl:row-start-1 xl:self-start",
+            "xl:sticky",
+            DETAIL_STICKY_TOP,
+          )}
+        >
+          <ItemCommerceBox
+            item={item}
+            stock={detail.stock.totals}
+            canReadStock={detail.can_read.stock}
+            warehouseCount={detail.stock.bins.length}
+            currency={currency}
+          />
+        </div>
+
+        <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-3 xl:col-start-2 xl:row-start-2">
+          <ItemSectionNav />
+          <ItemSpecs item={item} currency={currency} />
+        </div>
       </div>
 
+      {/* Full width, outside the grid: eight numeric columns and seven price
+       * columns have nowhere to go in a 1fr middle track, and this is where the
+       * sticky columns above are meant to let go. */}
       <StockLevels
         stock={detail.stock}
         canRead={detail.can_read.stock}
