@@ -30,6 +30,7 @@ import traceback
 import frappe
 from frappe.utils import now_datetime
 
+from alaiy_os.chat import artifacts as chat_artifacts
 from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import skills as chat_skills
@@ -179,6 +180,11 @@ def run_turn(session):
 	if frappe.session.user != doc.owner:
 		frappe.set_user(doc.owner)
 
+	# After the user is pinned, before anything can write a file. Jobs on the
+	# `long` queue share a worker process, so a previous turn that died between
+	# writing a file and the drain would otherwise hand its meta to this one.
+	chat_artifacts.reset(doc.name)
+
 	try:
 		skill = _pending_skill(doc.name)
 		if skill:
@@ -226,9 +232,17 @@ def _pending_skill(session):
 # ── The loop ─────────────────────────────────────────────────────────────────
 def _loop(doc):
 	specs = chat_tools.tool_specs()
-	system = _system_prompt()
+	system = _system_prompt(specs)
 	max_turns = int(frappe.conf.get("chat_max_turns") or DEFAULT_MAX_TURNS)
 	model = doc.model or default_model()
+
+	# Files a tool wrote on the previous pass, owed to the next assistant message.
+	# A tool only ever runs *after* the `stop_reason` check below, so a drain is
+	# always followed by another iteration — which is what puts the download chip
+	# on the message where the model says "here it is", rather than on the
+	# tool-result message, which is `role: user` and would render as though the
+	# user had attached it.
+	pending = None
 
 	for _ in range(max_turns):
 		messages = _history(doc.name)
@@ -236,13 +250,15 @@ def _loop(doc):
 		_record_usage(doc, response.get("usage") or {})
 
 		blocks = response["content"]
-		_append(doc.name, "assistant", blocks, text=_text_of(blocks))
+		_append(doc.name, "assistant", blocks, text=_text_of(blocks), attachments=pending)
+		pending = None
 		frappe.db.commit()
 
 		if response.get("stop_reason") != "tool_use":
 			return
 
 		results = _run_tools(blocks)
+		pending = chat_artifacts.drain() or None
 		_append(doc.name, "user", results)
 		frappe.db.commit()
 
@@ -253,7 +269,10 @@ def _loop(doc):
 		f"I stopped after {max_turns} steps without reaching an answer. "
 		"Try narrowing the question."
 	)
-	_append(doc.name, "assistant", [{"type": "text", "text": note}], text=note)
+	# `attachments=pending` matters here: a turn that wrote a file on its last
+	# step has the bytes on disk, and dropping the meta would leave them
+	# unreachable by anyone.
+	_append(doc.name, "assistant", [{"type": "text", "text": note}], text=note, attachments=pending)
 	frappe.db.commit()
 
 
@@ -355,6 +374,12 @@ def _attachment_blocks(session, names):
 			frappe.throw("That attachment is not available on this chat.")
 
 		entry = {
+			# For symmetry with a generated file's meta, and so the column is
+			# self-describing. Nothing may *depend* on it: every row written
+			# before this existed has no `kind` at all, which is why
+			# `_elide_old_attachments` tests for "artifact" rather than against
+			# "upload".
+			"kind": "upload",
 			"file_name": row.file_name,
 			"file_url": frappe.db.get_value("File", row.file, "file_url") if row.file else None,
 			"file_size": row.file_size,
@@ -402,6 +427,21 @@ def _elide_old_attachments(rows):
 	for row in reversed(rows):
 		blocks = json.loads(row.blocks or "[]")
 		meta = json.loads(row.attachments or "[]")
+
+		# `attachments` carries two unrelated kinds. An upload's meta is
+		# positional — the first len(meta) blocks ARE its attachment blocks, per
+		# `_attachment_blocks`. A generated file's is not: it rides on an
+		# assistant message whose blocks are prose and tool_use, and it is a
+		# download chip rather than context. Stubbing by position there would
+		# destroy the tool_use its following tool_result is paired with, and the
+		# API rejects an orphaned tool_result outright — so a session would break
+		# permanently on its second export.
+		#
+		# Tested as `== "artifact"`, never `!= "upload"`: every row written before
+		# this marker existed has neither key, and the wrong polarity would stub
+		# the whole of an existing history.
+		if any(entry.get("kind") == "artifact" for entry in meta):
+			meta = []
 
 		# Only inlined attachments are worth eliding. A "tool" attachment is
 		# already a pointer costing a few dozen tokens, and stubbing it would
@@ -504,11 +544,96 @@ def _record_usage(doc, usage):
 
 
 # ── Prompt ───────────────────────────────────────────────────────────────────
+
+#: Appended only when the user can actually call `create_download`.
+#:
+#: **Request-driven, deliberately.** Claude's artifacts and ChatGPT's Code
+#: Interpreter both hand over files unprompted, and both can afford to: an
+#: artifact *is* the answer, written once, and Code Interpreter's file is a
+#: byproduct of code that already ran. Here the model retypes every row as tool
+#: arguments, so an unrequested export pays for the same data twice — once in the
+#: prose, once in the call. A row threshold in the style of Claude's artifacts
+#: becomes the right rule once `create_download` can take a `source: {tool,
+#: arguments}` and let the server export what it already fetched; until then,
+#: proactive exports just make every ordinary answer cost double.
+#:
+#: "Create" and not "offer", for the same reason. "Offer" reads as an invitation
+#: to ask permission, which spends a whole round-trip on a question the user
+#: already answered by asking.
+#:
+#: The "never write a URL" clause is doing real work. The model has just called a
+#: tool whose return value names a file, and the pull to render a markdown link
+#: to a path it reconstructed by hand is strong — and a broken link is worse than
+#: no link, because it looks like the feature failed rather than like the model
+#: guessed.
+DOWNLOAD_PROMPT = (
+	"You can give the user a file to download, with the create_download tool: xlsx, "
+	"csv or pdf.\n"
+	"- Create one when the user asks for a file, an export, a spreadsheet, a report, "
+	"a download, or asks you to 'send' or 'give' them data. Create it in the same "
+	"reply — do not ask whether they want it, they just said so.\n"
+	"- Otherwise do not create a file, however long your answer is. A table in the "
+	"chat is a fine answer on its own, and a file nobody asked for costs the user "
+	"tokens and gives them a chip to ignore. If a table is too long to read, say so "
+	"and mention you can export it.\n"
+	"- Pass the rows you actually retrieved with another tool. Never placeholder or "
+	"example data, and never rows you did not read.\n"
+	"- Figures go in as plain numbers — no currency symbols, no thousands separators "
+	"— so the file stays sortable.\n"
+	"- The file is attached to your reply automatically, as a chip the user can "
+	"click. You never see where it is stored and you must not invent it: no "
+	"markdown link, no file path, no 'sandbox:/tmp/...', no file name. Writing one "
+	"is worse than writing nothing, because a link that goes nowhere looks like the "
+	"export failed. Just say what the file contains.\n"
+	"- xlsx by default; csv when they ask for one or the table is very large; pdf "
+	"only when the file is a document to print or forward.\n"
+	"- If what you retrieved is empty, do not make a file and do not go hunting for "
+	"another source. Say the result was empty and what you looked at — that is the "
+	"answer, and an empty spreadsheet is not."
+)
+
+#: Unconditional: there is no tool behind it, and a client that does not draw
+#: charts renders the block as a table instead, so the guidance is safe wherever
+#: the assistant is served from.
+CHART_PROMPT = (
+	"You may draw ONE chart per reply, when a chart genuinely reads better than the "
+	"numbers: a trend over time, a comparison across a handful of categories, or a "
+	"share of one total. Do not chart a single figure, a pair of figures, a list of "
+	"names, or anything the reader would rather read exactly.\n"
+	"To draw one, put a fenced block on its own lines, right after the sentence it "
+	"illustrates:\n"
+	"```alaiy-chart\n"
+	'{"type":"bar","title":"Revenue by brand","y":"Revenue","unit":"currency",\n'
+	' "labels":["Royal Canin","Pedigree","Whiskas"],\n'
+	' "series":[{"name":"Jul","points":[412000,231000,98000]}]}\n'
+	"```\n"
+	'- "type" is "bar", "line" or "pie"; omit it and the right one is chosen from '
+	'the data. "line" for time, "pie" only for a share of one total.\n'
+	'- "labels" are the categories or dates. Every series\' "points" must hold '
+	"exactly as many numbers as there are labels, in the same order. Use null for a "
+	"value you do not have.\n"
+	'- "unit" is "number", "currency" or "percent", and decides formatting. Points '
+	'are plain numbers: no currency symbols, no commas, no "%" — write 12, never '
+	'"12%".\n'
+	"- At most 4 series and 60 labels (8 for a pie). Beyond that, chart the top few "
+	"and say in prose what you left out.\n"
+	"- The reader can flip a chart to a table, so do not also print a markdown table "
+	"of the same numbers. Pick one.\n"
+	"- Never put a figure in a chart that you did not read with a tool."
+)
+
+
 def _text_of(blocks):
 	return "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
 
 
-def _system_prompt():
+def _system_prompt(specs=None):
+	"""The system prompt for this turn.
+
+	`specs` is the tool surface this user actually has. It is read only to decide
+	whether to promise a capability: a prompt that offers a tool the model cannot
+	call is a promise the assistant will break in front of the user.
+	"""
 	if frappe.conf.get("chat_system_prompt"):
 		return frappe.conf.get("chat_system_prompt")
 
@@ -535,8 +660,14 @@ def _system_prompt():
 		"document names and numbers you actually retrieved."
 	)
 
+	parts = [prompt, CHART_PROMPT]
+	if any(spec.get("name") == chat_artifacts.TOOL for spec in specs or []):
+		parts.append(DOWNLOAD_PROMPT)
+
 	extra = _tenant_context()
-	return f"{prompt}\n\n{extra}" if extra else prompt
+	if extra:
+		parts.append(extra)
+	return "\n\n".join(parts)
 
 
 def _tenant_context():
