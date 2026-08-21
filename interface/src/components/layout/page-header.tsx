@@ -16,8 +16,11 @@ import type { ReactNode } from "react";
 export function PageHeader({ title, subtitle, action }: { title: ReactNode; subtitle?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+      {/* min-w-0 because a flex item's automatic minimum size is its content's:
+          without it a long document name grows the row past the page rather
+          than wrapping inside it, and takes the action slot with it. */}
+      <div className="min-w-0 space-y-1">
+        <h1 className="text-2xl font-semibold tracking-tight break-words">{title}</h1>
         {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
       </div>
       {action}
