@@ -40,6 +40,15 @@ and several sources compose by chained intersection — the surface only ever
 shrinks. A source's own `tools` are its to define, but a name that collides with
 an FAC tool is rejected rather than shadowing it; prefix them.
 
+## Core's own tools
+
+Core contributes a small number of tools itself — `_core_tools()`, currently just
+`create_download` — in the same shape a tenant source uses, because one shape for
+a provided tool is simpler than two. They are **not** privileged: their names go
+through every tenant `filter` alongside FAC's, so a deployment that does not want
+its scoped users exporting spreadsheets can say so, and the site `chat_tools`
+allow-list still applies last and to them too.
+
 **This module fails closed, and that is deliberate.** `runner._tenant_context`
 and `mentions.sources` both swallow a broken hook and carry on, because a
 missing paragraph or a thin `@` picker is a cosmetic loss. Here the same bargain
@@ -48,6 +57,10 @@ degradation. So any exception raised while loading a source, running its
 `filter`, or listing its `tools` empties `tool_specs()` and makes `call_tool()`
 refuse, for every user, until it is fixed. The symptom is an assistant that says
 it has no tools; the cause is in the error log, under the source's name.
+
+That takes core's own tools down with it. It has to — there is one code path —
+and it is the right way round: a source that cannot be evaluated cannot say
+whether this user may export anything.
 """
 
 import frappe
@@ -125,14 +138,27 @@ def _surface():
 	"""
 	sources = _sources()
 	fac = _fac_specs()
-	provided = _provided(sources)
+	core = {tool["name"]: tool for tool in _core_tools()}
+	tenant = _provided(sources)
 
-	clash = sorted(set(provided) & {spec["name"] for spec in fac})
+	# Three-way, not two: a tenant tool shadowing a core one is the same accident
+	# as one shadowing an FAC tool, and precedence-by-import-order is exactly
+	# what this check exists to refuse.
+	clash = sorted(
+		(set(core) | set(tenant)) & {spec["name"] for spec in fac} | (set(core) & set(tenant))
+	)
 	if clash:
-		frappe.log_error(title=f"Chat tool name collision with FAC: {', '.join(clash)}")
+		frappe.log_error(title=f"Chat tool name collision: {', '.join(clash)}")
 		raise _SourceError("name collision")
 
-	kept = set(_narrow([spec["name"] for spec in fac], sources))
+	provided = {**core, **tenant}
+
+	# Core's names are narrowed with FAC's rather than bypassing `_narrow` with
+	# the tenant tools. A `filter` may only ever shrink what it was given, so
+	# nothing is at risk — and it is the only way a deployment can withhold a
+	# core tool from a scoped role.
+	offered = [spec["name"] for spec in fac] + list(core)
+	kept = set(_narrow(offered, sources))
 	specs = [spec for spec in fac if spec["name"] in kept]
 	specs.extend(
 		{
@@ -140,7 +166,8 @@ def _surface():
 			"description": tool.get("description") or "",
 			ANTHROPIC_SCHEMA_KEY: tool.get(ANTHROPIC_SCHEMA_KEY) or EMPTY_SCHEMA,
 		}
-		for tool in provided.values()
+		for name, tool in provided.items()
+		if name not in core or name in kept
 	)
 
 	# The site allow-list applies last and to everything, tenant tools included:
@@ -150,6 +177,18 @@ def _surface():
 	if allowed:
 		specs = [spec for spec in specs if spec["name"] in allowed]
 	return specs, provided
+
+
+def _core_tools():
+	"""Tools core provides itself, in the tenant-source shape.
+
+	Imported here rather than at module scope: `artifacts` imports `exports`,
+	which reaches for openpyxl and Frappe's pdf writer, and this module is
+	imported on every turn including the ones that never write a file.
+	"""
+	from alaiy_os.chat.artifacts import TOOL_SPEC
+
+	return [TOOL_SPEC]
 
 
 def _fac_specs():

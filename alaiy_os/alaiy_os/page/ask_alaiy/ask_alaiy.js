@@ -512,6 +512,15 @@ class AlaiyAskPage {
 			.ask-alaiy-file-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 			.ask-alaiy-file-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 			.ask-alaiy-file-meta { font-size: 11px; color: var(--s-muted); }
+			/* The title of a chart this client renders as a table. */
+			.ask-alaiy-chart-caption {
+				font-size: 12.5px; font-weight: var(--s-medium-weight); color: var(--s-ink);
+				margin: 0 0 4px;
+			}
+			/* A file the assistant produced, not one the user sent. */
+			.ask-alaiy-file.is-artifact { background: var(--s-paper); border-color: var(--s-accent); }
+			.ask-alaiy-file.is-artifact .ask-alaiy-file-icon { color: var(--s-accent); }
+			.ask-alaiy-body .ask-alaiy-tray { margin: 8px 0 0; }
 			.ask-alaiy-file.is-error {
 				border-color: var(--s-red); color: var(--s-red); background: var(--s-white);
 			}
@@ -567,6 +576,7 @@ class AlaiyAskPage {
 				'<path d="M21 11.5l-8.8 8.8a5 5 0 01-7.1-7.1l9-9a3.3 3.3 0 014.7 4.7l-9 9a1.7 1.7 0 01-2.4-2.4l8.3-8.3"/>',
 			file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/>',
 			close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+			download: '<path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
 			// Mention kinds. A mention source picks one of these by name; an
 			// unrecognised name draws nothing rather than breaking the row, so a
 			// deployment can add a kind without needing a path here first.
@@ -1275,10 +1285,15 @@ class AlaiyAskPage {
 		const $chip = $('<div class="ask-alaiy-file"></div>');
 		if (entry.error) $chip.addClass("is-error");
 
+		// An artifact is a file the assistant produced. Tested positively: `kind`
+		// is absent on every upload row written before the marker existed.
+		const is_artifact = entry.kind === "artifact";
+		if (is_artifact) $chip.addClass("is-artifact");
+
 		$chip.append(
 			entry.uploading
 				? '<div class="ask-alaiy-file-spinner" role="progressbar"></div>'
-				: `<span class="ask-alaiy-file-icon">${this._icon("file")}</span>`,
+				: `<span class="ask-alaiy-file-icon">${this._icon(is_artifact ? "download" : "file")}</span>`,
 		);
 
 		const $text = $('<div class="ask-alaiy-file-text"></div>').appendTo($chip);
@@ -1289,8 +1304,13 @@ class AlaiyAskPage {
 
 		if (entry.file_url && !opts.onRemove) {
 			// Sent messages link to the stored file; it is private, so only the
-			// people who can read the chat can open it.
-			$text.wrap($('<a class="ask-alaiy-file-link" target="_blank" rel="noopener"></a>').attr("href", entry.file_url));
+			// people who can read the chat can open it. A generated file
+			// downloads instead of opening — `download` plus a new tab would be
+			// a no-op tab flash, so the two are exclusive.
+			const $link = is_artifact
+				? $('<a class="ask-alaiy-file-link"></a>').attr("download", entry.file_name || "")
+				: $('<a class="ask-alaiy-file-link" target="_blank" rel="noopener"></a>');
+			$text.wrap($link.attr("href", entry.file_url));
 		}
 
 		if (opts.onRemove) {
@@ -1308,6 +1328,9 @@ class AlaiyAskPage {
 		if (entry.error) return entry.error;
 		if (entry.uploading) return __("Reading…");
 		const size = frappe.form.formatters.FileSize(entry.file_size || 0);
+		// A generated file was written, not read, so "characters read" means
+		// nothing for it — and "0 characters read" reads as a failure.
+		if (entry.format) return `${String(entry.format).toUpperCase()} · ${size}`;
 		// Characters, not bytes, is what decides how much of the file the model
 		// actually sees — a 4 MB PDF of scans and a 4 MB PDF of text are very
 		// different inputs.
@@ -1432,7 +1455,10 @@ class AlaiyAskPage {
 		}
 
 		const tools = message.tool_calls || [];
-		if (!message.text && tools.length === 0) return;
+		// A generated file counts as something to show: the model can hand over a
+		// spreadsheet and stop, and the chip is then the whole message.
+		const produced = message.attachments || [];
+		if (!message.text && tools.length === 0 && produced.length === 0) return;
 
 		const $turn = $('<div class="ask-alaiy-turn"></div>');
 		$(`<div class="ask-alaiy-mark">${this._icon("spark")}</div>`).appendTo($turn);
@@ -1445,6 +1471,13 @@ class AlaiyAskPage {
 			// markup. Never the other way round.
 			$body.append($('<div class="ask-alaiy-answer"></div>').html(this._markdown(message.text)));
 			$body.append(this._copy_button(message.text));
+		}
+
+		// Below the answer, unlike a user turn: a generated file is the reply's
+		// product, not its premise.
+		if (produced.length) {
+			const $tray = $('<div class="ask-alaiy-tray"></div>').appendTo($body);
+			produced.forEach((file) => $tray.append(this._file_chip(file, {})));
 		}
 
 		this._add($turn);
@@ -1503,6 +1536,49 @@ class AlaiyAskPage {
 
 	/** Just enough markdown for what the assistant actually writes: headings,
 	 * bold, inline code, fenced code, lists, quotes and tables. */
+	/** A chart spec as a table, or null if it is not one we can read.
+	 *
+	 * Deliberately thin: the shared-labels shape is a grid already, so this is a
+	 * transpose and nothing more. It clamps rather than validates — the React
+	 * panel's parser is the reference, and reproducing its rules here is exactly
+	 * the drift this avoids. Every value is escaped; the spec came from a model.
+	 */
+	_chart_table(raw) {
+		let spec;
+		try {
+			spec = JSON.parse(raw);
+		} catch (error) {
+			return null;
+		}
+		if (!spec || typeof spec !== "object" || Array.isArray(spec)) return null;
+
+		const labels = Array.isArray(spec.labels) ? spec.labels.slice(0, 60).map((v) => String(v ?? "")) : [];
+		const series = (Array.isArray(spec.series) ? spec.series : [])
+			.filter((s) => s && Array.isArray(s.points))
+			.slice(0, 4);
+		if (labels.length < 2 || !series.length) return null;
+
+		const cell = (value) =>
+			value === null || value === undefined || value === "" ? "—" : frappe.utils.escape_html(String(value));
+
+		const head = [spec.x || ""].concat(series.map((s, index) => String(s.name ?? `Series ${index + 1}`)));
+		const rows = labels.map((label, index) => [label].concat(series.map((s) => s.points[index])));
+
+		const caption = spec.title
+			? `<div class="ask-alaiy-chart-caption">${frappe.utils.escape_html(String(spec.title))}</div>`
+			: "";
+		return (
+			caption +
+			'<div class="ask-alaiy-table-wrap"><table><thead><tr>' +
+			// The corner cell stays blank when the spec named no x axis. A dash
+			// there would read as a missing value rather than an absent label.
+			head.map((value) => `<th>${value === "" ? "" : cell(value)}</th>`).join("") +
+			"</tr></thead><tbody>" +
+			rows.map((row) => `<tr>${row.map((value) => `<td>${cell(value)}</td>`).join("")}</tr>`).join("") +
+			"</tbody></table></div>"
+		);
+	}
+
 	_markdown(text) {
 		const lines = String(text).split("\n");
 		const out = [];
@@ -1536,9 +1612,27 @@ class AlaiyAskPage {
 
 			if (line.trimStart().startsWith("```")) {
 				flush();
+				const fence = line.trim();
 				const body = [];
 				i++;
 				while (i < lines.length && !lines[i].trimStart().startsWith("```")) body.push(lines[i++]);
+
+				// An ```alaiy-chart block is a chart spec the model wrote (see
+				// CHART_PROMPT in chat/runner.py). This client does not draw
+				// charts — porting the spec validation from the React panel's
+				// chartSpec.ts would mean two copies of it, free to drift — so
+				// the numbers are shown as a table instead. Correct data, no
+				// second implementation, and charts can land here later without
+				// any change to the wire format. A spec that will not parse falls
+				// through to the code block below.
+				if (/^```[ \t]*(?:json[ \t]+)?(?:alaiy-)?chart[ \t]*$/.test(fence)) {
+					const table = this._chart_table(body.join("\n"));
+					if (table) {
+						out.push(table);
+						continue;
+					}
+				}
+
 				out.push(`<pre><code>${frappe.utils.escape_html(body.join("\n"))}</code></pre>`);
 				continue;
 			}

@@ -73,7 +73,7 @@
    "options": "JSON"
   },
   {
-   "description": "Files sent with this message: [{file_name, file_url, file_size, chars}]. Denormalised for display, like `text` — the model reads the contents from the leading blocks, not from here. Also tells `runner._history` how many leading blocks are attachments.",
+   "description": "Display meta per file on this message, as JSON. Two kinds, told apart by `kind`. An upload (kind absent or \"upload\") is positional: the first len(attachments) blocks ARE its attachment blocks, which is how runner._elide_old_attachments finds them. A generated file (kind \"artifact\") is not positional — it rides on an assistant message whose blocks are prose and tool_use, and is a download chip rather than context.",
    "fieldname": "attachments",
    "fieldtype": "Code",
    "label": "Attachments (JSON)",
