@@ -120,4 +120,8 @@ export type ItemDetail = {
   /** Bin and Item Price carry their own permissions — false means "not shown",
    * which the page has to say out loud rather than render as an empty table. */
   can_read: { stock: boolean; prices: boolean };
+  /** Whether this user may write the Item. Decides whether the page offers edit
+   * affordances at all; it is not what protects the write, which checks the
+   * permission again server-side. */
+  can_write: { item: boolean };
 };

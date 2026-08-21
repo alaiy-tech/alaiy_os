@@ -12,6 +12,7 @@ import { getCompanyInfo } from "@/lib/frappe/server";
 import { getProductStatus, itemGalleryImages } from "@/lib/products";
 import { cn } from "@/lib/utils";
 
+import { EditableField } from "./_components/editable-field";
 import { ItemCommerceBox } from "./_components/item-commerce-box";
 import { ItemGallery } from "./_components/item-gallery";
 import { ItemOverview } from "./_components/item-overview";
@@ -35,11 +36,21 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // currency of the price list it belongs to and is formatted from that.
   const currency = company?.defaultCurrency ?? undefined;
   const gallery = itemGalleryImages(item, detail.variants);
+  const canWrite = detail.can_write.item;
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={item.item_name}
+        title={
+          <EditableField
+            item={item.name}
+            field="item_name"
+            label="Item name"
+            kind="text"
+            value={item.item_name}
+            canWrite={canWrite}
+          />
+        }
         subtitle={`Item · ${item.item_code}`}
         action={
           <div className="flex items-center gap-3">
@@ -83,7 +94,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-1">
-          <ItemOverview item={item} />
+          <ItemOverview item={item} canWrite={canWrite} />
           {hasVariantContext(detail) && <ItemVariantPanel detail={detail} currency={currency} />}
         </div>
 
@@ -100,12 +111,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             canReadStock={detail.can_read.stock}
             warehouseCount={detail.stock.bins.length}
             currency={currency}
+            canWrite={canWrite}
           />
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-3 xl:col-start-2 xl:row-start-2">
           <ItemSectionNav />
-          <ItemSpecs item={item} currency={currency} />
+          <ItemSpecs item={item} currency={currency} canWrite={canWrite} />
         </div>
       </div>
 

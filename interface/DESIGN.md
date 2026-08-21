@@ -621,6 +621,43 @@ What is different from the Sales Order shape, and why:
   viewport. It only scrolls — every section stays in the DOM, so find-in-page and
   a `#item-pricing` deep link both still work.
 
+#### Editing in place
+
+The Item page writes as well as reads, through two client components that every
+edit surface on it goes through — `EditableField` for a value, `EditableToggle`
+for a Check. The rules they encode are worth following on the next page that
+becomes editable:
+
+- **One field, one write, no form.** A value is read-only until its pencil is
+  clicked, and Save writes that field alone. There is no page-level dirty state
+  and no Save bar, because a catalogue edit is a correction to one field rather
+  than a form submission. A Check has no edit mode at all: the flip *is* the
+  write, since a boolean has one other state and an intermediate step around it
+  would be ceremony.
+- **A refused write keeps the editor open with the draft intact.** The stored
+  value was never replaced, so there is nothing to roll back — but closing the
+  editor would throw away what was typed and leave the operator unsure which
+  value is now live. Frappe's own message is the toast, via `frappeErrorMessage`
+  in `lib/frappe/error-message.ts`; never a generic "Request failed".
+- **`router.refresh()` after a successful save.** The page is a Server
+  Component and half of what it shows is derived — the status badge from
+  `disabled`, the stock pill from `is_stock_item`, the gallery from the variants
+  — so re-rendering the route is the only thing that keeps those honest. Between
+  the save and the refresh the control shows what was written, so nothing
+  flashes back to the old value.
+- **Permission decides the affordance, the server decides the write.**
+  `can_write.item` from `get_item_detail` is what makes the page render as plain
+  values for a reader, and `update_item` re-checks the permission regardless: a
+  client flag is a hint. The same split applies to *which* fields — the
+  `WRITABLE_FIELDS` allowlist lives in `alaiy_os/api/item.py`, so the request
+  decides values and never which fields.
+- **A field the page will not write says why.** `item_code` is the docname,
+  `valuation_rate` is derived from stock movements — both keep their row with
+  the reason on hover, rather than being dropped so the table looks tidy.
+- **Warn before a lossy save.** `Item.description` is stored as HTML and edited
+  here as text; where the stored value contains markup the editor says so before
+  it is replaced.
+
 ### Tree page
 
 Item Groups (`src/app/(main)/os/item-groups/`) is the only tree today:

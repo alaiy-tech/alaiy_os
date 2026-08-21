@@ -7,8 +7,13 @@ import type { ReactNode } from "react";
  * Renders the page's h1: it is the first heading on the page, so anything
  * lower leaves a screen-reader user navigating by heading with no page title.
  * Every page uses this once and only once - section headings inside a page
- * are CardTitle or a plain h2, not another PageHeader. */
-export function PageHeader({ title, subtitle, action }: { title: string; subtitle?: string; action?: ReactNode }) {
+ * are CardTitle or a plain h2, not another PageHeader.
+ *
+ * `title` takes a node, not just a string, so a page whose title is editable
+ * can put the editor inside the h1 rather than beside it - the heading text is
+ * then still the document's name for anyone navigating by heading. Pass a
+ * string for the ordinary case. */
+export function PageHeader({ title, subtitle, action }: { title: ReactNode; subtitle?: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="space-y-1">

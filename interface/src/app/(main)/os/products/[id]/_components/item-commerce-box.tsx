@@ -9,6 +9,9 @@ import { getItemStockState } from "@/lib/products";
 import { cn, formatCurrency } from "@/lib/utils";
 import type { ItemDetail, ItemDetailHeader } from "@/types/products";
 
+import { EditableField } from "./editable-field";
+import { EditableToggle } from "./editable-toggle";
+
 const EM_DASH = "—";
 
 /** A label/value pair on one line, the sidebar's smallest unit. Sized
@@ -107,12 +110,14 @@ export function ItemCommerceBox({
   canReadStock,
   warehouseCount,
   currency,
+  canWrite,
 }: {
   item: ItemDetailHeader;
   stock: ItemDetail["stock"]["totals"];
   canReadStock: boolean;
   warehouseCount: number;
   currency?: string;
+  canWrite: boolean;
 }) {
   const money = (value: number | null) =>
     value === null || value === undefined ? null : formatCurrency(value, { currency });
@@ -125,9 +130,19 @@ export function ItemCommerceBox({
       <div className="flex flex-col gap-4 rounded-xl bg-muted/60 p-4">
         <div className="flex flex-col gap-1">
           <span className="text-muted-foreground text-xs">Standard rate</span>
-          <span className="font-heading text-3xl tabular-nums leading-none tracking-tight">
-            {money(item.standard_rate) ?? <span className="text-muted-foreground text-xl">Not set</span>}
-          </span>
+          {/* The one figure on this panel that is a decision rather than a
+           * derivation, so it is the one that is editable here. Valuation and
+           * last purchase below are computed by ERPNext from stock movements. */}
+          <EditableField
+            item={item.name}
+            field="standard_rate"
+            label="Standard rate"
+            kind="number"
+            value={item.standard_rate}
+            display={money(item.standard_rate) ?? <span className="text-muted-foreground text-xl">Not set</span>}
+            canWrite={canWrite}
+            className="font-heading text-3xl tabular-nums leading-none tracking-tight"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-3 border-t pt-3">
@@ -170,12 +185,27 @@ export function ItemCommerceBox({
         )}
       </div>
 
-      <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 rounded-xl border p-4">
-        <Fact label="Item code" value={item.item_code} />
-        <Fact label="Item group" value={item.item_group} />
-        <Fact label="Brand" value={item.brand} />
-        <Fact label="Stock UOM" value={item.stock_uom} />
-        <Fact label="Origin" value={item.country_of_origin} />
+      <div className="flex flex-col gap-3 rounded-xl border p-4">
+        {/* Whether the item is sellable at all, which is what the rest of this
+         * panel is describing — so it belongs here rather than buried in the
+         * field table. Stored inverted: the Item field is `disabled`. */}
+        <EditableToggle
+          item={item.name}
+          field="disabled"
+          label="Active"
+          value={Boolean(item.disabled)}
+          canWrite={canWrite}
+          as="switch"
+          invert
+        />
+
+        <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 border-t pt-3">
+          <Fact label="Item code" value={item.item_code} />
+          <Fact label="Item group" value={item.item_group} />
+          <Fact label="Brand" value={item.brand} />
+          <Fact label="Stock UOM" value={item.stock_uom} />
+          <Fact label="Origin" value={item.country_of_origin} />
+        </div>
       </div>
 
       {signals.length > 0 && (
