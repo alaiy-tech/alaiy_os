@@ -122,6 +122,11 @@ export type ItemDetail = {
   can_read: { stock: boolean; prices: boolean };
   /** Whether this user may write the Item. Decides whether the page offers edit
    * affordances at all; it is not what protects the write, which checks the
-   * permission again server-side. */
-  can_write: { item: boolean };
+   * permission again server-side.
+   *
+   * Optional because the front end and the Frappe app deploy separately: a
+   * bench still running an alaiy_os from before update_item existed answers
+   * without this key, and the page reading as it always did is a better answer
+   * there than a 500 — an edit affordance would have nothing to call anyway. */
+  can_write?: { item: boolean };
 };

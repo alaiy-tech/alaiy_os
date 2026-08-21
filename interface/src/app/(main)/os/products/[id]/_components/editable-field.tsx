@@ -154,9 +154,13 @@ export function EditableField({
   };
 
   if (!editing) {
+    const valueNode = isEmpty ? <span className="text-muted-foreground">{EM_DASH}</span> : shown;
+
     // A multiline value is a paragraph: it lays out as a block with the pencil
-    // beside its first line, and must not be truncated the way a single-line
-    // value in a table cell is.
+    // beside its first line, must not be truncated the way a single-line value
+    // in a table cell is, and cannot be wrapped in the click target below —
+    // the description's own "Read more" is a button, and a button inside a
+    // button is invalid markup that browsers resolve by dropping one of them.
     return (
       <span
         className={cn(
@@ -165,16 +169,29 @@ export function EditableField({
           className,
         )}
       >
-        <span className={cn("min-w-0", multiline ? "flex-1" : "truncate")}>
-          {isEmpty ? <span className="text-muted-foreground">{EM_DASH}</span> : shown}
-        </span>
+        {multiline ? (
+          <span className="min-w-0 flex-1">{valueNode}</span>
+        ) : (
+          <button
+            type="button"
+            onClick={startEditing}
+            title={`Edit ${label}`}
+            className="min-w-0 cursor-text truncate text-left hover:underline hover:decoration-dotted hover:underline-offset-4"
+          >
+            {valueNode}
+          </button>
+        )}
+        {/* Muted rather than hidden. An affordance that only appears on hover
+         * cannot be seen before it is found, is not there at all on a touch
+         * screen, and left the page looking read-only — which is exactly how it
+         * was read. */}
         <Button
           type="button"
           variant="ghost"
           size="icon-xs"
           aria-label={`Edit ${label}`}
           onClick={startEditing}
-          className="shrink-0 text-muted-foreground opacity-0 transition-opacity duration-100 focus-visible:opacity-100 group-hover/edit:opacity-100"
+          className="shrink-0 text-muted-foreground opacity-60 transition-opacity duration-100 focus-visible:opacity-100 group-hover/edit:opacity-100"
         >
           <Pencil />
         </Button>

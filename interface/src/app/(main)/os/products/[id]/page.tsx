@@ -36,7 +36,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   // currency of the price list it belongs to and is formatted from that.
   const currency = company?.defaultCurrency ?? undefined;
   const gallery = itemGalleryImages(item, detail.variants);
-  const canWrite = detail.can_write.item;
+  const canWrite = detail.can_write?.item ?? false;
 
   return (
     <div className="flex flex-col gap-6">
@@ -116,7 +116,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </div>
 
         <div className="flex min-w-0 flex-col gap-6 lg:col-start-2 lg:row-start-3 xl:col-start-2 xl:row-start-2">
-          <ItemSectionNav />
+          {/* <ItemSectionNav /> */}
           <ItemSpecs item={item} currency={currency} canWrite={canWrite} />
         </div>
       </div>

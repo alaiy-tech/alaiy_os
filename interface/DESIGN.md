@@ -628,8 +628,13 @@ edit surface on it goes through — `EditableField` for a value, `EditableToggle
 for a Check. The rules they encode are worth following on the next page that
 becomes editable:
 
-- **One field, one write, no form.** A value is read-only until its pencil is
-  clicked, and Save writes that field alone. There is no page-level dirty state
+- **The affordance is visible, not hover-only.** Each editable value carries a
+  muted pencil that strengthens on hover, and the value itself is the click
+  target. An affordance that only appears on hover cannot be seen before it is
+  found and does not exist at all on a touch screen — the first cut of this page
+  hid the pencil at `opacity-0` and read as entirely read-only.
+- **One field, one write, no form.** A value is read-only until it is clicked,
+  and Save writes that field alone. There is no page-level dirty state
   and no Save bar, because a catalogue edit is a correction to one field rather
   than a form submission. A Check has no edit mode at all: the flip *is* the
   write, since a boolean has one other state and an intermediate step around it
