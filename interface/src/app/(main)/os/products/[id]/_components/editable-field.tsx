@@ -170,13 +170,17 @@ export function EditableField({
         )}
       >
         {multiline ? (
-          <span className="min-w-0 flex-1">{valueNode}</span>
+          <span className="min-w-0 flex-1 break-words">{valueNode}</span>
         ) : (
           <button
             type="button"
             onClick={startEditing}
             title={`Edit ${label}`}
-            className="min-w-0 cursor-text truncate text-left hover:underline hover:decoration-dotted hover:underline-offset-4"
+            // Wraps rather than truncates: this renders into a page heading as
+            // well as into table cells, and a heading that ellipsises its
+            // document's name hides the one thing the page is about.
+            // break-words is the backstop for a name with no spaces in it.
+            className="min-w-0 cursor-text break-words text-left hover:underline hover:decoration-dotted hover:underline-offset-4"
           >
             {valueNode}
           </button>
