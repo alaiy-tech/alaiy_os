@@ -1,0 +1,124 @@
+{
+ "autoname": "field:pool_id",
+ "creation": "2026-08-21 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "pool_id",
+  "is_active",
+  "description",
+  "amounts_section",
+  "total_capital",
+  "column_break_1",
+  "deployed_capital",
+  "available_capital",
+  "notes_section",
+  "last_change_reason"
+ ],
+ "fields": [
+  {
+   "bold": 1,
+   "fieldname": "pool_id",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Pool ID",
+   "reqd": 1,
+   "unique": 1,
+   "description": "e.g. \"commerce-pilot-tranche-1\". One row per capital tranche — a later tranche is a new row, not an edit to this one, so the history of how the pool grew stays intact."
+  },
+  {
+   "default": "1",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "fieldname": "amounts_section",
+   "fieldtype": "Section Break",
+   "label": "Amounts"
+  },
+  {
+   "fieldname": "total_capital",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Capital",
+   "reqd": 1,
+   "description": "The tranche size, e.g. ₹10,000 for the first tranche. Never edited after creation — a top-up is a new Pool ID row."
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "deployed_capital",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Deployed Capital",
+   "description": "Sum of capital currently committed to open, approved-and-executed proposals reading from this pool. Updated by Commerce Action Proposal, not edited by hand."
+  },
+  {
+   "fieldname": "available_capital",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Available Capital",
+   "read_only": 1,
+   "description": "total_capital - deployed_capital. Computed on save; never set directly."
+  },
+  {
+   "fieldname": "notes_section",
+   "fieldtype": "Section Break",
+   "label": "Notes"
+  },
+  {
+   "fieldname": "last_change_reason",
+   "fieldtype": "Small Text",
+   "label": "Last Change Reason",
+   "description": "Why deployed_capital last moved — which proposal, or which reallocation from a proven-weak bet. Kept as free text here; full history lives on the Commerce Action Proposal rows themselves."
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "Commerce Capital Pool",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Alaiy Admin",
+   "share": 1,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

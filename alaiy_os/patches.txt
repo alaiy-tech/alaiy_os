@@ -2,3 +2,4 @@
 alaiy_os.patches.merge_agent_doctypes
 
 [post_model_sync]
+alaiy_os.patches.register_commerce_pilot_agent

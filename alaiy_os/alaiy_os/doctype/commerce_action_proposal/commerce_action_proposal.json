@@ -1,0 +1,259 @@
+{
+ "autoname": "format:CAP-{action_type_code}-{#####}",
+ "creation": "2026-08-21 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "action_type",
+  "action_type_code",
+  "item",
+  "channel",
+  "status",
+  "values_section",
+  "current_value",
+  "proposed_value",
+  "column_break_1",
+  "margin_floor_pct",
+  "projected_margin_pct",
+  "capital_section",
+  "capital_pool",
+  "amount_requested",
+  "reconciliation_section",
+  "reconciliation_ok",
+  "block_reason",
+  "reconciliation_snapshot",
+  "audit_section",
+  "proposed_by_agent",
+  "proposed_by_run",
+  "approved_by",
+  "approved_on",
+  "executed_on",
+  "execution_error",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "action_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Action Type",
+   "options": "Price Update\nReorder PO\nAd Spend\nListing Edit",
+   "reqd": 1
+  },
+  {
+   "fieldname": "action_type_code",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Action Type Code",
+   "description": "Short code derived from action_type for the autoname pattern (PRICE / REORDER / ADSPEND / LISTING). Set in the controller, not by hand."
+  },
+  {
+   "fieldname": "item",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "channel",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Channel",
+   "options": "OS Connector Registry",
+   "description": "Which connector this action targets, e.g. shopify / amazon_sp_api / nayaglobal. Left blank for actions that aren't channel-specific."
+  },
+  {
+   "default": "Needs Review",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Draft\nNeeds Review\nApproved\nRejected\nBlocked\nExecuted\nExecution Failed",
+   "reqd": 1
+  },
+  {
+   "fieldname": "values_section",
+   "fieldtype": "Section Break",
+   "label": "Proposed Change"
+  },
+  {
+   "fieldname": "current_value",
+   "fieldtype": "Currency",
+   "label": "Current Value"
+  },
+  {
+   "fieldname": "proposed_value",
+   "fieldtype": "Currency",
+   "label": "Proposed Value",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "margin_floor_pct",
+   "fieldtype": "Percent",
+   "label": "Margin Floor %",
+   "description": "The floor this proposal was checked against — 15-20% contribution margin after landed cost + channel fees, per policy. Stored per-row so a later policy change doesn't silently reinterpret an old proposal's history."
+  },
+  {
+   "fieldname": "projected_margin_pct",
+   "fieldtype": "Percent",
+   "label": "Projected Margin %",
+   "read_only": 1,
+   "description": "Computed from reconciled landed cost at proposal time — the \"margin impact\" a reviewer sees before approving."
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "capital_section",
+   "fieldtype": "Section Break",
+   "label": "Capital"
+  },
+  {
+   "fieldname": "capital_pool",
+   "fieldtype": "Link",
+   "label": "Capital Pool",
+   "options": "Commerce Capital Pool",
+   "description": "Set only for actions that consume pool capital (Reorder PO, Ad Spend). A Price Update or Listing Edit does not deploy capital on its own, so this is left blank for those."
+  },
+  {
+   "fieldname": "amount_requested",
+   "fieldtype": "Currency",
+   "label": "Amount Requested",
+   "description": "How much of capital_pool this action would deploy if approved."
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "reconciliation_section",
+   "fieldtype": "Section Break",
+   "label": "Reconciliation"
+  },
+  {
+   "default": "0",
+   "fieldname": "reconciliation_ok",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Reconciliation OK",
+   "description": "False means the cross-system state this proposal depends on was stale, missing, or inconsistent when generated. A proposal with this unchecked must not be approved — see block_reason."
+  },
+  {
+   "depends_on": "eval:!doc.reconciliation_ok",
+   "fieldname": "block_reason",
+   "fieldtype": "Small Text",
+   "label": "Block Reason",
+   "description": "Why reconciliation failed, in plain language, e.g. \"Nayaglobal capacity data is 6 hours stale\" or \"Unicommerce stock and Amazon-reported stock disagree by 40 units\"."
+  },
+  {
+   "fieldname": "reconciliation_snapshot",
+   "fieldtype": "Code",
+   "label": "Reconciliation Snapshot (JSON)",
+   "options": "JSON",
+   "description": "The exact cross-system state read at proposal time, so a reviewer (or a later audit) can see precisely what this decision was based on, not just its conclusion."
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "audit_section",
+   "fieldtype": "Section Break",
+   "label": "Audit"
+  },
+  {
+   "fieldname": "proposed_by_agent",
+   "fieldtype": "Link",
+   "label": "Proposed By Agent",
+   "options": "OS Agent Registry"
+  },
+  {
+   "fieldname": "proposed_by_run",
+   "fieldtype": "Link",
+   "label": "Proposed By Run",
+   "options": "OS Agent Run"
+  },
+  {
+   "fieldname": "approved_by",
+   "fieldtype": "Link",
+   "label": "Approved By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "approved_on",
+   "fieldtype": "Datetime",
+   "label": "Approved On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "executed_on",
+   "fieldtype": "Datetime",
+   "label": "Executed On",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.status=='Execution Failed'",
+   "fieldname": "execution_error",
+   "fieldtype": "Small Text",
+   "label": "Execution Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-21 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "Commerce Action Proposal",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Alaiy Admin",
+   "share": 1,
+   "submit": 0,
+   "write": 1
+  },
+  {
+   "create": 0,
+   "delete": 0,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Alaiy Ops",
+   "share": 0,
+   "write": 0
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
