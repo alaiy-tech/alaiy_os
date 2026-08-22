@@ -1,0 +1,446 @@
+// Relative import, not the usual `@/constants/list` alias - this module is
+// also loaded by `seeds/seed-headless-db.ts` under plain ts-node, which
+// (unlike Next.js's own bundler) doesn't resolve `@/*` path aliases at
+// runtime. A relative path works identically under both.
+import { STATUS_TONE } from "../../constants/list";
+import type { PageConfigFile } from "../../types/runtime/page-config";
+
+/**
+ * The two seed pages this local SQLite store ships with. Written as typed
+ * TypeScript (checked against `PageConfigFile`/`UIPageDefinition` at compile
+ * time) rather than hand-authored JSON, then serialized once at seed time -
+ * a real benefit of moving off bundled `.json` files: a typo in a node's
+ * `kind`/`type` field is now a build error, not a runtime validation
+ * failure discovered by loading the page.
+ */
+
+const ORDER_PAYMENT_TONES: Record<string, string> = {
+  Paid: STATUS_TONE.success,
+  Pending: STATUS_TONE.warning,
+  Refunded: STATUS_TONE.destructive,
+};
+
+const ORDER_FULFILLMENT_TONES: Record<string, string> = {
+  Fulfilled: STATUS_TONE.success,
+  Unfulfilled: STATUS_TONE.caution,
+  Returned: STATUS_TONE.destructive,
+};
+
+const CUSTOMER_STATUS_TONES: Record<string, string> = {
+  Active: STATUS_TONE.success,
+  "No Orders": STATUS_TONE.neutral,
+  Disabled: STATUS_TONE.destructive,
+};
+
+export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
+  id: "dashboard",
+  route: "/os/dashboard",
+  metadata: {
+    title: "Dashboard",
+    description: "The /os dashboard, composed through the UI runtime instead of hardcoded JSX.",
+  },
+  definition: {
+    id: "headless-dashboard",
+    kind: "page",
+    children: [
+      {
+        id: "root-stack",
+        kind: "layout",
+        type: "stack",
+        children: [
+          {
+            id: "page-header",
+            kind: "component",
+            type: "os-page-header",
+            data: {
+              title: { source: "dashboard.greeting", path: "greeting" },
+              subtitle: { source: "dashboard.greeting", path: "formattedDate" },
+            },
+            children: [
+              {
+                id: "header-actions",
+                kind: "layout",
+                type: "inline",
+                children: [
+                  {
+                    id: "filter-bar",
+                    kind: "component",
+                    type: "os-filter-bar",
+                    props: {
+                      filters: [
+                        {
+                          id: "period",
+                          type: "select",
+                          label: "Period",
+                          searchParam: "period",
+                          options: ["1D", "1W", "1M", "1Y"],
+                          defaultValue: "1M",
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "kpi-chart-row",
+            kind: "layout",
+            type: "grid",
+            columns: { base: 1, xl: 12 },
+            children: [
+              {
+                id: "kpi-grid",
+                kind: "layout",
+                type: "grid",
+                columns: { base: 1, md: 2 },
+                layout: { span: { xl: 5 } },
+                children: [
+                  {
+                    id: "kpi-total-sales",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Total Sales", icon: "DollarSign", format: "currency" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "total_sales" },
+                      trend: { source: "dashboard.overview", path: "total_sales_delta" },
+                      currency: { source: "dashboard.overview", path: "defaultCurrency" },
+                    },
+                  },
+                  {
+                    id: "kpi-total-orders",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Total Orders", icon: "ShoppingBag", format: "number" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "total_orders" },
+                      trend: { source: "dashboard.overview", path: "total_orders_delta" },
+                    },
+                  },
+                  {
+                    id: "kpi-customer-growth",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Customer Growth", icon: "Users", format: "number" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "customer_growth" },
+                      trend: { source: "dashboard.overview", path: "customer_growth_delta" },
+                    },
+                  },
+                  {
+                    id: "kpi-average-order",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Average Order", icon: "ReceiptText", format: "currency" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "average_order" },
+                      trend: { source: "dashboard.overview", path: "average_order_delta" },
+                      currency: { source: "dashboard.overview", path: "defaultCurrency" },
+                    },
+                  },
+                  {
+                    id: "kpi-return-requests",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Return Requests", icon: "RotateCcw", format: "number", trendPolarity: "negative" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "return_requests" },
+                      trend: { source: "dashboard.overview", path: "return_requests_delta" },
+                    },
+                  },
+                  {
+                    id: "kpi-stock-accuracy",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Stock Accuracy", icon: "PackageCheck", format: "percent", trendUnit: "points" },
+                    data: {
+                      value: { source: "dashboard.overview", path: "stock_accuracy" },
+                      trend: { source: "dashboard.overview", path: "stock_accuracy_delta" },
+                    },
+                  },
+                ],
+              },
+              {
+                id: "sales-overview-chart",
+                kind: "component",
+                type: "os-chart",
+                layout: { span: { xl: 7 } },
+                props: {
+                  title: "Sales Overview",
+                  x: "period",
+                  legend: true,
+                  series: [
+                    { field: "revenue", label: "Revenue", type: "area" },
+                    { field: "profit", label: "Profit", type: "bar" },
+                  ],
+                },
+                data: { rows: { source: "dashboard.salesTrend" } },
+              },
+            ],
+          },
+          {
+            id: "products-stock-row",
+            kind: "layout",
+            type: "grid",
+            columns: { base: 1, xl: 12 },
+            children: [
+              {
+                id: "top-products-table",
+                kind: "component",
+                type: "os-data-table",
+                layout: { span: { xl: 6 } },
+                props: {
+                  title: "Top Products",
+                  paginated: false,
+                  emptyMessage: "No sales in this period.",
+                  columns: [
+                    { field: "item_name", label: "Product", sortable: true },
+                    { field: "category", label: "Category" },
+                    { field: "share", label: "Share", format: "number", align: "right" },
+                    { field: "amount", label: "Sales", format: "currency", align: "right", sortable: true },
+                  ],
+                },
+                data: { rows: { source: "dashboard.topProducts" } },
+              },
+              {
+                id: "stock-kpi-grid",
+                kind: "layout",
+                type: "grid",
+                columns: { base: 1, md: 3 },
+                layout: { span: { xl: 6 } },
+                children: [
+                  {
+                    id: "kpi-in-stock",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "In Stock", icon: "PackageCheck", format: "number" },
+                    data: { value: { source: "dashboard.stockMix", path: "in_stock" } },
+                  },
+                  {
+                    id: "kpi-low-stock",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Low Stock", icon: "Package", format: "number" },
+                    data: { value: { source: "dashboard.stockMix", path: "low_stock" } },
+                  },
+                  {
+                    id: "kpi-out-of-stock",
+                    kind: "component",
+                    type: "os-kpi",
+                    props: { title: "Out of Stock", icon: "Package", format: "number" },
+                    data: { value: { source: "dashboard.stockMix", path: "out_of_stock" } },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "recent-orders-table",
+            kind: "component",
+            type: "os-data-table",
+            props: {
+              title: "Recent Orders",
+              searchable: true,
+              searchPlaceholder: "Search orders...",
+              columnVisibility: true,
+              compulsoryColumns: ["id", "customer"],
+              minVisibleColumns: 3,
+              selectable: true,
+              paginated: true,
+              pageSize: 10,
+              emptyMessage: "No orders found.",
+              columns: [
+                { field: "id", label: "Order", sortable: true },
+                { field: "customer", label: "Customer", filterable: true },
+                {
+                  field: "payment",
+                  label: "Payment",
+                  format: "badge",
+                  filterable: true,
+                  filterOptions: ["Paid", "Pending", "Refunded"],
+                  badgeTones: ORDER_PAYMENT_TONES,
+                },
+                {
+                  field: "fulfillment",
+                  label: "Fulfillment",
+                  format: "badge",
+                  filterable: true,
+                  filterOptions: ["Fulfilled", "Unfulfilled", "Returned"],
+                  badgeTones: ORDER_FULFILLMENT_TONES,
+                },
+                { field: "total", label: "Total", format: "currency", align: "right", sortable: true },
+                { field: "date", label: "Date", format: "date", sortable: true },
+              ],
+            },
+            data: {
+              rows: { source: "dashboard.recentOrders" },
+              currency: { source: "dashboard.overview", path: "defaultCurrency" },
+            },
+          },
+        ],
+      },
+    ],
+  },
+};
+
+export const HEADLESS_CUSTOMERS_PAGE: PageConfigFile = {
+  id: "customers",
+  route: "/os/customers",
+  metadata: {
+    title: "Customers",
+    description: "The /os/customers page, composed through the UI runtime instead of hardcoded JSX.",
+  },
+  definition: {
+    id: "headless-customers",
+    kind: "page",
+    children: [
+      {
+        id: "root-stack",
+        kind: "layout",
+        type: "stack",
+        children: [
+          {
+            id: "page-header",
+            kind: "component",
+            type: "os-page-header",
+            props: {
+              title: "Customers",
+              subtitle: "Track acquisition, ordering activity, and spend across your customer base.",
+            },
+            children: [
+              {
+                id: "header-actions",
+                kind: "layout",
+                type: "inline",
+                children: [
+                  {
+                    id: "filter-bar",
+                    kind: "component",
+                    type: "os-filter-bar",
+                    props: {
+                      filters: [
+                        {
+                          id: "period",
+                          type: "select",
+                          label: "Period",
+                          searchParam: "period",
+                          options: ["1D", "1W", "1M", "1Y"],
+                          defaultValue: "1M",
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "kpi-grid",
+            kind: "layout",
+            type: "grid",
+            columns: { base: 1, md: 2, xl: 4 },
+            children: [
+              {
+                id: "kpi-total-customers",
+                kind: "component",
+                type: "os-kpi",
+                props: { title: "Total Customers", icon: "UsersRound", format: "number" },
+                data: {
+                  value: { source: "customers.overview", path: "total_customers" },
+                  trend: { source: "customers.overview", path: "total_customers_delta" },
+                },
+              },
+              {
+                id: "kpi-new-customers",
+                kind: "component",
+                type: "os-kpi",
+                props: { title: "New Customers", icon: "TrendingUp", format: "number" },
+                data: {
+                  value: { source: "customers.overview", path: "new_customers" },
+                  trend: { source: "customers.overview", path: "new_customers_delta" },
+                },
+              },
+              {
+                id: "kpi-active-customers",
+                kind: "component",
+                type: "os-kpi",
+                props: { title: "Active Customers", icon: "Users", format: "number" },
+                data: {
+                  value: { source: "customers.overview", path: "active_customers" },
+                  trend: { source: "customers.overview", path: "active_customers_delta" },
+                },
+              },
+              {
+                id: "kpi-revenue-per-customer",
+                kind: "component",
+                type: "os-kpi",
+                props: { title: "Revenue per Customer", icon: "DollarSign", format: "currency" },
+                data: {
+                  value: { source: "customers.overview", path: "revenue_per_customer" },
+                  trend: { source: "customers.overview", path: "revenue_per_customer_delta" },
+                  currency: { source: "customers.overview", path: "defaultCurrency" },
+                },
+              },
+            ],
+          },
+          {
+            id: "customer-trend-chart",
+            kind: "component",
+            type: "os-chart",
+            props: {
+              title: "Acquisition",
+              subtitle: "New customers against those who placed an order, by month over the last 12 months.",
+              x: "period",
+              legend: true,
+              series: [
+                { field: "new_customers", label: "New", type: "bar" },
+                { field: "active_customers", label: "Ordered", type: "line" },
+              ],
+            },
+            data: { rows: { source: "customers.trend" } },
+          },
+          {
+            id: "customers-table",
+            kind: "component",
+            type: "os-data-table",
+            props: {
+              title: "Customers",
+              searchable: true,
+              searchPlaceholder: "Search customers...",
+              columnVisibility: true,
+              compulsoryColumns: ["name"],
+              minVisibleColumns: 3,
+              selectable: true,
+              paginated: true,
+              pageSize: 10,
+              emptyMessage: "No customers found.",
+              columns: [
+                { field: "name", label: "Customer", sortable: true, filterable: true },
+                {
+                  field: "status",
+                  label: "Status",
+                  format: "badge",
+                  filterable: true,
+                  filterOptions: ["Active", "No Orders", "Disabled"],
+                  badgeTones: CUSTOMER_STATUS_TONES,
+                },
+                { field: "group", label: "Group", filterable: true },
+                { field: "territory", label: "Territory", filterable: true },
+                { field: "orders", label: "Orders", format: "number", align: "right", sortable: true },
+                { field: "spend", label: "Total Spend", format: "currency", align: "right", sortable: true },
+                { field: "lastOrder", label: "Last Order", format: "date", sortable: true },
+                { field: "joined", label: "Joined", format: "date", sortable: true },
+              ],
+            },
+            data: {
+              rows: { source: "customers" },
+              currency: { source: "customers.overview", path: "defaultCurrency" },
+            },
+          },
+        ],
+      },
+    ],
+  },
+};
+
+export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE];
