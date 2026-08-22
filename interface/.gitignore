@@ -37,3 +37,13 @@ yarn-error.log*
 next-env.d.ts
 
 certificates
+
+# Headless OS local runtime database - a generated artifact (auto-seeded on
+# first access, see src/ui-runtime/store/sqlite-page-store.ts), not a
+# committed asset. Also blocked from ever being served statically - see
+# src/proxy.ts.
+/public/*.sqlite*
+
+package-lock.json
+yarn.lock
+bun.lock
