@@ -8,9 +8,11 @@ already here instead of inventing a parallel convention.
 
 | Doc | When |
 |---|---|
-| [DESIGN.md](./DESIGN.md) | **Any UI work.** Colour tokens, typography, status pills, page layout, list/detail/tree patterns, spacing, motion. Non-optional for anything visual. |
-| [PATH.md](./PATH.md) | Adding, moving, or linking a route. Full URL inventory. |
-| [CONNECTOR_TO_BASE_UI_COMPOSITION.md](./CONNECTOR_TO_BASE_UI_COMPOSITION.md) | Building a connector's UI on the shared primitives. |
+| [docs/DESIGN.md](./docs/DESIGN.md) | **Any UI work.** Colour tokens, typography, status pills, page layout, list/detail/tree patterns, spacing, motion. Non-optional for anything visual. |
+| [docs/PATH.md](./docs/PATH.md) | Adding, moving, or linking a route. Full URL inventory. |
+| [docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md](./docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md) | Building a connector's UI on the shared primitives. |
+| [docs/HEADLESS_UI_OVERVIEW.md](./docs/HEADLESS_UI_OVERVIEW.md) | **First time touching Headless UI.** The concise orientation - what it is, the core principles, what NOT to do. |
+| [docs/UI_RUNTIME.md](./docs/UI_RUNTIME.md) | Working on the Headless OS config-driven runtime (`src/runtime/`). Schemas, registry contracts, file-by-file structure. |
 | [public/assets/README.md](./public/assets/README.md) | Touching a logo, icon, or image. |
 
 ## Stack
