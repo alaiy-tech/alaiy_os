@@ -804,7 +804,7 @@ alaiy_os_nayaglobal/interface/
             "items": [{ "id": "loyalty", "title": "Loyalty", "url": "/os/loyalty", "icon": "gift" }]
         }
     ],
-    "overrides": ["src/app/(main)/os/products/page.tsx"]
+    "overrides": ["src/app/(platform)/os/products/page.tsx"]
 }
 ```
 
@@ -815,10 +815,52 @@ is on), so nothing is lost on the consuming side.
 
 `icon` is a lucide-react name in lower-kebab-case. The composer turns the `nav`
 blocks of every app into `src/config/contributed-nav.ts` — emitting the icon
-imports it needs — and [sidebar-seed.ts](src/config/sidebar-seed.ts) folds
-that list into its own groups by matching `group` against a group `label`. An
-unrecognised label opens a new group, which is what lets a client add a section
-the base has never heard of.
+imports it needs — and [seed-data.ts](src/seeds/sidebar/seed-data.ts)'s
+`buildCodeDefinedSidebar()` folds that list into its own groups by matching
+`group` against a group `label`. An unrecognised label opens a new group,
+which is what lets a client add a section the base has never heard of.
+
+**Connectors specifically should declare `group: "Connectors"`, with all of
+their pages under one parent item named after the connector** (a
+`NavMainParentItem`, pages as its `subItems`) — not several flat items under
+an arbitrary group label of their own choosing. This groups every installed
+connector consistently in the sidebar (Connectors → Shopify → its pages,
+Connectors → Amazon → its pages, ...) instead of each connector opening its
+own top-level section. `"Connectors"` is not a base-enforced constant (the
+composer has no schema for group names beyond the JSON's own shape) — it's
+a convention every connector is expected to follow, the same way `icon`'s
+lower-kebab-case format is a convention rather than a validated enum. An
+item that lands in that group with no `icon` falls back to `"plug"` (the
+same fallback `settings/connectors`'s cards already use for a connector
+with no icon) — `buildCodeDefinedSidebar()` applies this automatically, a
+connector doesn't need to declare a fallback itself.
+
+```json
+{
+    "app": "alaiy_os_connector_shopify",
+    "platformVersion": "2.2.0",
+    "nav": [
+        {
+            "group": "Connectors",
+            "items": [
+                {
+                    "id": "shopify",
+                    "title": "Shopify",
+                    "icon": "shopping-bag",
+                    "subItems": [
+                        { "id": "shopify-dashboard", "title": "Dashboard", "url": "/os/channels/shopify" },
+                        { "id": "shopify-listings", "title": "Listings", "url": "/os/channels/shopify/listings" }
+                    ]
+                }
+            ]
+        }
+    ]
+}
+```
+
+One parent item per connector app, not one entry per page - a connector with
+several pages still contributes exactly one `nav` item, wrapping them all as
+`subItems`.
 
 **2026-08-25**: the merged result no longer lives in an in-memory constant a
 client component imports directly — the `/os/*` sidebar became
@@ -867,6 +909,16 @@ So the base offers extension points, declared the same way nav is:
 | Point | Generated into | Contract |
 | --- | --- | --- |
 | `products` | `src/config/contributed-products.ts` | [`ProductExtension`](src/config/product-extension-types.ts) |
+| `components` | `src/config/contributed-components.ts` | [`ComponentRegistry`](src/types/runtime/registry.ts) |
+
+`components` reuses the Headless UI runtime's own registry type directly as
+its contract, rather than a bespoke module like `ProductExtension` - unlike
+a product extension's behavioral questions (status rule, child loader),
+`ComponentRegistry` is already a fully general type → component map, so
+wrapping it in something new would add a layer with nothing to justify it.
+`runtime/resolve-page.tsx` merges the generated file into
+`baseComponentRegistry` via `mergeRegistries` (last-registry-wins on a type
+collision) - see `docs/UI_RUNTIME.md`'s "Composing registries" section.
 
 The contract is a set of optional questions — which columns to open on, what a
 row's status is, whether it has children and how to load them, which quick

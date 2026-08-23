@@ -45,7 +45,7 @@ gone in one is CSS in `src/app/globals.css`:
 | Default dark values | `.dark { … }` in `globals.css` |
 | Per-preset overrides | `:root[data-theme-preset="<name>"]` in `src/styles/presets/<name>.css` |
 | Per-preset dark overrides | `.dark:root[data-theme-preset="<name>"]` in the same file |
-| Font-family switching | `html[data-font="<key>"] body` blocks in `globals.css`, keys from `src/lib/fonts/registry.ts` |
+| Font-family switching | `html[data-font="<key>"] body` blocks in `globals.css`, keys from `src/config/fonts.ts` |
 
 Two rules follow from this that are easy to trip over:
 
@@ -173,7 +173,7 @@ Never write a raw `bg-green-*` / `bg-amber-*` pair for a status. Use
 
 ## Theme presets
 
-Five choices, from `src/lib/preferences/theme.ts`:
+Five choices, from `src/constants/theme.ts`:
 
 | Preset | `data-theme-preset` | `--primary` (light) | Notes |
 |---|---|---|---|
@@ -187,8 +187,8 @@ Five choices, from `src/lib/preferences/theme.ts`:
 `:end` markers. It is produced by `npm run generate:presets`
 (`src/scripts/generate-theme-presets.ts`) from the `label:` / `value:` header
 comment in each preset file. **Add a preset by adding a CSS file and
-regenerating — never by hand-editing `theme.ts` between the markers.** New
-preset files also need an `@import` in `globals.css`.
+regenerating — never by hand-editing `constants/theme.ts` between the
+markers.** New preset files also need an `@import` in `globals.css`.
 
 Presets are the only place shadow tokens are defined. `--shadow-2xs` through
 `--shadow-2xl` do not exist in the default theme, and the `@layer utilities`
@@ -201,7 +201,7 @@ block in `globals.css` deliberately only applies them under
 
 `--font-sans`, defaulting to Geist, resolved through
 `html[data-font="<key>"] body`. 18 keys are available from
-`src/lib/fonts/registry.ts` — `geist` `inter` `notoSans` `nunitoSans` `figtree`
+`src/config/fonts.ts` — `geist` `inter` `notoSans` `nunitoSans` `figtree`
 `roboto` `raleway` `dmSans` `publicSans` `outfit` `geistMono`
 `geistPixelSquare` `jetBrainsMono` `notoSerif` `robotoSlab` `merriweather`
 `lora` `playfairDisplay`. `body` falls back to `system-ui, sans-serif`.

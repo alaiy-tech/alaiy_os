@@ -51,10 +51,13 @@ instead of an LLM generating TSX.
 
 ## 4. Current state (this is real, not a POC anymore)
 
-Two production pages already run entirely on the runtime — **`/os/dashboard`
-and `/os/customers`**, using real Frappe data, the same components the
-hardcoded versions used. Neither has its own `page.tsx`; both resolve
-through one generic catch-all (`src/app/(platform)/os/[...page]/page.tsx`).
+Two production pages already run entirely on the runtime — **`/os` (the
+dashboard) and `/os/customers`**, using real Frappe data, the same
+components the hardcoded versions used. `/os/customers` resolves through
+the generic catch-all (`src/app/(platform)/os/[...page]/page.tsx`); the
+dashboard has its own thin `src/app/(platform)/os/page.tsx` (bare `/os` has
+no segments for that catch-all to match), which just hardcodes
+`resolvePage("dashboard", ...)` - not a second rendering path.
 
 There is no more `/os/headless` test route — that was step one, proving the
 runtime against a real page before trusting it with the actual dashboard.
@@ -64,8 +67,12 @@ the real thing now (old hardcoded versions kept in `obsolete/` as reference).
 Also live today:
 - **The `/os/*` sidebar is database-driven** (SQLite-backed, same file as
   page definitions), merged with connector-contributed nav on every app
-  start. Settings has its own fixed sidebar and lives at a separate
-  `/settings/*` route.
+  start. The code-owned baseline is deliberately minimal (OS → Ask Alaiy,
+  plus a Settings button); every page gets its own sidebar entry
+  automatically under "Uncategorised" when created
+  (`createPageWithSidebarEntry`), and each connector's pages group under a
+  fixed "Connectors" section. Settings has its own fixed sidebar and lives
+  at a separate `/settings/*` route.
 - **User preferences (theme, layout, sidebar variant, ...) are database-driven
   too** — one shared row per key in the same SQLite file, not per-user or a
   cookie of record. Cookies/localStorage still exist, but only as a
@@ -85,11 +92,12 @@ Also live today:
 
 ```text
 src/runtime/         behavior only — functions, classes, registries holding real components
-├── component-registry.ts, layout.ts, layout-registry.ts
-├── mutations.ts (applyUIAction), node.ts, validate.ts, validate-against-registry.ts
-├── resolve-page.tsx, page-features.tsx
+├── layout.ts, mutations.ts (applyUIAction), node.ts
+├── resolve-page.tsx, page-features.tsx, ui-renderer.tsx
+├── registry/        component-registry.ts, layout-registry.ts — "what can render as what"
+├── validate/        validate.ts (structural), validate-against-registry.ts (registry-aware)
 ├── data/            Data Source Registry + resolver + sources/{dashboard,customers}.ts
-└── store/           SQLite stores (pages, sidebar) + the client auth/company/preferences providers
+└── store/           SQLite stores (pages, sidebar, preferences) + the client auth/company/preferences providers
 
 src/types/runtime/   every pure type/interface the runtime uses — zero logic
 src/config/          zod schemas, Tailwind class tables, icon maps, contributed-nav
@@ -126,7 +134,10 @@ A stable, machine-readable contract per component
 ```ts
 {
   type: "os-kpi",
+  name: "KPI",
   description: "...",
+  category: "data-display",
+  ai: { exposed: true },
   capabilities: { movable: true, resizable: true },
   allowedParents: ["grid", "stack", "section"],
   supportsChildren: false,
@@ -136,7 +147,15 @@ A stable, machine-readable contract per component
 ```
 
 This is what makes the registry usable by an AI later — it's not just
-"here's a component," it's "here's what you're allowed to do with it."
+"here's a component," it's "here's what you're allowed to do with it," and
+`ai.exposed` is the final gate: only entries marked exposed (all 7 base
+components today, via `listAiExposedComponents`) are ever offered to Ask
+Alaiy — a component can be registered and renderable without being
+AI-exposed. A connector can contribute additional entries at build time
+through the `components` extension point
+(`config/contributed-components.ts`, merged via `mergeRegistries` in
+`resolve-page.tsx`) — see
+[`CONNECTOR_TO_BASE_UI_COMPOSITION.md`](./CONNECTOR_TO_BASE_UI_COMPOSITION.md) §16.1.
 `requiredFields` says which fields a component can't render without;
 `propsSchema` (a zod object per type) says what shape each literal prop must
 have if present at all - an unrecognised icon name or a stray prop key fails
