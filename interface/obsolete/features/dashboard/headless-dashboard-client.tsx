@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/primitive/button";
-import { applyUIAction } from "@/ui-runtime/actions/mutations";
-import type { ComponentRegistry } from "@/ui-runtime/registry/component-registry";
-import { UIRenderer } from "@/ui-runtime/renderer/ui-renderer";
-import type { UIPageDefinition } from "@/ui-runtime/schema/page";
+import { applyUIAction } from "@/runtime/actions/mutations";
+import type { ComponentRegistry } from "@/runtime/registry/component-registry";
+import { UIRenderer } from "@/runtime/renderer/ui-renderer";
+import type { UIPageDefinition } from "@/runtime/schema/page";
 
 /** Dev-only proof that the page is actually driven by `definition`, not
  * hardcoded JSX. Two independent toggles, each running real `applyUIAction`

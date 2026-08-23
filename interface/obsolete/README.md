@@ -98,3 +98,18 @@ obsolete/data/lib/dates.ts   isPastDue - confirmed dead in the live tree (zero
                              a Round 4 casualty the sweep at the time missed,
                              not new dead code.
 ```
+
+## Round 8: `runtime/` split into `registry/` and `validate/`
+
+The two "what can this render as" files (`component-registry.ts`,
+`layout-registry.ts`) and the two validation passes (`validate.ts`,
+`validate-against-registry.ts`) each got their own subfolder -
+`runtime/registry/` and `runtime/validate/` - leaving `runtime/`'s own root
+down to the files that don't pair with anything else (`layout.ts`,
+`mutations.ts`, `node.ts`, `page-features.tsx`, `resolve-page.tsx`,
+`ui-renderer.tsx`). `src/tests/runtime/registry/` and
+`src/tests/runtime/validate/` mirror the same split. Nothing moved to
+`obsolete/` here either - a live reorganization, not a retirement. A handful
+of stale doc comments elsewhere in the codebase still naming the pre-Round-6
+`ui-runtime/` path (predating even that rename) were also corrected in this
+pass - see `docs/UI_RUNTIME.md` for the current file map.

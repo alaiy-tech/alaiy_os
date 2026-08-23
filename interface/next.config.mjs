@@ -29,13 +29,10 @@ const nextConfig = {
   },
   async redirects() {
     return [
-      // The dashboard now lives at /os/dashboard (a real DB-driven page,
-      // not a redirect target) — bare /os lands there instead.
-      {
-        source: "/os",
-        destination: "/os/dashboard",
-        permanent: false,
-      },
+      // Bare /os is a real page now (src/app/(platform)/os/page.tsx) — no
+      // redirect needed, and one here would make that page unreachable
+      // (redirects() is checked before filesystem routing).
+
       // Settings has no index page of its own — land on the first item.
       {
         source: "/settings",

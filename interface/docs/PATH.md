@@ -18,19 +18,27 @@ zero extra segments) · `↻` proxied to Frappe.
 
 Since the Round 4 Headless OS refactor, `/os/*` splits into two kinds:
 
-- **Baseline (platform-owned, source-defined)**: `/os/ask-alaiy` - a real
-  `page.tsx`, unchanged by anything below.
-- **Dynamic (config-driven)**: everything else, including `/os/dashboard`
-  and `/os/customers` — every `/os/<id>` resolves through
+- **Baseline (platform-owned, source-defined)**: `/os` (the dashboard) and
+  `/os/ask-alaiy` - real `page.tsx` files, unchanged by anything below.
+- **Dynamic (config-driven)**: everything else, including `/os/customers`
+  — every other `/os/<id>` resolves through
   `src/app/(platform)/os/[...page]/page.tsx`, calling `resolvePage()`
   (`src/runtime/resolve-page.tsx`) against the local SQLite `UIPageStore`
   - see `docs/UI_RUNTIME.md`. Next's router always prefers a more specific
   static route over the catch-all, so baseline routes need no special-casing.
 
+The dashboard is *config-driven* (its `PageConfigFile` still lives in
+`ui_pages`, `id: "dashboard"`) but *source-routed*: `src/app/(platform)/os/page.tsx`
+hardcodes a call to `resolvePage("dashboard", ...)` rather than resolving
+whatever id the catch-all's segments spell out, since bare `/os` has no
+segments to resolve in the first place. Visiting `/os/dashboard` directly
+still works too (the catch-all resolves `id: "dashboard"` the normal way) -
+a harmless leftover alias, not the primary address.
+
 `/os/headless` and `/os/headless/customers` (a test route proving the UI
 runtime against a real page before promoting it) are gone as of Round 5 -
-the dashboard and customers pages are real production routes now,
-`/os/dashboard` and `/os/customers`, with no separate test surface. See
+the dashboard and customers pages are real production routes now, `/os`
+and `/os/customers`, with no separate test surface. See
 `obsolete/README.md`'s "Round 5" section.
 
 `/settings/*` is a **separate top-level route group** (`src/app/(platform)/settings/`,
@@ -40,7 +48,7 @@ not nested under `/os`), with its own fixed, code-owned sidebar - see
 ## Tree
 
 ```
-/                                             → /os/dashboard
+/                                             → /os
 │
 ├── /auth
 │   ├── /auth/login                           sign-in form (?next= preserved)
@@ -48,10 +56,9 @@ not nested under `/os`), with its own fixed, code-owned sidebar - see
 │
 ├── /unauthorized                             "no permission" screen
 │
-├── /os                                       → /os/dashboard
-│   ├── /os/dashboard                         dashboard — KPIs, sales trend, stock mix, recent
-│   │                                         orders; config-driven (id "dashboard" in ui_pages)
-│   │                                         ?period=1D|1W|1M|1Y
+├── /os                                       dashboard — KPIs, sales trend, stock mix, recent
+│   │                                         orders; config-driven (id "dashboard" in ui_pages),
+│   │                                         source-routed (own page.tsx); ?period=1D|1W|1M|1Y
 │   ├── /os/ask-alaiy                         Ask Alaiy chat
 │   ├── /os/customers                         config-driven (id "customers" in ui_pages)
 │   │
@@ -106,13 +113,16 @@ being cached permanently):
 
 | From | To |
 | --- | --- |
-| `/os` | `/os/dashboard` |
 | `/settings` | `/settings/organisation` |
 | `/os/sales-orders` | `/os/sales/orders` (now the dynamic catch-all's "coming soon" state - the target page was removed) |
 | `/os/purchase-orders` | `/os/procurement/purchase-orders` (same) |
 
-`/` redirects to `/os` from `src/app/page.tsx` rather than from the config,
-which the `/os` → `/os/dashboard` entry above then carries the rest of the way.
+`/` redirects to `/os` from `src/app/page.tsx` rather than from the config -
+and `/os` is a real page now (`src/app/(platform)/os/page.tsx`), not a
+redirect target, so that's the only hop. There used to be an `/os` →
+`/os/dashboard` entry here; removing it was required, not optional -
+`redirects()` runs before filesystem routing, so leaving it in place would
+have made the new `os/page.tsx` unreachable.
 
 ## Who can reach what
 
@@ -123,7 +133,7 @@ which the `/os` → `/os/dashboard` entry above then carries the rest of the way
   Headless OS runtime database lives under `public/` (see
   `docs/UI_RUNTIME.md`) but must never be directly downloadable.
 - `/os/**` or `/settings/**` without a Frappe session → `/auth/login?next=<path>`
-- `/auth/login` with a session → `/os` (which itself redirects to `/os/dashboard`)
+- `/auth/login` with a session → `/os` (the dashboard itself, a real page - no further redirect)
 - everything else is untouched, which is why `/auth/expired`, `/unauthorized`,
   `/api/**` and the file routes are reachable while signed out (the `/api` and
   file routes still carry the caller's cookies to Frappe, so Frappe enforces
@@ -140,24 +150,35 @@ Unlike Settings' fixed sidebar (below), the `/os/*` sidebar's groups and
 items are read from the same local SQLite database as `ui_pages`, via
 `src/runtime/store/sqlite-sidebar-store.ts` - see `docs/UI_RUNTIME.md`
 for the schema and how it stays in sync with code (`src/seeds/sidebar/seed-data.ts`)
-and connector contributions (`src/config/contributed-nav.ts`). The paths
-below are still config-driven placeholders with no page behind them yet;
-each currently lands on the dynamic `/os/**` catch-all's "coming soon" state:
+and connector contributions (`src/config/contributed-nav.ts`).
+
+The code-owned baseline is deliberately minimal - reset from an earlier
+version that listed several not-yet-built pages:
 
 ```
-/os/brands                /os/suppliers              /os/warehouses
-/os/item-prices           /os/supplier-groups        /os/stock-entries
-/os/pricing-rules         /os/purchase-receipts      /os/stock-ledger
-/os/sales-invoices        /os/purchase-invoices      /os/stock-reconciliation
-/os/customer-groups       /os/products               /os/item-groups
-/os/item-attributes       /os/sales/orders           /os/procurement/purchase-orders
+OS
+└── Ask Alaiy                                 /os/ask-alaiy
+
+Settings                                      /settings (no group heading)
 ```
 
-A composed deployment can add more entries, and whole new groups, through the
-generated `src/config/contributed-nav.ts` — those paths are owned by the
-contributing app, not by this list. A connector's contribution is folded
-into the sidebar database on every app start (`syncCodeDefinedSidebar`), so
-a redeploy that adds a new connector needs no manual reseed step.
+Everything else in the sidebar is added dynamically, not hand-seeded:
+
+- **A page gets a sidebar entry automatically**, under an "Uncategorised"
+  group, via `SidebarStore.ensureDynamicPageEntry()` -
+  `runtime/store/create-page.ts`'s `createPageWithSidebarEntry()` is the
+  primitive that creates a page and its entry together (see
+  `docs/UI_RUNTIME.md`'s Sidebar Store section). The two real pages
+  (`/os`, `/os/customers`) got their entries this same way.
+- **A connector's pages land under a `"Connectors"` group** - one parent
+  item per connector, its pages nested as `subItems`, falling back to a
+  `"plug"` icon if the connector didn't declare one. See
+  `docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16 for the contribution
+  shape a connector is expected to declare.
+
+A connector's contribution is folded into the sidebar database on every
+app start (`syncCodeDefinedSidebar`), so a redeploy that adds a new
+connector needs no manual reseed step.
 
 ## Settings' sidebar is fixed, not database-driven
 
@@ -165,8 +186,10 @@ a redeploy that adds a new connector needs no manual reseed step.
 is a baseline UI layout thing, per the same reasoning as `/os/ask-alaiy`
 being source-defined: its 7 items (Back to OS, Organisation, Users, Roles
 and Permissions, Connectors, Themes, Logs) are fixed in code, not read from
-the database. Reached via a "Settings" entry in the main `/os/*` sidebar's
-account menu (`src/components/menu/nav-user-menu.tsx`), not a sidebar group.
+the database. Reached via a "Settings" button in the main `/os/*` sidebar's
+baseline (code-owned, unlabeled) group, and also via a "Settings" entry in
+the account menu (`src/components/derived/menu/nav-user-menu.tsx`) - both
+just link to `/settings`.
 
 ## Adding a route
 
@@ -175,11 +198,15 @@ shell/auth)**: insert a row into the local `ui_pages` SQLite table (see
 `docs/UI_RUNTIME.md` - today that means adding to
 `src/seeds/pages/seed-data.ts` and running `npm run seed:headless-db`;
 there is no admin UI yet). No `page.tsx` required - it resolves through the
-existing `/os/[...page]` catch-all automatically. If the route needs live
-data, register a Data Source (`src/runtime/data/sources/`) rather than
-writing a page-specific fetcher. If it belongs in the sidebar, add it to
-`src/seeds/sidebar/seed-data.ts`'s `baseSidebarGroups` (or, for a connector, that
-app's `interface.config.json` `nav` block).
+existing `/os/[...page]` catch-all automatically. Creating the page through
+`runtime/store/create-page.ts`'s `createPageWithSidebarEntry()` also gives
+it a sidebar entry (under "Uncategorised") automatically - prefer that over
+hand-editing `src/seeds/sidebar/seed-data.ts`'s `baseSidebarGroups`, which
+is for the code-owned baseline itself, not individual pages. If the route
+needs live data, register a Data Source (`src/runtime/data/sources/`)
+rather than writing a page-specific fetcher. A connector's own pages
+belong in that app's `interface.config.json` `nav` block instead - see
+`docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16.
 
 **Source-defined (baseline/platform routes only)**: add a `page.tsx` under
 `src/app/(platform)/os/<segment>/` (or `src/app/(platform)/settings/<segment>/` for

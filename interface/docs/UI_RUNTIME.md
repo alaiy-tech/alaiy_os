@@ -33,10 +33,14 @@ a UI Renderer, and a mutation vocabulary (`applyUIAction`) that already has
 the right shape for an LLM to eventually produce - but nothing here calls an
 LLM, and nothing writes back to the database yet.
 
-Two real pages prove it: `/os/dashboard` and `/os/customers` - real Frappe
-data, composed from a UI Definition instead of hardcoded JSX. **Neither has
-its own `page.tsx`** - both resolve through the one dynamic route every
-other `/os/<id>` uses, `src/app/(platform)/os/[...page]/page.tsx`.
+Two real pages prove it: `/os` (the dashboard) and `/os/customers` - real
+Frappe data, composed from a UI Definition instead of hardcoded JSX.
+`/os/customers` has no `page.tsx` of its own - it resolves through the one
+dynamic route every other `/os/<id>` uses,
+`src/app/(platform)/os/[...page]/page.tsx`. The dashboard does have its own
+`src/app/(platform)/os/page.tsx`, since bare `/os` has no segments for that
+catch-all to match - it's a thin wrapper hardcoding `resolvePage("dashboard", ...)`,
+not a second rendering path.
 
 Both pages used to live at `/os/headless` and `/os/headless/customers`, a
 test route proving this runtime against a real page before trusting it with
@@ -72,15 +76,19 @@ something should move out.
 
 ```
 src/runtime/                  behavior only - functions, classes, registries holding real components
-├── component-registry.ts     baseComponentRegistry, mergeRegistries, resolveComponent
 ├── layout.ts                 gridColsClasses/spanClasses/isValidSpanValue/isValidGridColumnsValue
-├── layout-registry.ts        layoutRegistry, resolveLayout
 ├── mutations.ts               applyUIAction (ADD/REMOVE/MOVE/UPDATE_COMPONENT)
 ├── node.ts                    isLayoutNode/isComponentNode
-├── validate.ts                validatePageConfig, findDuplicateIds (structural validation)
-├── validate-against-registry.ts   registry-aware validation (see below)
 ├── page-features.tsx          pageFeatures render-override map (empty today)
 ├── resolve-page.tsx           the one pipeline every route calls
+├── ui-renderer.tsx            UIRenderer - the actual tree-walking render
+├── registry/                  the two "what can this render as" registries
+│   ├── component-registry.ts  baseComponentRegistry, mergeRegistries, resolveComponent,
+│   │                          listAiExposedComponents
+│   └── layout-registry.ts     layoutRegistry, resolveLayout
+├── validate/                  the two validation passes, grouped (see below)
+│   ├── validate.ts             validatePageConfig, findDuplicateIds (structural)
+│   └── validate-against-registry.ts   registry-aware validation
 ├── data/
 │   ├── registry.ts            Data Source Registry (registerDataSource/getDataSource/listDataSources)
 │   ├── resolver.ts             resolvePageData - walks a definition, resolves referenced sources in parallel
@@ -110,13 +118,15 @@ src/types/runtime/            every pure type/interface the runtime uses - zero 
 └── store.ts         UIPageStore, SidebarStore interfaces
 
 src/config/
-├── page-schema.ts    the zod schemas validate.ts checks a definition against (structural)
+├── page-schema.ts    the zod schemas validate/validate.ts checks a definition against (structural)
 ├── component-props-schema.ts  per-type propsSchema zod objects (registry-aware, see below)
 ├── layout-classes.ts  GRID_COLS_CLASSES/SPAN_CLASSES Tailwind lookup tables
 ├── kpi-icons.ts        curated icon-name ↔ LucideIcon map for os-kpi (KPI_ICONS, KPI_ICON_NAMES)
 ├── kpi-classes.ts      KPI_BORDER_TONES + KPI_BORDER_TONE_CLASSES for os-kpi's accent bar
 ├── nav-icons.ts        curated icon-name ↔ LucideIcon map for the sidebar
-└── contributed-nav.ts  composer-generated connector nav contributions (unchanged contract)
+├── contributed-nav.ts  composer-generated connector nav contributions (unchanged contract)
+└── contributed-components.ts  composer-generated connector registry entries (the `components`
+                               extension point - ships empty, see "Composing registries" below)
 
 src/seeds/
 ├── pages/seed-data.ts    HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, SEED_PAGES
@@ -135,14 +145,17 @@ src/components/
                         sidebar/ (app-sidebar.tsx, settings-sidebar.tsx), nav-main.tsx
 ```
 
-Why this split, concretely: `runtime/component-registry.ts` imports real
-React components from `@/components/registry/*` and assembles
+Why this split, concretely: `runtime/registry/component-registry.ts` imports
+real React components from `@/components/registry/*` and assembles
 `baseComponentRegistry` - that assembly, and `resolveComponent`, are logic,
 so they stay in `runtime/`. The *shape* of a registry entry
 (`ComponentRegistryEntry`) is a pure type with no behavior, so it lives in
-`types/runtime/registry.ts` instead of being declared inline. Same pattern
-throughout: `runtime/layout.ts`'s functions stay, the Tailwind class tables
-they read from moved to `config/layout-classes.ts`; `runtime/validate.ts`'s
+`types/runtime/registry.ts` instead of being declared inline. `registry/`
+groups it with `layout-registry.ts` (both answer "what can this render as");
+`validate/` groups the structural and registry-aware validation passes the
+same way - two files each, a real pairing rather than a folder for its own
+sake. Same pattern throughout: `runtime/layout.ts`'s functions stay, the Tailwind class tables
+they read from moved to `config/layout-classes.ts`; `runtime/validate/validate.ts`'s
 functions stay, the zod schemas they call moved to `config/page-schema.ts`.
 
 ## The Page Store: SQLite, not bundled JSON
@@ -212,24 +225,43 @@ CREATE TABLE sidebar_items (
 );
 ```
 
-Accessed only through `SidebarStore` (`types/runtime/store.ts`, one method:
-`getSidebarNav()`), implemented by `SQLiteSidebarStore`
-(`runtime/store/sqlite-sidebar-store.ts`) - same shape as
-`UIPageStore`/`SQLiteUIPageStore`, singleton getter included.
+Accessed only through `SidebarStore` (`types/runtime/store.ts`, two methods:
+`getSidebarNav()` and `ensureDynamicPageEntry()`), implemented by
+`SQLiteSidebarStore` (`runtime/store/sqlite-sidebar-store.ts`) - same shape
+as `UIPageStore`/`SQLiteUIPageStore`, singleton getter included.
 
 **Unlike `ui_pages`'s seed-once `ensureSeeded`**, `source = 'code'` rows are
 deleted and reinserted on *every* store construction
 (`syncCodeDefinedSidebar`), from `seeds/sidebar/seed-data.ts`'s
-`buildCodeDefinedSidebar()` - the base's own groups
-(Catalog/Sales/Procurement/Inventory/...) and connector contributions
-(`config/contributed-nav.ts`, unchanged - see
+`buildCodeDefinedSidebar()` - the base's own baseline groups (just "OS" and
+an unlabeled group holding "Settings" today - see below) and connector
+contributions (`config/contributed-nav.ts`, unchanged - see
 `docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16) are still code-owned config,
 and a redeploy that changes either must take effect without a manual reseed
-step. `source = 'dynamic'` rows are never touched by that sync - the seam a
-future page-creation flow (Ask Alaiy or otherwise) would write through,
-optionally pointing `page_id` at a `ui_pages` row so a nav entry can be
-traced back to the page it links to. No such flow is implemented yet; the
-schema just leaves room for it.
+step. `source = 'dynamic'` rows are never touched by that sync.
+
+**Dynamic entries: a page gets a sidebar entry automatically.**
+`SidebarStore.ensureDynamicPageEntry({ pageId, title, url, icon? })` -
+idempotent by `pageId` - creates a `source: 'dynamic'` row under an
+"Uncategorised" group (created on first use), optionally pointing `page_id`
+back at the `ui_pages` row it belongs to. `runtime/store/create-page.ts`'s
+`createPageWithSidebarEntry(page, options?)` is the primitive that calls
+both `UIPageStore.createPage()` and this together, so a page is never left
+unreachable from the sidebar - the seam a future Ask-Alaiy-driven
+page-creation flow calls, not built yet, but this is what it calls into.
+The two current real pages (`dashboard`, `customers`) got their entries
+this same way, from `sqlite-page-store.ts`'s `ensureSeeded` - see their
+`layout-dashboard`/`users` icons there for the two cases where a real,
+specific icon is known; a page created without one falls back to a
+neutral `file-text` placeholder (no AI exists yet to pick something
+genuinely relevant).
+
+**Connectors get a fixed home too.** A connector's contributed nav items
+land under a `"Connectors"` group by convention (see
+`docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16) - one parent item per
+connector, its pages as `subItems`, falling back to a `"plug"` icon when
+the connector didn't declare one (matching `settings/connectors`'s own
+fallback for a connector card).
 
 **Icons cross the Server → Client boundary as plain strings, not components.**
 `getSidebarNav()` returns lower-kebab-case icon *names* (the same convention
@@ -347,25 +379,36 @@ semantic source id like `"customers"` or `"dashboard.salesTrend"`.
 
 ## The Component Registry: a machine-readable contract
 
-Every component lives in one base registry (`runtime/component-registry.ts`)
+Every component lives in one base registry (`runtime/registry/component-registry.ts`)
 - nothing is feature-specific, because `columns`/`series`/`filters` are all
 plain, JSON-safe declarative specs rather than React code:
 
-| type | component | contract |
-|---|---|---|
-| `os-page-header` | `PageHeader` | title/subtitle/action slot (pre-existing) |
-| `os-card` | `OsCard` | generic chrome wrapper |
-| `os-kpi` | `OsKpi` | `value`, `format`/`currency`/`precision`, `trend`/`trendUnit`/`trendPolarity`, `borderTone` |
-| `os-chart` | `OsChart` | `x`, `series: {field,label,type:"bar"|"line"|"area"}[]`, `legend`, `rows` |
-| `os-data-table` | `OsDataTableView` | `columns: {field,label,format,align,sortable,filterable,badgeTones}[]`, `rows`, search/filter/columnVisibility/selectable/paginated |
-| `os-filter-bar` | `OsFilterBar` | `filters: {id,type:"select"|"text"|"date-range",label,searchParam,options,defaultValue}[]` |
-| `os-period-toggle` | `OSPeriodToggle` | pre-existing, `?period=` only |
+| type | name | component | category | AI-exposed | contract |
+|---|---|---|---|---|---|
+| `os-page-header` | Page Header | `PageHeader` | `page` | yes | title/subtitle/action slot (pre-existing) |
+| `os-card` | Card | `OsCard` | `layout` | yes | generic chrome wrapper |
+| `os-kpi` | KPI | `OsKpi` | `data-display` | yes | `value`, `format`/`currency`/`precision`, `trend`/`trendUnit`/`trendPolarity`, `borderTone` |
+| `os-chart` | Chart | `OsChart` | `data-display` | yes | `x`, `series: {field,label,type:"bar"|"line"|"area"}[]`, `legend`, `rows` |
+| `os-data-table` | Data Table | `OsDataTableView` | `data-display` | yes | `columns: {field,label,format,align,sortable,filterable,badgeTones}[]`, `rows`, search/filter/columnVisibility/selectable/paginated |
+| `os-filter-bar` | Filter Bar | `OsFilterBar` | `filtering` | yes | `filters: {id,type:"select"|"text"|"date-range",label,searchParam,options,defaultValue}[]` |
+| `os-period-toggle` | Period Toggle | `OSPeriodToggle` | `filtering` | yes | pre-existing, `?period=` only |
+
+These are **semantic** components, not shadcn primitives - the registry
+never exposes `Button`/`Popover`/`Separator`/etc. directly. A semantic
+component's own implementation is free to use as many primitives as it
+needs internally (`OsKpi` composes `Card`, `Badge`; `OsDataTableView`
+composes `Table`, `Select`, `Popover`...) - what makes something
+registry-worthy is that a user could plausibly ask Ask Alaiy to add or
+change it as a unit ("add a KPI," "add a filter"), not "add a Popover."
 
 Every entry (`types/runtime/registry.ts`'s `ComponentRegistryEntry`) also
 declares:
 
 ```ts
 {
+  name?: string;                              // human-readable label, distinct from `type`
+  category?: "page" | "layout" | "data-display" | "filtering";
+  ai?: { exposed?: boolean };                 // may Ask Alaiy reason about/place this? see below
   capabilities: { movable?: boolean; resizable?: boolean };
   allowedParents: (LayoutType | ComponentType)[]; // e.g. ["grid", "stack", "section"]
   supportsChildren: boolean;
@@ -374,10 +417,76 @@ declares:
 }
 ```
 
-`capabilities`/`allowedParents`/`supportsChildren`/`requiredFields`/
-`propsSchema` are all optional on the *type* (so a minimal ad hoc override -
-a test fixture, an early feature-specific entry - still type-checks), but
-every real entry in `baseComponentRegistry` populates them.
+`name`/`category`/`ai`/`capabilities`/`allowedParents`/`supportsChildren`/
+`requiredFields`/`propsSchema` are all optional on the *type* (so a minimal
+ad hoc override - a test fixture, an early feature-specific entry - still
+type-checks), but every real entry in `baseComponentRegistry` populates all
+eight.
+
+### Composing registries: base + contributed
+
+`mergeRegistries(...registries)` (`runtime/registry/component-registry.ts`)
+does `Object.assign({}, ...registries)` - last-registry-wins on a key
+collision, deliberately: this is an override mechanism (a feature or
+connector replacing a base type's implementation), not an error condition.
+`resolve-page.tsx` computes `effectiveComponentRegistry =
+mergeRegistries(baseComponentRegistry, contributedComponents)` once at
+module scope and uses that for every request.
+
+`contributedComponents` (`config/contributed-components.ts`) is the
+**`components` extension point** - the same build-time contribution
+mechanism `contributed-nav.ts` and the (now-obsolete) `products` point
+already established; see
+`CONNECTOR_TO_BASE_UI_COMPOSITION.md` §16.1 for how a connector declares
+one and how the composer generates this file. It ships empty in `alaiy_os`,
+so today's merge is a no-op - the seam exists and runs on every request,
+but nothing uses it yet. Unlike `products`, this point reuses the
+registry's own `ComponentRegistry` type directly as its contract; no
+bespoke type module was needed, because `ComponentRegistry` is already
+fully general.
+
+### Considered and deferred: component vocabulary
+
+The registry is deliberately small. A thorough audit of `obsolete/` (every
+retired page's real implementation) and the live codebase found three
+families worth naming explicitly, so the reasoning is discoverable next to
+the registry itself rather than left implicit:
+
+- **Entity detail** (`entity-header`, `entity-summary`, `related-records`,
+  `record-list`, `record-actions`) - genuinely good implementations exist
+  in `obsolete/pages/os/sales/orders/[id]/` (header + summary + linked
+  documents + status-gated actions), but that DocType (and Purchase Orders,
+  and Products) has no live route today - only `/os` and
+  `/os/customers` are real, and neither is a detail page. Building these
+  now would have zero consumer. The obsolete Sales Order detail page is the
+  concrete reference to promote from once a real detail-page route exists.
+- **Forms** (`form`, `form-section`, `form-field`, `form-actions`) - there
+  is no generic, schema-driven form abstraction anywhere in the codebase to
+  promote; `react-hook-form` is used in exactly one file
+  (`components/baseline/auth/login-form.tsx`), and every settings page
+  hand-rolls its own `useState` form. Building this now would be built from
+  nothing, not promoted from something real.
+- **Standalone status/feedback** (`status`, `empty-state`, `loading-state`,
+  `error-state`, `progress`) - "status" already has a real, generalized
+  implementation: `os-data-table`'s `format: "badge"` column type plus
+  `STATUS_TONE` (`constants/list.ts`). Empty/loading/error are properties
+  of a data-bound component's *own* state (`os-chart`/`os-kpi`/
+  `os-data-table` each already render their own inline empty/loading/error
+  state) - not something a user asks Ask Alaiy to add as a separate node.
+
+Also deferred, same reasoning (no live implementation to promote, or no
+live consumer): `breadcrumb` and `page-actions`/`action-bar` (already
+served by `os-page-header`'s `action` slot composing `os-filter-bar`/
+`os-period-toggle` via an `inline` layout - proven live on both real
+pages), new `os-chart` series types beyond bar/line/area, new
+`os-filter-bar` filter kinds beyond select/text/date-range, and
+`os-data-table` capabilities like expandable child rows or a bulk-action
+menu (both existed in `obsolete/`, neither with a live consumer). The
+wider Tier-2 list - `timeline`, `activity-feed`, `comments`, `attachments`,
+`approval-status`, `workflow-status`, `document-summary`,
+`document-timeline`, `kanban`, `calendar-view`, `wizard`, `stepper`,
+`file-list` - has no implementation anywhere in this codebase, live or
+obsolete, to promote from.
 
 `requiredFields` and `propsSchema` check two different things:
 `requiredFields` is about *presence* - is a component missing something it
@@ -396,15 +505,15 @@ field a past version of the component read) is a validation error instead
 of a silent no-op.
 
 `allowedParents`/`supportsChildren` are consumed by
-`runtime/validate-against-registry.ts` (next section) - not by the renderer,
+`runtime/validate/validate-against-registry.ts` (next section) - not by the renderer,
 and not by `runtime/mutations.ts`. `ADD_COMPONENT`/`MOVE_COMPONENT` still
 only check "is the parent a layout node at all," a deliberate v1
 simplification predating this contract (see that file's module doc) - using
 the finer-grained `allowedParents` there too would be a natural next step.
 
-## A second validation pass: `runtime/validate-against-registry.ts`
+## A second validation pass: `runtime/validate/validate-against-registry.ts`
 
-`runtime/validate.ts` is deliberately *structural only* - it checks a
+`runtime/validate/validate.ts` is deliberately *structural only* - it checks a
 component `type` as a non-empty string, not against the registry, so
 vocabulary and structure stay two separate concerns (see that file's own doc
 comment). `validate-against-registry.ts` is the vocabulary-aware pass that
@@ -429,7 +538,7 @@ id is really registered, it walks the tree and reports every:
 before resolving any data - a definition that fails it returns the same
 `{ status: "invalid", errors }` shape a structurally-invalid one already did,
 never a stack trace. Both real seed pages are covered by a dedicated
-regression test (`tests/runtime/validate-against-registry.seed.test.ts`) that
+regression test (`tests/runtime/validate/validate-against-registry.seed.test.ts`) that
 runs this exact gate against `HEADLESS_DASHBOARD_PAGE`/`HEADLESS_CUSTOMERS_PAGE`
 and the real Data Source Registry, so a future edit that quietly breaks
 either page's placement, required fields, or data bindings fails a test
@@ -467,8 +576,9 @@ dynamically generated TSX, no filesystem access from the renderer itself.
 ## The dynamic route
 
 ```
-src/app/(platform)/os/[...page]/page.tsx  - anything else under /os with no static route,
-                                            including /os/dashboard and /os/customers
+src/app/(platform)/os/page.tsx            - bare /os only; hardcodes resolvePage("dashboard", ...)
+src/app/(platform)/os/[...page]/page.tsx  - everything else under /os with no static route,
+                                            including /os/customers
 ```
 
 `resolvePage(id, searchParams)` (`runtime/resolve-page.tsx`): look up the id
@@ -570,3 +680,12 @@ User: "Create a customer analytics page."
 The LLM would never be trusted to emit React or TSX - only structured
 actions and data-source references against the same closed vocabulary this
 runtime already validates by hand.
+
+**Registered, renderable, and AI-exposed are three different things.** Every
+entry in `baseComponentRegistry` is registered (has a real component) and
+renderable (the `UIRenderer` can resolve and mount it) - but only entries
+with `ai.exposed: true` should ever reach an LLM's own view of "what exists
+to place." `listAiExposedComponents(registry)` returns exactly that subset
+today (all 7 base entries) - the seam an eventual Ask Alaiy integration
+reads from, so an internal/debug/half-finished component can exist in the
+registry (resolvable, testable) without ever being offered to the AI.
