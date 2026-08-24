@@ -15,6 +15,17 @@ _FONT_WEIGHTS = ":wght@400;500;600;700"
 SQUARE_LOGO_FILENAME = "client-logo-square.png"
 HOR_LOGO_FILENAME = "client-logo-hor.png"
 
+# Additional filenames the Next.js frontend looks for (favicon + collapsed/
+# expanded sidebar branding - see interface/src/lib/frappe/organisation.ts).
+# Written alongside, never instead of, the two above - existing desk/login
+# consumers of client-logo-*.png are untouched. Deliberately still the shared
+# `sites/assets/images/` directory, NOT the app-namespaced `sites/assets/
+# alaiy_os/images/` build-output folder that `bench build`/`bench migrate`
+# regenerates from this app's own `public/` - writing an upload there would
+# risk it silently reverting to Alaiy's bundled default on the next deploy.
+SQUARE_LOGO_EXTRA_FILENAMES = ["logo-square.png", "icon.png"]
+HOR_LOGO_EXTRA_FILENAMES = ["logo-hor.png"]
+
 # Ported verbatim from Alaiy-os-theme-generator/solist_theme.css's ENGINE +
 # component-rule sections (everything from "ENGINE — wires the control panel
 # into Frappe" through its generic fixes at the end), with two exclusions:
@@ -499,9 +510,11 @@ class OSThemeSettings(Document):
     def _apply_logos(self):
         images_dir = self._sites_assets_images_dir()
         if self.square_logo:
-            self._copy_attached_file(self.square_logo, os.path.join(images_dir, SQUARE_LOGO_FILENAME))
+            for filename in (SQUARE_LOGO_FILENAME, *SQUARE_LOGO_EXTRA_FILENAMES):
+                self._copy_attached_file(self.square_logo, os.path.join(images_dir, filename))
         if self.horizontal_logo:
-            self._copy_attached_file(self.horizontal_logo, os.path.join(images_dir, HOR_LOGO_FILENAME))
+            for filename in (HOR_LOGO_FILENAME, *HOR_LOGO_EXTRA_FILENAMES):
+                self._copy_attached_file(self.horizontal_logo, os.path.join(images_dir, filename))
 
         # Point the browser tab favicon + the reload/loading splash at the
         # same square logo instead of the stock Frappe mark.
