@@ -31,11 +31,7 @@ type SearchItem = {
   newTab?: boolean;
 };
 
-function getSubItemGroup(
-  groupLabels: Set<string>,
-  groupLabel: string | undefined,
-  itemTitle: string,
-) {
+function getSubItemGroup(groupLabels: Set<string>, groupLabel: string | undefined, itemTitle: string) {
   return groupLabels.has(itemTitle) ? (groupLabel ?? "Other") : itemTitle;
 }
 
@@ -44,13 +40,9 @@ function getSubItemGroup(
  * `search-menu.tsx` computed at module scope from the old static
  * `sidebarItems` constant, now derived from a prop instead (the sidebar is
  * no longer a synchronously-importable constant once it comes from the
- * database - see `ui-runtime/store/sqlite-sidebar-store.ts`). */
-function buildSearchItems(
-  groups: readonly SidebarNavGroupData[],
-): SearchItem[] {
-  const groupLabels = new Set(
-    groups.flatMap((group) => (group.label ? [group.label] : [])),
-  );
+ * database - see `runtime/store/sqlite-sidebar-store.ts`). */
+function buildSearchItems(groups: readonly SidebarNavGroupData[]): SearchItem[] {
+  const groupLabels = new Set(groups.flatMap((group) => (group.label ? [group.label] : [])));
 
   return groups.flatMap((group) =>
     group.items.flatMap((item) => {
@@ -84,9 +76,7 @@ function buildSearchItems(
 }
 
 function getAvailableItems(items: SearchItem[]) {
-  return items.filter(
-    (item) => !item.disabled && !item.url.includes("coming-soon"),
-  );
+  return items.filter((item) => !item.disabled && !item.url.includes("coming-soon"));
 }
 
 function groupBy(items: SearchItem[]) {
@@ -97,19 +87,12 @@ function groupBy(items: SearchItem[]) {
   }));
 }
 
-export function SearchDialog({
-  items,
-}: {
-  items: readonly SidebarNavGroupData[];
-}) {
+export function SearchDialog({ items }: { items: readonly SidebarNavGroupData[] }) {
   const [open, setOpen] = React.useState(false);
   const [query, setQuery] = React.useState("");
   const router = useRouter();
   const searchItems = React.useMemo(() => buildSearchItems(items), [items]);
-  const recommendations = React.useMemo(
-    () => getAvailableItems(searchItems),
-    [searchItems],
-  );
+  const recommendations = React.useMemo(() => getAvailableItems(searchItems), [searchItems]);
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -170,17 +153,9 @@ export function SearchDialog({
         Search
         <Kbd>⌘K</Kbd>
       </Button>
-      <CommandDialog
-        open={open}
-        onOpenChange={handleOpenChange}
-        className="sm:max-w-2xl"
-      >
+      <CommandDialog open={open} onOpenChange={handleOpenChange} className="sm:max-w-2xl">
         <Command>
-          <CommandInput
-            placeholder="Search dashboards, users, and more…"
-            value={query}
-            onValueChange={setQuery}
-          />
+          <CommandInput placeholder="Search dashboards, users, and more…" value={query} onValueChange={setQuery} />
           <CommandList>
             <CommandEmpty>No results found.</CommandEmpty>
             {query ? renderGroups(searchItems) : renderGroups(recommendations)}

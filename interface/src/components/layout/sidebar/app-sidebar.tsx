@@ -18,20 +18,15 @@ import {
 } from "@/components/primitive/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
 import { resolveNavIcon } from "@/config/nav-icons";
-import type {
-  NavGroup,
-  NavMainItem,
-  SidebarNavGroupData,
-  SidebarNavItemData,
-} from "@/types/navigation";
 import { usePreferencesStore } from "@/runtime/store/preferences/preferences-provider";
+import type { NavGroup, NavMainItem, SidebarNavGroupData, SidebarNavItemData } from "@/types/navigation";
 
 import { NavUser } from "../../derived/menu/nav-user-menu";
 import { NavMain } from "../nav-main";
 
 /**
  * Resolves the plain-data icon-name strings the server sent down
- * (`ui-runtime/store/sqlite-sidebar-store.ts`) into real `LucideIcon`
+ * (`runtime/store/sqlite-sidebar-store.ts`) into real `LucideIcon`
  * components, entirely client-side - a component reference can't cross the
  * Server → Client boundary as a prop itself (see `config/nav-icons.ts`'s
  * doc comment). `NavMain` keeps its existing `NavGroup[]` contract
@@ -68,9 +63,7 @@ function resolveNavMainItem(item: SidebarNavItemData): NavMainItem {
   };
 }
 
-function resolveSidebarGroups(
-  groups: readonly SidebarNavGroupData[],
-): NavGroup[] {
+function resolveSidebarGroups(groups: readonly SidebarNavGroupData[]): NavGroup[] {
   return groups.map((group, index) => ({
     id: index,
     label: group.label,
@@ -110,7 +103,7 @@ export function AppSidebar({
                 with `hidden`, which is display:none, so the one that is not
                 showing is also out of the accessibility tree. */}
             <SidebarMenuButton className="w-fit group-data-[collapsible=icon]:p-0!">
-              <Link prefetch={false} href="/os/dashboard">
+              <Link prefetch={false} href="/os">
                 <Image
                   src="/assets/images/client-logo-hor.png"
                   alt={APP_CONFIG.name}

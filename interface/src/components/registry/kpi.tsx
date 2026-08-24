@@ -6,7 +6,13 @@ import { Badge } from "@/components/primitive/badge";
 import { KPI_ICONS } from "@/config/kpi-icons";
 import { formatCurrency } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { OsKpiBorderTone, OsKpiFormat, OsKpiIconName, OsKpiTrendPolarity, OsKpiTrendUnit } from "@/types/kpi";
+import type {
+  OsKpiBorderTone,
+  OsKpiFormat,
+  OsKpiIconName,
+  OsKpiTrendPolarity,
+  OsKpiTrendUnit,
+} from "@/types/kpi";
 
 import { StatCard } from "./stat-card";
 
@@ -24,10 +30,16 @@ function formatValue(
   if (typeof value === "string") return value;
 
   if (format === "currency") {
-    return formatCurrency(value, { currency, minimumFractionDigits: precision, maximumFractionDigits: precision });
+    return formatCurrency(value, {
+      currency,
+      minimumFractionDigits: precision,
+      maximumFractionDigits: precision,
+    });
   }
-  if (format === "percent") return `${value.toFixed(precision ?? 0)}%`;
-  return precision !== undefined ? value.toFixed(precision) : Math.round(value).toLocaleString();
+  if (format === "percent") return `${value?.toFixed(precision ?? 0)}%`;
+  return precision !== undefined
+    ? value.toFixed(precision)
+    : Math.round(value).toLocaleString();
 }
 
 /** The badge shown next to the value - green/destructive per whether the
@@ -69,11 +81,23 @@ function TrendBadge({
 
 /** The summary line at the card's bottom - the delta badge's caption, once
  * the badge itself moved up next to the value. */
-function TrendSummary({ trend, trendLabel }: { trend: number | undefined | null; trendLabel?: string }) {
+function TrendSummary({
+  trend,
+  trendLabel,
+}: {
+  trend: number | undefined | null;
+  trendLabel?: string;
+}) {
   if (trend === undefined || trend === null) {
-    return <span className="text-muted-foreground">No comparison available</span>;
+    return (
+      <span className="text-muted-foreground">No comparison available</span>
+    );
   }
-  return <span className="text-muted-foreground">{trendLabel ?? "vs last period"}</span>;
+  return (
+    <span className="text-muted-foreground">
+      {trendLabel ?? "vs last period"}
+    </span>
+  );
 }
 
 /**
@@ -119,7 +143,13 @@ export function OsKpi({
       label={title}
       icon={<Icon className="size-3 text-foreground" />}
       value={formatValue(value, format, precision, currency)}
-      delta={<TrendBadge trend={trend} trendUnit={trendUnit} trendPolarity={trendPolarity} />}
+      delta={
+        <TrendBadge
+          trend={trend}
+          trendUnit={trendUnit}
+          trendPolarity={trendPolarity}
+        />
+      }
       summary={<TrendSummary trend={trend} trendLabel={trendLabel} />}
       borderTone={borderTone}
     />

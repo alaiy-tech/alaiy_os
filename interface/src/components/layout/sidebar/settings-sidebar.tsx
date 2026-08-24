@@ -4,16 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  ArrowLeft,
-  Building2,
-  type LucideIcon,
-  Palette,
-  Plug,
-  Server,
-  Shield,
-  Users,
-} from "lucide-react";
+import { ArrowLeft, Building2, type LucideIcon, Palette, Plug, Server, Shield, Users } from "lucide-react";
 
 import {
   Sidebar,
@@ -39,7 +30,7 @@ type SettingsNavItem = {
 
 /**
  * The Settings sidebar's items are a fixed, baseline UI layout - unlike the
- * `/os/*` sidebar (database-driven, see `ui-runtime/store/sqlite-sidebar-store.ts`),
+ * `/os/*` sidebar (database-driven, see `runtime/store/sqlite-sidebar-store.ts`),
  * this list is meant to stay in code. Renders as a distinct sidebar from
  * `AppSidebar`, mounted by `app/(main)/settings/layout.tsx` instead of
  * `os/layout.tsx`.
@@ -48,7 +39,7 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   {
     id: "back-to-os",
     title: "Back to OS",
-    url: "/os/dashboard",
+    url: "/os",
     icon: ArrowLeft,
   },
   {
@@ -108,17 +99,10 @@ export function SettingsSidebar(props: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               {SETTINGS_NAV_ITEMS.map((item) => {
-                const isActive =
-                  item.url === "/os/dashboard"
-                    ? false
-                    : pathname.startsWith(item.url);
+                const isActive = item.url === "/os" ? false : pathname.startsWith(item.url);
                 return (
                   <SidebarMenuItem key={item.id}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive}
-                      tooltip={item.title}
-                    >
+                    <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
                       <Link href={item.url}>
                         <item.icon />
                         <span>{item.title}</span>
