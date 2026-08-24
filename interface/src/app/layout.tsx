@@ -2,17 +2,18 @@ import type { ReactNode } from "react";
 
 import type { Metadata } from "next";
 
-import { Toaster } from "../components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import { TooltipProvider } from "@/components/primitive/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
-import { fontVars } from "@/lib/fonts/registry";
+import { fontVars } from "@/config/fonts";
 import { getServerUser } from "@/lib/frappe/server";
-import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
+import { AuthProvider } from "@/runtime/store/auth/auth-provider";
+import { PreferencesStoreProvider } from "@/runtime/store/preferences/preferences-provider";
 import { ThemeBootScript } from "@/scripts/theme-boot";
-import { AuthProvider } from "@/stores/auth/auth-provider";
-import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
+import { getAllPreferences } from "@/server/server-actions";
 
-import "./globals.css";
+import { Toaster } from "../components/primitive/sonner";
+
+import "../styles/globals.css";
 
 export const metadata: Metadata = {
   title: APP_CONFIG.meta.title,
@@ -22,19 +23,10 @@ export const metadata: Metadata = {
   },
 };
 
-export default async function RootLayout({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const {
-    theme_mode,
-    theme_preset,
-    content_layout,
-    navbar_style,
-    sidebar_variant,
-    sidebar_collapsible,
-    font,
-  } = PREFERENCE_DEFAULTS;
-  const user = await getServerUser();
+export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
+  const [preferences, user] = await Promise.all([getAllPreferences(), getServerUser()]);
+  const { theme_mode, theme_preset, content_layout, navbar_style, sidebar_variant, sidebar_collapsible, font } =
+    preferences;
   return (
     <html
       lang="en"
@@ -54,7 +46,7 @@ export default async function RootLayout({
       <body className={`${fontVars} min-h-screen antialiased`}>
         <TooltipProvider>
           <AuthProvider initialUser={user}>
-            <PreferencesStoreProvider initialValues={PREFERENCE_DEFAULTS}>
+            <PreferencesStoreProvider initialValues={preferences}>
               {children}
               <Toaster />
             </PreferencesStoreProvider>
