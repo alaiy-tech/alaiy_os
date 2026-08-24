@@ -11,8 +11,21 @@
 
 import type { Table as TableType } from "@tanstack/react-table";
 
-import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/primitive/pagination";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/primitive/select";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50];
 
@@ -39,7 +52,10 @@ export function PaginationFooter<T>({
       <div className="flex items-center gap-4 text-muted-foreground text-sm">
         <div className="flex items-center gap-2">
           <span>Per page</span>
-          <Select value={`${pageSize}`} onValueChange={(value) => table.setPageSize(Number(value))}>
+          <Select
+            value={`${pageSize}`}
+            onValueChange={(value) => table.setPageSize(Number(value))}
+          >
             <SelectTrigger size="sm" className="w-16">
               <SelectValue placeholder={`${pageSize}`} />
             </SelectTrigger>
@@ -65,7 +81,9 @@ export function PaginationFooter<T>({
             <PaginationPrevious
               href="#"
               text=""
-              className={pageIndex === 0 ? "pointer-events-none opacity-50" : undefined}
+              className={
+                pageIndex === 0 ? "pointer-events-none opacity-50" : undefined
+              }
               onClick={(event) => {
                 event.preventDefault();
                 table.previousPage();
@@ -76,7 +94,11 @@ export function PaginationFooter<T>({
             <PaginationNext
               href="#"
               text=""
-              className={currentPage >= pageCount ? "pointer-events-none opacity-50" : undefined}
+              className={
+                currentPage >= pageCount
+                  ? "pointer-events-none opacity-50"
+                  : undefined
+              }
               onClick={(event) => {
                 event.preventDefault();
                 table.nextPage();
