@@ -8,16 +8,13 @@ import { getPageStore } from "@/runtime/store/sqlite-page-store";
 /**
  * Replaces the old `os/[...not-found]/page.tsx`. Next.js only ever routes a
  * request here when no more specific static segment matched (`ask-alaiy`,
- * `settings/*`, `customers`, `products`, `os/headless`, ...) - static
- * siblings always win over a catch-all, so those routes need no
- * special-casing here at all.
+ * `settings/*`, `customers`, `dashboard`, ...) - static siblings always win
+ * over a catch-all, so those routes need no special-casing here at all.
  *
  * `params.page` is the raw path segments (e.g. `/os/my-page` ->
- * `["my-page"]` - `/os/headless` and `/os/headless/customers` are actually
- * served by `os/headless/[[...page]]`'s own static folder match, so they
- * never reach this file at all). Segments are joined with `/` to form a page
- * id and handed to `resolvePage`, which resolves it against the local SQLite
- * `UIPageStore` (`ui-runtime/store/sqlite-page-store.ts`) - this file never
+ * `["my-page"]`). Segments are joined with `/` to form a page id and handed
+ * to `resolvePage`, which resolves it against the local SQLite
+ * `UIPageStore` (`runtime/store/sqlite-page-store.ts`) - this file never
  * touches a database or the filesystem itself.
  */
 export default async function Page({

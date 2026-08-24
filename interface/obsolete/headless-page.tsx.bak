@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 
-import { ComingSoon } from "@/ui-runtime/fallback/coming-soon";
-import { InvalidPageConfig } from "@/ui-runtime/fallback/invalid-page-config";
-import { resolvePage } from "@/ui-runtime/resolve-page";
-import { getPageStore } from "@/ui-runtime/store/json-file-page-store";
+import { ComingSoon } from "@/runtime/fallback/coming-soon";
+import { InvalidPageConfig } from "@/runtime/fallback/invalid-page-config";
+import { resolvePage } from "@/runtime/resolve-page";
+import { getPageStore } from "@/runtime/store/json-file-page-store";
 
 const PAGE_ID = "headless";
 

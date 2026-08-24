@@ -5,7 +5,7 @@ import {
   baseComponentRegistry,
   type ComponentRegistry,
   mergeRegistries,
-} from "@/ui-runtime/registry/component-registry";
+} from "@/runtime";
 
 import { FilterBarNode } from "./filter-bar-node";
 import { RecentOrdersTable } from "./recent-orders-table";
@@ -20,30 +20,37 @@ import { RecentOrdersTable } from "./recent-orders-table";
  * `component-registry.ts`'s comment on why that type isn't in the base
  * registry). `/os/headless` is the only page that imports this.
  */
-export const dashboardComponentRegistry: ComponentRegistry = mergeRegistries(baseComponentRegistry, {
-  "os-filter-bar": {
-    type: "os-filter-bar",
-    component: FilterBarNode,
-    description: "Dashboard's period + channel filters, plus a settings icon button.",
+export const dashboardComponentRegistry: ComponentRegistry = mergeRegistries(
+  baseComponentRegistry,
+  {
+    "os-filter-bar": {
+      type: "os-filter-bar",
+      component: FilterBarNode,
+      description:
+        "Dashboard's period + channel filters, plus a settings icon button.",
+    },
+    "os-data-table": {
+      type: "os-data-table",
+      component: RecentOrdersTable,
+      description:
+        "Recent orders: searchable, filterable, sortable, with column visibility and selection.",
+    },
+    "os-chart": {
+      type: "os-chart",
+      component: SalesOverviewChart,
+      description: "Revenue/profit trend chart over the last 12 months.",
+    },
+    "os-inventory-gauge": {
+      type: "os-inventory-gauge",
+      component: Inventory,
+      description:
+        "Half-donut gauge of in-stock/low-stock/out-of-stock SKU counts.",
+    },
+    "os-top-products": {
+      type: "os-top-products",
+      component: TopProducts,
+      description:
+        "Top-selling products for the period, grouped by category share.",
+    },
   },
-  "os-data-table": {
-    type: "os-data-table",
-    component: RecentOrdersTable,
-    description: "Recent orders: searchable, filterable, sortable, with column visibility and selection.",
-  },
-  "os-chart": {
-    type: "os-chart",
-    component: SalesOverviewChart,
-    description: "Revenue/profit trend chart over the last 12 months.",
-  },
-  "os-inventory-gauge": {
-    type: "os-inventory-gauge",
-    component: Inventory,
-    description: "Half-donut gauge of in-stock/low-stock/out-of-stock SKU counts.",
-  },
-  "os-top-products": {
-    type: "os-top-products",
-    component: TopProducts,
-    description: "Top-selling products for the period, grouped by category share.",
-  },
-});
+);
