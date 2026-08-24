@@ -843,13 +843,34 @@ convention:
   total in this mode, only `hasMore`, so numbered links would have nothing
   honest to count against).
 
-See `/os`'s `recentOrders` entry (`src/seed.ts`) for how a server-paginated
-table's search/filter is actually wired today: `recent-orders-table` owns
-`searchParam`/`pageParam`/`sortParam` directly in its own toolbar (no
-separate `os-filter-bar` node), each read server-side by `resolver.ts`'s
-`readNamedSearch`/`readNamedFilters` against the named `recentOrders` data
-definition's own `query.search`/`query.filters`. `os-filter-bar` remains
-available for a filter row that lives outside a table entirely.
+See `/os`'s `orders` entry (`src/seed.ts`) for how a server-paginated table's
+search/filter is actually wired today: `recent-orders-table` owns
+`searchParam`/`filterParam`/`pageParam`/`sortParam` directly in its own
+toolbar (no separate `os-filter-bar` node), each read server-side by
+`resolver.ts`'s `readNamedSearch`/`readNamedFilters` against the named
+`orders` data definition's own `query.search`/`query.filters`.
+`os-filter-bar` remains available for a filter row that lives outside a
+table entirely.
+
+`query.filters` is a plain `true`/absent flag, not a per-field declaration
+array - it opts a data definition into per-field server-side filtering for
+*any* of its own doctype fields (requires `exposeFields: true`, since that's
+what fetches the field list a URL-supplied field name is validated against -
+see `data-definition-schema.ts`'s `.refine()`). `readNamedFilters` reads
+`` `${name}_filter_<field>` `` (value) and `` `${name}_filter_<field>_op` ``
+(operator, defaulting to `"="`, whitelisted against
+`constants/list.ts`'s `MANUAL_FILTER_OPERATORS`) for every field the
+doctype actually has - both field *and* operator are request-driven here,
+since `FilterPopover` now lets a user pick any doctype field and any
+operator, not just one author-fixed operator per author-declared field (a
+narrower, single-fixed-operator-per-author-declared-field version of this
+used to exist; it's been superseded by this dynamic version since the filter
+popover itself became doctype-field-driven - see "DocType Field Exposure"
+below). `OsDataTable`'s own `filterParam` prop (mirroring `searchParam`/
+`sortParam`) is what tells a table's `FilterPopover` to write/read this
+instead of filtering only its current page's rows in memory - and to
+restrict its own operator choices to `MANUAL_FILTER_OPERATORS` (no
+`between`, which has no matching single Frappe list-filter operator).
 
 ## DocType Field Exposure
 
@@ -936,9 +957,9 @@ plain, JSON-safe declarative specs rather than React code:
 | `os-card` | Card | `OsCard` | `layout` | yes | generic chrome wrapper |
 | `os-kpi` | KPI | `OsKpi` | `data-display` | yes | `value`, `format`/`currency`/`precision`, `trend`/`trendUnit`/`trendPolarity`, `borderTone` |
 | `os-chart` | Chart | `OsChart` | `data-display` | yes | `x`, `series: {field,label,type:"bar"|"line"|"area"}[]`, `legend`, `rows` |
-| `os-data-table` | Data Table | `OsDataTableView` | `data-display` | yes | `columns: {field,label,format,align,sortable,badgeCategory,compulsory,textStyle}[]` (the *default* visible set - see "DocType Field Exposure" below), `rows`, `fields`/`excludedFields`, `actions` (navigate/edit/delete), `selectionActions` (edit/delete, required when `selectable`), search/filter/columnVisibility/selectable/paginated |
+| `os-data-table` | Data Table | `OsDataTableView` | `data-display` | yes | `columns: {field,label,format,align,sortable,badgeCategory,compulsory,textStyle}[]` (the *default* visible set - see "DocType Field Exposure" below), `rows`, `fields`/`excludedFields`, `filterParam` (server-side, any doctype field - see "Paginated Data Sources" above), `actions` (navigate/edit/delete), `selectionActions` (edit/delete, required when `selectable`), search/filter/columnVisibility/selectable/paginated |
 | `os-filter-bar` | Filter Bar | `OsFilterBar` | `filtering` | yes | `filters: {id,type:"select"|"text"|"date-range",label,searchParam,options,defaultValue}[]` |
-| `os-period-toggle` | Period Toggle | `OSPeriodToggle` | `filtering` | yes | pre-existing, `?period=` only |
+| `os-period-toggle` | Period Toggle | `OSPeriodToggle` | `filtering` | yes | `options: string[]` (a shadcn `ButtonGroup`, one button per entry) - the *first* entry is the default, never written to the URL; `paramName` (default `"period"`) |
 
 These are **semantic** components, not shadcn primitives - the registry
 never exposes `Button`/`Popover`/`Separator`/etc. directly. A semantic

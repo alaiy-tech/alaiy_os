@@ -4,7 +4,10 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import { SettingsSidebar } from "@/components/layout/sidebar/settings-sidebar";
+import {
+  getSettingsSearchNav,
+  SettingsSidebar,
+} from "@/components/layout/sidebar/settings-sidebar";
 import { Separator } from "@/components/primitive/separator";
 import {
   SidebarInset,
@@ -16,6 +19,7 @@ import { buildPageMetadata } from "@/lib/metadata";
 import { cn } from "@/utils";
 import { getPreference } from "@/server/server-actions";
 
+import { SearchDialog } from "../../../components/derived/menu/search-menu";
 import UserMenu from "../../../components/derived/menu/user-menu";
 import { NotificationsPopover } from "../../../components/derived/popover/notifications-popover";
 
@@ -98,9 +102,7 @@ export default async function Layout({
                 orientation="vertical"
                 className="mx-2 data-[orientation=vertical]:h-4 data-[orientation=vertical]:self-center"
               />
-              <span className="font-medium text-muted-foreground text-sm">
-                Settings
-              </span>
+              <SearchDialog items={getSettingsSearchNav()} />
             </div>
             <div className="flex items-center gap-4">
               <NotificationsPopover />
