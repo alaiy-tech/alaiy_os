@@ -189,6 +189,106 @@ the *session*, so it outlives the staging row (the sent message's chip still
 links to it), inherits the session's `if_owner` permission, and is collected when
 the session is deleted.
 
+## Generated files
+
+The other direction: a file the assistant *wrote*, offered as a download chip
+under its reply. `chat/exports.py` is the writer (rows → bytes, pure, no Frappe
+documents — the mirror of `attachments.py`), `chat/artifacts.py` is the Frappe
+side, and `create_download` is the tool the model calls. xlsx, csv and pdf.
+
+```
+model calls create_download  ──▶ artifacts.create  ──▶ save_file(… "OS Chat Session" …)
+                                        │
+                          record() on frappe.local │
+                                        ▼
+        runner._loop  ──▶ drain()  ──▶ _append(assistant, attachments=[…])
+                                        │
+                          api/chat._present ──▶ the chip, with its file_url
+```
+
+**The channel is the `attachments` column, and that is not an accident.** A tool's
+*result* never reaches the client, so a `file_url` returned from a tool would be
+seen by the model and by nobody else. What `_present` does ship per message is
+`attachments` — which already carries uploads, already draws a chip, and has room
+for a `kind` marker. So a generated file rides the same column, tagged
+`kind: "artifact"`.
+
+The collector in between exists because the two events are one iteration of
+`_loop` apart. A tool runs *after* the `stop_reason` check, so a drain is always
+followed by another pass — which puts the chip on the message where the model says
+"here it is", rather than on the tool-result message, which is `role: user` and
+would render as though the user had attached it. The out-of-turns path drains too:
+a turn that wrote a file on its twelfth step has the bytes on disk, and dropping
+the meta leaves them unreachable by anyone.
+
+`kind` is read in exactly one place that matters. `_elide_old_attachments` finds an
+upload's blocks **by position** — the first `len(meta)` of the message — and on an
+assistant message those blocks are prose and `tool_use`. Stubbing them would orphan
+the `tool_result` paired with that `tool_use`, which the API rejects outright, so a
+session would break permanently on its *second* export. Artifact meta is therefore
+excluded from elision entirely, tested as `kind == "artifact"` and never as
+`!= "upload"`: every row written before the marker existed has no `kind` at all.
+
+**The rows come from the model, inline.** It passes the table it already retrieved;
+it does not name an earlier tool call for the server to re-run. There is no handle
+to name (results are not stored as retrievable values, and `_truncate` means the
+model only ever saw a prefix), and a re-run is a second execution of a live tool —
+a second audit-log row, a second permission evaluation, and a different answer if
+the data moved, so the file would disagree with the reply above it. Inline means
+the file contains exactly the numbers in the message, which is the only property
+that makes a download trustworthy in a system whose prompt already says "never
+invent figures".
+
+What that gives up is a **genuinely bulk export** — "every order last month" is
+refused, not served. Deliberate, for now: the answer for fifty thousand rows is a
+scheduled report, not a chat message. The route to it later is a
+`source: {tool, arguments}` variant that re-runs a data tool server-side; nothing
+in the artifact plumbing or the meta shape has to change when it lands. Note that a
+tenant's own tools cap their row counts for the model's benefit
+(`alaiy_os_globali/chat_tools.py` caps every breakdown at 25), so that work needs an
+export-path limit on those endpoints too — the writer's cap is not the binding one.
+
+**A tool schema has to survive every provider on the `ai_client` seam**, not just
+Anthropic's. The default model is reached through LiteLLM in front of Gemini,
+whose function declarations are an OpenAPI subset: a `"type"` union like
+`["string", "number", "null"]` is rejected outright, reported as a *missing
+field* on the node below it. So a cell in `create_download`'s `rows` is declared
+as a plain `"string"`, and nothing is lost — `exports.normalise` stringifies
+every cell anyway, and `_typed` turns a figure back into a real number when
+writing xlsx, so a model that sends `412000.5` and one that sends `"412000.5"`
+produce the same spreadsheet. Keep new tool schemas to single types.
+
+`create_download` is core's first own tool, contributed through `_core_tools()` in
+the same shape a tenant source uses. It is **not** privileged: its name goes through
+every tenant `filter` alongside FAC's, so a deployment can withhold it — and one
+that scopes its users to a subset of the generic surface has to name it to keep it
+(`alaiy_os_globali` does).
+
+**Exports are request-driven, and that is a cost decision rather than caution.**
+Claude's artifacts and ChatGPT's Code Interpreter both produce files unprompted,
+and both can afford to — an artifact *is* the answer, written once, and Code
+Interpreter's file falls out of code that already ran. Here the model retypes
+every row as tool arguments, so an unrequested export pays for the same data
+twice: once in the prose, once in the call. A row threshold in the style of
+Claude's artifacts is the right rule the moment `create_download` can take a
+`source: {tool, arguments}` and let the server export what it already fetched.
+Until then `DOWNLOAD_PROMPT` says to create a file when asked and not otherwise.
+
+**The model is told the file exists and nothing else** — not its name, not its
+location. That is not tidiness, it is a fix for observed behaviour: given only the
+name `top-skus-8c7051.xlsx`, gemini-3.1-flash-lite wrote
+`[top_skus.xlsx](sandbox:/tmp/top_skus-8c7051.xlsx)` into its reply, inventing a
+plausible path around the name, hash included. A system-prompt clause forbidding
+it did not stop that. A name that was never supplied cannot be built into a path,
+so the return value withholds it and the chip — which is where the user reads the
+name anyway — carries it instead. Prose refers to "the Excel file" perfectly well
+without it.
+
+The oversize path is the ordinary tool-failure path: `create_download` raises,
+`_run_tools` turns that into a `tool_result` marked `is_error`, the model reads the
+cap and narrows or switches format, and nothing was written to disk. Every message
+names the real number, and the format to switch to where one would help.
+
 ## Why it doesn't need MCP
 
 MCP is a wire format over Frappe Assistant Core's tool registry. In-process,
@@ -201,6 +301,33 @@ directly and adds no checks of its own.
 FAC stays an optional dependency: `tools.py` returns no tools on a site without
 it and the chat still answers, in line with the note in `hooks.py` about why
 `frappe_assistant_core` is absent from `required_apps`.
+
+## Charts
+
+A chart is a **prompt convention, not a channel**. `CHART_PROMPT` in `runner.py`
+tells the model to emit a fenced ` ```alaiy-chart ` block holding a small JSON
+spec, inline in its reply, and the client draws it. Nothing on the server parses
+it; no doctype field, no tool, no wire change.
+
+An echo `render_chart` tool was the obvious alternative and is worse on four
+counts: it costs a **full extra `llm.complete` round-trip per chart** (the tool
+result has to come back before the model can write the prose), it lands the chart
+in its own message *before* the prose, it shows up in every client's tool trail
+needing a name-based special case there, and the spec re-enters context on replay
+anyway since nothing elides `tool_use` blocks. A `charts` JSON column would buy
+server-side validation and history elision, at the cost of a migration and of the
+inline ordering that is the whole point.
+
+The prompt is unconditional because there is no tool behind it to be permitted or
+withheld, and a client that does not draw charts renders the block as a table
+instead — which is what the desk page does. Validation is the client's job and
+must be total: the model will sometimes emit a malformed or absurd spec, and that
+may never take a chat panel down.
+
+If replay cost proves real — measure `input_tokens` on chart-heavy sessions — the
+fix is fence-to-stub elision alongside `_elide_old_attachments`, a pure backend
+change that never touches the client contract, since a client only ever needs the
+newest message's fence intact.
 
 ## Why it doesn't reuse `engine/executor.py`
 
@@ -256,6 +383,13 @@ turns into one conversation.
 - `chat_max_turns` (12) — hitting it ends the turn with a message saying so,
   not a failure: the history is still valid, so the user can just reply.
 
+Export limits live in `chat/exports.py`: 5,000 rows, 50 columns and 50,000 cells
+per file, 500 chars per cell (truncated in place), 5 MB per file after generation,
+3 files per turn — and **500 rows for a pdf**, which is the load-bearing one: it is
+the only cap bounding a *subprocess*, since `get_pdf` shells out to wkhtmltopdf
+with no timeout parameter. None of them is the first cap in practice; the model's
+own output limit is, because every cell costs output tokens to write.
+
 Attachment limits live in `chat/attachments.py`: 10 MB per file (or the site's
 `max_file_size`, whichever is lower — see `upload_limit`), 5 files per message,
 20k extracted chars per file and 40k per message, 200 PDF pages and 2,000 rows
@@ -279,7 +413,9 @@ PDF that is mostly one embedded scan.
 
   `tool`-mode attachments are exempt: they are already pointers, and stubbing one
   would strip the `file_url` that is the model's only route back to a file it may
-  be asked about again many turns later.
+  be asked about again many turns later. So are `kind: "artifact"` rows, for a
+  stronger reason — the positional rule does not hold for them at all, and
+  applying it would orphan a `tool_result`. See **Generated files**.
 
 Most of the limits above are therefore an `inline`-mode concern. On the `tool`
 path the reader's own ceilings apply instead — 50 MB and a `max_pages` argument
