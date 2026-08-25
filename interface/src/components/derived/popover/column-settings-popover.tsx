@@ -80,54 +80,45 @@ function SortableFieldRow({
         isDragging && "z-10 shadow-md",
       )}
     >
-      <TooltipWrap label="Drag to reorder">
-        <button
-          type="button"
-          {...attributes}
-          {...listeners}
-          className="cursor-grab text-muted-foreground hover:text-foreground"
-          aria-label={`Reorder ${field.label}`}
-        >
-          <GripVertical className="size-4" />
-        </button>
-      </TooltipWrap>
+      <button
+        type="button"
+        {...attributes}
+        {...listeners}
+        className="cursor-grab text-muted-foreground hover:text-foreground"
+        aria-label={`Reorder ${field.label}`}
+      >
+        <GripVertical className="size-4" />
+      </button>
       <span className="flex-1 truncate text-foreground">{field.label}</span>
       <div className="flex items-center gap-0.5">
-        <TooltipWrap label="Move up">
-          <button
-            type="button"
-            disabled={index === 0}
-            onClick={() => onMove(-1)}
-            aria-label={`Move ${field.label} up`}
-            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronUp className="size-3.5" />
-          </button>
-        </TooltipWrap>
-        <TooltipWrap label="Move down">
-          <button
-            type="button"
-            disabled={index === total - 1}
-            onClick={() => onMove(1)}
-            aria-label={`Move ${field.label} down`}
-            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
-          >
-            <ChevronDown className="size-3.5" />
-          </button>
-        </TooltipWrap>
-        <TooltipWrap
-          label={removeDisabled ? removeDisabledReason : "Remove column"}
+        <button
+          type="button"
+          disabled={index === 0}
+          onClick={() => onMove(-1)}
+          aria-label={`Move ${field.label} up`}
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
         >
-          <button
-            type="button"
-            disabled={removeDisabled}
-            onClick={onRemove}
-            aria-label={`Remove ${field.label}`}
-            className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
-          >
-            <X className="size-3.5" />
-          </button>
-        </TooltipWrap>
+          <ChevronUp className="size-3.5" />
+        </button>
+        <button
+          type="button"
+          disabled={index === total - 1}
+          onClick={() => onMove(1)}
+          aria-label={`Move ${field.label} down`}
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30 disabled:hover:bg-transparent"
+        >
+          <ChevronDown className="size-3.5" />
+        </button>
+
+        <button
+          type="button"
+          disabled={removeDisabled}
+          onClick={onRemove}
+          aria-label={`Remove ${field.label}`}
+          className="flex size-6 items-center justify-center rounded text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"
+        >
+          <X className="size-3.5" />
+        </button>
       </div>
     </div>
   );
@@ -230,6 +221,7 @@ export function ColumnSettingsPopover({
 
   function add(fieldname: string) {
     setDraft((d) => ({ ...d, columnOrder: [...d.columnOrder, fieldname] }));
+    setAddOpen(false);
   }
 
   function handleDragEnd(event: DragEndEvent) {
@@ -245,9 +237,7 @@ export function ColumnSettingsPopover({
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
-      <TooltipWrap label="Column settings">
-        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
-      </TooltipWrap>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         align="end"
         className="w-[320px] p-3.5"
@@ -267,14 +257,12 @@ export function ColumnSettingsPopover({
               Table Columns ({visibleFields.length})
             </span>
             <Popover open={addOpen} onOpenChange={setAddOpen}>
-              <TooltipWrap label="Add fields">
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-1">
-                    <Plus className="size-3.5" />
-                    Add Fields
-                  </Button>
-                </PopoverTrigger>
-              </TooltipWrap>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <Plus className="size-3.5" />
+                  Add Fields
+                </Button>
+              </PopoverTrigger>
               <PopoverContent align="end" className="w-[240px] p-0">
                 <Command>
                   <CommandInput placeholder="Search fields…" />
@@ -332,21 +320,17 @@ export function ColumnSettingsPopover({
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-2.5">
-          <TooltipWrap label="Reset to the default column layout">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={sameOrder(draft.columnOrder, defaultColumnOrder)}
-              onClick={handleReset}
-            >
-              Reset
-            </Button>
-          </TooltipWrap>
-          <TooltipWrap label="Save column settings">
-            <Button size="sm" disabled={!hasChanges} onClick={handleSave}>
-              Save
-            </Button>
-          </TooltipWrap>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={sameOrder(draft.columnOrder, defaultColumnOrder)}
+            onClick={handleReset}
+          >
+            Reset
+          </Button>
+          <Button size="sm" disabled={!hasChanges} onClick={handleSave}>
+            Save
+          </Button>
         </div>
       </PopoverContent>
     </Popover>
