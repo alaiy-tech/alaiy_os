@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import type { DocFieldMeta } from "@/components/list/types";
+import type { DocFieldMeta } from "@/components/derived/list/types";
 
 export type DoctypeMeta = {
   fields: DocFieldMeta[];
