@@ -28,7 +28,7 @@ export type DashboardOverview = {
  * day-range) - the Sales Overview chart's tick and tooltip formatters parse
  * that shape. */
 export type SalesTrendPoint = {
-  period: string;
+  period: string
   revenue: number;
   profit: number;
 };

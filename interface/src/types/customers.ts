@@ -45,3 +45,7 @@ export type Customer = {
  * Customer field. ERPNext has no customer lifecycle state, and inventing one
  * would be the dummy data this page just lost. */
 export type CustomerStatus = "Disabled" | "Active" | "No Orders";
+
+/** `lib/frappe/customer-list.server.ts`'s `getCustomersServer()` result -
+ * as returned by alaiy_os.api.customer.get_customers. */
+export type CustomerListResult = { customers: Customer[]; total: number };
