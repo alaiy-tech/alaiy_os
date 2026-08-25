@@ -19,9 +19,22 @@ function hasFrappeSession(req: NextRequest): boolean {
  */
 export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
-  const loggedIn = hasFrappeSession(req);
 
-  if (!loggedIn && pathname.startsWith("/os")) {
+  // The Headless OS runtime database lives under `public/` (see
+  // src/ui-runtime/store/sqlite-page-store.ts) because that's where this
+  // phase's local config store was asked to live - but anything under
+  // `public/` is otherwise served as a static file by Next.js regardless of
+  // auth state. This is the concrete mechanism that stops that: a bare 404
+  // for this exact path, checked before anything else, so the browser can
+  // never download the database file.
+  if (pathname === "/headless-os.sqlite") {
+    return new NextResponse(null, { status: 404 });
+  }
+
+  const loggedIn = hasFrappeSession(req);
+  const isGatedRoute = pathname.startsWith("/os") || pathname.startsWith("/settings");
+
+  if (!loggedIn && isGatedRoute) {
     const loginUrl = new URL("/auth/login", req.url);
     loginUrl.searchParams.set("next", pathname + search);
     return NextResponse.redirect(loginUrl);
@@ -37,5 +50,5 @@ export function proxy(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/os/:path*", "/auth/login"],
+  matcher: ["/os/:path*", "/settings/:path*", "/auth/login", "/headless-os.sqlite"],
 };
