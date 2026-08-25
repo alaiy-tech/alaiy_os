@@ -28,7 +28,7 @@ export function spanClasses(span: ResponsiveValue | undefined): string[] {
 }
 
 /** True if `value` has a real `col-span-*` class at `breakpoint` - used by
- * `runtime/validate-against-registry.ts` to catch a `layout.span` value that
+ * `runtime/validate/validate-against-registry.ts` to catch a `layout.span` value that
  * would otherwise silently render with no span class at all (see
  * `spanClasses`'s "unknown pairs are dropped" fallback). */
 export function isValidSpanValue(breakpoint: Breakpoint, value: number): boolean {

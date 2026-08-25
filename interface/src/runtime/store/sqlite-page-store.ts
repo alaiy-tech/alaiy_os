@@ -15,8 +15,9 @@ import { SEED_PAGES } from "@/seeds/pages/seed-data";
 import type { PageConfigFile } from "@/types/runtime/page-config";
 import type { UIPageStore } from "@/types/runtime/store";
 
-import { validatePageConfig } from "../validate";
+import { validatePageConfig } from "../validate/validate";
 import { InvalidPageConfigError } from "./invalid-page-config-error";
+import { getSidebarStore } from "./sqlite-sidebar-store";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
@@ -79,14 +80,35 @@ export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
   );
 }
 
+/** Icons picked by hand for the two known seed pages - unlike a page
+ * created through `createPageWithSidebarEntry` later, these are genuinely
+ * relevant, not the generic fallback. */
+const SEED_PAGE_ICONS: Record<string, string> = {
+  dashboard: "layout-dashboard",
+  customers: "users",
+};
+
 /** Seeds the two Headless OS pages if the table is empty - a fresh clone
  * works with just `pnpm dev`, no manual step required. A no-op (not an
  * error) if pages already exist, so it's safe to call unconditionally on
- * every store construction. */
+ * every store construction. Also ensures each seed page has a dynamic
+ * "Uncategorised" sidebar entry (`ensureDynamicPageEntry` is itself
+ * idempotent, so this is safe to run every time regardless). */
 export function ensureSeeded(db: DatabaseSync): void {
   const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
-  if (row.count > 0) return;
-  for (const page of SEED_PAGES) upsertPage(db, page);
+  if (row.count === 0) {
+    for (const page of SEED_PAGES) upsertPage(db, page);
+  }
+
+  const sidebarStore = getSidebarStore();
+  for (const page of SEED_PAGES) {
+    void sidebarStore.ensureDynamicPageEntry({
+      pageId: page.id,
+      title: page.metadata?.title ?? page.id,
+      url: page.route,
+      icon: SEED_PAGE_ICONS[page.id],
+    });
+  }
 }
 
 function rowToConfig(row: UiPageRow): PageConfigFile {
@@ -145,6 +167,10 @@ export class SQLiteUIPageStore implements UIPageStore {
       }
     }
     return pages;
+  }
+
+  async createPage(page: PageConfigFile): Promise<void> {
+    upsertPage(this.db, page);
   }
 }
 

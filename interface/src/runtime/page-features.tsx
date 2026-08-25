@@ -6,7 +6,7 @@ import type { PageFeatureBinding } from "@/types/runtime/page-features";
  * flows through `resolvePageData` (`runtime/data/resolver.ts`), which
  * resolves whatever the definition itself references via the Data Source
  * Registry, and every component lives in one base registry
- * (`runtime/component-registry.ts`). A page id with no entry here renders
+ * (`runtime/registry/component-registry.ts`). A page id with no entry here renders
  * through the plain `<UIRenderer>` - the ordinary, expected case for every
  * real JSON-only page today.
  */
