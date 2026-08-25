@@ -1,4 +1,4 @@
-import type { ResolvedThemeMode, ThemeMode } from "./theme";
+import type { ResolvedThemeMode, ThemeMode } from "@/types/theme";
 
 function resolveThemeMode(mode: ThemeMode): ResolvedThemeMode {
   if (mode === "system") {

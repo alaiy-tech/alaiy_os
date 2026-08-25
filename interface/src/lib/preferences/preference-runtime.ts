@@ -1,7 +1,8 @@
 "use client";
 
+import type { ResolvedThemeMode } from "@/types/theme";
+
 import { PREFERENCE_REGISTRY, type PreferenceKey, type PreferenceValueMap } from "./preferences-config";
-import type { ResolvedThemeMode } from "./theme";
 import { applyThemeMode } from "./theme-utils";
 
 export function applyPreference<K extends PreferenceKey>(
