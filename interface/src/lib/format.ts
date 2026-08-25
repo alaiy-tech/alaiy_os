@@ -33,6 +33,28 @@ export function formatQty(value: number | null | undefined): string {
   return qty.toLocaleString(undefined, { maximumFractionDigits: 3 });
 }
 
+export function formatCurrency(
+  amount: number,
+  opts?: {
+    currency?: string;
+    locale?: string;
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+    noDecimals?: boolean;
+  },
+) {
+  const { currency = "USD", locale = "en-US", minimumFractionDigits, maximumFractionDigits, noDecimals } = opts ?? {};
+
+  const formatOptions: Intl.NumberFormatOptions = {
+    style: "currency",
+    currency,
+    minimumFractionDigits: noDecimals ? 0 : minimumFractionDigits,
+    maximumFractionDigits: noDecimals ? 0 : maximumFractionDigits,
+  };
+
+  return new Intl.NumberFormat(locale, formatOptions).format(amount);
+}
+
 /** A Frappe `YYYY-MM-DD HH:mm:ss[.ffffff]` rendered in the reader's locale.
  *
  * Frappe stores datetimes in the site's timezone with no offset on the string,

@@ -2,15 +2,12 @@
 // /api/method proxy (see src/app/api/method/[...path]/route.ts) so the browser
 // only ever talks to this app's origin — Frappe's session cookie gets set on
 // that origin, not on Frappe's.
-import { type FrappeUser, toFrappeUser, USER_PROFILE_FIELDS, type UserProfileFields } from "./user";
+import { USER_PROFILE_FIELDS } from "@/constants/frappe-user";
+import type { FrappeLoginResult, FrappeUser, UserProfileFields } from "@/types/frappe-user";
+
+import { toFrappeUser } from "./user";
 
 export class FrappeAuthError extends Error {}
-
-export type FrappeLoginResult = {
-  message: string;
-  full_name?: string;
-  home_page?: string;
-};
 
 // Frappe reports failures as `{ message, _server_messages }`, where
 // _server_messages is itself a JSON-encoded array of JSON-encoded objects.
