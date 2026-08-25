@@ -6,11 +6,11 @@ import type { UINode } from "@/types/runtime/node";
 import type { UIPageDefinition } from "@/types/runtime/page";
 import type { ComponentRegistry } from "@/types/runtime/registry";
 
-import { resolveComponent } from "./component-registry";
 import { resolveDataSources } from "./data/resolve-data-source";
 import { spanClasses } from "./layout";
-import { resolveLayout } from "./layout-registry";
 import { isComponentNode, isLayoutNode } from "./node";
+import { resolveComponent } from "./registry/component-registry";
+import { resolveLayout } from "./registry/layout-registry";
 
 /** Rendered in place of a node whose `type` isn't in the registry, instead of
  * throwing - one bad/typo'd node degrades visibly without taking the rest of
@@ -85,9 +85,9 @@ function renderChild(
 
 /**
  * Walks a `UIPageDefinition` and renders it against `data` (a page's own
- * named data sources - see `ui-runtime/data/resolve-data-source.ts`) using
+ * named data sources - see `runtime/data/resolve-data-source.ts`) using
  * `registry` (that page's own composed `ComponentRegistry` - see
- * `ui-runtime/registry/component-registry.ts`'s `mergeRegistries`). The
+ * `runtime/registry/component-registry.ts`'s `mergeRegistries`). The
  * renderer itself has zero business-domain knowledge: it never imports a
  * feature's registry or data shape, only whatever is passed in.
  */

@@ -34,7 +34,7 @@ const CUSTOMER_STATUS_TONES: Record<string, string> = {
 
 export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
   id: "dashboard",
-  route: "/os/dashboard",
+  route: "/os",
   metadata: {
     title: "Dashboard",
     description: "The /os dashboard, composed through the UI runtime instead of hardcoded JSX.",

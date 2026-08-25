@@ -6,12 +6,18 @@
 
 import { buildCodeDefinedSidebar } from "@/seeds/sidebar/seed-data";
 import type { SidebarNavGroupData, SidebarNavItemData } from "@/types/navigation";
-import type { SidebarStore } from "@/types/runtime/store";
+import type { DynamicPageEntry, SidebarStore } from "@/types/runtime/store";
 
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
 const DB_PATH = path.join(process.cwd(), "public", "headless-os.sqlite");
+
+const UNCATEGORISED_GROUP_ID = "uncategorised";
+const UNCATEGORISED_GROUP_LABEL = "Uncategorised";
+/** No AI exists yet to pick something genuinely relevant to a page's
+ * content - a neutral "this is a page" glyph, not a real heuristic. */
+const DEFAULT_DYNAMIC_PAGE_ICON = "file-text";
 
 const SCHEMA = `
   CREATE TABLE IF NOT EXISTS sidebar_groups (
@@ -129,6 +135,27 @@ export function syncCodeDefinedSidebar(db: DatabaseSync): void {
   });
 }
 
+function nextSortOrder(db: DatabaseSync, table: "sidebar_groups" | "sidebar_items", groupId?: string): number {
+  const row =
+    table === "sidebar_items"
+      ? (db.prepare("SELECT MAX(sort_order) as maxOrder FROM sidebar_items WHERE group_id = ?").get(groupId) as {
+          maxOrder: number | null;
+        })
+      : (db.prepare("SELECT MAX(sort_order) as maxOrder FROM sidebar_groups").get() as { maxOrder: number | null });
+  return (row.maxOrder ?? -1) + 1;
+}
+
+/** Creates the "Uncategorised" group (`source: 'dynamic'`) the first time a
+ * dynamic page entry needs it. A no-op every call after that. */
+function ensureUncategorisedGroup(db: DatabaseSync, now: string): void {
+  const existing = db.prepare("SELECT id FROM sidebar_groups WHERE id = ?").get(UNCATEGORISED_GROUP_ID);
+  if (existing) return;
+
+  db.prepare(
+    `INSERT INTO sidebar_groups (id, label, sort_order, source, updated_at) VALUES (?, ?, ?, 'dynamic', ?)`,
+  ).run(UNCATEGORISED_GROUP_ID, UNCATEGORISED_GROUP_LABEL, nextSortOrder(db, "sidebar_groups"), now);
+}
+
 function rowToItemData(row: SidebarItemRow): SidebarNavItemData {
   return {
     id: row.id,
@@ -187,6 +214,31 @@ export class SQLiteSidebarStore implements SidebarStore {
       label: group.label ?? undefined,
       items: nestItems(itemRows.filter((item) => item.group_id === group.id)),
     }));
+  }
+
+  async ensureDynamicPageEntry(entry: DynamicPageEntry): Promise<void> {
+    const existing = this.db.prepare("SELECT id FROM sidebar_items WHERE page_id = ?").get(entry.pageId);
+    if (existing) return;
+
+    const now = new Date().toISOString();
+    ensureUncategorisedGroup(this.db, now);
+
+    this.db
+      .prepare(
+        `INSERT INTO sidebar_items
+           (id, group_id, parent_item_id, title, url, icon, badge, disabled, new_tab, sort_order, page_id, source, updated_at)
+         VALUES (?, ?, NULL, ?, ?, ?, NULL, 0, 0, ?, ?, 'dynamic', ?)`,
+      )
+      .run(
+        entry.pageId,
+        UNCATEGORISED_GROUP_ID,
+        entry.title,
+        entry.url,
+        entry.icon ?? DEFAULT_DYNAMIC_PAGE_ICON,
+        nextSortOrder(this.db, "sidebar_items", UNCATEGORISED_GROUP_ID),
+        entry.pageId,
+        now,
+      );
   }
 }
 
