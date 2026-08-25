@@ -5,7 +5,8 @@ import type { ComponentRegistry } from "./registry";
 
 export type PageFeatureBinding = {
   /** Optional override for how the definition is rendered. Nothing needs
-   * one today - `/os/dashboard`'s dev-only mutation-demo render override
+   * one today - the dashboard page's (`id: "dashboard"`, now at bare `/os`)
+   * dev-only mutation-demo render override
    * (a proof that `applyUIAction` works, from when this page lived at the
    * test-only `/os/headless` route) was retired now that this is a real
    * production page; see `obsolete/` for that component if it's ever needed

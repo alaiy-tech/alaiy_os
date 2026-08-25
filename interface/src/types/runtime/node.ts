@@ -8,7 +8,7 @@ import type { ResponsiveValue } from "./layout";
 export type LayoutType = "section" | "stack" | "inline" | "grid";
 
 /** The registered vocabulary of semantic components - every one of these
- * lives in the single base registry (`runtime/component-registry.ts`)
+ * lives in the single base registry (`runtime/registry/component-registry.ts`)
  * and is genuinely generic: `columns`/`series`/`filters` are declarative
  * specs, not per-page React components, so nothing here is feature-specific
  * anymore (see that file's module doc for why that changed in Round 4).
