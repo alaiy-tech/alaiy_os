@@ -12,3 +12,12 @@ export type LogSource = {
 /** A log row is whatever its doctype's fields happen to be; only `name` is
  * guaranteed, and `creation` is always requested alongside it. */
 export type LogRow = Record<string, unknown> & { name: string; creation?: string };
+
+/** `lib/frappe/logs.ts`'s `fetchLogRows()` params. */
+export type LogListParams = {
+  doctype: string;
+  fields: string[];
+  filters?: Array<[string, string, unknown]>;
+  limitStart?: number;
+  limitPageLength?: number;
+};
