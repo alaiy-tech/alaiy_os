@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { baseComponentRegistry, mergeRegistries } from "@/runtime/component-registry";
+import { baseComponentRegistry, mergeRegistries } from "@/runtime/registry/component-registry";
 import { UIRenderer } from "@/runtime/ui-renderer";
 import type { UIPageDefinition } from "@/types/runtime/page";
 

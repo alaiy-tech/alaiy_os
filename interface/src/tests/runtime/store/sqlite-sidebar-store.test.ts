@@ -14,27 +14,21 @@ function memoryStore(): SQLiteSidebarStore {
 }
 
 describe("SQLiteSidebarStore", () => {
-  it("initializes the schema and syncs the code-defined sidebar on construction", async () => {
+  it("initializes the schema and syncs the code-defined baseline sidebar on construction", async () => {
     const store = memoryStore();
     const groups = await store.getSidebarNav();
 
     const os = groups.find((group) => group.id === "os");
-    expect(os).toBeDefined();
-    expect(os?.items.map((item) => item.id)).toEqual(expect.arrayContaining(["ask-alaiy", "dashboard"]));
+    expect(os?.items.map((item) => item.id)).toEqual(["ask-alaiy"]);
 
-    const dashboard = os?.items.find((item) => item.id === "dashboard");
-    expect(dashboard?.url).toBe("/os/dashboard");
-    expect(dashboard?.icon).toBe("layout-dashboard");
-  });
+    const askAlaiy = os?.items.find((item) => item.id === "ask-alaiy");
+    expect(askAlaiy?.url).toBe("/os/ask-alaiy");
+    expect(askAlaiy?.icon).toBe("sparkles");
 
-  it("nests sub-items under their parent via parent_item_id", async () => {
-    const store = memoryStore();
-    const groups = await store.getSidebarNav();
-
-    const catalog = groups.find((group) => group.id === "catalog");
-    const products = catalog?.items.find((item) => item.id === "products");
-    expect(products?.url).toBeNull();
-    expect(products?.subItems?.map((sub) => sub.id)).toEqual(["items", "item-groups", "brands", "attributes"]);
+    const settings = groups.find((group) => group.id === "settings");
+    expect(settings?.label).toBeUndefined();
+    expect(settings?.items.map((item) => item.id)).toEqual(["settings-link"]);
+    expect(settings?.items[0]?.url).toBe("/settings");
   });
 
   it("re-syncing (e.g. a second store construction against the same database) doesn't duplicate code rows", () => {
@@ -46,12 +40,12 @@ describe("SQLiteSidebarStore", () => {
     const groupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups").get() as { count: number };
     const itemCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items").get() as { count: number };
 
-    // Sanity: exactly the 5 base groups, no duplicates.
-    expect(groupCount.count).toBe(5);
-    const dashboardCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items WHERE id = ?").get("dashboard") as {
+    // Sanity: exactly the 2 baseline groups, no duplicates.
+    expect(groupCount.count).toBe(2);
+    const askAlaiyCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_items WHERE id = ?").get("ask-alaiy") as {
       count: number;
     };
-    expect(dashboardCount.count).toBe(1);
+    expect(askAlaiyCount.count).toBe(1);
     expect(itemCount.count).toBeGreaterThan(0);
   });
 
@@ -84,6 +78,45 @@ describe("SQLiteSidebarStore", () => {
     const codeGroupCount = db.prepare("SELECT COUNT(*) as count FROM sidebar_groups WHERE source = 'code'").get() as {
       count: number;
     };
-    expect(codeGroupCount.count).toBe(5);
+    expect(codeGroupCount.count).toBe(2);
+  });
+
+  describe("ensureDynamicPageEntry", () => {
+    it("creates the Uncategorised group and a dynamic item on first call", async () => {
+      const store = memoryStore();
+      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
+
+      const groups = await store.getSidebarNav();
+      const uncategorised = groups.find((group) => group.id === "uncategorised");
+      expect(uncategorised?.label).toBe("Uncategorised");
+      expect(uncategorised?.items).toHaveLength(1);
+      expect(uncategorised?.items[0]).toMatchObject({ id: "my-page", title: "My Page", url: "/os/my-page" });
+    });
+
+    it("is idempotent - a second call for the same pageId does not duplicate the entry", async () => {
+      const store = memoryStore();
+      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
+      await store.ensureDynamicPageEntry({ pageId: "my-page", title: "My Page", url: "/os/my-page" });
+
+      const groups = await store.getSidebarNav();
+      const uncategorised = groups.find((group) => group.id === "uncategorised");
+      expect(uncategorised?.items).toHaveLength(1);
+    });
+
+    it("falls back to a generic icon when none is given, but keeps a caller-supplied one", async () => {
+      const store = memoryStore();
+      await store.ensureDynamicPageEntry({ pageId: "no-icon-page", title: "No Icon Page", url: "/os/no-icon-page" });
+      await store.ensureDynamicPageEntry({
+        pageId: "icon-page",
+        title: "Icon Page",
+        url: "/os/icon-page",
+        icon: "layout-dashboard",
+      });
+
+      const groups = await store.getSidebarNav();
+      const uncategorised = groups.find((group) => group.id === "uncategorised");
+      expect(uncategorised?.items.find((item) => item.id === "no-icon-page")?.icon).toBe("file-text");
+      expect(uncategorised?.items.find((item) => item.id === "icon-page")?.icon).toBe("layout-dashboard");
+    });
   });
 });

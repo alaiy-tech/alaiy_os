@@ -61,6 +61,14 @@ describe("SQLiteUIPageStore", () => {
     expect(byRoute?.id).toBe("test-page");
   });
 
+  it("createPage writes a page reachable by both id and route", async () => {
+    const store = memoryStore();
+    await store.createPage(VALID_PAGE);
+
+    expect((await store.getPageById("test-page"))?.route).toBe("/os/test-page");
+    expect((await store.getPageByRoute("/os/test-page"))?.id).toBe("test-page");
+  });
+
   it("returns null for a route/id with no page", async () => {
     const store = memoryStore();
     expect(await store.getPageById("does-not-exist")).toBeNull();

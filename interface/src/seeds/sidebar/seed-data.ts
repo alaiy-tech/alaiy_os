@@ -22,126 +22,29 @@ import type { NavContribution, SidebarNavGroupData, SidebarNavItemData } from "@
  * merge time.
  *
  * The "Settings" group that used to live here has moved out entirely - see
- * `components/layout/sidebar/settings-sidebar.tsx` - reached via a
- * "Settings" entry in the account menu instead of a sidebar group.
+ * `components/layout/sidebar/settings-sidebar.tsx` for the *separate*
+ * fixed Settings sidebar. What's left here is deliberately minimal - a
+ * baseline reset - since the previous Catalog/Sales/Procurement/Inventory
+ * groups described pages that don't exist yet. Real pages get a sidebar
+ * entry dynamically, via `runtime/store/create-page.ts`'s
+ * `createPageWithSidebarEntry` (see the "Uncategorised" group it creates,
+ * `docs/UI_RUNTIME.md`'s Sidebar Store section), not by hand-editing this
+ * file.
  */
+export const CONNECTORS_GROUP_LABEL = "Connectors";
+
 const baseSidebarGroups: SidebarNavGroupData[] = [
   {
     id: "os",
     label: "OS",
-    items: [
-      { id: "ask-alaiy", title: "Ask Alaiy", url: "/os/ask-alaiy", icon: "sparkles" },
-      { id: "dashboard", title: "Dashboard", url: "/os/dashboard", icon: "layout-dashboard" },
-    ],
+    items: [{ id: "ask-alaiy", title: "Ask Alaiy", url: "/os/ask-alaiy", icon: "sparkles" }],
   },
   {
-    id: "catalog",
-    label: "Catalog",
-    items: [
-      {
-        id: "products",
-        title: "Products",
-        url: null,
-        icon: "shopping-bag",
-        subItems: [
-          { id: "items", title: "Items", icon: "package", url: "/os/products" },
-          { id: "item-groups", title: "Item Groups", icon: "folder-tree", url: "/os/item-groups" },
-          { id: "brands", title: "Brands", icon: "tag", url: "/os/brands" },
-          { id: "attributes", title: "Item Attributes", icon: "fingerprint", url: "/os/item-attributes" },
-        ],
-      },
-      {
-        id: "pricing",
-        title: "Pricing",
-        url: null,
-        icon: "banknote",
-        subItems: [
-          { id: "item-prices", title: "Item Prices", icon: "banknote", url: "/os/item-prices" },
-          { id: "pricing-rules", title: "Pricing Rules", icon: "scale", url: "/os/pricing-rules" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "sales",
-    label: "Sales",
-    items: [
-      {
-        id: "orders",
-        title: "Orders",
-        url: null,
-        icon: "receipt-text",
-        subItems: [
-          { id: "sales-orders", title: "Sales Orders", icon: "scroll-text", url: "/os/sales/orders" },
-          { id: "sales-invoices", title: "Sales Invoices", icon: "receipt-text", url: "/os/sales-invoices" },
-        ],
-      },
-      {
-        id: "customers",
-        title: "Customers",
-        url: null,
-        icon: "users",
-        subItems: [
-          { id: "customers-list", title: "Customers", icon: "users", url: "/os/customers" },
-          { id: "customer-groups", title: "Customer Groups", icon: "boxes", url: "/os/customer-groups" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "procurement",
-    label: "Procurement",
-    items: [
-      {
-        id: "purchasing",
-        title: "Purchasing",
-        url: null,
-        icon: "shopping-bag",
-        subItems: [
-          {
-            id: "purchase-orders",
-            title: "Purchase Orders",
-            icon: "shopping-bag",
-            url: "/os/procurement/purchase-orders",
-          },
-          { id: "purchase-receipts", title: "Purchase Receipts", icon: "truck", url: "/os/purchase-receipts" },
-          { id: "purchase-invoices", title: "Purchase Invoices", icon: "banknote", url: "/os/purchase-invoices" },
-        ],
-      },
-      {
-        id: "suppliers",
-        title: "Suppliers",
-        url: null,
-        icon: "users",
-        subItems: [
-          { id: "suppliers-list", title: "Suppliers", icon: "store", url: "/os/suppliers" },
-          { id: "supplier-groups", title: "Supplier Groups", icon: "boxes", url: "/os/supplier-groups" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "inventory",
-    label: "Inventory",
-    items: [
-      {
-        id: "warehousing",
-        title: "Warehousing",
-        url: null,
-        icon: "forklift",
-        subItems: [
-          { id: "warehouses", title: "Warehouses", icon: "warehouse", url: "/os/warehouses" },
-          { id: "stock-entries", title: "Stock Entries", icon: "forklift", url: "/os/stock-entries" },
-          { id: "stock-ledger", title: "Stock Ledger", icon: "scroll-text", url: "/os/stock-ledger" },
-          {
-            id: "stock-reconciliation",
-            title: "Stock Reconciliation",
-            icon: "package-search",
-            url: "/os/stock-reconciliation",
-          },
-        ],
-      },
-    ],
+    id: "settings",
+    // No `label` - renders with no group heading (`nav-main.tsx`'s
+    // `{group.label && <SidebarGroupLabel>}`), so this reads as a single
+    // standalone button sitting right below the OS group.
+    items: [{ id: "settings-link", title: "Settings", url: "/settings", icon: "settings" }],
   },
 ];
 
@@ -189,6 +92,14 @@ function contributionToItemData(item: NavContribution["items"][number]): Sidebar
  * group `label`, an unrecognised label opens a new group, a contributed
  * item whose `id` already exists in the target group replaces it), just
  * producing plain-data groups instead of a render-ready array.
+ *
+ * A connector is expected to declare exactly one top-level item for
+ * itself (a `NavMainParentItem`, its pages as `subItems`) under
+ * `group: "Connectors"` - see `docs/CONNECTOR_TO_BASE_UI_COMPOSITION.md`
+ * §16. An item landing in that specific group with no icon of its own
+ * falls back to `"plug"`, the same fallback
+ * `components/baseline/settings/connectors.tsx` already uses for a
+ * connector card with no icon - the two surfaces agree visually.
  */
 export function buildCodeDefinedSidebar(): SidebarNavGroupData[] {
   if (contributedNav.length === 0) return baseSidebarGroups;
@@ -205,8 +116,10 @@ export function buildCodeDefinedSidebar(): SidebarNavGroupData[] {
       };
       merged.push(target);
     }
+    const isConnectorsGroup = target.label === CONNECTORS_GROUP_LABEL;
     for (const rawItem of contribution.items) {
       const item = contributionToItemData(rawItem);
+      if (isConnectorsGroup && !item.icon) item.icon = "plug";
       const existing = target.items.findIndex((candidate) => candidate.id === item.id);
       if (existing === -1) target.items.push(item);
       else target.items[existing] = item;
