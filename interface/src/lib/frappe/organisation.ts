@@ -1,14 +1,6 @@
-export class OrganisationApiError extends Error {}
+import type { OrganisationInfo } from "@/types/organisation";
 
-export type OrganisationInfo = {
-  companyDocName: string;
-  companyName: string;
-  abbr: string;
-  defaultCurrency: string | null;
-  country: string | null;
-  squareLogoUrl: string | null;
-  horizontalLogoUrl: string | null;
-};
+export class OrganisationApiError extends Error {}
 
 async function getSingleValue(doctype: string, field: string): Promise<string | null> {
   const res = await fetch(

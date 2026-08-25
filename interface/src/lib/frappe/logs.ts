@@ -1,4 +1,4 @@
-import type { LogRow, LogSource } from "@/types/logs";
+import type { LogListParams, LogRow, LogSource } from "@/types/logs";
 
 /** The log doctypes the current user can read. Server-filtered — see
  * alaiy_os.api.logs.get_log_sources — so this never needs permission logic of
@@ -10,14 +10,6 @@ export async function fetchLogSources(): Promise<LogSource[]> {
   const data = (await res.json()) as { message?: LogSource[] };
   return data.message ?? [];
 }
-
-export type LogListParams = {
-  doctype: string;
-  fields: string[];
-  filters?: Array<[string, string, unknown]>;
-  limitStart?: number;
-  limitPageLength?: number;
-};
 
 /** Logs are read through the generic resource API rather than an endpoint of
  * their own: the page has no knowledge of any particular log's shape, and the
