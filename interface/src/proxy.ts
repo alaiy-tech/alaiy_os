@@ -21,7 +21,7 @@ export function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
 
   // The Headless OS runtime database lives under `public/` (see
-  // src/ui-runtime/store/sqlite-page-store.ts) because that's where this
+  // src/runtime/store/sqlite-page-store.ts) because that's where this
   // phase's local config store was asked to live - but anything under
   // `public/` is otherwise served as a static file by Next.js regardless of
   // auth state. This is the concrete mechanism that stops that: a bare 404

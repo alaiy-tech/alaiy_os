@@ -5,9 +5,9 @@ import { KPI_ICON_NAMES } from "@/config/kpi-icons";
 import { PERIODS } from "@/constants/list";
 
 /**
- * Per-type `propsSchema` values for `runtime/component-registry.ts`'s
+ * Per-type `propsSchema` values for `runtime/registry/component-registry.ts`'s
  * `baseComponentRegistry` entries - checked by
- * `runtime/validate-against-registry.ts`'s second pass against whatever a
+ * `runtime/validate/validate-against-registry.ts`'s second pass against whatever a
  * node's literal `props` actually contains. Every field is `.optional()`,
  * even a `requiredFields`-listed one: a field supplied via a `data` binding
  * instead is legitimately absent from `props`, and presence is

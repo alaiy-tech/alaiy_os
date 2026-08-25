@@ -1,5 +1,5 @@
 // Server-only: called via frappeFetch (direct to Frappe, forwarding the
-// request's cookies). Consumed today by `ui-runtime/data/sources/dashboard.ts`'s
+// request's cookies). Consumed today by `runtime/data/sources/dashboard.ts`'s
 // `dashboard.stockMix` data source - `getProductsOverviewServer` (the
 // Products page's own KPI fetcher) moved to `obsolete/` alongside the rest
 // of the removed `/os/products` page's code.

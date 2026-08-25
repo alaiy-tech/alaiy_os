@@ -16,7 +16,7 @@ import { z } from "zod";
  * `type` renders as the existing safe "Unknown component type" placeholder,
  * it's never a validation failure. Coupling this schema to the registry's
  * closed union would also make every new feature's component types a
- * change to two places instead of one. Consumed by `runtime/validate.ts`.
+ * change to two places instead of one. Consumed by `runtime/validate/validate.ts`.
  */
 
 export const RESPONSIVE_VALUE_SCHEMA = z
