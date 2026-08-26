@@ -10,6 +10,7 @@
   "seq",
   "column_break_1",
   "role",
+  "is_partial",
   "skill_used",
   "screen",
   "text",
@@ -46,6 +47,13 @@
    "label": "Role",
    "options": "user\nassistant",
    "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Set while an assistant message is still being written, token by token, by a streaming turn. The row exists so a poll can watch its `text` grow; its `blocks` are empty until the stream ends, which is why runner._history skips a message with no blocks. Always 0 by the time a turn finishes \u2014 including a failed one, which runner.run_turn clears on its way out.",
+   "fieldname": "is_partial",
+   "fieldtype": "Check",
+   "label": "Is Partial"
   },
   {
    "description": "Set on a user message sent as a `/skill`: the OS Agent Registry skill_slug that was invoked. `runner.run_turn` reads it to decide whether the turn opens with an agent dispatch.",

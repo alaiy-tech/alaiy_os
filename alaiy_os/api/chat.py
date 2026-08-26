@@ -14,6 +14,18 @@ GET  /api/method/alaiy_os.api.chat.list_mentions   -> the `@` picker's options
 `send_message` returns as soon as the turn is queued; the client then polls
 `get_messages` with the highest seq it has until status leaves "Running".
 
+Progressive output is **opt-in**, per call: `get_messages(partial=1)` also returns
+the message the assistant is still writing, flagged `partial: true`. Such a row is
+re-sent, longer, on every poll, so a caller that asks for it must advance its
+cursor past *complete* messages only and redraw a message it has already seen
+rather than append it again.
+
+The default is off, and has to be: the rule above inverts the one every existing
+client follows. A poller that advances to the highest seq it saw would step past
+the partial row and never be sent the finished message, leaving a truncated answer
+on screen for good. So an unmodified consumer sees exactly what it always did —
+nothing until the message is complete.
+
 Isolation is Frappe's, not ours: both DocTypes grant the `All` role only
 `if_owner`, so `check_permission` / the `owner` filter below is the whole story.
 """
@@ -21,6 +33,7 @@ Isolation is Frappe's, not ours: both DocTypes grant the `All` role only
 import json
 
 import frappe
+from frappe.utils import cint
 from frappe.utils.file_manager import save_file
 
 # `mentions` is aliased because `send_message` already takes a parameter of that
@@ -154,18 +167,27 @@ def delete_attachment(attachment):
 
 
 @frappe.whitelist()
-def get_messages(session, after=0):
+def get_messages(session, after=0, partial=0):
 	"""Messages with seq > `after`, plus the session's current status.
 
 	The poll endpoint. `after=0` fetches the whole conversation, which is also
 	how the frontend loads a session picked from the history sidebar.
+
+	`partial=1` additionally returns the message the assistant is mid-way through
+	writing, flagged `partial: true` (see the module docstring, and `chat/runner.py`
+	for how it comes to exist). Off by default because a client that has not been
+	taught the cursor rule would skip past it and never see the finished message.
 	"""
 	doc = frappe.get_doc("OS Chat Session", session)
 	doc.check_permission("read")
 
+	filters = {"session": session, "seq": (">", int(after))}
+	if not cint(partial):
+		filters["is_partial"] = 0
+
 	rows = frappe.get_all(
 		"OS Chat Message",
-		filters={"session": session, "seq": (">", int(after))},
+		filters=filters,
 		fields=[
 			"name",
 			"seq",
@@ -175,6 +197,7 @@ def get_messages(session, after=0):
 			"attachments",
 			"mentions",
 			"skill_used",
+			"is_partial",
 			"creation",
 		],
 		order_by="seq asc",
@@ -234,6 +257,10 @@ def _present(row):
 	failed. Tool *results* are deliberately not sent: they are raw JSON the
 	model has already summarised in its reply, and can be megabytes.
 
+	`partial` says the assistant is still writing this message: `text` is what has
+	arrived so far and `tool_calls` is empty, because the blocks are not stored
+	until the stream ends. See `chat/runner.py`.
+
 	Attachments and mentions come from their own denormalised columns rather than
 	being read back out of `blocks`, where they are indistinguishable from any
 	other text block — and where the payload is the whole document, or the
@@ -257,5 +284,6 @@ def _present(row):
 		"skill": row.skill_used,
 		"tool_calls": tool_calls,
 		"tool_errors": tool_errors,
+		"partial": bool(row.is_partial),
 		"creation": row.creation,
 	}
