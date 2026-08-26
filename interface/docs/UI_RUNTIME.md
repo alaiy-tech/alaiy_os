@@ -597,10 +597,11 @@ owns reading/writing the named URL param, using the exact same
 clone-`URLSearchParams`-then-`router.replace(..., {scroll:false})` pattern
 `OSPeriodToggle`/`OsFilterBar` already use - client navigation, no full
 reload, every other search param preserved, browser back/forward just works,
-for free. `PaginationFooter` gained an `external` mode (`hasMore`-driven
-Next/Previous instead of a `totalCount`-derived page count, since no true
-total exists) that leaves its default `totalCount`-based rendering - and
-every table not passing these new props - completely untouched.
+for free. `OsDataTable`'s own pagination rendering has an `external` mode
+(`hasMore`-driven Next/Previous instead of a `totalCount`-derived page count,
+since no true total exists) that leaves its default `totalCount`-based
+rendering - and every table not passing these new props - completely
+untouched.
 **No `pageParam` means Next/Previous render disabled**, not hidden and not
 silently inert - loud, matching this codebase's "unknown type renders a
 visible placeholder, never nothing" convention (`UnknownNodePlaceholder`) -
@@ -657,10 +658,10 @@ check would be dead code rather than defense in depth.
   for the same reason, plus `in`/`not in` - no UI here produces an array
   value for a request-driven filter.
 - Page *size* is not URL-addressable, only page *number* - `pageSize` comes
-  from the named entry's own config; `PaginationFooter`'s "Per page"
-  selector is suppressed entirely in external/manual mode rather than left
-  connected to nothing. No existing page-size control anywhere in this
-  codebase to make request-aware in the first place.
+  from the named entry's own config; the "Per page" selector is suppressed
+  entirely in external/manual mode rather than left connected to nothing. No
+  existing page-size control anywhere in this codebase to make request-aware
+  in the first place. (Superseded later - see `pageSizeParam` further down.)
 - `applyUIAction`'s mutation vocabulary (`runtime/mutations.ts`) has no verb
   for `UIPageDefinition.data` yet - nothing calls `applyUIAction` in
   production regardless, so this is a flagged follow-up, not a blocker (see
@@ -821,9 +822,9 @@ production today regardless (the same is already true of every existing
 verb), so there's no concrete caller to build and test against yet - this is
 a recorded decision, not an implementation.
 
-**A table can also self-host search/filter/per-page-size in its own toolbar,
-instead of a separate `os-filter-bar` node.** `OsDataTable` gained three more
-URL-param props alongside `pageParam`/`sortParam`, all following the exact
+**A table can also self-host search/per-page-size in its own toolbar,
+instead of a separate `os-filter-bar` node.** `OsDataTable` gained two more
+URL-param props alongside `pageParam`/`sortParam`, both following the exact
 same "omit the param name and the control still renders but does nothing"
 convention:
 - `searchParam` - when set alongside `searchable`, the table's own search box
@@ -832,19 +833,8 @@ convention:
   server-side, the same fork `sort`/`sortParam` already established).
   Omitted keeps today's local in-memory search - correct for a small,
   fully-loaded table like Top Products, wrong for a paginated one.
-- A column's `filterParam` (`column-spec.tsx`'s `ColumnSpec`) marks its
-  filter as server-driven: `buildManualFilterFields` collects every
-  `filterable` column that also declares one, and `OsDataTable` renders them
-  in a dedicated `ManualFilterPopover` (`components/derived/popover/
-  manual-filter-popover.tsx`) instead of the generic `FilterPopover`.
-  Deliberately **no operator picker** - `readNamedFilters` only ever applies
-  the one operator a named entry's own `query.filters` declares per field, so
-  offering a user-editable operator the server would silently ignore would
-  be a real bug. Its Apply/Clear each issue one batched `URLSearchParams`
-  write (never sequential single-field writes, which would read the same
-  stale snapshot and silently undo each other).
-- `pageSizeParam` - renders a per-page `<Select>` in `PaginationFooter`'s
-  external (server-paginated, `hasMore`-only) branch, writing
+- `pageSizeParam` - renders a per-page `<Select>` in `OsDataTable`'s own
+  external (server-paginated, `hasMore`-only) pagination branch, writing
   `` `${name}_page_size` ``. `resolver.ts`'s `readNamedPageSize` validates it
   against the fixed `PAGE_SIZE_OPTIONS` whitelist (`constants/list.ts`)
   before overriding `request.params.pageSize` - an arbitrary URL-supplied
@@ -853,11 +843,86 @@ convention:
   total in this mode, only `hasMore`, so numbered links would have nothing
   honest to count against).
 
-See `/os`'s `recentOrders` entry (`src/seed.ts`) for a complete example: a
-`filterParam`-marked `status` column (rendered as a `format: "badge"` cell
-via `os-dynamic-badge`'s category system, `utils/get-badge-style.ts`),
-`searchParam`, `pageSizeParam`, and `columnVisibility` all set directly on
-one `os-data-table` node, no `os-filter-bar` node alongside it at all.
+See `/os`'s `recentOrders` entry (`src/seed.ts`) for how a server-paginated
+table's search/filter is actually wired today: `recent-orders-table` owns
+`searchParam`/`pageParam`/`sortParam` directly in its own toolbar (no
+separate `os-filter-bar` node), each read server-side by `resolver.ts`'s
+`readNamedSearch`/`readNamedFilters` against the named `recentOrders` data
+definition's own `query.search`/`query.filters`. `os-filter-bar` remains
+available for a filter row that lives outside a table entirely.
+
+## DocType Field Exposure
+
+`columns` on `os-data-table` is the *default/initial visible set*, not the
+universe of what the filter popover and column-settings ("Add Fields")
+popover may offer - that universe is the doctype's own field list. A named
+`data` entry opts into exposing it by setting `exposeFields: true` on its
+`DataDefinition` (only valid for `list`/`count` operations, not `method` -
+`data-definition-schema.ts`'s `.refine()`); `resolveDataDefinition` then
+fetches it (`runtime/data/fetch-doctype-fields.ts`, calling
+`alaiy_os.api.list_view.get_doctype_fields`) alongside the request itself and
+merges it into the resolved value as `fields: DocFieldMeta[]`. A page binds
+it like any other resolved value: `data: { fields: { ref: "<name>", path:
+"fields" } }`.
+
+`OsDataTableView` folds `fields` in two ways:
+- `buildExtraColumnDefs(columns, fields, excludedFields)` (`column-spec.tsx`)
+  builds one generic, fieldtype-keyed column per doctype field that isn't
+  already an authored column and isn't listed in the plain `excludedFields`
+  prop (for a field folded into another column's cell instead of ever being
+  its own standalone column - e.g. `/settings/users`' combined avatar+name+
+  email cell) - merged into the same `columns` array passed to `OsDataTable`,
+  so its own column-picker/filter-popover discovery (`columnFieldsFrom`)
+  finds them the same way it finds any other column.
+- The filter popover's field pool is `fields` minus `excludedFields`,
+  computed directly - no separate `filterFields`/`filterOptions` config
+  needed per column anymore.
+
+`ColumnSpec.compulsory` (inline, per column) replaces the old separate
+`compulsoryColumns` array - `buildCompulsoryColumns(columns)` derives it,
+so marking a column compulsory is one field in one place instead of two
+things kept in sync by hand.
+
+`actions?: RowActionGroup[]` (`row-actions.tsx`) is a fully declarative
+trailing "3 dots" menu: a list of `DropdownMenuGroup`s (separated, never
+labelled), each holding `{label, tone?: "default"|"destructive", action}`
+items. `action` is a closed, discriminated-union vocabulary -
+`{type:"navigate", url}` (real, working - `{field}` placeholders in `url`
+are interpolated from the row) or `{type:"edit"}`/`{type:"delete"}`
+(deliberately just a placeholder confirmation dialog for now; a real generic
+doctype edit form or delete endpoint is a separate, larger piece of work).
+See `/os`'s `orders` table in `src/seed.ts` for a live example of all three.
+
+`selectionActions?: BulkActionGroup[]` (`selection-actions.tsx`) is the same
+declarative-groups-of-items idea for a *bulk* "Actions (N)" button - shown
+right-aligned in the toolbar only once `selectable` and at least one row is
+checkbox-selected. Its own vocabulary is narrower - `{type:"edit"}` |
+`{type:"delete"}` only, no `navigate` (jumping to one URL doesn't mean
+anything for an arbitrary selected set) - and, unlike a row-actions group, a
+bulk-actions group may carry its own `label`. `selectable: true` makes
+`selectionActions` required (`component-props-schema.ts`'s `superRefine`) -
+a selectable table with nothing to do with a selection is half-finished, not
+a valid minimal config.
+
+`ColumnSpec.textStyle?: ("bold"|"italic"|"underline")[]` applies plain text
+styling to that column's *cell values only* (never its header) -
+`column-spec.tsx`'s `textStyleClass` maps it to `font-bold`/`italic`/
+`underline` utility classes. An empty array is rejected (nothing to opt
+into - just omit the prop) by the same schema.
+
+**Filter popover: fieldtype-aware operators and value input.**
+`FilterPopover` already resolves a field's `fieldtype` (from `DocFieldMeta`,
+the same doctype metadata `exposeFields` resolves) to pick both its operator
+set (`operatorsForFieldtype`, `constants/list.ts`) and its value input
+(`filter-popover.tsx`): a number input for a numeric field's `=`/`!=`/`>`/
+`<`/`>=`/`<=`, a date picker for `Date`/`Datetime`, a searchable dropdown of
+that field's own `options` (Frappe's newline-separated `Select` choice list)
+for a `Select` field's `=`/`!=` (not `Link` - its `options` names the *target
+doctype*, not a value list, so it falls back to plain text), comma-separated
+free text for `in`/`not in` regardless of fieldtype, and plain text
+otherwise. The operator vocabulary itself deliberately excludes `like`/
+`not like`/`is`/`is not` - kept simple on purpose, not partial coverage of
+Frappe's fuller filter grammar.
 
 ## The Component Registry: a machine-readable contract
 
@@ -871,7 +936,7 @@ plain, JSON-safe declarative specs rather than React code:
 | `os-card` | Card | `OsCard` | `layout` | yes | generic chrome wrapper |
 | `os-kpi` | KPI | `OsKpi` | `data-display` | yes | `value`, `format`/`currency`/`precision`, `trend`/`trendUnit`/`trendPolarity`, `borderTone` |
 | `os-chart` | Chart | `OsChart` | `data-display` | yes | `x`, `series: {field,label,type:"bar"|"line"|"area"}[]`, `legend`, `rows` |
-| `os-data-table` | Data Table | `OsDataTableView` | `data-display` | yes | `columns: {field,label,format,align,sortable,filterable,badgeTones}[]`, `rows`, search/filter/columnVisibility/selectable/paginated |
+| `os-data-table` | Data Table | `OsDataTableView` | `data-display` | yes | `columns: {field,label,format,align,sortable,badgeCategory,compulsory,textStyle}[]` (the *default* visible set - see "DocType Field Exposure" below), `rows`, `fields`/`excludedFields`, `actions` (navigate/edit/delete), `selectionActions` (edit/delete, required when `selectable`), search/filter/columnVisibility/selectable/paginated |
 | `os-filter-bar` | Filter Bar | `OsFilterBar` | `filtering` | yes | `filters: {id,type:"select"|"text"|"date-range",label,searchParam,options,defaultValue}[]` |
 | `os-period-toggle` | Period Toggle | `OSPeriodToggle` | `filtering` | yes | pre-existing, `?period=` only |
 
