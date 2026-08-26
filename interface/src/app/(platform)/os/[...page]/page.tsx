@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 
 import { ComingSoon } from "@/components/layout/coming-soon";
 import { InvalidPageConfig } from "@/components/layout/invalid-page-config";
+import { getCompanyInfo } from "@/lib/frappe/server";
+import { buildPageMetadata } from "@/lib/metadata";
 import { resolvePage } from "@/runtime/resolve-page";
 import { getPageStore } from "@/runtime/store/sqlite-page-store";
 
@@ -35,8 +37,18 @@ export default async function Page({
 export async function generateMetadata({ params }: { params: Promise<{ page: string[] }> }): Promise<Metadata> {
   try {
     const { page: segments } = await params;
-    const config = await getPageStore().getPageById(segments.join("/"));
-    return config?.metadata ? { title: config.metadata.title, description: config.metadata.description } : {};
+    const [config, company] = await Promise.all([
+      getPageStore().getPageById(segments.join("/")),
+      getCompanyInfo(),
+    ]);
+    if (!config?.metadata) return {};
+    return buildPageMetadata({
+      companyName: company?.name ?? null,
+      pageTitle: config.metadata.title ?? segments.join("/"),
+      description: config.metadata.description ?? "",
+      keywords: config.metadata.keywords,
+      route: `/os/${segments.join("/")}`,
+    });
   } catch {
     return {};
   }

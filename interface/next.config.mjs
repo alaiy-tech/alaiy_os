@@ -19,12 +19,25 @@ const nextConfig = {
     // Rewrites are transparent to the caller, unlike redirects: the browser
     // (and every existing `fetch("/api/method/...")` call in src/lib/frappe/)
     // never sees the nested path.
+    //
+    // Frappe's own site-wide static assets (not a File doctype attachment,
+    // so the /files/* proxy above doesn't cover it) - e.g. the org's
+    // uploaded logo, copied by OS Theme Settings to a fixed filename under
+    // sites/assets/images/ (see lib/frappe/server.ts's getOrganisationLogoSrc).
+    // Same-origin from the browser's view, so next/image needs no
+    // `images.remotePatterns` entry for the bench's own host, and no CORS/
+    // cookie concerns either - a plain external rewrite, same idea as the
+    // proxies above, just to a literal external destination instead of an
+    // internal route handler.
+    const frappeUrl = (process.env.FRAPPE_URL ?? "").replace(/\/+$/, "");
+
     return [
       { source: "/api/method/:path*", destination: "/api/frappe/proxy/api/method/:path*" },
       { source: "/api/resource/:path*", destination: "/api/frappe/proxy/api/resource/:path*" },
       { source: "/files/:path*", destination: "/api/frappe/proxy/files/:path*" },
       { source: "/private/files/:path*", destination: "/api/frappe/proxy/private/files/:path*" },
       { source: "/auth/expired", destination: "/api/auth/expired" },
+      ...(frappeUrl ? [{ source: "/frappe-assets/:path*", destination: `${frappeUrl}/assets/:path*` }] : []),
     ];
   },
   async redirects() {
