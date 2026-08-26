@@ -5,11 +5,10 @@ import {
   CardAction,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
 } from "@/components/primitive/card";
-import { KPI_BORDER_TONE_CLASSES } from "@/config/kpi-classes";
 import { cn } from "@/utils";
-import type { OsKpiBorderTone } from "@/types/kpi";
 
 /**
  * Fully generic KPI card - label, icon, formatted value, a pre-rendered
@@ -28,7 +27,6 @@ export function StatCard({
   value,
   delta,
   summary,
-  borderTone,
   className,
 }: {
   label: string;
@@ -36,40 +34,26 @@ export function StatCard({
   value: string;
   delta: React.ReactNode;
   summary: React.ReactNode;
-  borderTone?: OsKpiBorderTone;
   className?: string;
 }) {
   return (
     <Card
-      className={cn(
-        "relative h-full overflow-hidden rounded-none border border-border ring-0 rounded-xl",
-        className,
-      )}
+      className={cn("relative h-full overflow-hidden border ring-0", className)}
     >
-      {borderTone && (
-        <span
-          aria-hidden
-          className={cn(
-            "absolute inset-y-0 left-0 w-1",
-            KPI_BORDER_TONE_CLASSES[borderTone],
-          )}
-        />
-      )}
       <CardHeader>
-        <CardDescription className="text-sm">{label}</CardDescription>
-        <CardAction className="grid mt-0.5 scale-125 place-items-center rounded-sm">
+        <CardDescription className="text-sm mb-1.5 text-foreground">
+          {label}
+        </CardDescription>
+        <CardAction className="grid mt-1 scale-125 place-items-center rounded-sm">
           {icon}
         </CardAction>
-      </CardHeader>
-      <CardContent className="space-y-1">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl text-foreground tabular-nums leading-none tracking-tight">
-            {value}
-          </span>
-          {delta}
+        <span className="text-3xl pt-1 pb-0.5 text-foreground tabular-nums leading-none tracking-tight">
+          {value}
+        </span>
+        <div className="py-0 flex flex-row items-center gap-1 pt-1.5">
+          {delta} {summary}
         </div>
-        <p className="text-sm">{summary}</p>
-      </CardContent>
+      </CardHeader>
     </Card>
   );
 }

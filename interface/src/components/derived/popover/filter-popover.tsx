@@ -29,6 +29,7 @@ import {
   PopoverTrigger,
 } from "@/components/primitive/popover";
 import { TooltipWrap } from "@/components/primitive/tooltip-wrap";
+import { MANUAL_FILTER_OPERATORS } from "@/constants/list";
 
 function newRow(): FilterRow {
   const id =
@@ -65,7 +66,10 @@ function isDateField(fieldtype: string | undefined, operator: FilterOperator) {
  * doctype*, not a list of values, so it falls back to plain text like any
  * other field. Never for "in"/"not in" - those stay comma-separated text
  * regardless of fieldtype. */
-function isDropdownField(fieldtype: string | undefined, operator: FilterOperator) {
+function isDropdownField(
+  fieldtype: string | undefined,
+  operator: FilterOperator,
+) {
   return fieldtype === "Select" && (operator === "=" || operator === "!=");
 }
 
@@ -73,7 +77,10 @@ function isDropdownField(fieldtype: string | undefined, operator: FilterOperator
  * list convention - a leading blank choice (common for "no default") isn't a
  * real filterable value. */
 function parseSelectOptions(options: string | null | undefined): string[] {
-  return (options ?? "").split("\n").map((option) => option.trim()).filter(Boolean);
+  return (options ?? "")
+    .split("\n")
+    .map((option) => option.trim())
+    .filter(Boolean);
 }
 
 /** A row is ready to apply once its field is picked and its value is filled in too. */
@@ -86,6 +93,12 @@ export interface FilterPopoverProps {
   availableFields: DocFieldMeta[];
   value: FilterRow[];
   onApply: (rows: FilterRow[]) => void;
+  /** True when this table is server-filtered (`OsDataTable`'s
+   * `filterParam`) - restricts the operator choices to
+   * `MANUAL_FILTER_OPERATORS`, dropping `between` (a Frappe list filter has
+   * no single matching operator for it, so a server-filtered table must
+   * never let the user pick a filter row it can't actually honour). */
+  manual?: boolean;
 }
 
 /** Generic doctype filter builder: field / fieldtype-scoped operator / value rows. Anchored to its own trigger button, not a full-screen modal. */
@@ -93,6 +106,7 @@ export function FilterPopover({
   availableFields,
   value,
   onApply,
+  manual = false,
 }: FilterPopoverProps) {
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<FilterRow[]>(value);
@@ -103,14 +117,19 @@ export function FilterPopover({
 
   const fieldByName = new Map(availableFields.map((f) => [f.fieldname, f]));
 
+  function operatorsFor(fieldtype: string | undefined): FilterOperator[] {
+    const operators = operatorsForFieldtype(fieldtype);
+    if (!manual) return operators;
+    const allowed: FilterOperator[] = MANUAL_FILTER_OPERATORS;
+    return operators.filter((op) => allowed.includes(op));
+  }
+
   function updateRow(id: string, patch: Partial<FilterRow>) {
     setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...patch } : r)));
   }
 
   function changeField(id: string, fieldname: string) {
-    const nextOperator = operatorsForFieldtype(
-      fieldByName.get(fieldname)?.fieldtype,
-    )[0];
+    const nextOperator = operatorsFor(fieldByName.get(fieldname)?.fieldtype)[0];
     updateRow(id, { field: fieldname, operator: nextOperator, value: "" });
   }
 
@@ -120,6 +139,14 @@ export function FilterPopover({
 
   const hasAnyContent = rows.some((r) => r.field || r.value);
   const canApply = rows.length > 0 && rows.every(isRowComplete);
+  // Every row already present must be complete before another can be added
+  // - otherwise "Add a Filter" would just pile up more empty rows on top of
+  // one the user hasn't finished (the default single-row starting state
+  // included). Multiple rows can still be filled in and left un-applied
+  // across several "Add a Filter" clicks - only `handleApply` (Apply
+  // Filters) sends them all at once; `rows` never resets on its own while
+  // this popover stays open.
+  const canAddRow = rows.every(isRowComplete);
 
   function handleApply() {
     if (!canApply) return;
@@ -135,24 +162,22 @@ export function FilterPopover({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <TooltipWrap label="Filter this list">
-        <PopoverTrigger asChild>
-          <Button variant="outline" size="sm" className="text-[13px]">
-            <FilterIcon className="size-3.5" />
-            Filters
-            {value.length > 0 && (
-              <Badge variant="default" className="h-4.5 px-1">
-                {value.length}
-              </Badge>
-            )}
-          </Button>
-        </PopoverTrigger>
-      </TooltipWrap>
+      <PopoverTrigger asChild>
+        <Button variant="outline" size="sm" className="text-[13px]">
+          <FilterIcon className="size-3.5" />
+          Filters
+          {value.length > 0 && (
+            <Badge variant="default" className="h-4.5 px-1">
+              {value.length}
+            </Badge>
+          )}
+        </Button>
+      </PopoverTrigger>
       <PopoverContent className="w-[520px] p-3.5" align="start">
         <div className="flex flex-col gap-2">
           {rows.map((row) => {
             const field = fieldByName.get(row.field);
-            const operators = operatorsForFieldtype(field?.fieldtype);
+            const operators = operatorsFor(field?.fieldtype);
 
             return (
               <div key={row.id} className="flex items-center gap-1.5">
@@ -166,10 +191,7 @@ export function FilterPopover({
                     fieldByName.get(fieldname)?.label ?? fieldname
                   }
                 >
-                  <ComboboxInput
-                    placeholder="Field"
-                    className="w-44"
-                  />
+                  <ComboboxInput placeholder="Field" className="w-44" />
                   <ComboboxContent>
                     <ComboboxEmpty>No fields found.</ComboboxEmpty>
                     <ComboboxList>
@@ -219,10 +241,7 @@ export function FilterPopover({
                     value={row.value || null}
                     onValueChange={(v) => updateRow(row.id, { value: v ?? "" })}
                   >
-                    <ComboboxInput
-                      placeholder="Value"
-                      className="flex-1"
-                    />
+                    <ComboboxInput placeholder="Value" className="flex-1" />
                     <ComboboxContent>
                       <ComboboxEmpty>No options found.</ComboboxEmpty>
                       <ComboboxList>
@@ -258,55 +277,44 @@ export function FilterPopover({
                   />
                 )}
 
-                <TooltipWrap label="Remove filter">
-                  <button
-                    type="button"
-                    disabled={rows.length < 2}
-                    onClick={() => removeRow(row.id)}
-                    aria-label="Remove filter"
-                    className="flex size-7 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
-                  >
-                    <X className="size-3.5" />
-                  </button>
-                </TooltipWrap>
+                <button
+                  type="button"
+                  disabled={rows.length < 2}
+                  onClick={() => removeRow(row.id)}
+                  aria-label="Remove filter"
+                  className="flex size-7 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <X className="size-3.5" />
+                </button>
               </div>
             );
           })}
         </div>
 
         <div className="mt-1 flex items-center justify-between border-t pt-3">
-          <TooltipWrap label="Add another filter row">
+          <Button
+            variant="outline"
+            size="sm"
+            className="w-fit gap-1.5"
+            disabled={!canAddRow}
+            onClick={() => setRows((rs) => [...rs, newRow()])}
+          >
+            <Plus className="size-3" />
+            Add a Filter
+          </Button>
+
+          <div className="flex gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="w-fit gap-1.5"
-              onClick={() => setRows((rs) => [...rs, newRow()])}
+              disabled={!hasAnyContent}
+              onClick={handleClear}
             >
-              <Plus className="size-3" />
-              Add a Filter
+              Clear Filters
             </Button>
-          </TooltipWrap>
-
-          <div className="flex gap-2">
-            <TooltipWrap label="Remove every filter">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={!hasAnyContent}
-                onClick={handleClear}
-              >
-                Clear Filters
-              </Button>
-            </TooltipWrap>
-            <TooltipWrap label="Apply these filters">
-              <Button
-                size="sm"
-                disabled={!canApply}
-                onClick={handleApply}
-              >
-                Apply Filters
-              </Button>
-            </TooltipWrap>
+            <Button size="sm" disabled={!canApply} onClick={handleApply}>
+              Apply Filters
+            </Button>
           </div>
         </div>
       </PopoverContent>
