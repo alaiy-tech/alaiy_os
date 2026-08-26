@@ -127,6 +127,7 @@ function ChartTooltipContent({
   labelFormatter,
   labelClassName,
   formatter,
+  valueFormatter,
   color,
   nameKey,
   labelKey,
@@ -137,6 +138,13 @@ function ChartTooltipContent({
     indicator?: "line" | "dot" | "dashed";
     nameKey?: string;
     labelKey?: string;
+    /** Formats just the numeric value in the default row layout (indicator
+     * + name + value untouched) - unlike `formatter`, which replaces the
+     * *entire* row and would need to reimplement all of that just to change
+     * how the number itself reads. Ignored when `formatter` is given (that
+     * already fully owns the row). Defaults to the same
+     * `value.toLocaleString()` this always used. */
+    valueFormatter?: (value: number) => string;
   } & Omit<
     RechartsPrimitive.DefaultTooltipContentProps<
       TooltipValueType,
@@ -255,7 +263,8 @@ function ChartTooltipContent({
                       {item.value != null && (
                         <span className="font-mono font-medium text-foreground tabular-nums">
                           {typeof item.value === "number"
-                            ? item.value.toLocaleString()
+                            ? (valueFormatter?.(item.value) ??
+                              item.value.toLocaleString())
                             : String(item.value)}
                         </span>
                       )}

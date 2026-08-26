@@ -19,7 +19,9 @@ import {
   SidebarMenuItem,
 } from "@/components/primitive/sidebar";
 import { APP_CONFIG } from "@/config/app-config";
+import { iconName } from "@/config/nav-icons";
 import { usePreferencesStore } from "@/runtime/store/preferences/preferences-provider";
+import type { SidebarNavGroupData } from "@/types/navigation";
 
 import { NavUser } from "../../derived/menu/nav-user-menu";
 
@@ -67,6 +69,29 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "themes", title: "Themes", url: "/settings/themes", icon: Palette },
   { id: "logs", title: "Logs", url: "/settings/logs", icon: Server },
 ];
+
+/** The same fixed nav above, reshaped into `SidebarNavGroupData[]` -
+ * `SearchDialog`'s own prop shape (built for the `/os` sidebar's
+ * database-driven nav, string icon names via `resolveNavIcon`) - so
+ * `settings/layout.tsx` (a Server Component) can drop the same search
+ * dialog into its own header instead of a plain "Settings" label, without a
+ * second, independently-maintained nav list to keep in sync with the one
+ * above. A plain function, not a component - safe to call from a Server
+ * Component despite this file's own `"use client"`. */
+export function getSettingsSearchNav(): SidebarNavGroupData[] {
+  return [
+    {
+      id: "settings",
+      label: "Settings",
+      items: [BACK_TO_OS_ITEM, ...SETTINGS_NAV_ITEMS].map((item) => ({
+        id: item.id,
+        title: item.title,
+        url: item.url,
+        icon: iconName(item.icon),
+      })),
+    },
+  ];
+}
 
 export function SettingsSidebar({
   squareLogoSrc = "/assets/images/client-logo-square.png",
