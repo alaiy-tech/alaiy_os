@@ -110,10 +110,10 @@ are dotted-path *strings*; only FAC's `custom_tools` plugin ever resolves them.
 On a site without FAC, `assistant_tools/` is never imported and the OS runs
 unchanged — which is why `required_apps` stays `["erpnext"]`.
 
-The default install path sets FAC up for you: `scripts/install_fac.sh` fetches
-and installs it, and provisioning's `enable_fac_custom_tools` step turns on the
-`custom_tools` plugin every migrate (FAC admin → Plugins remains the manual
-fallback). See [Install](#install) — including how to opt out.
+Installing the OS sets FAC up for you: `after_install` fetches and installs it,
+and provisioning's `enable_fac_custom_tools` step turns on the `custom_tools`
+plugin on every migrate (FAC admin → Plugins remains the manual fallback). See
+[Install](#install) — including how to opt out.
 
 Agent- and connector-specific tools are *not* registered here. Those apps ship
 their own tools via their own `assistant_tools` hook, so a tool appears only
@@ -145,33 +145,53 @@ bench get-app alaiy_os /path/to/alaiy_os
 bench --site <site> install-app alaiy_os
 bench --site <site> migrate
 bench build --app alaiy_os
-
-# Frappe Assistant Core (FAC) — fetch, install, and enable its custom_tools plugin
-bash apps/alaiy_os/scripts/install_fac.sh --site <site>
 ```
 
 ### FAC
 
-The last command is what exposes `assistant_tools/` over MCP: it runs
-`bench get-app` for [Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core),
-`bench --site <site> install-app frappe_assistant_core`, and then enables FAC's
-`custom_tools` plugin. Every step is skipped when already satisfied, so the
-script is idempotent and safe to re-run. `--dry-run` prints the commands it
-would run (only the read-only checks actually execute); `--repo`/`--branch`
-override what is fetched; `--help` lists the rest.
+`install-app alaiy_os` brings [Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core)
+in with it. After provisioning commits, `after_install` runs
+`ensure_fac_installed()`, which fetches FAC into `apps/` if it isn't there,
+installs it on the site, and enables its `custom_tools` plugin — the three
+manual steps that used to stand between a fresh site and working MCP tools:
 
-**Opting out.** `ALAIY_OS_INSTALL_FAC=false` (or `--no-fac`) makes the script
-exit before any network call — the CI-safe path. The OS runs unchanged on a site
-without FAC; only the MCP tools go unexposed.
+```
+Installing alaiy_os...
+Alaiy OS: 19/19 provisioning steps succeeded.
+Alaiy OS: installing frappe_assistant_core (skip with ALAIY_OS_INSTALL_FAC=false)...
+Installing frappe_assistant_core...
+Alaiy OS: frappe_assistant_core installed.
+Alaiy OS: FAC plugin 'custom_tools' enabled.
+```
 
-This is a separate command rather than part of `install-app` because fetching an
-app is a bench/pip-level operation outside the site transaction, and a freshly
-pip-installed app is not importable in the process that installed it — an
-`after_install` hook could fetch FAC but could never install it. So provisioning
-only *detects* FAC: on a site without it, `bench migrate` prints the command
-above (suppressed when `ALAIY_OS_INSTALL_FAC=false`, to keep opted-out CI logs
-clean), and on a site with it, the `enable_fac_custom_tools` step keeps
-`custom_tools` enabled.
+It only ever runs on **install**, never on `bench migrate` — a deploy must not
+depend on the network. Migrate still re-runs `enable_fac_custom_tools`, so the
+plugin cannot drift off, and prints the manual command on a site that has no FAC.
+
+**Opting out.** `ALAIY_OS_INSTALL_FAC=false bench --site <site> install-app alaiy_os`
+installs the OS and nothing else, making no network call — the CI-safe path. The
+OS runs unchanged on a site without FAC; only the MCP tools go unexposed.
+
+**Doing it separately.** `scripts/install_fac.sh` is the same three steps as a
+standalone command, for a site that opted out or was installed before this
+existed:
+
+```bash
+bash apps/alaiy_os/scripts/install_fac.sh --site <site>
+```
+
+Every step is skipped when already satisfied, so it is idempotent and safe to
+re-run. `--dry-run` prints the commands it would run (only the read-only checks
+actually execute); `--repo`/`--branch` override what is fetched; `--no-fac` and
+`ALAIY_OS_INSTALL_FAC=false` both make it exit before any network call;
+`--help` lists the rest.
+
+The split — a subprocess for `bench get-app`, an in-process
+`frappe.installer.install_app()` for the site install — is not cosmetic.
+`bench install-app` wraps itself in a per-site filelock with a 1s timeout, which
+`install-app alaiy_os` already holds, so a nested one dies with
+`LockTimeoutError`. Calling the installer directly is what Frappe itself does
+for `required_apps`: same process, same lock, same transaction.
 
 ## Structure
 
@@ -197,4 +217,5 @@ alaiy_os/
 ```
 
 `scripts/install_fac.sh` sits at the repo root, outside the app package, because
-it drives `bench` rather than running inside a site — see [Install](#install).
+it drives `bench` rather than running inside a site. It is the manual equivalent
+of what `after_install` does — see [Install](#install).
