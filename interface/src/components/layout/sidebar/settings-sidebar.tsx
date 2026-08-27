@@ -37,13 +37,14 @@ type SettingsNavItem = {
  * `AppSidebar`, mounted by `app/(main)/settings/layout.tsx` instead of
  * `os/layout.tsx`.
  */
+const BACK_TO_OS_ITEM: SettingsNavItem = {
+  id: "back-to-os",
+  title: "Back to OS",
+  url: "/os",
+  icon: ArrowLeft,
+};
+
 const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
-  {
-    id: "back-to-os",
-    title: "Back to OS",
-    url: "/os",
-    icon: ArrowLeft,
-  },
   {
     id: "organisation",
     title: "Organisation",
@@ -117,8 +118,22 @@ export function SettingsSidebar(props: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip={BACK_TO_OS_ITEM.title}>
+                  <Link href={BACK_TO_OS_ITEM.url}>
+                    <BACK_TO_OS_ITEM.icon />
+                    <span>{BACK_TO_OS_ITEM.title}</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
               {SETTINGS_NAV_ITEMS.map((item) => {
-                const isActive = item.url === "/os" ? false : pathname.startsWith(item.url);
+                const isActive = pathname.startsWith(item.url);
                 return (
                   <SidebarMenuItem key={item.id}>
                     <SidebarMenuButton asChild isActive={isActive} tooltip={item.title}>
