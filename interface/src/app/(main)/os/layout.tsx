@@ -4,6 +4,7 @@ import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { AppSidebar } from "@/components/layout/app-sidebar";
+import { AskAlaiyLauncher } from "@/components/ask-alaiy/ask-alaiy-launcher";
 import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
@@ -106,6 +107,7 @@ export default async function Layout({
         </div>
       </SidebarInset>
     </SidebarProvider>
+    <AskAlaiyLauncher userFullName={user.fullName} />
     </CompanyProvider>
   );
 }
