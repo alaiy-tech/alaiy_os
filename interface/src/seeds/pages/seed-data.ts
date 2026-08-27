@@ -4,9 +4,10 @@
 // runtime. A relative path works identically under both.
 import { STATUS_TONE } from "../../constants/list";
 import type { PageConfigFile } from "../../types/runtime/page-config";
+import { HEADLESS_PRODUCTS_PAGE } from "./products-page";
 
 /**
- * The two seed pages this local SQLite store ships with. Written as typed
+ * The seed pages this local SQLite store ships with. Written as typed
  * TypeScript (checked against `PageConfigFile`/`UIPageDefinition` at compile
  * time) rather than hand-authored JSON, then serialized once at seed time -
  * a real benefit of moving off bundled `.json` files: a typo in a node's
@@ -443,4 +444,4 @@ export const HEADLESS_CUSTOMERS_PAGE: PageConfigFile = {
   },
 };
 
-export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE];
+export const SEED_PAGES: PageConfigFile[] = [HEADLESS_DASHBOARD_PAGE, HEADLESS_CUSTOMERS_PAGE, HEADLESS_PRODUCTS_PAGE];

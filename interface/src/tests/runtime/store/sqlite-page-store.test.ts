@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { InvalidPageConfigError } from "@/runtime/store/invalid-page-config-error";
 import { createSchema, SQLiteUIPageStore, upsertPage } from "@/runtime/store/sqlite-page-store";
+import { SEED_PAGES } from "@/seeds/pages/seed-data";
 import type { PageConfigFile } from "@/types/runtime/page-config";
 
 import { DatabaseSync } from "node:sqlite";
@@ -32,10 +33,11 @@ const VALID_PAGE: PageConfigFile = {
 };
 
 describe("SQLiteUIPageStore", () => {
-  it("initializes the schema and auto-seeds - a fresh store already has the two Headless OS pages", async () => {
+  it("initializes the schema and auto-seeds - a fresh store already has every Headless OS seed page", async () => {
     const store = memoryStore();
-    expect(await store.getPageById("dashboard")).not.toBeNull();
-    expect(await store.getPageById("customers")).not.toBeNull();
+    for (const page of SEED_PAGES) {
+      expect(await store.getPageById(page.id)).not.toBeNull();
+    }
   });
 
   it("auto-seeding is idempotent - re-opening an already-seeded database doesn't duplicate rows", async () => {
@@ -46,7 +48,7 @@ describe("SQLiteUIPageStore", () => {
     ensureSeeded(db);
     ensureSeeded(db);
     const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as { count: number };
-    expect(row.count).toBe(2);
+    expect(row.count).toBe(SEED_PAGES.length);
   });
 
   it("creates and reads back a page by id and by route", async () => {

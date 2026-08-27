@@ -80,15 +80,16 @@ export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
   );
 }
 
-/** Icons picked by hand for the two known seed pages - unlike a page
- * created through `createPageWithSidebarEntry` later, these are genuinely
- * relevant, not the generic fallback. */
+/** Icons picked by hand for the known seed pages - unlike a page created
+ * through `createPageWithSidebarEntry` later, these are genuinely relevant,
+ * not the generic fallback. */
 const SEED_PAGE_ICONS: Record<string, string> = {
   dashboard: "layout-dashboard",
   customers: "users",
+  products: "package",
 };
 
-/** Seeds the two Headless OS pages if the table is empty - a fresh clone
+/** Seeds the Headless OS pages if the table is empty - a fresh clone
  * works with just `pnpm dev`, no manual step required. A no-op (not an
  * error) if pages already exist, so it's safe to call unconditionally on
  * every store construction. Also ensures each seed page has a dynamic
