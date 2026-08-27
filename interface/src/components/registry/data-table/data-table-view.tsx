@@ -49,6 +49,8 @@ export type OsDataTableViewProps = {
   searchPlaceholder?: string;
   /** Mirrors `OsDataTable`'s own `searchParam` - see its doc comment. */
   searchParam?: string;
+  /** Mirrors `OsDataTable`'s own `filterParam` - see its doc comment. */
+  filterParam?: string;
   columnVisibility?: boolean;
   minVisibleColumns?: number;
   selectable?: boolean;
@@ -113,6 +115,7 @@ export function OsDataTableView({
   searchable,
   searchPlaceholder,
   searchParam,
+  filterParam,
   columnVisibility,
   minVisibleColumns,
   selectable,
@@ -170,6 +173,7 @@ export function OsDataTableView({
       searchParam={searchParam}
       filterable={filterable}
       filterFields={filterFields}
+      filterParam={filterParam}
       columnVisibility={columnVisibility}
       defaultColumnOrder={defaultColumnOrder}
       compulsoryColumns={compulsoryColumns}
