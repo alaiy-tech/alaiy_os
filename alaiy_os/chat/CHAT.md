@@ -13,8 +13,10 @@ any client  ──POST──▶ api/chat.send_message ┐
      └──poll──▶ api/chat.get_messages       ▼
                                  chat/runner.run_turn  (worker)
                                             │
-               engine/llm.complete ◀────────┤────────▶ chat/tools.call_tool
-               (ai_client hook)             │           (FAC tool registry)
+      engine/llm.stream / .complete ◀───────┤────────▶ chat/tools.call_tool
+             (ai_client hook)               │           (FAC tool registry)
+                    │ text deltas           │
+                    └───────────────────────┼──▶ the row grows mid-turn
                                             ▼
                                OS Chat Session / OS Chat Message
 ```
@@ -30,7 +32,7 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_skills` | — | the `/` command catalogue |
 | `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
-| `get_messages` | `session`, `after=0` | `{status, error, messages[]}` — the poll endpoint |
+| `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[], suggestions[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
 | `delete_session` | `session` | `{deleted}` |
 | `upload_attachment` | `session` + a multipart `file` | `{name, file_name, file_url, file_size, chars}` |
@@ -41,8 +43,21 @@ The flow is: `create_session` once, then per question `send_message` → poll
 `get_messages(after=<highest seq seen>)` until `status` leaves `Running`.
 Messages arrive as they are committed, so tool calls show up before the answer.
 
+Progressive output is opt-in, per call, and that is the whole of **Streaming**
+below. Pass `partial=1` and `get_messages` also returns the message the assistant
+is still writing, flagged `partial: true`. A caller that asks for it takes on one
+rule: advance the cursor past *complete* messages only — a partial row is re-sent,
+longer, on every poll — and redraw a message it has seen before rather than append
+it again.
+
+Off by default, and it has to be, because that rule inverts the one every existing
+client follows. A poller that advanced to the highest seq it saw would step past
+the partial row and never be sent the finished message, leaving a truncated answer
+on screen for good. An unmodified consumer therefore sees exactly what it always
+did: nothing until the message is complete.
+
 A message is
-`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[]}`.
+`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[], partial}`.
 `tool_calls` is `{id, name, input}` per tool the assistant invoked; a tool's
 *result* is not returned — it is raw JSON the model has already summarised in its
 reply, and can be megabytes. Read `OS Chat Message.blocks` directly if you need
@@ -302,6 +317,72 @@ FAC stays an optional dependency: `tools.py` returns no tools on a site without
 it and the chat still answers, in line with the note in `hooks.py` about why
 `frappe_assistant_core` is absent from `required_apps`.
 
+## Suggested questions
+
+Three follow-ups under the newest answer — "and the month before?", "which SKUs
+drove that?" — offered as chips a client sends verbatim on a click. The welcome
+screen's prompt chips already prove the interaction; this keeps it alive past the
+first message, which is precisely where a user runs out of ideas about what their
+data can answer.
+
+```
+run_turn:
+  _loop(doc)              the answer, as before
+  suggest.attach(doc)     one more llm.complete, no tools
+  status ──▶ Idle
+
+get_messages ──▶ {status, error, messages[], suggestions: ["…", "…", "…"]}
+```
+
+**It is a second LLM call in the worker, not an endpoint.** The obvious shape is
+`get_suggested_questions(session)`, called when the answer lands — and it breaks
+the rule under **Rules that carry over**: no LLM call in a web request. The
+reasons are the turn's own. A provider that hangs hangs the request; a client that
+wants chips pays a second round-trip for them. The poll already runs, and already
+arrives at exactly the moment there is something to say.
+
+**`suggestions` rides the response, not the message it belongs to**, and that is
+load-bearing rather than a matter of taste. A poller advances its cursor past
+every *complete* message, and these are written after the final assistant message
+is committed — so by then that row is behind every client's cursor and will never
+be sent again. A field on it would be written and never read. Returned beside
+`status`, it reaches every poll including the last one, which is the only one that
+matters. It is still *stored* on the message (`OS Chat Message.suggestions`), so
+reopening a chat from the history restores the chips it ended on rather than a
+dead end; the API just never serves them that way.
+
+A `Running` session offers none. The newest answer is then the *previous* one, and
+a chip under a question already being answered is a click that gets refused ("this
+chat is still working on the previous message").
+
+**Every failure is silent.** `attach` cannot raise: it runs after the turn is
+committed, and a suggestion is a nicety that may never cost a user their answer. A
+provider that errors, a model that replies in prose, an array of numbers — each is
+logged and yields no chips. `_parse` is written for that: it strips a code fence,
+rejects anything that is not a list of strings, drops the over-long rather than
+truncating them (half a question is not a question), dedupes, and caps at three.
+Three, not five, because a wall of chips between the answer and the composer stops
+reading as "you could also ask" and starts reading as a menu.
+
+**The call gets no tools.** Suggestions are written from the transcript that
+already exists; a call able to read data would be a second, unaudited route to it
+for the sake of decorating a reply. What it *is* given is the tool **names**, as a
+fence — a chip the assistant cannot act on is worse than no chip. Their
+descriptions are written for a model deciding whether to call one, which is a
+different question, and would be the largest thing in the request.
+
+The transcript is the last six messages' denormalised `text`, never `blocks`: tool
+arguments, tool results and the contents of an attached document are not what a
+follow-up is written from, and they are the expensive part of the history.
+Filtering on non-empty `text` drops tool-result rows for free. Mention *labels*
+ride along, because "how did that brand do the month before?" is exactly the chip
+this exists to make cheap — the resolved dates behind them are the turn's business,
+not this one's.
+
+No tenant hook, yet. `chat_suggestion_filter` in the style of `chat_skill_filter`
+is the obvious next seam if a deployment needs to veto or rewrite what is offered,
+and nothing in the storage or the wire shape has to change when it lands.
+
 ## Charts
 
 A chart is a **prompt convention, not a channel**. `CHART_PROMPT` in `runner.py`
@@ -359,12 +440,56 @@ A tool round-trip is not its own doctype. It is an assistant message whose
 blocks contain `tool_use`, followed by a user message whose blocks are
 `tool_result` — the Anthropic wire shape exactly, so replaying history is a
 `json.loads` per row and nothing translates. `OS Chat Message.text` is the
-denormalised text blocks, for display only.
+denormalised text blocks, for display only. `OS Chat Message.suggestions` is the
+same kind of column — display-only, written after the fact, and never read back
+into the model's context.
 
 Deleting a session deletes its messages and any staged attachments
 (`OSChatSession.on_trash`), after which Frappe's own cascade unlinks the uploaded
 Files. Both deletes must stay in `on_trash` rather than `after_delete`:
 `delete_doc` runs `on_trash`, *then* the link check, then removes attachments.
+
+## Streaming
+
+The answer is readable while the model is still writing it, and the message row
+is how — there is no second channel.
+
+There cannot be one. A turn runs in a worker, in a different process from any web
+request, so at the moment tokens are produced there is no response left open to
+push them down. What there *is* is a poll that already runs mid-turn. So the
+assistant message is inserted **before the first token**, with empty `blocks` and
+`is_partial = 1`; `engine/llm.stream` hands each text delta to a callback that
+appends to a buffer and rewrites the row's `text`; when the stream ends, one last
+write puts the blocks in and clears the flag. `get_messages` needs almost no new
+code — it returns the row it always did, longer each time, to a caller that asked
+for it with `partial=1`.
+
+Two consequences worth knowing:
+
+- **The flush is throttled** — `STREAM_FLUSH_SECONDS` (0.4) and
+  `STREAM_FLUSH_CHARS` (200), whichever comes first. Every flush is an `UPDATE`
+  plus a `COMMIT`, so one per token would make the database the bottleneck. The
+  desk page polls at `POLL_INTERVAL_STREAM_MS` (400) while a partial is open,
+  which is what the throttle is matched to.
+- **The final write is authoritative** and takes its `text` from the blocks, not
+  from the buffer. A delta the provider sent twice, or dropped, cannot leave the
+  stored message disagreeing with what the model said.
+
+A row with `is_partial = 1` and no blocks is a turn that died mid-answer. Its
+text is kept — it is the part a person can read — but `_history` skips a message
+with no blocks, because the API rejects empty content outright, and
+`run_turn` clears the flag on its way out so no client polls for a worker that is
+gone.
+
+`stream` is **optional** on the `ai_client` contract (see `engine/ai_client.py`).
+A managed client that predates it is missing the method rather than broken by it,
+and `runner._loop` checks with `llm.streaming_available()` before choosing a path.
+A provider that accepts the call and then refuses to stream falls back too, but
+only if nothing arrived first: once there is text on screen, a failure is a failed
+turn with a readable partial answer, not a silent restart.
+
+Set `chat_streaming: false` to turn the whole thing off; the buffered path is
+unchanged and produces byte-identical messages.
 
 ## One turn at a time
 
@@ -431,12 +556,37 @@ bench --site <site> execute alaiy_os.chat.smoke.run --kwargs "{'question': '...'
 Runs the loop in-process — no worker, no browser, traceback on stdout instead
 of in the Error Log. Costs one real LLM call.
 
+```bash
+bench --site <site> execute alaiy_os.chat.smoke.run_suggest
+```
+
+The follow-up chips against a scripted client: no network, no cost, a fixed
+answer and a fixed suggestion payload. Checks that the extra call happens with no
+tools and with the conversation in it, that the chips are stored, that
+`get_messages` serves them to a caller whose cursor is already past the last
+message — the one failure that would make the feature invisible while everything
+else passed — that a `Running` session offers none, and that `chat_suggestions:
+false` leaves the turn identical and silent. The parser is exercised separately on
+the payloads a real model produces: prose, a fenced array, objects, duplicates.
+
+```bash
+bench --site <site> execute alaiy_os.chat.smoke.run_stream
+```
+
+The streaming path against a scripted client rather than a provider: no network,
+no cost, a fixed answer. Checks that the text was readable *before* the turn
+finished and grew, that the finished row is complete and no longer partial, that
+`chat_streaming: false` produces identical text, and that a client with no
+`stream` method takes the buffered path in silence.
+
 ## site_config keys
 
 | key | default | effect |
 |---|---|---|
 | `chat_model` | `gemini-3.1-flash-lite` | model for new sessions (per-session override on the record) |
 | `chat_max_turns` | 12 | LLM calls per user message |
+| `chat_streaming` | `true` | write the answer as it arrives (see **Streaming**); `false` restores one write per message |
+| `chat_suggestions` | `true` | offer follow-up questions under each answer (see **Suggested questions**); `false` skips the extra call |
 | `chat_tools` | unset | allow-list of tool names; unset = everything the user may call |
 | `chat_system_prompt` | built-in | replaces the whole system prompt |
 
