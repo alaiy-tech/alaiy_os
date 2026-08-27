@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -10,7 +11,8 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/primitive/sidebar";
-import { getServerUser } from "@/lib/frappe/server";
+import { getCompanyInfo, getOrganisationLogoSrc, getServerUser } from "@/lib/frappe/server";
+import { buildPageMetadata } from "@/lib/metadata";
 import { cn } from "@/utils";
 import { getPreference } from "@/server/server-actions";
 
@@ -24,15 +26,32 @@ import { NotificationsPopover } from "../../../components/derived/popover/notifi
  * per the brief, the Settings sidebar is a baseline UI layout thing, so its
  * config stays in code rather than the sidebar database.
  */
+/** The section-wide fallback ("<Company> OS | Settings") - every real
+ * `/settings/*` page overrides this with its own more specific
+ * `generateMetadata`, so this is only ever seen for a route directly under
+ * `/settings` with no page-level metadata of its own. */
+export async function generateMetadata(): Promise<Metadata> {
+  const company = await getCompanyInfo();
+  return buildPageMetadata({
+    companyName: company?.name ?? null,
+    pageTitle: "Settings",
+    description:
+      "Configure your organisation, users, permissions, connectors, themes, and activity logs for Alaiy OS.",
+    keywords: ["settings", "organisation", "users", "permissions", "Alaiy OS"],
+    route: "/settings",
+  });
+}
+
 export default async function Layout({
   children,
 }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
-  const [variant, collapsible, user] = await Promise.all([
+  const [variant, collapsible, user, logoSrc] = await Promise.all([
     getPreference("sidebar_variant"),
     getPreference("sidebar_collapsible"),
     getServerUser(),
+    getOrganisationLogoSrc(),
   ]);
 
   if (!user) {
@@ -50,7 +69,12 @@ export default async function Layout({
         } as React.CSSProperties
       }
     >
-      <SettingsSidebar variant={variant} collapsible={collapsible} />
+      <SettingsSidebar
+        variant={variant}
+        collapsible={collapsible}
+        squareLogoSrc={logoSrc.square}
+        horizontalLogoSrc={logoSrc.horizontal}
+      />
       <SidebarInset
         className={cn(
           "[html[data-content-layout=centered]_&>*]:mx-auto",
