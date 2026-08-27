@@ -130,6 +130,7 @@ def _run_provisioning():
         check_dotted_path_handlers,
         ensure_sales_channel_field,
         ensure_assistant_roles,
+        enable_fac_custom_tools,
     ]
     failed = []
     for step in steps:
@@ -1018,3 +1019,85 @@ def ensure_assistant_roles():
     that adds FAC later has a working permission model immediately.
     """
     _ensure_assistant_roles()
+
+
+# ── FAC (Frappe Assistant Core) ───────────────────────────────────────────────
+
+FAC_APP = "frappe_assistant_core"
+FAC_PLUGIN = "custom_tools"
+FAC_INSTALL_SCRIPT = "bash apps/alaiy_os/scripts/install_fac.sh --site {site}"
+
+
+def _fac_install_opted_out():
+    return os.environ.get("ALAIY_OS_INSTALL_FAC", "true").strip().lower() in (
+        "false", "0", "no", "off",
+    )
+
+
+def enable_fac_custom_tools():
+    """Enable FAC's custom_tools plugin so the OS's MCP tools are actually exposed.
+
+    hooks.py's `assistant_tools` entries are dotted-path strings that nothing
+    resolves until FAC's custom_tools plugin is on — so a site with FAC
+    installed but the plugin off has the tools present and invisible. That was
+    a manual step in FAC admin -> Plugins; this makes it part of provisioning.
+
+    Never fetches or installs anything: pulling FAC in is a bench-level
+    operation (see scripts/install_fac.sh) and a freshly pip-installed app is
+    not importable in the process that installed it. On a site without FAC this
+    only prints a pointer to that script, so FAC stays optional exactly as
+    hooks.py describes.
+
+    Public and importable on its own — scripts/install_fac.sh calls it via
+    `bench --site <site> execute`.
+    """
+    if FAC_APP not in frappe.get_installed_apps():
+        if not _fac_install_opted_out():
+            # Keep opted-out CI logs clean; otherwise say exactly what to run.
+            print(
+                f"Alaiy OS: {FAC_APP} is not installed, so the MCP tools in "
+                f"assistant_tools/ are not exposed. To install it:\n"
+                f"    {FAC_INSTALL_SCRIPT.format(site=frappe.local.site)}\n"
+                f"  (skip with ALAIY_OS_INSTALL_FAC=false)"
+            )
+        return
+
+    try:
+        from frappe_assistant_core.utils.plugin_manager import get_plugin_manager
+    except (ImportError, AttributeError) as e:
+        # FAC is installed on the site but its internals moved between
+        # versions. Fall back to the setting the plugin manager persists to,
+        # rather than failing provisioning over a refactor upstream.
+        print(
+            f"Alaiy OS: could not load FAC's plugin manager ({e}); "
+            f"falling back to writing enabled_plugins_list directly."
+        )
+        _enable_fac_plugin_via_settings()
+        return
+
+    # enable_plugin() is itself idempotent -- it returns early when the plugin
+    # is already in the enabled set -- so this is safe on every migrate.
+    get_plugin_manager().enable_plugin(FAC_PLUGIN)
+    print(f"Alaiy OS: FAC plugin '{FAC_PLUGIN}' enabled.")
+
+
+def _enable_fac_plugin_via_settings():
+    """Append custom_tools to Assistant Core Settings.enabled_plugins_list.
+
+    The JSON field the plugin manager persists to (default `["core"]`). Only
+    used when FAC's plugin_manager API is unavailable; FAC picks the value up
+    on its next plugin discovery.
+    """
+    settings = frappe.get_single("Assistant Core Settings")
+    try:
+        enabled = json.loads(settings.enabled_plugins_list or "[]")
+    except ValueError:
+        enabled = []
+    if not isinstance(enabled, list):
+        enabled = []
+    if FAC_PLUGIN in enabled:
+        return
+    enabled.append(FAC_PLUGIN)
+    settings.enabled_plugins_list = json.dumps(enabled)
+    settings.save(ignore_permissions=True)
+    print(f"Alaiy OS: FAC plugin '{FAC_PLUGIN}' added to enabled_plugins_list.")

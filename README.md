@@ -108,8 +108,12 @@ that app owns.
 **FAC is not a dependency of this app.** `hooks.py`'s `assistant_tools` entries
 are dotted-path *strings*; only FAC's `custom_tools` plugin ever resolves them.
 On a site without FAC, `assistant_tools/` is never imported and the OS runs
-unchanged — which is why `required_apps` stays `["erpnext"]`. To use the tools,
-install FAC and enable its `custom_tools` plugin (FAC admin → Plugins).
+unchanged — which is why `required_apps` stays `["erpnext"]`.
+
+The default install path sets FAC up for you: `scripts/install_fac.sh` fetches
+and installs it, and provisioning's `enable_fac_custom_tools` step turns on the
+`custom_tools` plugin every migrate (FAC admin → Plugins remains the manual
+fallback). See [Install](#install) — including how to opt out.
 
 Agent- and connector-specific tools are *not* registered here. Those apps ship
 their own tools via their own `assistant_tools` hook, so a tool appears only
@@ -141,7 +145,33 @@ bench get-app alaiy_os /path/to/alaiy_os
 bench --site <site> install-app alaiy_os
 bench --site <site> migrate
 bench build --app alaiy_os
+
+# Frappe Assistant Core (FAC) — fetch, install, and enable its custom_tools plugin
+bash apps/alaiy_os/scripts/install_fac.sh --site <site>
 ```
+
+### FAC
+
+The last command is what exposes `assistant_tools/` over MCP: it runs
+`bench get-app` for [Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core),
+`bench --site <site> install-app frappe_assistant_core`, and then enables FAC's
+`custom_tools` plugin. Every step is skipped when already satisfied, so the
+script is idempotent and safe to re-run. `--dry-run` prints the commands it
+would run (only the read-only checks actually execute); `--repo`/`--branch`
+override what is fetched; `--help` lists the rest.
+
+**Opting out.** `ALAIY_OS_INSTALL_FAC=false` (or `--no-fac`) makes the script
+exit before any network call — the CI-safe path. The OS runs unchanged on a site
+without FAC; only the MCP tools go unexposed.
+
+This is a separate command rather than part of `install-app` because fetching an
+app is a bench/pip-level operation outside the site transaction, and a freshly
+pip-installed app is not importable in the process that installed it — an
+`after_install` hook could fetch FAC but could never install it. So provisioning
+only *detects* FAC: on a site without it, `bench migrate` prints the command
+above (suppressed when `ALAIY_OS_INSTALL_FAC=false`, to keep opted-out CI logs
+clean), and on a site with it, the `enable_fac_custom_tools` step keeps
+`custom_tools` enabled.
 
 ## Structure
 
@@ -165,3 +195,6 @@ alaiy_os/
 ├── public/js/item.js                 # Item-form-only version of the same fix (doctype_js hook)
 └── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
 ```
+
+`scripts/install_fac.sh` sits at the repo root, outside the app package, because
+it drives `bench` rather than running inside a site — see [Install](#install).
