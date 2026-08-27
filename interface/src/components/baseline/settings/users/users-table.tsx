@@ -23,14 +23,9 @@ import {
   SelectValue,
 } from "@/components/primitive/select";
 import { Separator } from "@/components/primitive/separator";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/primitive/table";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/primitive/table";
+import { PAGE_SIZE_OPTIONS } from "@/constants/list";
+import { getPageNumbers } from "@/utils/get-page-numbers";
 
 import type { UserRow } from "./data";
 
@@ -38,24 +33,9 @@ function preventPaginationNavigation(event: MouseEvent<HTMLAnchorElement>) {
   event.preventDefault();
 }
 
-function getPageNumbers(currentPage: number, pageCount: number) {
-  if (pageCount <= 3) {
-    return Array.from({ length: pageCount }, (_, index) => index + 1);
-  }
-
-  if (currentPage <= 2) return [1, 2, 3];
-  if (currentPage >= pageCount - 1)
-    return [pageCount - 2, pageCount - 1, pageCount];
-
-  return [currentPage - 1, currentPage, currentPage + 1];
-}
-
 export function UsersTable({ table }: { table: TableType<UserRow> }) {
   const pageCount = Math.max(table.getPageCount(), 1);
-  const currentPage = Math.min(
-    table.getState().pagination.pageIndex + 1,
-    pageCount,
-  );
+  const currentPage = Math.min(table.getState().pagination.pageIndex + 1, pageCount);
   const pageNumbers = getPageNumbers(currentPage, pageCount);
   const rowsPerPage = `${table.getState().pagination.pageSize}`;
 
@@ -68,12 +48,7 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} className="py-4 font-normal">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext(),
-                        )}
+                    {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </TableHead>
                 ))}
               </TableRow>
@@ -90,20 +65,14 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="px-3 py-4 align-middle">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext(),
-                      )}
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
                   ))}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell
-                  colSpan={table.getVisibleLeafColumns().length}
-                  className="h-24 text-center"
-                >
+                <TableCell colSpan={table.getVisibleLeafColumns().length} className="h-24 text-center">
                   No results.
                 </TableCell>
               </TableRow>
@@ -122,16 +91,12 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
               value={`${table.getState().pagination.pageSize}`}
               onValueChange={(value) => table.setPageSize(Number(value))}
             >
-              <SelectTrigger
-                size="sm"
-                className="w-20"
-                id="users-rows-per-page"
-              >
+              <SelectTrigger size="sm" className="w-20" id="users-rows-per-page">
                 <SelectValue placeholder={rowsPerPage} />
               </SelectTrigger>
               <SelectContent side="top">
                 <SelectGroup>
-                  {[10, 20, 30, 40, 50].map((pageSize) => (
+                  {PAGE_SIZE_OPTIONS.map((pageSize) => (
                     <SelectItem key={pageSize} value={`${pageSize}`}>
                       {pageSize}
                     </SelectItem>
@@ -151,11 +116,7 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
               <PaginationPrevious
                 href="#"
                 text=""
-                className={
-                  !table.getCanPreviousPage()
-                    ? "pointer-events-none opacity-50"
-                    : undefined
-                }
+                className={!table.getCanPreviousPage() ? "pointer-events-none opacity-50" : undefined}
                 onClick={(event) => {
                   preventPaginationNavigation(event);
                   table.previousPage();
@@ -171,9 +132,7 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
               <PaginationItem key={`page-${pageNumber}`}>
                 <PaginationLink
                   href="#"
-                  isActive={
-                    table.getState().pagination.pageIndex === pageNumber - 1
-                  }
+                  isActive={table.getState().pagination.pageIndex === pageNumber - 1}
                   onClick={(event) => {
                     preventPaginationNavigation(event);
                     table.setPageIndex(pageNumber - 1);
@@ -192,11 +151,7 @@ export function UsersTable({ table }: { table: TableType<UserRow> }) {
               <PaginationNext
                 href="#"
                 text=""
-                className={
-                  !table.getCanNextPage()
-                    ? "pointer-events-none opacity-50"
-                    : undefined
-                }
+                className={!table.getCanNextPage() ? "pointer-events-none opacity-50" : undefined}
                 onClick={(event) => {
                   preventPaginationNavigation(event);
                   table.nextPage();

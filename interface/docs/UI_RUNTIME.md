@@ -821,6 +821,44 @@ production today regardless (the same is already true of every existing
 verb), so there's no concrete caller to build and test against yet - this is
 a recorded decision, not an implementation.
 
+**A table can also self-host search/filter/per-page-size in its own toolbar,
+instead of a separate `os-filter-bar` node.** `OsDataTable` gained three more
+URL-param props alongside `pageParam`/`sortParam`, all following the exact
+same "omit the param name and the control still renders but does nothing"
+convention:
+- `searchParam` - when set alongside `searchable`, the table's own search box
+  reads/writes this param (debounced) instead of local in-memory state, and
+  skips filtering `data` client-side (it's assumed already filtered
+  server-side, the same fork `sort`/`sortParam` already established).
+  Omitted keeps today's local in-memory search - correct for a small,
+  fully-loaded table like Top Products, wrong for a paginated one.
+- A column's `filterParam` (`column-spec.tsx`'s `ColumnSpec`) marks its
+  filter as server-driven: `buildManualFilterFields` collects every
+  `filterable` column that also declares one, and `OsDataTable` renders them
+  in a dedicated `ManualFilterPopover` (`components/derived/popover/
+  manual-filter-popover.tsx`) instead of the generic `FilterPopover`.
+  Deliberately **no operator picker** - `readNamedFilters` only ever applies
+  the one operator a named entry's own `query.filters` declares per field, so
+  offering a user-editable operator the server would silently ignore would
+  be a real bug. Its Apply/Clear each issue one batched `URLSearchParams`
+  write (never sequential single-field writes, which would read the same
+  stale snapshot and silently undo each other).
+- `pageSizeParam` - renders a per-page `<Select>` in `PaginationFooter`'s
+  external (server-paginated, `hasMore`-only) branch, writing
+  `` `${name}_page_size` ``. `resolver.ts`'s `readNamedPageSize` validates it
+  against the fixed `PAGE_SIZE_OPTIONS` whitelist (`constants/list.ts`)
+  before overriding `request.params.pageSize` - an arbitrary URL-supplied
+  page size never reaches Frappe. The same external branch also gets a
+  plain "Go to page" number input (not numbered links - there's no true
+  total in this mode, only `hasMore`, so numbered links would have nothing
+  honest to count against).
+
+See `/os`'s `recentOrders` entry (`src/seed.ts`) for a complete example: a
+`filterParam`-marked `status` column (rendered as a `format: "badge"` cell
+via `os-dynamic-badge`'s category system, `utils/get-badge-style.ts`),
+`searchParam`, `pageSizeParam`, and `columnVisibility` all set directly on
+one `os-data-table` node, no `os-filter-bar` node alongside it at all.
+
 ## The Component Registry: a machine-readable contract
 
 Every component lives in one base registry (`runtime/registry/component-registry.ts`)
