@@ -52,6 +52,39 @@ frappe.pages["ask-alaiy"].on_page_show = function (wrapper) {
 };
 
 const POLL_INTERVAL_MS = 1000;
+// While the assistant is mid-sentence the poll IS the stream (see chat/runner.py
+// — the message row grows and `partial` says it is still being written), so it
+// runs faster. Only while a partial is open: an idle Running turn, one waiting on
+// a slow tool, stays on the interval above.
+const POLL_INTERVAL_STREAM_MS = 400;
+
+/* Text arrives a chunk at a time — a row rewritten every ~400ms server-side
+   (chat/runner.py), which is as fine-grained as a poll transport gets. Even true
+   SSE would carry multi-character tokens rather than characters, so typing is a
+   rendering concern either way and lives here.
+
+   The rate is derived rather than fixed. A fixed chars/sec either falls behind a
+   fast model (text landing seconds after it finished) or outruns a slow one
+   (type, stall, type, stall). Draining what has arrived over roughly one poll
+   interval self-corrects: the faster it arrives, the faster it is typed. */
+const REVEAL_WINDOW_MS = 420;
+/** Floor, so the tail of a chunk doesn't crawl. */
+const REVEAL_MIN_CPS = 45;
+/** Ceiling, and the one that decides how this feels. The window alone ties the
+ *  rate to throughput, so a fast model delivering 300 characters a poll types at
+ *  ~740/s — about 13 characters a frame, which reads as blocks appearing
+ *  rather than as typing. Roughly 5 a frame still reads as typing.
+ *
+ *  The cost is that a long answer finishes after the model does (~6s behind on
+ *  2200 characters), which is mostly invisible: that much text is a minute and a
+ *  half of reading. Raise it if waiting for the tail becomes the complaint. */
+const REVEAL_MAX_CPS = 250;
+/** Applied only when a message is first seen, never mid-stream: reopening a chat
+ *  part-way through an answer arrives with a paragraph already written, and
+ *  nobody wants to watch it replay. Applying it to a live stream would instead
+ *  make a long answer lurch forward the moment its backlog outgrew the cap —
+ *  the very jump the cap exists to avoid. */
+const REVEAL_SNAP_CHARS = 600;
 const NEAR_BOTTOM_PX = 120;
 
 // Mirrors chat/attachments.py SUPPORTED. Only a hint to the file picker — the
@@ -327,6 +360,16 @@ class AlaiyAskPage {
 			}
 			@keyframes ask-alaiy-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
 
+			/* A block caret on the last line of an answer still being written, so a
+			   pause between chunks reads as "thinking" rather than "finished". */
+			.is-partial .ask-alaiy-answer::after {
+				content: ""; display: inline-block; vertical-align: text-bottom;
+				width: 7px; height: 15px; margin-inline-start: 2px; background: var(--s-muted);
+				animation: ask-alaiy-caret 1s steps(1) infinite;
+			}
+			@keyframes ask-alaiy-caret { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0; } }
+
+			.ask-alaiy-typing-turn.is-quiet { display: none; }
 			.ask-alaiy-typing { display: flex; gap: 4px; align-items: center; height: 26px; }
 			.ask-alaiy-typing span {
 				width: 6px; height: 6px; border-radius: 50%; background: var(--s-muted);
@@ -1372,9 +1415,97 @@ class AlaiyAskPage {
 		}
 	}
 
-	_schedule_poll() {
+	/** Type `text` into the answer already on screen, rather than redrawing it.
+	 *
+	 * Called on every poll of a still-writing message. The first call binds the
+	 * loop to that turn's answer div; later ones just raise the target, so the
+	 * node is never rebuilt mid-sentence — which is what would otherwise cancel
+	 * the animation four times a second.
+	 */
+	_reveal(seq, $answer, text, done) {
+		if (this.reveal && this.reveal.seq === seq) {
+			this.reveal.target = text;
+			// Set on the poll that finds the message finished. The loop calls it
+			// once it has typed the rest out, so the settled turn — tool trail,
+			// copy button, chips — replaces the animation instead of cutting it
+			// off mid-sentence. Without this a rate cap would just move the
+			// problem: the tail would vanish into a redraw rather than be read.
+			if (done) this.reveal.done = done;
+			return;
+		}
+		this._stop_reveal();
+		// Text already written before anyone was watching is there, not typed.
+		const from = text.length > REVEAL_SNAP_CHARS ? text.length : 0;
+		this.reveal = {
+			seq: seq, target: text, shown: from, exact: from,
+			$answer: $answer, raf: null, done: done || null,
+		};
+		if (from) $answer.html(this._markdown(text));
+
+		const tick = (now) => {
+			const state = this.reveal;
+			if (!state) return;
+			const dt = Math.max(0, now - (state.last || now));
+			state.last = now;
+
+			const backlog = state.target.length - state.exact;
+			if (backlog > 0) {
+				const cps = Math.min(
+					REVEAL_MAX_CPS,
+					Math.max(REVEAL_MIN_CPS, (backlog * 1000) / REVEAL_WINDOW_MS),
+				);
+				state.exact = Math.min(state.target.length, state.exact + (cps * dt) / 1000);
+				const whole = Math.floor(state.exact);
+				// Only touch the DOM when a whole character appears: this runs at
+				// frame rate, and re-rendering markdown 60 times a second to show
+				// nothing new is pure waste.
+				if (whole > state.shown) {
+					state.shown = whole;
+					const stick = this._near_bottom();
+					state.$answer.html(this._markdown(state.target.slice(0, whole)));
+					if (stick) this._scroll_to_end();
+				}
+			} else if (state.done) {
+				// Finished and fully typed out.
+				const finish = state.done;
+				this._stop_reveal();
+				finish();
+				return;
+			}
+			state.raf = requestAnimationFrame(tick);
+		};
+		this.reveal.raf = requestAnimationFrame(tick);
+	}
+
+	_stop_reveal() {
+		if (this.reveal && this.reveal.raf) cancelAnimationFrame(this.reveal.raf);
+		this.reveal = null;
+	}
+
+	_schedule_poll(streaming) {
 		this._stop_poll();
-		this.poll_timer = setTimeout(() => this._poll(), POLL_INTERVAL_MS);
+		const delay = streaming ? POLL_INTERVAL_STREAM_MS : POLL_INTERVAL_MS;
+		this.poll_timer = setTimeout(() => this._poll(), delay);
+	}
+
+	/** Draw a batch of polled messages and advance the cursor over them.
+	 *
+	 * The cursor stops short of a message still being written: it is re-sent,
+	 * longer, on the next poll, and `_draw` redraws it in place. Returns whether
+	 * one was seen, which is what decides how soon to ask again.
+	 */
+	_absorb(messages) {
+		let partial = false;
+		(messages || []).forEach((message) => {
+			if (message.partial) partial = true;
+			else this.last_seq = message.seq;
+			this._draw(message);
+		});
+		// The dots and the caret make the same claim. While text is arriving the
+		// caret is the better one, so the dots stand down — and come back
+		// between steps, where a tool is running and there is nothing to read.
+		this.$thread.find(".ask-alaiy-typing-turn").toggleClass("is-quiet", partial);
+		return partial;
 	}
 
 	async _poll() {
@@ -1383,18 +1514,18 @@ class AlaiyAskPage {
 			const data = await frappe.xcall("alaiy_os.api.chat.get_messages", {
 				session: session,
 				after: this.last_seq,
+				// This client knows the cursor rule for a half-written message
+				// (see `_absorb`), so it asks to be sent one.
+				partial: 1,
 			});
 			// A different chat was opened while this was in flight — the answer
 			// belongs to a conversation no longer on screen.
 			if (session !== this.session) return;
 
-			(data.messages || []).forEach((message) => {
-				this.last_seq = message.seq;
-				this._draw(message);
-			});
+			const streaming = this._absorb(data.messages);
 
 			if (data.status === "Running") {
-				this._schedule_poll();
+				this._schedule_poll(streaming);
 				return;
 			}
 
@@ -1458,19 +1589,31 @@ class AlaiyAskPage {
 		// A generated file counts as something to show: the model can hand over a
 		// spreadsheet and stop, and the chip is then the whole message.
 		const produced = message.attachments || [];
-		if (!message.text && tools.length === 0 && produced.length === 0) return;
+		// A message still being written starts empty and has nothing to show for
+		// an instant. Draw the shell anyway: it is what the caret hangs off, and
+		// leaving the turn out until the first token would make the answer jump.
+		if (!message.text && !message.partial && tools.length === 0 && produced.length === 0) return;
 
-		const $turn = $('<div class="ask-alaiy-turn"></div>');
+		const $turn = $('<div class="ask-alaiy-turn"></div>')
+			// Polling re-sends a message while it is still being written, so a
+			// draw has to be able to land on one already on screen. The seq is
+			// what makes that possible — without it every poll would append the
+			// answer again.
+			.attr("data-seq", message.seq)
+			.toggleClass("is-partial", !!message.partial);
 		$(`<div class="ask-alaiy-mark">${this._icon("spark")}</div>`).appendTo($turn);
 		const $body = $('<div class="ask-alaiy-body"></div>').appendTo($turn);
 
 		if (tools.length) $body.append(this._trail(tools, new Set(message.tool_errors || [])));
 
-		if (message.text) {
+		if (message.text || message.partial) {
 			// Model output is untrusted text: escape first, then apply our own
 			// markup. Never the other way round.
 			$body.append($('<div class="ask-alaiy-answer"></div>').html(this._markdown(message.text)));
-			$body.append(this._copy_button(message.text));
+			// No copy button until the answer is finished — copying half of one
+			// is never what someone meant, and the button moving down the screen
+			// as the text grows invites exactly that misclick.
+			if (!message.partial) $body.append(this._copy_button(message.text));
 		}
 
 		// Below the answer, unlike a user turn: a generated file is the reply's
@@ -1480,6 +1623,51 @@ class AlaiyAskPage {
 			produced.forEach((file) => $tray.append(this._file_chip(file, {})));
 		}
 
+		const $existing = this.$thread.find(`.ask-alaiy-turn[data-seq="${message.seq}"]`);
+
+		// Still being written, and already on screen: hand the longer text to the
+		// animation and leave the DOM alone. Replacing the node here is what would
+		// cancel the typing on every poll — and would also throw away the
+		// characters not yet revealed, making the answer jump instead of type.
+		if (message.partial && $existing.length) {
+			const $answer = $existing.find(".ask-alaiy-answer");
+			if ($answer.length) {
+				this._reveal(message.seq, $answer, message.text);
+				return;
+			}
+		}
+
+		if (message.partial) {
+			// First sight of this message: mount the turn, then type into it.
+			const $answer = $turn.find(".ask-alaiy-answer").empty();
+			if ($existing.length) $existing.replaceWith($turn);
+			else this._add($turn);
+			if ($answer.length) this._reveal(message.seq, $answer, message.text);
+			return;
+		}
+
+		const swap = () => {
+			const $now = this.$thread.find(`.ask-alaiy-turn[data-seq="${message.seq}"]`);
+			if (!$now.length) return this._add($turn);
+			const stick = this._near_bottom();
+			$now.replaceWith($turn);
+			if (stick) this._scroll_to_end();
+		};
+
+		// Settled, but the animation may still be a sentence behind. Let it finish
+		// and swap in the full turn — tool trail, copy button, download chips —
+		// when it gets there, rather than cutting the tail off with a redraw.
+		if (this.reveal && this.reveal.seq === message.seq) {
+			this._reveal(message.seq, this.reveal.$answer, message.text, swap);
+			return;
+		}
+
+		if ($existing.length) {
+			const stick = this._near_bottom();
+			$existing.replaceWith($turn);
+			if (stick) this._scroll_to_end();
+			return;
+		}
 		this._add($turn);
 	}
 
@@ -1907,19 +2095,20 @@ class AlaiyAskPage {
 		this._draw_sessions(); // move the active highlight straight away
 
 		try {
-			const data = await frappe.xcall("alaiy_os.api.chat.get_messages", { session: name, after: 0 });
+			const data = await frappe.xcall("alaiy_os.api.chat.get_messages", {
+				session: name,
+				after: 0,
+				partial: 1,
+			});
 			if (this.session !== name) return;
 
-			(data.messages || []).forEach((message) => {
-				this.last_seq = message.seq;
-				this._draw(message);
-			});
+			const streaming = this._absorb(data.messages);
 			this._scroll_to_end();
 
 			// It may still be mid-turn — started in another tab, or before a reload.
 			if (data.status === "Running") {
 				this._set_running(true);
-				this._schedule_poll();
+				this._schedule_poll(streaming);
 			}
 		} catch (e) {
 			this._show_error(this._error_text(e, __("Could not open that chat.")));
@@ -1928,6 +2117,7 @@ class AlaiyAskPage {
 
 	_reset(options) {
 		this._stop_poll();
+		this._stop_reveal();
 		// Dropping the id is enough: the session and its messages stay in the
 		// database, this page just stops following them.
 		this.session = null;

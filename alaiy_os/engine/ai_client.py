@@ -17,6 +17,19 @@ returning the shape the executor consumes:
      "stop_reason": str,
      "usage": {"input_tokens": int, "output_tokens": int}}
 
+optionally, for a caller that wants to show the answer as it is written:
+
+    stream(model, system, messages, tools=None, on_text=None) -> dict
+
+which returns *exactly* the same dict, having called `on_text(chunk)` for each
+text delta on the way. Optional, deliberately: this is a published seam, so a
+managed client written before streaming existed must keep working. Absence is the
+answer — `chat/runner.py` checks with `llm.streaming_available()` and takes the
+buffered path when there is no `stream`, the same way `image_support()` reports a
+capability without making a call. Never widen `complete` with a streaming
+argument instead: an override that does not accept it would raise TypeError on
+every turn.
+
 plus two image capabilities, for tools that produce imagery rather than text:
 
     generate_image(prompt, reference_data_uri=None)
@@ -87,7 +100,13 @@ class ByokClient:
 		# integration for. The managed client serves it via the billing service.
 		return {"generate": bool(self._image_key), "translate": False}
 
-	def complete(self, model, system, messages, tools=None):
+	def _prepare(self, model, system, messages, tools=None):
+		"""The provider client and request kwargs, shared by both call paths.
+
+		Factored out so `complete` and `stream` cannot drift: a model, key or
+		header that works buffered must work streamed, or the flag that chooses
+		between them stops being a safe thing to flip.
+		"""
 		import anthropic
 
 		api_key = frappe.conf.get("ai_api_key") or frappe.conf.get("anthropic_api_key")
@@ -111,8 +130,10 @@ class ByokClient:
 		}
 		if tools:
 			kwargs["tools"] = tools
+		return client, kwargs
 
-		response = client.messages.create(**kwargs)
+	def _result(self, response):
+		"""One provider Message in the shape every caller consumes."""
 		return {
 			"content": [block.model_dump() for block in response.content],
 			"stop_reason": response.stop_reason,
@@ -121,6 +142,28 @@ class ByokClient:
 				"output_tokens": response.usage.output_tokens,
 			},
 		}
+
+	def complete(self, model, system, messages, tools=None):
+		client, kwargs = self._prepare(model, system, messages, tools=tools)
+		return self._result(client.messages.create(**kwargs))
+
+	def stream(self, model, system, messages, tools=None, on_text=None):
+		"""Same call, same return value, with text handed over as it arrives.
+
+		`on_text` sees only `text_delta`s — not tool arguments, which are useless
+		half-written, and not thinking. The return value comes from
+		`get_final_message()`, the SDK's own accumulation of the stream, so
+		tool_use blocks, `stop_reason` and `usage` are exactly what the buffered
+		path would have produced and no caller has to know which one ran.
+		"""
+		client, kwargs = self._prepare(model, system, messages, tools=tools)
+		with client.messages.stream(**kwargs) as stream:
+			for event in stream:
+				if event.type != "content_block_delta" or event.delta.type != "text_delta":
+					continue
+				if on_text:
+					on_text(event.delta.text)
+			return self._result(stream.get_final_message())
 
 	def generate_image(self, prompt, reference_data_uri=None):
 		"""One image, via OpenRouter's Unified Image API on the site's own key.

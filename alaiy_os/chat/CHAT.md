@@ -13,8 +13,10 @@ any client  ──POST──▶ api/chat.send_message ┐
      └──poll──▶ api/chat.get_messages       ▼
                                  chat/runner.run_turn  (worker)
                                             │
-               engine/llm.complete ◀────────┤────────▶ chat/tools.call_tool
-               (ai_client hook)             │           (FAC tool registry)
+      engine/llm.stream / .complete ◀───────┤────────▶ chat/tools.call_tool
+             (ai_client hook)               │           (FAC tool registry)
+                    │ text deltas           │
+                    └───────────────────────┼──▶ the row grows mid-turn
                                             ▼
                                OS Chat Session / OS Chat Message
 ```
@@ -30,7 +32,7 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_skills` | — | the `/` command catalogue |
 | `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
-| `get_messages` | `session`, `after=0` | `{status, error, messages[]}` — the poll endpoint |
+| `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
 | `delete_session` | `session` | `{deleted}` |
 | `upload_attachment` | `session` + a multipart `file` | `{name, file_name, file_url, file_size, chars}` |
@@ -41,8 +43,21 @@ The flow is: `create_session` once, then per question `send_message` → poll
 `get_messages(after=<highest seq seen>)` until `status` leaves `Running`.
 Messages arrive as they are committed, so tool calls show up before the answer.
 
+Progressive output is opt-in, per call, and that is the whole of **Streaming**
+below. Pass `partial=1` and `get_messages` also returns the message the assistant
+is still writing, flagged `partial: true`. A caller that asks for it takes on one
+rule: advance the cursor past *complete* messages only — a partial row is re-sent,
+longer, on every poll — and redraw a message it has seen before rather than append
+it again.
+
+Off by default, and it has to be, because that rule inverts the one every existing
+client follows. A poller that advanced to the highest seq it saw would step past
+the partial row and never be sent the finished message, leaving a truncated answer
+on screen for good. An unmodified consumer therefore sees exactly what it always
+did: nothing until the message is complete.
+
 A message is
-`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[]}`.
+`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[], partial}`.
 `tool_calls` is `{id, name, input}` per tool the assistant invoked; a tool's
 *result* is not returned — it is raw JSON the model has already summarised in its
 reply, and can be megabytes. Read `OS Chat Message.blocks` directly if you need
@@ -366,6 +381,48 @@ Deleting a session deletes its messages and any staged attachments
 Files. Both deletes must stay in `on_trash` rather than `after_delete`:
 `delete_doc` runs `on_trash`, *then* the link check, then removes attachments.
 
+## Streaming
+
+The answer is readable while the model is still writing it, and the message row
+is how — there is no second channel.
+
+There cannot be one. A turn runs in a worker, in a different process from any web
+request, so at the moment tokens are produced there is no response left open to
+push them down. What there *is* is a poll that already runs mid-turn. So the
+assistant message is inserted **before the first token**, with empty `blocks` and
+`is_partial = 1`; `engine/llm.stream` hands each text delta to a callback that
+appends to a buffer and rewrites the row's `text`; when the stream ends, one last
+write puts the blocks in and clears the flag. `get_messages` needs almost no new
+code — it returns the row it always did, longer each time, to a caller that asked
+for it with `partial=1`.
+
+Two consequences worth knowing:
+
+- **The flush is throttled** — `STREAM_FLUSH_SECONDS` (0.4) and
+  `STREAM_FLUSH_CHARS` (200), whichever comes first. Every flush is an `UPDATE`
+  plus a `COMMIT`, so one per token would make the database the bottleneck. The
+  desk page polls at `POLL_INTERVAL_STREAM_MS` (400) while a partial is open,
+  which is what the throttle is matched to.
+- **The final write is authoritative** and takes its `text` from the blocks, not
+  from the buffer. A delta the provider sent twice, or dropped, cannot leave the
+  stored message disagreeing with what the model said.
+
+A row with `is_partial = 1` and no blocks is a turn that died mid-answer. Its
+text is kept — it is the part a person can read — but `_history` skips a message
+with no blocks, because the API rejects empty content outright, and
+`run_turn` clears the flag on its way out so no client polls for a worker that is
+gone.
+
+`stream` is **optional** on the `ai_client` contract (see `engine/ai_client.py`).
+A managed client that predates it is missing the method rather than broken by it,
+and `runner._loop` checks with `llm.streaming_available()` before choosing a path.
+A provider that accepts the call and then refuses to stream falls back too, but
+only if nothing arrived first: once there is text on screen, a failure is a failed
+turn with a readable partial answer, not a silent restart.
+
+Set `chat_streaming: false` to turn the whole thing off; the buffered path is
+unchanged and produces byte-identical messages.
+
 ## One turn at a time
 
 `start_turn` refuses while a session is `Running`, and the enqueue is
@@ -431,12 +488,23 @@ bench --site <site> execute alaiy_os.chat.smoke.run --kwargs "{'question': '...'
 Runs the loop in-process — no worker, no browser, traceback on stdout instead
 of in the Error Log. Costs one real LLM call.
 
+```bash
+bench --site <site> execute alaiy_os.chat.smoke.run_stream
+```
+
+The streaming path against a scripted client rather than a provider: no network,
+no cost, a fixed answer. Checks that the text was readable *before* the turn
+finished and grew, that the finished row is complete and no longer partial, that
+`chat_streaming: false` produces identical text, and that a client with no
+`stream` method takes the buffered path in silence.
+
 ## site_config keys
 
 | key | default | effect |
 |---|---|---|
 | `chat_model` | `gemini-3.1-flash-lite` | model for new sessions (per-session override on the record) |
 | `chat_max_turns` | 12 | LLM calls per user message |
+| `chat_streaming` | `true` | write the answer as it arrives (see **Streaming**); `false` restores one write per message |
 | `chat_tools` | unset | allow-list of tool names; unset = everything the user may call |
 | `chat_system_prompt` | built-in | replaces the whole system prompt |
 
