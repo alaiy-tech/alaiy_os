@@ -209,12 +209,19 @@ app_include_js = [
     f"/assets/alaiy_os/js/alaiy_workspace.js?v={_V}",
     f"/assets/alaiy_os/js/route_guard.js?v={_V}",
     f"/assets/alaiy_os/js/alaiy_connector_card.js?v={_V}",
+    # Ask Alaiy floating launcher + panel -- a self-contained React bundle
+    # (frontend/, built with `npm run build`), independent of the vanilla-JS
+    # constellation above: it owns its own DOM node and never reads window
+    # globals those scripts define, so it's order-independent and safe to
+    # load last. See frontend/README.md for the build.
+    f"/assets/alaiy_os/dist/ask_alaiy.js?v={_V}",
 ]
 app_include_css = [
     f"/assets/alaiy_os/css/core.css?v={_V}",
     # Served by a whitelisted method (not a static file) so every OS Theme
     # Settings save reflects on the next reload — see alaiy_os/api/theme.py.
     "/api/method/alaiy_os.api.theme.custom_theme_css",
+    f"/assets/alaiy_os/dist/ask_alaiy.css?v={_V}",
 ]
 
 # Per-doctype form scripts. Unlike app_include_js these are read server-side and
