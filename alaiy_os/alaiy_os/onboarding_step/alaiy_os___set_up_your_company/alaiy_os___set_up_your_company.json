@@ -1,0 +1,21 @@
+{
+ "action": "Update Settings",
+ "action_label": "Open Company Settings",
+ "creation": "2026-08-10 11:58:58.134907",
+ "description": "Enter your company's name, address, and default currency.",
+ "docstatus": 0,
+ "doctype": "Onboarding Step",
+ "idx": 0,
+ "is_complete": 0,
+ "is_single": 0,
+ "is_skipped": 0,
+ "modified": "2026-08-27 06:37:47.341390",
+ "modified_by": "Administrator",
+ "name": "Alaiy OS - Set up your Company",
+ "owner": "Administrator",
+ "reference_document": "Company",
+ "show_form_tour": 0,
+ "show_full_form": 0,
+ "title": "Set up your Company",
+ "validate_action": 1
+}

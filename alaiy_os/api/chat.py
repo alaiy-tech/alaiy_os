@@ -56,11 +56,24 @@ def list_sessions(limit=50):
 
 
 @frappe.whitelist()
-def send_message(session, text=None, attachments=None, skill=None, screen=None, mentions=None):
+def send_message(
+	session,
+	text=None,
+	attachments=None,
+	skill=None,
+	skill_args=None,
+	screen=None,
+	mentions=None,
+):
 	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
 
 	An unknown skill throws here rather than on the worker, so the picker gets a
 	real error instead of a conversation that quietly answers the wrong thing.
+
+	`skill_args` is that skill's arguments, as an object or a JSON string — the
+	shape `list_skills` publishes as its `input_schema`. Validated against that
+	schema on this request, so a form can show the error against the field that
+	caused it. Omit it for a skill that takes none, which is most of them.
 
 	`mentions` is `[{kind, value}]` from `list_mentions` — the records the user
 	picked with `@`. Each is re-resolved server-side, so only `kind` and `value`
@@ -70,7 +83,13 @@ def send_message(session, text=None, attachments=None, skill=None, screen=None, 
 	# permission is the gate, since a chat can only reach what its owner can. It
 	# also validates every attachment name against that session.
 	seq = runner.start_turn(
-		session, text, attachments=attachments, skill=skill, screen=screen, mentions=mentions
+		session,
+		text,
+		attachments=attachments,
+		skill=skill,
+		skill_args=skill_args,
+		screen=screen,
+		mentions=mentions,
 	)
 	return {"seq": seq, "status": "Running"}
 

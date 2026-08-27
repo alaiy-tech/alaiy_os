@@ -5,7 +5,6 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "image_field": "agent_avatar",
  "field_order": [
   "agent_id",
   "agent_name",
@@ -26,6 +25,8 @@
   "system_prompt",
   "tools_section",
   "tools",
+  "input_section",
+  "input_schema",
   "output_section",
   "output_format",
   "output_schema"
@@ -79,11 +80,11 @@
    "label": "Surface"
   },
   {
+   "description": "The agent executes as this user, so every tool read is scoped by their Roles and row-level permissions. Leave empty to run as Administrator, which sees the whole site.",
    "fieldname": "run_as_user",
    "fieldtype": "Link",
-   "options": "User",
    "label": "Run As User",
-   "description": "The agent executes as this user, so every tool read is scoped by their Roles and row-level permissions. Leave empty to run as Administrator, which sees the whole site."
+   "options": "User"
   },
   {
    "description": "Settings DocType shipped by the agent app (API keys, toggles).",
@@ -101,7 +102,7 @@
   },
   {
    "default": "0",
-   "description": "Expose this agent in Ask Alaiy as a <code>/</code> skill. A skill runs with NO payload and for ANY user who can chat — the OS Agent Run permission is not the gate, because it grants System Manager only. Tick this only when every tool on this agent enforces its own permissions (read via <code>frappe.get_list</code>, never <code>get_all</code>) and none of them write.",
+   "description": "Expose this agent in Ask Alaiy as a <code>/</code> skill. A skill runs with NO payload and for ANY user who can chat \u2014 the OS Agent Run permission is not the gate, because it grants System Manager only. Tick this only when every tool on this agent enforces its own permissions (read via <code>frappe.get_list</code>, never <code>get_all</code>) and none of them write.",
    "fieldname": "chat_skill",
    "fieldtype": "Check",
    "label": "Available as Chat Skill"
@@ -159,6 +160,18 @@
    "options": "OS Agent Tool"
   },
   {
+   "fieldname": "input_section",
+   "fieldtype": "Section Break",
+   "label": "Input"
+  },
+  {
+   "description": "JSON Schema the arguments must satisfy when this pack is run as a skill. Leave empty for a pack that takes none \u2014 that is the default and the majority.",
+   "fieldname": "input_schema",
+   "fieldtype": "Code",
+   "label": "Input Schema (JSON)",
+   "options": "JSON"
+  },
+  {
    "fieldname": "output_section",
    "fieldtype": "Section Break",
    "label": "Output"
@@ -180,6 +193,7 @@
    "options": "JSON"
   }
  ],
+ "image_field": "agent_avatar",
  "links": [],
  "modified": "2026-07-20 00:00:00.000000",
  "modified_by": "Administrator",

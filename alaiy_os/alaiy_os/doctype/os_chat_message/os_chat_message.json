@@ -11,6 +11,7 @@
   "column_break_1",
   "role",
   "skill_used",
+  "skill_args",
   "screen",
   "text",
   "blocks",
@@ -54,6 +55,14 @@
    "label": "Skill Used"
   },
   {
+   "description": "The arguments the skill was run with, as sent. Validated against the pack's Input Schema before the run.",
+   "fieldname": "skill_args",
+   "fieldtype": "Code",
+   "label": "Skill Arguments (JSON)",
+   "options": "JSON",
+   "read_only": 1
+  },
+  {
    "description": "Which screen the user was on when they sent this, as the client reported it (e.g. `orders`, `item/ABC-1`). Recorded for context and analytics; nothing dispatches on it.",
    "fieldname": "screen",
    "fieldtype": "Data",
@@ -73,14 +82,14 @@
    "options": "JSON"
   },
   {
-   "description": "Display meta per file on this message, as JSON. Two kinds, told apart by `kind`. An upload (kind absent or \"upload\") is positional: the first len(attachments) blocks ARE its attachment blocks, which is how runner._elide_old_attachments finds them. A generated file (kind \"artifact\") is not positional — it rides on an assistant message whose blocks are prose and tool_use, and is a download chip rather than context.",
+   "description": "Display meta per file on this message, as JSON. Two kinds, told apart by `kind`. An upload (kind absent or \"upload\") is positional: the first len(attachments) blocks ARE its attachment blocks, which is how runner._elide_old_attachments finds them. A generated file (kind \"artifact\") is not positional \u2014 it rides on an assistant message whose blocks are prose and tool_use, and is a download chip rather than context.",
    "fieldname": "attachments",
    "fieldtype": "Code",
    "label": "Attachments (JSON)",
    "options": "JSON"
   },
   {
-   "description": "Records the user named with `@`: [{kind, value, label, hint, …}]. Denormalised for display, like `attachments` — the model reads them from a block ahead of the question, not from here. Written by `chat/mentions.resolve`, so every value was re-checked against its source at send time; the client's own labels and dates are never stored.",
+   "description": "Records the user named with `@`: [{kind, value, label, hint, \u2026}]. Denormalised for display, like `attachments` \u2014 the model reads them from a block ahead of the question, not from here. Written by `chat/mentions.resolve`, so every value was re-checked against its source at send time; the client's own labels and dates are never stored.",
    "fieldname": "mentions",
    "fieldtype": "Code",
    "label": "Mentions (JSON)",

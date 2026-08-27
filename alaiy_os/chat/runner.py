@@ -72,7 +72,9 @@ def default_model():
 
 
 
-def start_turn(session, text, attachments=None, skill=None, screen=None, mentions=None):
+def start_turn(
+	session, text, attachments=None, skill=None, skill_args=None, screen=None, mentions=None
+):
 	"""Append the user's message and enqueue the turn. Returns the message seq.
 
 	`attachments` is a list of `OS Chat Attachment` names staged by
@@ -84,6 +86,12 @@ def start_turn(session, text, attachments=None, skill=None, screen=None, mention
 	resolved here so an unknown slug is a 417 on the send rather than a failure
 	that only shows up in the thread a minute later, but it is *run* on the
 	worker — the agent behind it makes its own LLM calls.
+
+	`skill_args` is that skill's arguments, checked against the pack's declared
+	Input Schema here for the same reason the slug is: a bad argument belongs on
+	the request that made it, not in a thread a minute later. A pack that declares
+	no schema takes none, and sending some is an error rather than a silent drop —
+	see `skills.validate_args`.
 
 	`mentions` is what the user picked with `@` (see `chat/mentions.py`), as
 	`[{kind, value}]`. Every one is re-resolved against its source here, so the
@@ -105,10 +113,20 @@ def start_turn(session, text, attachments=None, skill=None, screen=None, mention
 	if skill:
 		skill = str(skill).strip().lstrip("/").lower()
 		chat_skills.resolve(skill)
+		# The words typed alongside the command fill a single required argument,
+		# so `/amazon is SKU ABC listed?` works from a picker that knows nothing
+		# about this skill's schema. An explicit `skill_args` always wins.
+		skill_args = chat_skills.fill_from_text(skill, skill_args, text)
+		skill_args = chat_skills.validate_args(skill, skill_args)
 		# The message needs words: it is what the user sees in their own bubble,
 		# what names the session in the rail, and what the model reads as the
-		# request the tool result is answering.
-		text = text or f"/{skill}"
+		# request the tool result is answering. Arguments go in the visible text
+		# too — a bubble reading just "/amazon" when the user asked about one ASIN
+		# loses what they actually asked, both for them and for the model reading
+		# it back three turns later.
+		text = text or _skill_text(skill, skill_args)
+	elif skill_args:
+		frappe.throw("skill_args was sent without a skill.")
 
 	att_blocks, meta, consumed = _attachment_blocks(session, attachments)
 	if not text and not att_blocks:
@@ -134,6 +152,7 @@ def start_turn(session, text, attachments=None, skill=None, screen=None, mention
 		attachments=meta,
 		mentions=mention_meta,
 		skill=skill,
+		skill_args=skill_args,
 		screen=screen,
 	)
 
@@ -186,12 +205,12 @@ def run_turn(session):
 	chat_artifacts.reset(doc.name)
 
 	try:
-		skill = _pending_skill(doc.name)
+		skill, skill_args = _pending_skill(doc.name)
 		if skill:
 			# Writes the tool_use/tool_result pair, so by the time _loop reads the
 			# history the agent's output is the last thing in it and the model's
 			# first call is the one that narrates it.
-			chat_skills.run_skill(doc.name, skill, _append)
+			chat_skills.run_skill(doc.name, skill, _append, args=skill_args)
 		_loop(doc)
 	except Exception:
 		# Messages already written stay written — unlike a batch run, the
@@ -210,6 +229,18 @@ def run_turn(session):
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
 
 
+def _skill_text(slug, args):
+	"""The user-visible words for a skill send that carried no text of its own.
+
+	`/amazon (asin=B01234)` rather than a JSON blob: this is read by a person in
+	their own chat bubble first, and by the model second.
+	"""
+	if not args:
+		return f"/{slug}"
+	pairs = ", ".join(f"{k}={v}" for k, v in args.items())
+	return f"/{slug} ({pairs})"
+
+
 def _pending_skill(session):
 	"""The slug to dispatch before this turn's first LLM call, if any.
 
@@ -222,11 +253,21 @@ def _pending_skill(session):
 	last = frappe.db.get_value(
 		"OS Chat Message",
 		{"session": session},
-		["role", "skill_used"],
+		["role", "skill_used", "skill_args"],
 		order_by="seq desc",
 		as_dict=True,
 	)
-	return last.skill_used if last and last.role == "user" else None
+	if not last or last.role != "user" or not last.skill_used:
+		return None, None
+	# Stored as text by `_append` and validated on the send, so a parse failure
+	# here means the row was edited by hand. Run on defaults rather than killing
+	# the turn: the slug is still the user's intent.
+	try:
+		args = json.loads(last.skill_args) if last.skill_args else None
+	except ValueError:
+		frappe.log_error(title=f"OS Chat Message skill_args unparseable for {session}")
+		args = None
+	return last.skill_used, args
 
 
 # ── The loop ─────────────────────────────────────────────────────────────────
@@ -469,7 +510,15 @@ def _elide_old_attachments(rows):
 
 # ── Persistence ──────────────────────────────────────────────────────────────
 def _append(
-	session, role, blocks, text=None, attachments=None, mentions=None, skill=None, screen=None
+	session,
+	role,
+	blocks,
+	text=None,
+	attachments=None,
+	mentions=None,
+	skill=None,
+	skill_args=None,
+	screen=None,
 ):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
@@ -485,6 +534,7 @@ def _append(
 			"attachments": json.dumps(attachments) if attachments else None,
 			"mentions": json.dumps(mentions) if mentions else None,
 			"skill_used": skill,
+			"skill_args": json.dumps(skill_args) if skill_args else None,
 			"screen": screen,
 		}
 	).insert(ignore_permissions=True)
@@ -592,6 +642,35 @@ DOWNLOAD_PROMPT = (
 	"answer, and an empty spreadsheet is not."
 )
 
+#: Appended only when this user's surface actually holds pack tools — the same
+#: discipline as DOWNLOAD_PROMPT: never describe a capability the turn lacks.
+#:
+#: **Why this block exists.** The generic read tools (`list_documents`,
+#: `search_documents`, `get_document`, …) can reach almost any doctype, so the
+#: model can always assemble *an* answer — and measurably prefers to. Asked "what
+#: is the state of my Amazon listings?" with only the generic surface, it spent
+#: eight LLM calls and 20k input tokens guessing doctype names (`Amazon Listing`,
+#: `Amazon Product` — neither exists) before finding the right one by listing
+#: DocType with a LIKE filter. A pack tool answers the same question in one call,
+#: because someone who knew the domain wrote its name and its description.
+#:
+#: `chat/tools.py` already puts pack tools first in the list, which is most of the
+#: work; this says out loud why they are there, because ordering alone does not
+#: stop a model reaching past them for a tool whose name it recognises.
+PACK_PROMPT = (
+	"Some of your tools are named `pack__tool` — `amazon_sp_api__get_health_summary`, "
+	"for example. The prefix is a connector or a curated area, and each of these was "
+	"written for one job by someone who knew that system.\n"
+	"- When one covers the question, use it. Do not reach for a generic document tool "
+	"instead, and do not reach for one first to 'check' — the prefixed tool already "
+	"knows which records hold the answer and what its fields mean.\n"
+	"- Read the descriptions before choosing. They say what the tool returns and when "
+	"to call it, and picking on the name alone is how you end up calling three.\n"
+	"- The generic tools are for everything the prefixed ones do not cover. That is "
+	"most of the site, and reaching for them there is right."
+)
+
+
 #: Unconditional: there is no tool behind it, and a client that does not draw
 #: charts renders the block as a table instead, so the guidance is safe wherever
 #: the assistant is served from.
@@ -650,11 +729,31 @@ def _system_prompt(specs=None):
 		"Your tools read and write this business's REAL, LIVE data — orders that ship, "
 		"stock that gets counted, listings customers see. Treat them accordingly:\n"
 		"- Prefer reading over writing. Look before you change anything.\n"
-		"- Before any action that creates, cancels, submits or publishes, state what you "
-		"are about to do and wait for the user to confirm in their next message.\n"
+		"- Prefer LOCAL writes. Flag the local record and let the connector's own\n"
+		"  scheduled push carry the change to the marketplace. The connector's retry\n"
+		"  queue and echo suppression apply then; they do not if you call the remote\n"
+		"  API yourself, and a failure after a successful external write leaves the\n"
+		"  two systems disagreeing in a way nothing here can roll back.\n"
+		"- Reads never need permission. Searching, listing, opening a document, running "
+		"a report — just do it and answer. Asking 'shall I look that up?' wastes the "
+		"user's turn on a question they already answered by asking.\n"
+		"- Writes always need it. Before anything that creates, updates, cancels, "
+		"submits, deletes or publishes, state exactly what you are about to change — "
+		"which records, which fields, what values, how many — and stop. Wait for the "
+		"user to confirm in their next message. One confirmation covers the one change "
+		"you just described and nothing else: if the plan grows, describe it and ask "
+		"again.\n"
+		"- The line is whether the business's data or a marketplace changes, not "
+		"whether the tool sounds harmless. A tool that syncs, pushes, imports or "
+		"reprices is a write however it is named.\n"
 		"- A tool may refuse on permissions. That is the system working; explain what "
 		"the user would need, do not look for another route to the same effect.\n"
-		"- Never invent figures. If you have not read a number with a tool, say so.\n\n"
+		"- Never invent figures. If you have not read a number with a tool, say so.\n"
+		"- Do not guess a doctype name. If you are not certain one exists, list DocType "
+		"filtered by name first — one call that tells you the real names beats three "
+		"that come back 'DocType X not found'. The same goes for its fields: read them "
+		"before you ask for them. And a Single doctype holds one record and cannot be "
+		"listed; open it directly instead.\n\n"
 		"Answer in plain prose, formatted as markdown — a table when you are reporting "
 		"rows, bold for the figures that matter. Be concise and specific: cite the "
 		"document names and numbers you actually retrieved."
@@ -663,6 +762,9 @@ def _system_prompt(specs=None):
 	parts = [prompt, CHART_PROMPT]
 	if any(spec.get("name") == chat_artifacts.TOOL for spec in specs or []):
 		parts.append(DOWNLOAD_PROMPT)
+
+	if any(chat_tools.PACK_SEPARATOR in (spec.get("name") or "") for spec in specs or []):
+		parts.append(PACK_PROMPT)
 
 	extra = _tenant_context()
 	if extra:

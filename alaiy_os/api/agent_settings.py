@@ -10,37 +10,20 @@ Two questions this answers, which the Desk list view cannot:
 whose user cannot read Sales Invoice does not fail loudly — it quietly reports
 zeros, which is worse. `frappe.get_list` returns an empty set for a user without
 permission, so an under-permissioned agent looks like a quiet business day.
+
+The gate here is design-time. `engine/factory.py` re-checks the same
+declarations against the same user before every run, through the shared
+`engine/permissions.py` — a role revoked after an agent was switched on would
+otherwise bring the zeros back with the switch still on.
 """
 
-import json
-
 import frappe
+
+from alaiy_os.engine import permissions
 
 # Agents run as Administrator when no user is set. Named rather than implied so
 # the UI can say so out loud.
 ADMINISTRATOR = "Administrator"
-
-
-def _tool_permissions(tool):
-	"""Declared requirements for one tool row, as a list of dicts."""
-	raw = tool.get("required_permissions")
-	if not raw:
-		return []
-	try:
-		parsed = json.loads(raw) if isinstance(raw, str) else raw
-	except (ValueError, TypeError):
-		return []
-	return parsed if isinstance(parsed, list) else []
-
-
-def _check(user, doctype, ptype):
-	"""Whether `user` holds `ptype` on `doctype`. Never raises."""
-	try:
-		return bool(frappe.has_permission(doctype=doctype, ptype=ptype, user=user))
-	except Exception:
-		# An unknown doctype (app not installed, typo in a manifest) is a
-		# requirement that cannot be satisfied, not a crash.
-		return False
 
 
 @frappe.whitelist()
@@ -66,14 +49,12 @@ def list_agents():
 
 		tool_views, unmet = [], []
 		for tool in tools:
-			requirements = []
-			for requirement in _tool_permissions(tool):
-				doctype = requirement.get("doctype")
-				ptype = requirement.get("ptype", "read")
-				granted = _check(user, doctype, ptype)
-				requirements.append({"doctype": doctype, "ptype": ptype, "granted": granted})
-				if not granted:
-					unmet.append(f"{tool.tool_id}: {ptype} on {doctype}")
+			requirements = permissions.check_tool(user, tool)
+			unmet.extend(
+				permissions.describe(tool.tool_id, requirement["doctype"], requirement["ptype"])
+				for requirement in requirements
+				if not requirement["granted"]
+			)
 
 			tool_views.append({
 				"tool_id": tool.tool_id,
@@ -137,3 +118,49 @@ def set_agent_enabled(agent, enabled, force=False):
 	frappe.db.set_value("OS Agent Registry", agent, "is_enabled", 1 if enabled else 0)
 	frappe.db.commit()
 	return {"agent": agent, "is_enabled": enabled}
+
+
+@frappe.whitelist()
+def set_agent_run_as_user(agent, user=None):
+	"""
+	Set — or clear — the service user an agent's runs adopt.
+
+	Clearing it means Administrator, which reads the whole site. That is the
+	field's default rather than a neutral blank, which is why the settings
+	payload reports `runs_as_administrator` as a fact of its own: an agent
+	nobody has assigned a user to is not unconfigured, it is site-wide.
+
+	Returns the agent's recomputed settings row, because changing the user
+	rewrites every permission answer on it — the caller should render what comes
+	back rather than patching its own copy.
+
+	An agent that is already on stays on, even when the new user cannot satisfy
+	its tools. Switching it off here would be a second surprise for an operator
+	who asked for one thing, and it is no longer needed to stay safe: since
+	`engine/factory.py` re-checks the declarations, such a run now fails loudly
+	instead of reporting zeros. The row comes back saying both — enabled, and
+	missing permissions.
+	"""
+	if not frappe.has_permission("OS Agent Registry", "write"):
+		frappe.throw("Not permitted.", frappe.PermissionError)
+
+	if not frappe.db.exists("OS Agent Registry", agent):
+		frappe.throw(f"There is no agent {agent}.")
+
+	user = (user or "").strip()
+	if user:
+		# Checked here rather than left to the Link field's own validation: a
+		# disabled or Guest user is accepted by the link and then silently reads
+		# nothing, which is the failure this whole module exists to prevent.
+		if user == "Guest":
+			frappe.throw("An agent cannot run as Guest.")
+		state = frappe.db.get_value("User", user, ["enabled"], as_dict=True)
+		if not state:
+			frappe.throw(f"There is no user {user}.")
+		if not state.enabled:
+			frappe.throw(f"{user} is disabled, so an agent cannot run as them.")
+
+	frappe.db.set_value("OS Agent Registry", agent, "run_as_user", user or None)
+	frappe.db.commit()
+
+	return next((a for a in list_agents() if a["agent_id"] == agent), None)
