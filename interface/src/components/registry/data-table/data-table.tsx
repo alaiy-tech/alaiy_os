@@ -16,6 +16,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { Cog, Search, X } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import type {
   ColumnPrefs,
@@ -74,7 +75,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/primitive/table";
-import { DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from "@/constants/list";
+import {
+  DEFAULT_PAGE_SIZE,
+  MANUAL_FILTER_OPERATORS,
+  PAGE_SIZE_OPTIONS,
+} from "@/constants/list";
 import { getPageNumbers } from "@/utils/get-page-numbers";
 
 import { applyFilterRows } from "./apply-filters";
@@ -123,6 +128,14 @@ export type OsDataTableProps<TData extends Record<string, unknown>> = {
    * `filterable` to do anything (a table with no known fields has nothing to
    * offer a filter row). */
   filterFields?: DocFieldMeta[];
+  /** The name this table's filters read/write when set (e.g. `"orders"`,
+   * matching `readNamedFilters`'s own `${name}_filter_<field>` convention) -
+   * `data` is then assumed already filtered server-side (one active filter
+   * per field, across the *whole* result set, not just the current page),
+   * and `FilterPopover` restricts itself to `MANUAL_FILTER_OPERATORS` (no
+   * `between` - a Frappe list filter has no matching operator for it).
+   * Omitted keeps today's local, current-page-only in-memory filtering. */
+  filterParam?: string;
 
   columnVisibility?: boolean;
   /** Which manageable columns show, and in what order, before the user
@@ -349,7 +362,7 @@ function DataTablePagination<T>({
 
       return (
         <div className="flex flex-wrap items-center justify-between gap-2 pr-4">
-          <div className="flex items-center gap-4 text-muted-foreground text-sm">
+          <div className="flex items-center gap-4 text-muted-foreground text-xs">
             {external.onPageSizeChange && (
               <div className="flex items-center gap-2">
                 <Select
@@ -374,7 +387,7 @@ function DataTablePagination<T>({
               </div>
             )}
             <span>
-              Viewing {clampedPage * pageCount} of {external.total} {itemLabel}
+              Page {clampedPage}/{pageCount} of {external.total} {itemLabel}
             </span>
           </div>
 
@@ -630,6 +643,7 @@ export function OsDataTable<TData extends Record<string, unknown>>({
   searchParam,
   filterable = true,
   filterFields = [],
+  filterParam,
   columnVisibility = true,
   defaultColumnOrder,
   structuralColumnIds = [],
@@ -768,6 +782,116 @@ export function OsDataTable<TData extends Record<string, unknown>>({
 
   const [filterRows, setFilterRows] = React.useState<FilterRow[]>([]);
 
+  // Always called (Rules of Hooks) - inert when `filterParam` is unset,
+  // since nothing below reads `filterSearchParams`/`filterRouter`/
+  // `filterPathname` in that case. A dedicated `useSearchParams()` call
+  // (not reused from `useUrlParam`, which only exposes one param's value) -
+  // filters span an author-unknown set of fields, so both the read (parsing
+  // every currently-applied `${filterParam}_filter_<field>` pair back into
+  // `FilterRow[]`) and the write (one batched replace covering every field
+  // at once - see docs/UI_RUNTIME.md's "buffers edits locally... one
+  // batched URLSearchParams write" note) need the full param set directly.
+  const manualFilter = Boolean(filterParam);
+  const filterSearchParams = useSearchParams();
+  const filterRouter = useRouter();
+  const filterPathname = usePathname();
+
+  const urlFilterRows = React.useMemo<FilterRow[]>(() => {
+    if (!manualFilter) return [];
+    return filterFields.flatMap((field): FilterRow[] => {
+      const value = filterSearchParams.get(
+        `${filterParam}_filter_${field.fieldname}`,
+      );
+      if (!value) return [];
+      const rawOp = filterSearchParams.get(
+        `${filterParam}_filter_${field.fieldname}_op`,
+      );
+      const operator = (MANUAL_FILTER_OPERATORS as string[]).includes(
+        rawOp ?? "",
+      )
+        ? (rawOp as FilterRow["operator"])
+        : "=";
+      return [{ id: field.fieldname, field: field.fieldname, operator, value }];
+    });
+  }, [manualFilter, filterParam, filterFields, filterSearchParams]);
+
+  const effectiveFilterRows = manualFilter ? urlFilterRows : filterRows;
+
+  // Strips a URL param this table can't actually use, rather than leaving a
+  // stale/hand-edited value sitting there forever unused: an out-of-range
+  // page number, a page size outside `PAGE_SIZE_OPTIONS`, a filter field
+  // this table doesn't have, or a filter operator outside
+  // `MANUAL_FILTER_OPERATORS`. The *value* already degrades to a sane
+  // fallback regardless (server-side for page/page-size/filters, in
+  // `urlFilterRows` above for filters) - this just keeps the URL itself
+  // honest instead of carrying a param nothing reads. One batched replace
+  // covering everything found invalid, same principle as
+  // `applyManualFilters` above.
+  React.useEffect(() => {
+    const toRemove: string[] = [];
+
+    if (pageParam) {
+      const raw = filterSearchParams.get(pageParam);
+      if (raw !== null) {
+        const parsed = Number(raw);
+        if (!Number.isInteger(parsed) || parsed <= 0) toRemove.push(pageParam);
+      }
+    }
+
+    if (pageSizeParam) {
+      const raw = filterSearchParams.get(pageSizeParam);
+      if (
+        raw !== null &&
+        !(PAGE_SIZE_OPTIONS as readonly number[]).includes(Number(raw))
+      ) {
+        toRemove.push(pageSizeParam);
+      }
+    }
+
+    if (manualFilter) {
+      const validFieldNames = new Set(filterFields.map((f) => f.fieldname));
+      const prefix = `${filterParam}_filter_`;
+      for (const key of filterSearchParams.keys()) {
+        if (!key.startsWith(prefix)) continue;
+        const rest = key.slice(prefix.length);
+        const isOp = rest.endsWith("_op");
+        const field = isOp ? rest.slice(0, -3) : rest;
+
+        if (!validFieldNames.has(field)) {
+          toRemove.push(key);
+          continue;
+        }
+        if (isOp) {
+          const opValue = filterSearchParams.get(key);
+          const hasValue = Boolean(filterSearchParams.get(`${prefix}${field}`));
+          if (
+            !hasValue ||
+            !(MANUAL_FILTER_OPERATORS as string[]).includes(opValue ?? "")
+          ) {
+            toRemove.push(key);
+          }
+        }
+      }
+    }
+
+    if (toRemove.length === 0) return;
+    const params = new URLSearchParams(filterSearchParams);
+    for (const key of toRemove) params.delete(key);
+    const query = params.toString();
+    filterRouter.replace(query ? `${filterPathname}?${query}` : filterPathname, {
+      scroll: false,
+    });
+  }, [
+    pageParam,
+    pageSizeParam,
+    manualFilter,
+    filterParam,
+    filterFields,
+    filterSearchParams,
+    filterRouter,
+    filterPathname,
+  ]);
+
   const [columnsOpen, setColumnsOpen] = React.useState(false);
   const [columnPrefs, setColumnPrefs] = React.useState<ColumnPrefs>({
     columnOrder: defaultColumnOrder ?? manageableColumnIds,
@@ -781,13 +905,50 @@ export function OsDataTable<TData extends Record<string, unknown>>({
       pageSize: paginated ? pageSize : Number.MAX_SAFE_INTEGER,
     }));
 
+  // One batched write covering every field at once (not built from
+  // sequential per-field `useUrlParam` calls, which would each read a stale
+  // `searchParams` snapshot and the second call would silently undo the
+  // first's write - see docs/UI_RUNTIME.md). Clears every field's own
+  // params first (so a removed filter row's params don't linger), then
+  // writes whatever `rows` still has a field+value for. Also resets
+  // `pageParam` in the same navigation - changing what's filtered without
+  // resetting the page could otherwise strand the user past the end of the
+  // new, smaller result set.
+  function applyManualFilters(rows: FilterRow[]) {
+    const params = new URLSearchParams(filterSearchParams);
+    for (const field of filterFields) {
+      params.delete(`${filterParam}_filter_${field.fieldname}`);
+      params.delete(`${filterParam}_filter_${field.fieldname}_op`);
+    }
+    for (const row of rows) {
+      if (!row.field || !row.value) continue;
+      params.set(`${filterParam}_filter_${row.field}`, row.value);
+      // "=" is the resolver's own default when the `_op` param is absent -
+      // omitting it there keeps the common case's URL shorter.
+      if (row.operator !== "=") {
+        params.set(`${filterParam}_filter_${row.field}_op`, row.operator);
+      }
+    }
+    if (pageParam) params.delete(pageParam);
+
+    const query = params.toString();
+    filterRouter.replace(query ? `${filterPathname}?${query}` : filterPathname, {
+      scroll: false,
+    });
+  }
+
   function handleFilterApply(rows: FilterRow[]) {
+    if (manualFilter) {
+      applyManualFilters(rows);
+      return;
+    }
     setFilterRows(rows);
     setClientPagination((p) => ({ ...p, pageIndex: 0 }));
   }
 
   function handleClearSearchAndFilters() {
-    setFilterRows([]);
+    if (manualFilter) applyManualFilters([]);
+    else setFilterRows([]);
     setClientPagination((p) => ({ ...p, pageIndex: 0 }));
     setSearchInput("");
     if (manualSearch) setUrlSearch(null);
@@ -860,7 +1021,11 @@ export function OsDataTable<TData extends Record<string, unknown>>({
     let result = data;
     if (searchable && !manualSearch)
       result = applySearch(result, search, searchFields);
-    if (filterable) result = applyFilterRows(result, filterRows, filterFields);
+    // Not applied client-side when `manualFilter` - `data` is assumed
+    // already filtered server-side across the *whole* result set, same
+    // fork already used for `manualSearch`/`manualSorting` above.
+    if (filterable && !manualFilter)
+      result = applyFilterRows(result, filterRows, filterFields);
     return result;
   }, [
     data,
@@ -869,6 +1034,7 @@ export function OsDataTable<TData extends Record<string, unknown>>({
     search,
     searchFields,
     filterable,
+    manualFilter,
     filterRows,
     filterFields,
   ]);
@@ -953,17 +1119,17 @@ export function OsDataTable<TData extends Record<string, unknown>>({
   // Distinguishes "genuinely no data" (plain `emptyMessage`) from "a search
   // term or filter matched nothing" (an actionable empty state, since the
   // user can fix that themselves) - the client-side `search`/`filterRows`
-  // when local, the URL's `urlSearch` when server-driven.
+  // when local, the URL's `urlSearch`/`urlFilterRows` when server-driven.
   const hasActiveQuery =
     (manualSearch ? Boolean(urlSearch) : Boolean(search)) ||
-    filterRows.length > 0;
+    effectiveFilterRows.length > 0;
 
   const selectedCount = table.getFilteredSelectedRowModel().rows.length;
   const showSelectionActions =
     selectable && Boolean(selectionActions?.length) && selectedCount > 0;
 
   return (
-    <Card>
+    <Card >
       {hasHeader && (
         <CardHeader>
           {title && <CardTitle className="leading-none">{title}</CardTitle>}
@@ -998,13 +1164,14 @@ export function OsDataTable<TData extends Record<string, unknown>>({
               <ButtonGroup>
                 <FilterPopover
                   availableFields={filterFields}
-                  value={filterRows}
+                  value={effectiveFilterRows}
                   onApply={handleFilterApply}
+                  manual={manualFilter}
                 />
                 <Button
                   variant="outline"
                   size="sm"
-                  disabled={filterRows.length === 0}
+                  disabled={effectiveFilterRows.length === 0}
                   onClick={() => handleFilterApply([])}
                   aria-label="Clear all filters"
                 >

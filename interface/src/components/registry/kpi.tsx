@@ -7,7 +7,6 @@ import { KPI_ICONS } from "@/config/kpi-icons";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/utils";
 import type {
-  OsKpiBorderTone,
   OsKpiFormat,
   OsKpiIconName,
   OsKpiTrendPolarity,
@@ -15,6 +14,7 @@ import type {
 } from "@/types/kpi";
 
 import { StatCard } from "../derived/stat-card";
+import React from "react";
 
 /** Auto-typecasts a raw value into display text: a string from the Data
  * Source passes through unchanged, a number is formatted per `format`. This
@@ -81,21 +81,18 @@ function TrendBadge({
   trend: number | string | null | undefined;
   trendUnit?: OsKpiTrendUnit;
   trendPolarity?: OsKpiTrendPolarity;
+  children: React.ReactNode;
 }) {
   const normalizedTrend = normalizeNumber(trend);
-  if (normalizedTrend === null) return null;
 
   const suffix = trendUnit === "points" ? " pts" : "%";
 
-  if (normalizedTrend === 0) {
+  if (normalizedTrend === 0 || normalizedTrend === null) {
     return (
-      <Badge
-        variant="outline"
-        className="border-muted-foreground/20 bg-muted text-muted-foreground"
-      >
+      <span className="flex flex-row items-center gap-0.5 text-muted-foreground">
         <Minus />
         {`0${suffix}`}
-      </Badge>
+      </span>
     );
   }
 
@@ -104,27 +101,31 @@ function TrendBadge({
   const TrendIcon = isUp ? TrendingUp : TrendingDown;
 
   return (
-    <Badge
-      variant="outline"
+    <span
       className={cn(
-        isGood
-          ? "border-success/20 bg-success/10 text-success-foreground dark:border-success/40 dark:bg-success/15"
-          : "border-destructive/20 bg-destructive/10 text-destructive",
+        isGood ? "text-success-foreground" : "text-destructive",
+        "flex flex-row gap-0.5 items-center",
       )}
     >
-      <TrendIcon />
+      <TrendIcon size={16} />
       {isUp ? "+" : ""}
       {normalizedTrend.toFixed(1)}
       {suffix}
-    </Badge>
+    </span>
   );
 }
 
 /** The summary line at the card's bottom - the delta badge's caption, once
- * the badge itself moved up next to the value. `trendLabel` is just the
- * comparison point's own name (e.g. the active period toggle's option,
- * "1D") - this is what prepends the "vs " every caller would otherwise have
- * to repeat. */
+ * the badge itself moved up next to the value. `trendLabel` is the full
+ * caption text itself (e.g. "since last month", or a static caption like
+ * "Live snapshot" for a metric with no period comparison at all - e.g. the
+ * stock KPIs) - not just the comparison point's bare name, so a caller can
+ * phrase it however it wants instead of this component imposing its own
+ * "vs "/"since" wording. Shown whenever given, independent of whether
+ * `trend` resolved to a real number - a caption doesn't have to be about a
+ * numeric delta. Falls back to "No comparison available" only when there's
+ * neither a `trendLabel` nor a `trend` - genuinely nothing to say, rather
+ * than silently rendering blank. */
 function TrendSummary({
   trend,
   trendLabel,
@@ -132,25 +133,13 @@ function TrendSummary({
   trend: number | string | null | undefined;
   trendLabel?: string;
 }) {
-  const normalizedTrend = normalizeNumber(trend);
-
-  if (normalizedTrend === null) {
-    return (
-      <span className="text-muted-foreground">No comparison available</span>
-    );
-  }
-
-  return (
-    <span className="text-muted-foreground">
-      vs {trendLabel ?? "last period"}
-    </span>
-  );
+  return <span className="text-muted-foreground">{trendLabel}</span>;
 }
 
 /**
  * The `os-kpi` registry entry - fully generic across every page. `title`,
  * `icon`, `format`/`currency`/`precision`, `trendUnit`/`trendPolarity`/
- * `trendLabel`, and `borderTone` are presentation config (`props`, editable
+ * `trendLabel`, are presentation config (`props`, editable
  * via `UPDATE_COMPONENT`); `value`/`trend`/`previousValue` are raw
  * already-fetched numbers (or a pre-formatted string for `value`), resolved
  * from a Data Source Registry source (see `runtime/data/`). A source can
@@ -172,7 +161,7 @@ export function OsKpi({
   trendUnit,
   trendPolarity,
   trendLabel,
-  borderTone,
+  className,
 }: {
   title: string;
   icon?: OsKpiIconName;
@@ -187,7 +176,7 @@ export function OsKpi({
   trendUnit?: OsKpiTrendUnit;
   trendPolarity?: OsKpiTrendPolarity;
   trendLabel?: string;
-  borderTone?: OsKpiBorderTone;
+  className: string;
 }): ReactNode {
   const Icon = (icon && KPI_ICONS[icon]) || KPI_ICONS.DollarSign;
   const effectiveTrend = trend ?? computeTrend(value, previousValue);
@@ -202,12 +191,11 @@ export function OsKpi({
           trend={effectiveTrend}
           trendUnit={trendUnit}
           trendPolarity={trendPolarity}
+          children={<></>}
         />
       }
-      summary={
-        <TrendSummary trend={effectiveTrend} trendLabel={trendLabel} />
-      }
-      borderTone={borderTone}
+      summary={<TrendSummary trend={effectiveTrend} trendLabel={trendLabel} />}
+      className={className}
     />
   );
 }
