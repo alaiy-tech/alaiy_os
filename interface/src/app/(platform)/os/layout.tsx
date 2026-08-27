@@ -10,7 +10,7 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/primitive/sidebar";
-import { getCompanyInfo, getServerUser } from "@/lib/frappe/server";
+import { getCompanyInfo, getOrganisationLogoSrc, getServerUser } from "@/lib/frappe/server";
 import { cn } from "@/utils";
 import { getPreference } from "@/server/server-actions";
 import { CompanyProvider } from "@/runtime/store/company/company-provider";
@@ -25,12 +25,13 @@ export default async function Layout({
 }: Readonly<{ children: ReactNode }>) {
   const cookieStore = await cookies();
   const defaultOpen = cookieStore.get("sidebar_state")?.value !== "false";
-  const [variant, collapsible, user, company, sidebarNav] = await Promise.all([
+  const [variant, collapsible, user, company, sidebarNav, logoSrc] = await Promise.all([
     getPreference("sidebar_variant"),
     getPreference("sidebar_collapsible"),
     getServerUser(),
     getCompanyInfo(),
     getSidebarStore().getSidebarNav(),
+    getOrganisationLogoSrc(),
   ]);
 
   if (!user) {
@@ -61,6 +62,8 @@ export default async function Layout({
           collapsible={collapsible}
           companyName={company?.name ?? null}
           items={sidebarNav}
+          squareLogoSrc={logoSrc.square}
+          horizontalLogoSrc={logoSrc.horizontal}
         />
         <SidebarInset
           className={cn(
