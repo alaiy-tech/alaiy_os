@@ -1,18 +1,27 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Sparkles } from "lucide-react";
-import { useAskAlaiy } from "@/hooks/use-ask-alaiy";
+import { useAskAlaiyContext } from "./ask-alaiy-provider";
 import { AskAlaiyPanel } from "./ask-alaiy-panel";
 
+const FULL_PAGE_PATHNAME = "/os/ask-alaiy";
+
 /**
- * Fixed to the bottom-right corner of every /os page. Mounted once in the
- * os layout (outside any individual page's tree), so the conversation
- * survives client-side route navigation -- closing the panel just hides it.
+ * Fixed to the bottom-right corner of every /os page except the dedicated
+ * /os/ask-alaiy page, which already shows the full experience inline.
+ * Mounted once in the os layout (outside any individual page's tree), so
+ * the conversation survives client-side route navigation -- closing the
+ * panel just hides it. Shares its chat state with that page via
+ * AskAlaiyProvider, so switching between the two never loses the thread.
  */
 export function AskAlaiyLauncher({ userFullName }: { userFullName: string }) {
-  const chat = useAskAlaiy();
+  const chat = useAskAlaiyContext();
   const [open, setOpen] = useState(false);
+  const pathname = usePathname();
+
+  if (pathname === FULL_PAGE_PATHNAME) return null;
 
   return (
     <>

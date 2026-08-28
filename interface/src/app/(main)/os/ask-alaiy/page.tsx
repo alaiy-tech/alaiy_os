@@ -7,7 +7,7 @@ export default async function Page() {
   const firstName = user?.fullName.split(" ")[0] ?? "there";
 
   return (
-    <div className="h-full">
+    <div className="h-full" data-content-padding="false">
       <AskAlaiyView userName={firstName} />
     </div>
   );

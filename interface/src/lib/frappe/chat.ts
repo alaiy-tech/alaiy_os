@@ -13,7 +13,14 @@ import { frappeErrorMessage } from "./error-message";
 
 const NS = "alaiy_os.api.chat";
 
-export class FrappeError extends Error {}
+export class FrappeError extends Error {
+  httpStatus: number;
+
+  constructor(message: string, httpStatus: number) {
+    super(message);
+    this.httpStatus = httpStatus;
+  }
+}
 
 async function call<T>(method: string, args: Record<string, unknown> = {}): Promise<T> {
   const res = await fetch(`/api/method/${method}`, {
@@ -29,7 +36,7 @@ async function call<T>(method: string, args: Record<string, unknown> = {}): Prom
     _server_messages?: string;
   };
 
-  if (!res.ok) throw new FrappeError(frappeErrorMessage(body, `Request failed (${res.status})`));
+  if (!res.ok) throw new FrappeError(frappeErrorMessage(body, `Request failed (${res.status})`), res.status);
   return body.message as T;
 }
 

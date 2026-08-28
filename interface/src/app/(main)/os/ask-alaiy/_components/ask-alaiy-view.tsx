@@ -1,20 +1,21 @@
 "use client";
 
-import { useState } from "react";
-
 import { AskAlaiyBackground } from "./ask-alaiy-background";
 import { AskAlaiyChat } from "./ask-alaiy-chat";
 import { ChatHistorySidebar } from "./chat-history-sidebar";
 
 export function AskAlaiyView({ userName }: { readonly userName: string }) {
-  const [chatKey, setChatKey] = useState(0);
-
   return (
-    <div className="relative isolate flex h-full gap-4 overflow-hidden">
+    // items-start matters: without it, flex's default align-items:stretch
+    // makes the sidebar's own box exactly as tall as the (very long) chat
+    // column next to it. A sticky element stretched to already span the
+    // whole scroll range has nothing left to visibly "stick" to -- it just
+    // scrolls with the page as if position:sticky weren't set at all.
+    <div className="relative isolate flex items-start gap-4">
       <AskAlaiyBackground />
-      <ChatHistorySidebar onNewChat={() => setChatKey((key) => key + 1)} />
+      <ChatHistorySidebar />
       <div className="relative min-w-0 flex-1">
-        <AskAlaiyChat key={chatKey} userName={userName} />
+        <AskAlaiyChat userName={userName} />
       </div>
     </div>
   );

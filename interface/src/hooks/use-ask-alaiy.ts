@@ -53,6 +53,36 @@ export interface ThreadTurn {
   partial: boolean;
 }
 
+/**
+ * A multi-step tool-using reply isn't one growing OS Chat Message row --
+ * the server writes a separate, individually-settling message per tool
+ * call (each arrives with its own populated tool_calls the moment it's
+ * done) and only the final text lands on a message of its own. Left
+ * ungrouped, that's one avatar+bubble per step instead of one continuous
+ * reply with a combined tool trail. Both surfaces (the drawer panel and
+ * the /os/ask-alaiy page) call this on their own visibleTurns so they
+ * render identically.
+ */
+export function groupAssistantTurns(turns: ThreadTurn[]): ThreadTurn[] {
+  const grouped: ThreadTurn[] = [];
+  for (const turn of turns) {
+    const prev = grouped[grouped.length - 1];
+    if (turn.role === "assistant" && prev?.role === "assistant") {
+      grouped[grouped.length - 1] = {
+        ...prev,
+        text: turn.text || prev.text,
+        toolCalls: [...prev.toolCalls, ...turn.toolCalls],
+        toolErrors: new Set([...prev.toolErrors, ...turn.toolErrors]),
+        attachments: [...prev.attachments, ...turn.attachments],
+        partial: turn.partial,
+      };
+    } else {
+      grouped.push(turn);
+    }
+  }
+  return grouped;
+}
+
 export interface PendingAttachment {
   localId: string;
   file_name: string;
@@ -325,10 +355,21 @@ export function useAskAlaiy() {
           pollTimer.current = setTimeout(() => poll(name), streaming ? POLL_STREAM_MS : POLL_MS);
         }
       } catch (e) {
+        if (e instanceof FrappeError && e.httpStatus === 404) {
+          // The session this tab remembered no longer exists server-side
+          // (deleted, or a reseeded dev database) -- drop back to a clean
+          // chat instead of reopening the same dead session on every visit.
+          if (activeSession.current === name) activeSession.current = null;
+          setSessionId(null);
+          setTurns([]);
+          lastSeq.current = 0;
+          setRunning(false);
+          return;
+        }
         setError(e instanceof FrappeError ? e.message : "Could not open that chat.");
       }
     },
-    [sessionId, absorbMessage, poll, stopPoll],
+    [sessionId, absorbMessage, poll, stopPoll, setSessionId],
   );
 
   const hydrated = useRef(false);

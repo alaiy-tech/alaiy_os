@@ -8,7 +8,7 @@ import {
   Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { MAX_ATTACHMENTS, type useAskAlaiy, type PendingAttachment, type ThreadTurn } from "@/hooks/use-ask-alaiy";
+import { groupAssistantTurns, MAX_ATTACHMENTS, type useAskAlaiy, type PendingAttachment, type ThreadTurn } from "@/hooks/use-ask-alaiy";
 import { listChatMentions } from "@/lib/frappe/chat";
 import type {
   ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
@@ -29,7 +29,7 @@ const SUGGESTIONS = [
   "What's new since yesterday?",
 ];
 
-const ATTACHMENT_ACCEPT =
+export const ATTACHMENT_ACCEPT =
   ".pdf,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.yaml,.yml,.py,.js,.ts,.sql,.log,.xml,.html,.htm,.css,.ini,.cfg,.toml";
 
 function skillQueryOf(value: string): string | null {
@@ -87,11 +87,13 @@ function attachmentMeta(fileSize: number, chars?: number, format?: string): stri
   return chars ? `${size} · ${chars.toLocaleString()} characters read` : size;
 }
 
-function greeting(fullName: string) {
-  const hour = new Date().getHours();
-  const part = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+function dayPartFor(hour: number): string {
+  return hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+}
+
+function greeting(fullName: string, part: string | null) {
   const first = fullName.split(" ")[0] || fullName;
-  return `${part}, ${first}`;
+  return `${part ?? "Welcome"}, ${first}`;
 }
 
 export function AskAlaiyPanel({
@@ -103,6 +105,8 @@ export function AskAlaiyPanel({
   userFullName: string;
 }) {
   const [text, setText] = useState("");
+  const [dayPart, setDayPart] = useState<string | null>(null);
+  useEffect(() => setDayPart(dayPartFor(new Date().getHours())), []);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [plusMenuOpen, setPlusMenuOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -287,10 +291,27 @@ export function AskAlaiyPanel({
   const showWelcome = chat.turns.length === 0 && !chat.running && !chat.error;
 
   const lastUserIdx = chat.turns.reduce((acc, t, i) => (t.role === "user" ? i : acc), -1);
-  const visibleTurns = chat.running
-    ? chat.turns.filter((t, i) => i <= lastUserIdx || t.text.length > 0)
-    : chat.turns;
+  // toolCalls.length > 0 matters here: an assistant turn with tool calls but
+  // no text yet (still working, nothing written back) used to be filtered
+  // out entirely, hiding the tool trail until text started streaming --
+  // i.e. real-time tool progress never showed up in "real time" at all.
+  const visibleTurns = groupAssistantTurns(
+    chat.running
+      ? chat.turns.filter((t, i) => i <= lastUserIdx || t.text.length > 0 || t.toolCalls.length > 0)
+      : chat.turns,
+  );
   const streamingNow = chat.running && visibleTurns.some((t) => t.partial && t.text.length > 0);
+  // Not t.partial -- each tool-call sub-message settles (its own partial
+  // flips false) the moment that one step finishes, well before the overall
+  // exchange does, so after grouping the merged turn's partial flag just
+  // reflects whichever sub-message merged in last. It goes false almost
+  // immediately even while more steps are still running, which is why
+  // gating on it here showed nothing at all during a real run. What
+  // actually means "still going" is chat.running, checked against whether
+  // this is the turn currently being built (the last one).
+  const lastVisible = visibleTurns[visibleTurns.length - 1];
+  const toolStatusShowing =
+    chat.running && lastVisible?.role === "assistant" && lastVisible.toolCalls.length > 0;
 
   return (
     <div
@@ -344,7 +365,7 @@ export function AskAlaiyPanel({
             <div className="mb-4 flex size-11 items-center justify-center rounded-full bg-primary/10 text-primary">
               <Bot className="size-5" />
             </div>
-            <p className="font-heading text-lg font-semibold leading-tight">{greeting(userFullName)}</p>
+            <p className="font-heading text-lg font-semibold leading-tight">{greeting(userFullName, dayPart)}</p>
             <p className="mt-1 text-[13.5px] text-muted-foreground">How can I help?</p>
             <div className="mt-5 flex flex-wrap justify-center gap-2">
               {SUGGESTIONS.map((s) => (
@@ -356,10 +377,10 @@ export function AskAlaiyPanel({
           </div>
         ) : (
           <div className="flex flex-col gap-4 px-4 py-4">
-            {visibleTurns.map((turn) => (
-              <Turn key={turn.key} turn={turn} suppressTools={chat.running} />
+            {visibleTurns.map((turn, i) => (
+              <Turn key={turn.key} turn={turn} showToolStatus={toolStatusShowing && i === visibleTurns.length - 1} />
             ))}
-            {chat.running && !streamingNow && <ThinkingIndicator />}
+            {chat.running && !streamingNow && !toolStatusShowing && <ThinkingIndicator />}
             {chat.error && <ErrorTurn text={chat.error} />}
           </div>
         )}
@@ -474,7 +495,7 @@ function typedPrefix(text: string, shown: number): string {
 /** The revealed prefix of a streaming message: a derived-rate character
  * reveal on top of the server's coarse ~400ms flush, so chunky polling reads
  * as smooth typing. See alaiy_os/chat/CHAT.md's Streaming section. */
-function useTypedText(text: string, partial: boolean): string {
+export function useTypedText(text: string, partial: boolean): string {
   const target = useRef(text);
   target.current = text;
   const [shown, setShown] = useState(() => (!partial || text.length > REVEAL_SNAP_CHARS ? text.length : 0));
@@ -513,7 +534,7 @@ function useTypedText(text: string, partial: boolean): string {
   return shown < text.length ? typedPrefix(text, shown) : text;
 }
 
-function Turn({ turn, suppressTools }: { turn: ThreadTurn; suppressTools?: boolean }) {
+function Turn({ turn, showToolStatus }: { turn: ThreadTurn; showToolStatus?: boolean }) {
   const typed = useTypedText(turn.text, turn.partial);
 
   if (turn.role === "user") {
@@ -533,13 +554,23 @@ function Turn({ turn, suppressTools }: { turn: ThreadTurn; suppressTools?: boole
     );
   }
 
+  // While only the tool-status line is showing (no answer text yet), it's a
+  // single short line, not a paragraph -- center the avatar against it
+  // instead of using the top-of-paragraph nudge meant for AnswerBody.
+  const onlyStatusShowing = showToolStatus && turn.toolCalls.length > 0 && !typed;
+
   return (
-    <div className="flex gap-2.5">
-      <div className="mt-0.5 flex size-6 flex-none items-center justify-center rounded-full bg-muted text-muted-foreground">
+    <div className={cn("flex gap-2.5", onlyStatusShowing && "items-center")}>
+      <div
+        className={cn(
+          "flex size-6 flex-none items-center justify-center rounded-full bg-muted text-muted-foreground",
+          !onlyStatusShowing && "mt-0.5",
+        )}
+      >
         <Sparkles className="size-3.5" />
       </div>
       <div className="min-w-0 flex-1 text-[13.5px] leading-relaxed">
-        {turn.toolCalls.length > 0 && !suppressTools && <ToolTrail turn={turn} />}
+        {showToolStatus && turn.toolCalls.length > 0 && <ToolTrail turn={turn} withGap={!!typed} />}
         {typed && (
           <div className={typed.length < turn.text.length ? "ask-alaiy-streaming" : undefined}>
             <AnswerBody text={typed} />
@@ -555,34 +586,39 @@ function Turn({ turn, suppressTools }: { turn: ThreadTurn; suppressTools?: boole
   );
 }
 
-function ToolTrail({ turn }: { turn: ThreadTurn }) {
+/**
+ * A single, continuously-replacing status line for whichever tool call is
+ * most recent -- not a running history of every step. The caller only passes
+ * showToolStatus=true for the turn currently being generated (not per-turn
+ * `partial`, which settles per tool call well before the overall reply
+ * does), and stops passing it once the whole exchange finishes, so nothing
+ * "loading"-shaped lingers next to the finished answer.
+ */
+export function ToolTrail({ turn, withGap }: { turn: ThreadTurn; withGap?: boolean }) {
+  const current = turn.toolCalls[turn.toolCalls.length - 1];
+  if (!current) return null;
+  const failed = turn.toolErrors.has(current.id);
+  // The call can land before its own name does (the row is created, then
+  // named), so an empty name isn't "no call" -- it's this one, mid-arrival.
+  // Falling back to a generic label keeps the line something rather than a
+  // bare pulsing dot with nothing next to it.
+  const label = !current.name
+    ? "Working…"
+    : String(current.name).startsWith("skill:")
+      ? `/${current.name.slice(6)}`
+      : String(current.name).replace(/_/g, " ");
+
   return (
-    <div className="mb-2 space-y-1">
-      {turn.toolCalls.map((call) => {
-        const failed = turn.toolErrors.has(call.id);
-        const args = Object.entries(call.input || {}).filter(([, v]) => v !== null && v !== "");
-        return (
-          <details key={call.id} className="group">
-            <summary className={cn("flex list-none items-center gap-1.5 text-xs", args.length > 0 && "cursor-pointer", failed ? "text-destructive" : "text-muted-foreground")}>
-              <span className={cn("size-1.5 flex-none rounded-full", failed ? "bg-destructive" : "bg-border")} />
-              <span className="font-medium capitalize">
-                {String(call.name || "").startsWith("skill:") ? `/${call.name.slice(6)}` : String(call.name || "").replace(/_/g, " ")}
-              </span>
-              {failed && <span>· refused</span>}
-            </summary>
-            {args.length > 0 && (
-              <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 rounded-md bg-muted px-2.5 py-2 font-mono text-[11px]">
-                {args.map(([k, v]) => (
-                  <div key={k} className="contents">
-                    <dt className="text-muted-foreground">{k}</dt>
-                    <dd className="truncate">{typeof v === "string" ? v : JSON.stringify(v)}</dd>
-                  </div>
-                ))}
-              </dl>
-            )}
-          </details>
-        );
-      })}
+    // withGap only when answer text is about to render right below this --
+    // a bottom margin here otherwise inflates this element's own box (it's
+    // a flex item's only child, so the margin can't collapse out the way it
+    // would in normal flow) to match the avatar's height, which leaves the
+    // *visible* row sitting above true center even though the two flex
+    // items end up technically equal height.
+    <div className={cn("flex items-center gap-1.5 text-xs", withGap && "mb-2", failed ? "text-destructive" : "text-muted-foreground")}>
+      <span className={cn("size-1.5 flex-none rounded-full", failed ? "bg-destructive" : "animate-pulse bg-border")} />
+      <span className="font-medium capitalize">{label}</span>
+      {failed && <span>· refused</span>}
     </div>
   );
 }
@@ -610,7 +646,7 @@ function ThinkingIndicator() {
   );
 }
 
-function AttachmentChip({ attachment, onRemove }: { attachment: PendingAttachment | ChatAttachmentMeta; onRemove?: () => void }) {
+export function AttachmentChip({ attachment, onRemove }: { attachment: PendingAttachment | ChatAttachmentMeta; onRemove?: () => void }) {
   const status = "status" in attachment ? attachment.status : undefined;
   const errorText = "error" in attachment ? attachment.error : undefined;
   const fileUrl = "file_url" in attachment ? attachment.file_url : undefined;
