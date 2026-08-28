@@ -2,7 +2,7 @@
 
 import * as React from "react";
 
-import { buildColumnDefs, buildFilterFields, type ColumnSpec } from "./column-spec";
+import { buildColumnDefs, buildFilterFields, buildManualFilterFields, type ColumnSpec } from "./column-spec";
 import { OsDataTable } from "./data-table";
 
 export type OsDataTableViewProps = {
@@ -26,6 +26,8 @@ export type OsDataTableViewProps = {
   currency?: string;
   searchable?: boolean;
   searchPlaceholder?: string;
+  /** Mirrors `OsDataTable`'s own `searchParam` - see its doc comment. */
+  searchParam?: string;
   columnVisibility?: boolean;
   compulsoryColumns?: string[];
   minVisibleColumns?: number;
@@ -41,6 +43,8 @@ export type OsDataTableViewProps = {
    * is set (e.g. `"customers_page"`) - a plain `props` value, not resolved
    * from any source. */
   pageParam?: string;
+  /** Mirrors `OsDataTable`'s own `pageSizeParam` - see its doc comment. */
+  pageSizeParam?: string;
   /** The current effective sort - a `data`-bound prop (e.g. `{ ref:
    * "suppliers", path: "orderBy" }`), resolved from the same source `rows`
    * came from. See `docs/UI_RUNTIME.md`'s "Generic List Query State". */
@@ -72,6 +76,7 @@ export function OsDataTableView({
   currency,
   searchable,
   searchPlaceholder,
+  searchParam,
   columnVisibility,
   compulsoryColumns,
   minVisibleColumns,
@@ -80,13 +85,15 @@ export function OsDataTableView({
   pageSize,
   pagination,
   pageParam,
+  pageSizeParam,
   sort,
   sortParam,
   emptyMessage,
 }: OsDataTableViewProps) {
   const columnDefs = React.useMemo(() => buildColumnDefs(columns, currency), [columns, currency]);
   const filterFields = React.useMemo(() => buildFilterFields(columns), [columns]);
-  const filterable = filterFields.length > 0;
+  const manualFilterFields = React.useMemo(() => buildManualFilterFields(columns), [columns]);
+  const filterable = filterFields.length > 0 || manualFilterFields.length > 0;
 
   return (
     <OsDataTable
@@ -97,8 +104,10 @@ export function OsDataTableView({
       getRowId={rowId ? (row) => String((row as Record<string, unknown>)[rowId]) : undefined}
       searchable={searchable}
       searchPlaceholder={searchPlaceholder}
+      searchParam={searchParam}
       filterable={filterable}
       filterFields={filterFields}
+      manualFilterFields={manualFilterFields}
       columnVisibility={columnVisibility}
       compulsoryColumns={compulsoryColumns}
       minVisibleColumns={minVisibleColumns}
@@ -107,6 +116,7 @@ export function OsDataTableView({
       pageSize={pageSize}
       pagination={pagination}
       pageParam={pageParam}
+      pageSizeParam={pageSizeParam}
       sort={sort}
       sortParam={sortParam}
       emptyMessage={emptyMessage}
