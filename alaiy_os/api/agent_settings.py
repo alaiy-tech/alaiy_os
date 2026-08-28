@@ -137,3 +137,34 @@ def set_agent_enabled(agent, enabled, force=False):
 	frappe.db.set_value("OS Agent Registry", agent, "is_enabled", 1 if enabled else 0)
 	frappe.db.commit()
 	return {"agent": agent, "is_enabled": enabled}
+
+
+@frappe.whitelist()
+def set_agent_run_as_user(agent, user):
+	"""
+	Change which user an agent's tools run as, then hand back its recomputed
+	settings row -- one user change can flip every permission chip on the
+	card, so the caller should render what comes back rather than patch its
+	own copy.
+
+	An empty `user` means Administrator (site-wide reads), not "unset" --
+	`list_agents` already treats a falsy `run_as_user` that way.
+	"""
+	if not frappe.has_permission("OS Agent Registry", "write"):
+		frappe.throw("Not permitted.", frappe.PermissionError)
+
+	user = (user or "").strip()
+
+	if user:
+		if user == "Guest" or not frappe.db.exists("User", user):
+			frappe.throw(f"{user} is not a valid user.", title="Invalid Run As User")
+		if not frappe.db.get_value("User", user, "enabled"):
+			frappe.throw(f"{user} is disabled.", title="Invalid Run As User")
+
+	frappe.db.set_value("OS Agent Registry", agent, "run_as_user", user)
+	frappe.db.commit()
+
+	state = next((a for a in list_agents() if a["agent_id"] == agent), None)
+	if not state:
+		frappe.throw(f"Agent {agent} not found.")
+	return state

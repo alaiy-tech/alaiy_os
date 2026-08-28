@@ -9,3 +9,8 @@ alaiy_os/desktop_icon/
 alaiy_os/workspace/
 .DS_Store
 /node_modules
+
+# Ask Alaiy widget (frontend/) -- built output only; the source ships, the
+# bundle doesn't. See frontend/README.md.
+frontend/node_modules/
+alaiy_os/public/dist/

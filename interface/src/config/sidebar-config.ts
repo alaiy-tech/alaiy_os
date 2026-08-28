@@ -1,5 +1,6 @@
 import {
   Banknote,
+  Bot,
   Boxes,
   Building2,
   Fingerprint,
@@ -274,18 +275,12 @@ const baseSidebarItems: NavGroup[] = [
         url: "/os/settings/connectors",
         icon: Plug,
       },
-      // {
-      //   id: "ai",
-      //   title: "AI",
-      //   icon: Sparkles,
-      //   subItems: [
-      //     {
-      //       id: "agents",
-      //       title: "Agents",
-      //       url: "/os/settings/agents",
-      //     },
-      //   ],
-      // },
+      {
+        id: "agents",
+        title: "Agents",
+        url: "/os/settings/agents",
+        icon: Bot,
+      },
       {
         id: "system",
         title: "System",
