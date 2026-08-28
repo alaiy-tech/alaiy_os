@@ -2,19 +2,11 @@
 "use no memo";
 
 import type { ColumnDef } from "@tanstack/react-table";
-import { parse } from "date-fns";
-import { Check, Clock, MoreHorizontal, X } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 
-import {
-  Avatar,
-  AvatarBadge,
-  AvatarFallback,
-  AvatarGroup,
-  AvatarGroupCount,
-} from "@/components/primitive/avatar";
-import { Badge } from "@/components/primitive/badge";
+import type { DocFieldMeta } from "@/components/derived/list/types";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/primitive/avatar";
 import { Button } from "@/components/primitive/button";
-import { Checkbox } from "@/components/primitive/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,241 +14,141 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/primitive/dropdown-menu";
+import { STATUS_TONE } from "@/constants/list";
 import { cn, getInitials } from "@/utils";
+import { formatFieldValue } from "@/utils/format";
 
-import { statusMeta, type UserRow } from "./data";
+export type UserFieldRow = Record<string, unknown>;
 
-function RoleCell({ role, team }: { role: string; team: string }) {
+/** Folded into the combined "User" cell (avatar/name/email) or given their
+ * own dedicated column below - never separately offered in the column
+ * picker, and never fetched-then-ignored either (see `lib/frappe/users.ts`). */
+export const EXCLUDED_FROM_COLUMN_PICKER = new Set([
+  "user_image",
+  "first_name",
+  "middle_name",
+  "last_name",
+  "email",
+  "enabled",
+  "user_type",
+  "last_login",
+]);
+
+function fullNameOf(row: UserFieldRow): string {
+  return [row.first_name, row.middle_name, row.last_name]
+    .filter((part): part is string => typeof part === "string" && part.trim().length > 0)
+    .join(" ");
+}
+
+function stringField(row: UserFieldRow, field: string): string | undefined {
+  const value = row[field];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+}
+
+function UserCell({ row }: { row: UserFieldRow }) {
+  const email = stringField(row, "email") ?? stringField(row, "name") ?? "";
+  const name = fullNameOf(row) || email;
+  const image = stringField(row, "user_image");
+
   return (
-    <div className="grid gap-0.5">
-      <span className="whitespace-nowrap">{role}</span>
-      <span className="text-muted-foreground text-xs">{team}</span>
+    <div className="flex items-center gap-3">
+      <Avatar size="lg">
+        {image && <AvatarImage src={image} alt={name} />}
+        <AvatarFallback>{getInitials(name)}</AvatarFallback>
+      </Avatar>
+      <div className="min-w-0">
+        <div className="truncate font-medium text-foreground text-sm">{name}</div>
+        <div className="truncate text-muted-foreground text-sm">{email}</div>
+      </div>
     </div>
   );
 }
 
-function StatusBadge({ status }: { status: UserRow["status"] }) {
-  const meta = statusMeta[status];
-
+function StatusBadge({ enabled }: { enabled: boolean }) {
   return (
-    <Badge
-      className={cn("gap-1.5 border px-2 py-1 font-medium", meta.badgeClass)}
-      variant="outline"
+    <span
+      className={cn(
+        "inline-flex items-center rounded-full px-2 py-0.5 font-medium text-xs",
+        enabled ? STATUS_TONE.success : STATUS_TONE.neutral,
+      )}
     >
-      <span className={cn("size-1.5 rounded-full", meta.dotClass)} />
-      {status}
-    </Badge>
+      {enabled ? "Enabled" : "Disabled"}
+    </span>
   );
 }
 
-function getAvatarTone(name: string) {
-  const tones = [
-    "[&_[data-slot=avatar-fallback]]:bg-amber-100 [&_[data-slot=avatar-fallback]]:text-amber-700 after:border-amber-200 dark:[&_[data-slot=avatar-fallback]]:bg-amber-500/15 dark:[&_[data-slot=avatar-fallback]]:text-amber-300 dark:after:border-amber-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-orange-100 [&_[data-slot=avatar-fallback]]:text-orange-700 after:border-orange-200 dark:[&_[data-slot=avatar-fallback]]:bg-orange-500/15 dark:[&_[data-slot=avatar-fallback]]:text-orange-300 dark:after:border-orange-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-rose-100 [&_[data-slot=avatar-fallback]]:text-rose-700 after:border-rose-200 dark:[&_[data-slot=avatar-fallback]]:bg-rose-500/15 dark:[&_[data-slot=avatar-fallback]]:text-rose-300 dark:after:border-rose-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-pink-100 [&_[data-slot=avatar-fallback]]:text-pink-700 after:border-pink-200 dark:[&_[data-slot=avatar-fallback]]:bg-pink-500/15 dark:[&_[data-slot=avatar-fallback]]:text-pink-300 dark:after:border-pink-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-fuchsia-100 [&_[data-slot=avatar-fallback]]:text-fuchsia-700 after:border-fuchsia-200 dark:[&_[data-slot=avatar-fallback]]:bg-fuchsia-500/15 dark:[&_[data-slot=avatar-fallback]]:text-fuchsia-300 dark:after:border-fuchsia-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-purple-100 [&_[data-slot=avatar-fallback]]:text-purple-700 after:border-purple-200 dark:[&_[data-slot=avatar-fallback]]:bg-purple-500/15 dark:[&_[data-slot=avatar-fallback]]:text-purple-300 dark:after:border-purple-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-violet-100 [&_[data-slot=avatar-fallback]]:text-violet-700 after:border-violet-200 dark:[&_[data-slot=avatar-fallback]]:bg-violet-500/15 dark:[&_[data-slot=avatar-fallback]]:text-violet-300 dark:after:border-violet-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-indigo-100 [&_[data-slot=avatar-fallback]]:text-indigo-700 after:border-indigo-200 dark:[&_[data-slot=avatar-fallback]]:bg-indigo-500/15 dark:[&_[data-slot=avatar-fallback]]:text-indigo-300 dark:after:border-indigo-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-sky-100 [&_[data-slot=avatar-fallback]]:text-sky-700 after:border-sky-200 dark:[&_[data-slot=avatar-fallback]]:bg-sky-500/15 dark:[&_[data-slot=avatar-fallback]]:text-sky-300 dark:after:border-sky-500/20",
-    "[&_[data-slot=avatar-fallback]]:bg-emerald-100 [&_[data-slot=avatar-fallback]]:text-emerald-700 after:border-emerald-200 dark:[&_[data-slot=avatar-fallback]]:bg-emerald-500/15 dark:[&_[data-slot=avatar-fallback]]:text-emerald-300 dark:after:border-emerald-500/20",
-  ];
-
-  return tones[name.length % tones.length];
-}
-
-function getLastActiveBadge(lastActive: number) {
-  if (lastActive < 1) {
-    return {
-      className: "bg-green-600 text-green-950 [&>svg]:text-white",
-      icon: Check,
-    };
-  }
-
-  if (lastActive < 4 * 60) {
-    return {
-      className: "bg-amber-500 text-amber-950",
-      icon: Clock,
-    };
-  }
-
-  if (lastActive < 7 * 24 * 60) {
-    return {
-      className: "bg-destructive",
-      icon: null,
-    };
-  }
-
-  return {
-    className: "bg-muted-foreground text-muted",
-    icon: X,
-  };
-}
-
-function AvatarCell({
-  lastActive,
-  name,
-}: {
-  lastActive: number;
-  name: string;
-}) {
-  const badge = getLastActiveBadge(lastActive);
-  const BadgeIcon = badge.icon;
-
-  return (
-    <Avatar size="lg" className={cn("font-medium", getAvatarTone(name))}>
-      <AvatarFallback>{getInitials(name)}</AvatarFallback>
-      <AvatarBadge className={badge.className}>
-        {BadgeIcon ? <BadgeIcon /> : null}
-      </AvatarBadge>
-    </Avatar>
-  );
-}
-
-function WorkspaceCell({ workspaces }: { workspaces: string[] }) {
-  const [firstWorkspace, ...remainingWorkspaces] = workspaces;
-  const remainingCount = remainingWorkspaces.length;
-
-  return (
-    <AvatarGroup className="*:data-[slot=avatar]:ring-0">
-      {firstWorkspace ? (
-        <Avatar className="after:rounded-sm">
-          <AvatarFallback className="rounded-sm ring-0">
-            {getInitials(firstWorkspace)}
-          </AvatarFallback>
-        </Avatar>
-      ) : null}
-      {remainingCount > 0 ? (
-        <AvatarGroupCount className="rounded-sm border ring-card">
-          +{remainingCount}
-        </AvatarGroupCount>
-      ) : null}
-    </AvatarGroup>
-  );
-}
-
-export const usersColumns: ColumnDef<UserRow>[] = [
+/** The fixed columns every Users table render has, in the exact order and
+ * with the exact defaults specified: checkbox (added by `OsDataTable`'s own
+ * `selectable`, not here) → User (combined, structural) → User Type → Status
+ * (backed by the real `enabled` field, not a fictional multi-state one) →
+ * Last Logged In → Actions (structural, no header text, narrow). Any other
+ * doctype field the org wants shown is added via `buildExtraColumn` below,
+ * driven entirely by `useDoctypeMeta("User")` - never hardcoded here. */
+export const FIXED_USER_COLUMNS: ColumnDef<UserFieldRow>[] = [
   {
-    id: "select",
-    header: ({ table }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          aria-label="Select all users"
-          checked={
-            table.getIsAllPageRowsSelected()
-              ? true
-              : table.getIsSomePageRowsSelected()
-                ? "indeterminate"
-                : false
-          }
-          onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
-        />
-      </div>
-    ),
-    cell: ({ row }) => (
-      <div className="flex items-center justify-center">
-        <Checkbox
-          aria-label={`Select ${row.original.name}`}
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => row.toggleSelected(!!value)}
-        />
-      </div>
-    ),
-    enableHiding: false,
-    enableSorting: false,
-  },
-  {
-    id: "search",
-    accessorFn: (row) => `${row.name} ${row.email}`,
-    filterFn: "includesString",
-    enableHiding: true,
-  },
-  {
-    accessorKey: "name",
+    id: "user",
     header: "User",
-    cell: ({ row }) => (
-      <div className="flex items-center gap-3">
-        <AvatarCell
-          name={row.original.name}
-          lastActive={row.original.lastActive}
-        />
-        <div className="min-w-0">
-          <div className="truncate font-medium text-foreground text-sm">
-            {row.original.name}
-          </div>
-          <div className="truncate text-muted-foreground text-sm">
-            {row.original.email}
-          </div>
-        </div>
-      </div>
-    ),
-  },
-  {
-    accessorKey: "role",
-    header: "Role / Team",
-    filterFn: "equalsString",
-    cell: ({ row }) => (
-      <RoleCell role={row.original.role} team={row.original.team} />
-    ),
-  },
-  {
-    accessorKey: "team",
-    header: "Team",
-    filterFn: "equalsString",
-    cell: ({ row }) => <div className="text-sm">{row.original.team}</div>,
-  },
-  {
-    accessorKey: "workspace",
-    header: "Workspace",
-    filterFn: "arrIncludes",
-    cell: ({ row }) => <WorkspaceCell workspaces={row.original.workspace} />,
-  },
-  {
-    accessorKey: "status",
-    header: "Status",
-    filterFn: "equalsString",
-    cell: ({ row }) => <StatusBadge status={row.original.status} />,
-  },
-  {
-    id: "joinedDate",
-    accessorFn: (row) =>
-      parse(row.joinedDate, "dd MMM yyyy, h:mm a", new Date()).getTime(),
-    header: "Joined date",
-    cell: ({ row }) => (
-      <div className="text-foreground text-sm">{row.original.joinedDate}</div>
-    ),
-  },
-  {
-    id: "actions",
-    header: () => <div className="text-right">Actions</div>,
-    cell: ({ row }) => (
-      <div className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              aria-label={`Open actions for ${row.original.name}`}
-              className="size-8 rounded-md text-muted-foreground hover:bg-muted/50"
-              size="icon-sm"
-              variant="ghost"
-            >
-              <MoreHorizontal className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>View profile</DropdownMenuItem>
-            <DropdownMenuItem>Edit user</DropdownMenuItem>
-            <DropdownMenuItem>Manage team</DropdownMenuItem>
-            <DropdownMenuItem>Resend invite</DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive">
-              Deactivate user
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-    ),
+    cell: ({ row }) => <UserCell row={row.original} />,
     enableHiding: false,
     enableSorting: false,
+  },
+  {
+    accessorKey: "user_type",
+    header: "User Type",
+    cell: ({ row }) => <span className="text-sm">{stringField(row.original, "user_type") ?? "—"}</span>,
+  },
+  {
+    id: "status",
+    accessorKey: "enabled",
+    header: "Status",
+    cell: ({ row }) => <StatusBadge enabled={Number(row.original.enabled) === 1} />,
+  },
+  {
+    accessorKey: "last_login",
+    header: "Last Logged In",
+    cell: ({ row }) => <span className="text-sm">{formatFieldValue(row.original.last_login, "Datetime")}</span>,
   },
 ];
+
+export const ACTIONS_COLUMN: ColumnDef<UserFieldRow> = {
+  id: "actions",
+  header: () => null,
+  cell: () => (
+    <div className="flex w-10 justify-end">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            aria-label="Open user actions"
+            className="size-8 rounded-md text-muted-foreground hover:bg-muted/50"
+            size="icon-sm"
+            variant="ghost"
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem>View profile</DropdownMenuItem>
+          <DropdownMenuItem>Edit user</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem variant="destructive">Deactivate user</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </div>
+  ),
+  enableHiding: false,
+  enableSorting: false,
+};
+
+/** One generic, doctype-meta-driven column per extra field the org adds via
+ * the column picker - rendering is keyed only by fieldtype, exactly like
+ * `settings/logs`' own doctype-generic columns (`formatFieldValue`), since
+ * this page knows nothing else about what a given field means. */
+export function buildExtraColumn(field: DocFieldMeta): ColumnDef<UserFieldRow> {
+  return {
+    accessorKey: field.fieldname,
+    header: field.label,
+    cell: ({ row }) => (
+      <span className="text-sm">{formatFieldValue(row.original[field.fieldname], field.fieldtype)}</span>
+    ),
+  };
+}

@@ -85,7 +85,7 @@ function LogoUploadField({
             ref={inputRef}
             id={`logo-${label}`}
             type="file"
-            accept="image/*"
+            accept="image/png"
             className="hidden"
             onChange={(event: ChangeEvent<HTMLInputElement>) => {
               const file = event.target.files?.[0];
@@ -201,6 +201,15 @@ export function OrganisationSettings() {
   }
 
   async function handleLogoUpload(file: File, logoType: LogoType) {
+    // `accept="image/png"` on the file input is a picker filter hint only -
+    // drag-and-drop and "All Files" bypass it entirely, so the real check
+    // still has to happen here (the server independently re-checks the
+    // actual file bytes - see alaiy_os.api.theme.upload_organisation_logo).
+    if (file.type !== "image/png") {
+      toast.error("Only PNG files are allowed for the organisation logo.");
+      return;
+    }
+
     setUploading((prev) => ({ ...prev, [logoType]: true }));
     try {
       const fileUrl = await uploadOrganisationLogo(file, logoType);
