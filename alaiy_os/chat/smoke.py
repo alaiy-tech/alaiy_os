@@ -40,6 +40,16 @@ buffers gives a site no streaming at all and nothing anywhere says so.
 
 	bench --site <site> execute alaiy_os.chat.smoke.run_stream_live
 
+`run_suggest` checks the follow-up chips, also against a scripted client: no
+network, no cost, and a fixed answer *and* a fixed suggestion payload, so the
+assertions can be exact. It covers the two things that make the feature reach a
+user at all — that the suggestions are written before the session goes Idle, and
+that `get_messages` returns them at the top level where a poller past its cursor
+can still see them — plus the parser, which has to survive a model that answers
+in prose.
+
+	bench --site <site> execute alaiy_os.chat.smoke.run_suggest
+
 `dump` prints a stored session in full — tool arguments AND tool results, which
 `api/chat.get_messages` deliberately withholds and no client therefore shows. It
 is the only way to see *why* a model retried a tool eleven times, so it is the
@@ -53,7 +63,8 @@ import json
 
 import frappe
 
-from alaiy_os.chat import artifacts, runner, tools
+from alaiy_os.api import chat as chat_api
+from alaiy_os.chat import artifacts, runner, suggest, tools
 from alaiy_os.engine import llm
 
 DEFAULT_QUESTION = "How many sales orders were created this month? Use a tool to check."
@@ -457,6 +468,165 @@ def run_stream(keep=False):
 		else:
 			_cleanup(*sessions)
 			print("\n(sessions deleted; pass --kwargs \"{'keep': True}\" to keep them)")
+
+
+# ── Suggestions ──────────────────────────────────────────────────────────────
+SUGGEST_REPLY = '["How did Royal Canin do last month?", "Which SKUs drove the lift?", "Show me the flat brands."]'
+SUGGEST_EXPECTED = [
+	"How did Royal Canin do last month?",
+	"Which SKUs drove the lift?",
+	"Show me the flat brands.",
+]
+
+
+class _SuggestClient(_BufferedClient):
+	"""The scripted answer, then the scripted follow-ups.
+
+	One client serves both calls of the turn because that is how the real one
+	works — `chat/suggest.py` goes through the same `ai_client` seam as `_loop`,
+	and a fake that could only answer once would hide the fact that the second
+	call happens at all. They are told apart by the system prompt, which is the
+	only thing that differs: the suggestion call carries `SUGGEST_PROMPT` and no
+	tools.
+	"""
+
+	def __init__(self, session=None, delay=0, reply=None):
+		super().__init__(session=session, delay=delay)
+		self.reply = SUGGEST_REPLY if reply is None else reply
+		self.suggest_calls = []
+
+	def complete(self, model, system, messages, tools=None):
+		if suggest.SUGGEST_PROMPT.split("\n")[0] not in (system or ""):
+			return super().complete(model, system, messages, tools=tools)
+		self.suggest_calls.append({"tools": tools, "text": messages[0]["content"][0]["text"]})
+		return {
+			"content": [{"type": "text", "text": self.reply}],
+			"stop_reason": "end_turn",
+			"usage": {"input_tokens": 30, "output_tokens": 20},
+		}
+
+
+def run_suggest(keep=False):
+	"""The follow-up chips, end to end, with a scripted client instead of a model.
+
+	Five things, in the order they can break:
+
+	  1. the turn makes the extra call, with no tools and with the conversation
+	     in it — a suggestion call that could reach data would be a second,
+	     unaudited route to it;
+	  2. the chips are stored on the newest assistant message;
+	  3. `get_messages` returns them at the TOP LEVEL, to a caller whose cursor
+	     is already past that message — which is the whole reason they are not a
+	     field on it, and the one failure that would make the feature invisible
+	     while every other assertion here still passed;
+	  4. a Running session offers none, so last turn's chips never sit under a
+	     question already being answered;
+	  5. `chat_suggestions: false` leaves the turn byte-identical and silent.
+
+	`_parse` is checked separately, on the payloads a real model actually
+	produces: prose, a fenced array, objects, duplicates, an essay.
+	"""
+	_check_parse()
+
+	original_flag = frappe.conf.get("chat_suggestions")
+	sessions = []
+	try:
+		# 1 + 2 + 3 — on (the default)
+		frappe.conf["chat_suggestions"] = True
+		client = _SuggestClient()
+		session, row = _one_turn(client)
+		sessions.append(session)
+
+		print(f"{session.name} — suggestions on")
+		assert len(client.suggest_calls) == 1, f"expected one extra call, got {len(client.suggest_calls)}"
+		call = client.suggest_calls[0]
+		assert not call["tools"], "the suggestion call was given tools"
+		assert "How many sales orders" in call["text"], "the question never reached the prompt"
+		assert STREAM_ANSWER[:20] in call["text"], "the answer never reached the prompt"
+		print(f"  one extra call, no tools, {len(call['text'])} chars of transcript")
+
+		stored = frappe.db.get_value(
+			"OS Chat Message",
+			{"session": session.name, "role": "assistant"},
+			["name", "suggestions"],
+			order_by="seq desc",
+			as_dict=True,
+		)
+		assert json.loads(stored.suggestions or "[]") == SUGGEST_EXPECTED, (
+			f"stored suggestions are {stored.suggestions}"
+		)
+		print(f"  stored on {stored.name}")
+
+		# 3 — read the way a poller reads them: cursor past the last message.
+		last_seq = frappe.db.get_value(
+			"OS Chat Message", {"session": session.name}, "seq", order_by="seq desc"
+		)
+		polled = chat_api.get_messages(session.name, after=last_seq, partial=1)
+		assert not polled["messages"], "the cursor was not actually past everything"
+		assert polled["suggestions"] == SUGGEST_EXPECTED, (
+			"get_messages returned no suggestions to a poller past its cursor — "
+			"which is every client, on the poll that sees the turn finish"
+		)
+		print("  get_messages served them with an empty message list")
+
+		# 4 — nothing while a turn is in flight
+		frappe.db.set_value("OS Chat Session", session.name, "status", "Running")
+		running = chat_api.get_messages(session.name, after=0)
+		assert running["suggestions"] == [], "a Running session offered last turn's chips"
+		frappe.db.set_value("OS Chat Session", session.name, "status", "Idle")
+		print("  none offered while Running")
+
+		# 5 — off
+		frappe.conf["chat_suggestions"] = False
+		quiet_client = _SuggestClient()
+		quiet, quiet_row = _one_turn(quiet_client)
+		sessions.append(quiet)
+		print(f"{quiet.name} — suggestions off")
+		assert not quiet_client.suggest_calls, "the extra call was made anyway"
+		assert quiet_row.text == row.text, "turning suggestions off changed the answer"
+		assert chat_api.get_messages(quiet.name, after=0)["suggestions"] == []
+		print("  no extra call, identical answer, no chips")
+
+		print("\nOK — generated, stored, served past the cursor, and silent when off")
+	finally:
+		if original_flag is None:
+			frappe.conf.pop("chat_suggestions", None)
+		else:
+			frappe.conf["chat_suggestions"] = original_flag
+		if keep:
+			print("\nkept: " + ", ".join(s.name for s in sessions))
+		else:
+			_cleanup(*sessions)
+			print("\n(sessions deleted; pass --kwargs \"{'keep': True}\" to keep them)")
+
+
+def _check_parse():
+	"""What the parser must survive. No database, no client.
+
+	Every case here is something a real model has done or will: wrap the array in
+	a fence, explain itself first, return objects, repeat itself, or write a
+	paragraph where a question was asked for. None of them may produce a chip,
+	and none of them may raise — a suggestion is a nicety, and `run_turn` has
+	already committed the answer by the time this code runs.
+	"""
+	cases = [
+		('["a", "b"]', ["a", "b"]),
+		('```json\n["a", "b"]\n```', ["a", "b"]),
+		('["a", "b", "c", "d"]', ["a", "b", "c"]),  # capped
+		('["a", "A", "b"]', ["a", "b"]),  # deduped, case-insensitively
+		('["a", "", "  ", "b"]', ["a", "b"]),  # empties dropped
+		(f'["{"x" * 200}", "b"]', ["b"]),  # over-long dropped, not truncated
+		("[]", None),
+		('[{"q": "a"}]', None),  # objects, not strings
+		("Here are three ideas: ...", None),  # prose
+		('{"suggestions": ["a"]}', None),  # keyed, not an array
+		("", None),
+		(None, None),
+	]
+	for payload, expected in cases:
+		got = suggest._parse(payload)
+		assert got == expected, f"_parse({payload!r}) -> {got!r}, expected {expected!r}"
+	print(f"_parse: {len(cases)} payloads handled, none raised")
 
 
 def run_stream_live(question=None):

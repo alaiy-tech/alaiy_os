@@ -109,6 +109,11 @@ export function useAskAlaiy() {
   }, []);
   const [turns, setTurns] = useState<ThreadTurn[]>([]);
   const [running, setRunning] = useState(false);
+  // Follow-up questions to offer under the newest answer. Lives here rather
+  // than in a panel because there is exactly one useAskAlaiy() for the whole
+  // /os tree (see ask-alaiy-provider.tsx) -- the drawer and the full page have
+  // to agree about what is on offer.
+  const [followUps, setFollowUps] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAttachment[]>([]);
   const [skills, setSkills] = useState<ChatSkill[] | null>(null);
@@ -199,6 +204,11 @@ export function useAskAlaiy() {
         }
 
         setRunning(false);
+        // The one poll that carries them: the server writes the follow-ups just
+        // before the session leaves Running, and this is the first read after
+        // that. They ride the response rather than a message because our cursor
+        // is already past the answer they belong to.
+        setFollowUps(data.suggestions ?? []);
         if (data.status === "Failed") {
           const lines = (data.error ?? "").trim().split("\n");
           setError(lines[lines.length - 1] || "The assistant failed to reply.");
@@ -254,6 +264,8 @@ export function useAskAlaiy() {
       ]);
       setPending([]);
       setRunning(true);
+      // They belonged to the answer above; a question is now on its way past it.
+      setFollowUps([]);
 
       try {
         const session = await ensureSession();
@@ -342,12 +354,17 @@ export function useAskAlaiy() {
       setError(null);
       setRunning(false);
       setPending([]);
+      setFollowUps([]);
 
       try {
         const data = await getChatMessages({ session: name, after: 0, partial: 1 });
         if (activeSession.current !== name) return;
 
         data.messages.forEach(absorbMessage);
+        // Stored on the message server-side, so a chat reopened from the
+        // history comes back with the follow-ups it ended on rather than a dead
+        // end. A session still Running is served none, so this needs no guard.
+        setFollowUps(data.suggestions ?? []);
 
         if (data.status === "Running") {
           setRunning(true);
@@ -364,6 +381,7 @@ export function useAskAlaiy() {
           setTurns([]);
           lastSeq.current = 0;
           setRunning(false);
+          setFollowUps([]);
           return;
         }
         setError(e instanceof FrappeError ? e.message : "Could not open that chat.");
@@ -389,6 +407,7 @@ export function useAskAlaiy() {
     setRunning(false);
     setError(null);
     setPending([]);
+    setFollowUps([]);
   }, [stopPoll]);
 
   const remove = useCallback(
@@ -401,7 +420,7 @@ export function useAskAlaiy() {
   );
 
   return {
-    sessionId, turns, running, error,
+    sessionId, turns, running, error, followUps,
     sessions, sessionsLoading,
     send, load, newChat, remove, refreshSessions,
     attachments: pending, uploadFiles, removeAttachment,
