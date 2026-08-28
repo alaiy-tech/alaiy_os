@@ -35,6 +35,7 @@ from alaiy_os.chat import artifacts as chat_artifacts
 from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import skills as chat_skills
+from alaiy_os.chat import suggest as chat_suggest
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.engine import llm
 
@@ -222,6 +223,11 @@ def run_turn(session):
 		return
 
 	doc.reload()
+	# Before the status flip, not after: a client stops polling the moment a
+	# session reads Idle, so anything written past this line is written for
+	# nobody. `attach` never raises — a turn that answered must never be reported
+	# as failed because its follow-up chips could not be written.
+	chat_suggest.attach(doc)
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
 
 
