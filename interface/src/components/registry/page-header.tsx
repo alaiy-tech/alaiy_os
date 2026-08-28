@@ -19,8 +19,8 @@ export function PageHeader({ title, subtitle, action }: { title: ReactNode; subt
       {/* min-w-0 because a flex item's automatic minimum size is its content's:
           without it a long document name grows the row past the page rather
           than wrapping inside it, and takes the action slot with it. */}
-      <div className="min-w-0 space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight break-words">{title}</h1>
+      <div className="min-w-0 space-y-1.5">
+        <h1 className="text-3xl font-normal tracking-tight break-words">{title}</h1>
         {subtitle && <p className="text-muted-foreground text-sm">{subtitle}</p>}
       </div>
       {action}
