@@ -19,6 +19,7 @@ import { Cog, Search, X } from "lucide-react";
 import type { ColumnPrefs, DocFieldMeta, FilterRow } from "@/components/derived/list/types";
 import { type ColumnField, ColumnSettingsPopover } from "@/components/derived/popover/column-settings-popover";
 import { FilterPopover } from "@/components/derived/popover/filter-popover";
+import { ManualFilterPopover } from "@/components/derived/popover/manual-filter-popover";
 import { PaginationFooter } from "@/components/layout/pagination-footer";
 import { Button } from "@/components/primitive/button";
 import { ButtonGroup } from "@/components/primitive/button-group";
@@ -28,8 +29,9 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/primi
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/primitive/table";
 
 import { applyFilterRows } from "./apply-filters";
+import type { ManualFilterField } from "./column-spec";
 import { usePaginationParam } from "./use-pagination-param";
-import { useSortParam } from "./use-sort-param";
+import { useUrlParam } from "./use-url-param";
 
 export type OsDataTableProps<TData> = {
   title?: string;
@@ -43,14 +45,26 @@ export type OsDataTableProps<TData> = {
   searchable?: boolean;
   searchPlaceholder?: string;
   /** Which fields the search box matches against. Every field is checked
-   * (stringified) if omitted. */
+   * (stringified) if omitted. Ignored when `searchParam` is set - a
+   * server-driven search has no local rows to scan. */
   searchFields?: (keyof TData)[];
+  /** The URL search param this table's search box reads/writes when set
+   * (e.g. `"orders_search"`) - `data` is then assumed already filtered
+   * server-side, and the box no longer scans it locally. Omitted keeps
+   * today's local in-memory search. See docs/UI_RUNTIME.md's "Generic List
+   * Query State". */
+  searchParam?: string;
 
   filterable?: boolean;
   /** Drives the filter builder's field/operator/value UI - required for
    * `filterable` to do anything (a table with no known fields has nothing to
    * offer a filter row). */
   filterFields?: DocFieldMeta[];
+  /** Server-driven filter fields (see `column-spec.tsx`'s
+   * `buildManualFilterFields`) - rendered as their own popover alongside/
+   * instead of the local `FilterPopover`, each writing straight to its own
+   * URL param with no operator picker (the operator is fixed server-side). */
+  manualFilterFields?: ManualFilterField[];
 
   columnVisibility?: boolean;
   /** Which manageable columns show, and in what order, before the user
@@ -85,6 +99,11 @@ export type OsDataTableProps<TData> = {
    * explicit, stable name to be paginated interactively; omitted,
    * Next/Previous render disabled rather than silently doing nothing. */
   pageParam?: string;
+  /** The URL search param this table's per-page size reads/writes when set -
+   * only meaningful alongside `pagination`/`pageParam`. Omitted means no
+   * per-page selector renders (Next/Previous still work off the static
+   * `pageSize` the source was configured with). */
+  pageSizeParam?: string;
 
   /** The current effective sort - e.g. `"supplier_name asc"`, the same
    * literal format `frappe-list`'s own static `orderBy` uses. When present,
@@ -164,8 +183,10 @@ export function OsDataTable<TData>({
   searchable = false,
   searchPlaceholder = "Search...",
   searchFields,
+  searchParam,
   filterable = false,
   filterFields = [],
+  manualFilterFields = [],
   columnVisibility = false,
   defaultColumnOrder,
   structuralColumnIds = [],
@@ -176,6 +197,7 @@ export function OsDataTable<TData>({
   pageSize = 10,
   pagination,
   pageParam,
+  pageSizeParam,
   sort,
   sortParam,
   emptyMessage = "No results.",
@@ -253,12 +275,26 @@ export function OsDataTable<TData>({
     [effectiveColumns, structuralIds],
   );
 
-  const [searchInput, setSearchInput] = React.useState("");
+  const manualSearch = Boolean(searchParam);
+  const { value: urlSearch, setValue: setUrlSearch } = useUrlParam(searchParam ?? "", pageParam ? [pageParam] : []);
+
+  const [searchInput, setSearchInput] = React.useState(() => urlSearch ?? "");
   const [search, setSearch] = React.useState("");
   React.useEffect(() => {
-    const timeout = setTimeout(() => setSearch(searchInput), 300);
+    const timeout = setTimeout(() => {
+      if (manualSearch) setUrlSearch(searchInput || null);
+      else setSearch(searchInput);
+    }, 300);
     return () => clearTimeout(timeout);
-  }, [searchInput]);
+  }, [searchInput, manualSearch, setUrlSearch]);
+
+  // Resyncs the visible box from the URL when it changes from outside this
+  // component (browser back/forward, a Reset elsewhere) - a no-op for our
+  // own debounced writes above, since `searchInput` already matches by the
+  // time they land.
+  React.useEffect(() => {
+    if (manualSearch) setSearchInput(urlSearch ?? "");
+  }, [manualSearch, urlSearch]);
 
   const [filterRows, setFilterRows] = React.useState<FilterRow[]>([]);
   const [columnsOpen, setColumnsOpen] = React.useState(false);
@@ -276,6 +312,10 @@ export function OsDataTable<TData>({
   // Always called (Rules of Hooks) - inert when `manualPagination` is
   // false, since nothing reads `urlPage`/`setUrlPage` in that branch.
   const { page: urlPage, setPage: setUrlPage } = usePaginationParam(pageParam ?? "", pagination?.page ?? 1);
+  // Same inertness rule for page size - resetting `pageParam` in the same
+  // navigation (via `resetParams`) is what keeps a size change from
+  // stranding the user on a page number the new size no longer has.
+  const { setValue: setUrlPageSize } = useUrlParam(pageSizeParam ?? "", pageParam ? [pageParam] : []);
 
   const effectivePagination: PaginationState = manualPagination
     ? { pageIndex: urlPage - 1, pageSize: pagination.pageSize }
@@ -295,7 +335,7 @@ export function OsDataTable<TData>({
   // Resetting `pageParam` (if any) alongside a sort write, not just a page
   // write, is what satisfies "changing sort resets the relevant page"
   // without OsFilterBar's involvement - see docs/UI_RUNTIME.md.
-  const { value: urlSort, setValue: setUrlSort } = useSortParam(sortParam ?? "", pageParam ? [pageParam] : []);
+  const { value: urlSort, setValue: setUrlSort } = useUrlParam(sortParam ?? "", pageParam ? [pageParam] : []);
 
   const effectiveSorting: SortingState = React.useMemo(() => {
     if (!manualSorting) return [];
@@ -318,10 +358,10 @@ export function OsDataTable<TData>({
 
   const filteredData = React.useMemo(() => {
     let result = data;
-    if (searchable) result = applySearch(result, search, searchFields);
+    if (searchable && !manualSearch) result = applySearch(result, search, searchFields);
     if (filterable) result = applyFilterRows(result, filterRows, filterFields);
     return result;
-  }, [data, searchable, search, searchFields, filterable, filterRows, filterFields]);
+  }, [data, searchable, manualSearch, search, searchFields, filterable, filterRows, filterFields]);
 
   const columnVisibilityState = React.useMemo<VisibilityState>(() => {
     if (!columnVisibility) return {};
@@ -387,7 +427,7 @@ export function OsDataTable<TData>({
       )}
 
       <CardContent className="flex flex-col gap-4">
-        {[searchable, filterable, columnVisibility].some(Boolean) && (
+        {[searchable, filterable, columnVisibility, manualFilterFields.length > 0].some(Boolean) && (
           <div className="flex flex-wrap items-center gap-2">
             {searchable && (
               <InputGroup className="h-7 w-full md:w-64">
@@ -399,13 +439,13 @@ export function OsDataTable<TData>({
                   value={searchInput}
                   onChange={(event) => {
                     setSearchInput(event.target.value);
-                    setClientPagination((p) => ({ ...p, pageIndex: 0 }));
+                    if (!manualSearch) setClientPagination((p) => ({ ...p, pageIndex: 0 }));
                   }}
                 />
               </InputGroup>
             )}
 
-            {filterable && (
+            {filterFields.length > 0 && (
               <ButtonGroup>
                 <FilterPopover
                   availableFields={filterFields}
@@ -425,6 +465,10 @@ export function OsDataTable<TData>({
                   <X />
                 </Button>
               </ButtonGroup>
+            )}
+
+            {manualFilterFields.length > 0 && (
+              <ManualFilterPopover fields={manualFilterFields} resetParams={pageParam ? [pageParam] : []} />
             )}
 
             {columnVisibility && (
@@ -494,6 +538,9 @@ export function OsDataTable<TData>({
                     onNext: () => setUrlPage(urlPage + 1),
                     onPrevious: () => setUrlPage(urlPage - 1),
                     disabled: !pageParam,
+                    pageSize: pagination.pageSize,
+                    onPageSizeChange: pageSizeParam ? (size) => setUrlPageSize(String(size)) : undefined,
+                    onGoToPage: pageParam ? (page) => setUrlPage(page) : undefined,
                   }
                 : undefined
             }
