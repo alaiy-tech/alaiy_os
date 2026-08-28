@@ -32,7 +32,7 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_skills` | — | the `/` command catalogue |
 | `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
-| `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[]}` — the poll endpoint |
+| `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[], suggestions[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
 | `delete_session` | `session` | `{deleted}` |
 | `upload_attachment` | `session` + a multipart `file` | `{name, file_name, file_url, file_size, chars}` |
@@ -317,6 +317,72 @@ FAC stays an optional dependency: `tools.py` returns no tools on a site without
 it and the chat still answers, in line with the note in `hooks.py` about why
 `frappe_assistant_core` is absent from `required_apps`.
 
+## Suggested questions
+
+Three follow-ups under the newest answer — "and the month before?", "which SKUs
+drove that?" — offered as chips a client sends verbatim on a click. The welcome
+screen's prompt chips already prove the interaction; this keeps it alive past the
+first message, which is precisely where a user runs out of ideas about what their
+data can answer.
+
+```
+run_turn:
+  _loop(doc)              the answer, as before
+  suggest.attach(doc)     one more llm.complete, no tools
+  status ──▶ Idle
+
+get_messages ──▶ {status, error, messages[], suggestions: ["…", "…", "…"]}
+```
+
+**It is a second LLM call in the worker, not an endpoint.** The obvious shape is
+`get_suggested_questions(session)`, called when the answer lands — and it breaks
+the rule under **Rules that carry over**: no LLM call in a web request. The
+reasons are the turn's own. A provider that hangs hangs the request; a client that
+wants chips pays a second round-trip for them. The poll already runs, and already
+arrives at exactly the moment there is something to say.
+
+**`suggestions` rides the response, not the message it belongs to**, and that is
+load-bearing rather than a matter of taste. A poller advances its cursor past
+every *complete* message, and these are written after the final assistant message
+is committed — so by then that row is behind every client's cursor and will never
+be sent again. A field on it would be written and never read. Returned beside
+`status`, it reaches every poll including the last one, which is the only one that
+matters. It is still *stored* on the message (`OS Chat Message.suggestions`), so
+reopening a chat from the history restores the chips it ended on rather than a
+dead end; the API just never serves them that way.
+
+A `Running` session offers none. The newest answer is then the *previous* one, and
+a chip under a question already being answered is a click that gets refused ("this
+chat is still working on the previous message").
+
+**Every failure is silent.** `attach` cannot raise: it runs after the turn is
+committed, and a suggestion is a nicety that may never cost a user their answer. A
+provider that errors, a model that replies in prose, an array of numbers — each is
+logged and yields no chips. `_parse` is written for that: it strips a code fence,
+rejects anything that is not a list of strings, drops the over-long rather than
+truncating them (half a question is not a question), dedupes, and caps at three.
+Three, not five, because a wall of chips between the answer and the composer stops
+reading as "you could also ask" and starts reading as a menu.
+
+**The call gets no tools.** Suggestions are written from the transcript that
+already exists; a call able to read data would be a second, unaudited route to it
+for the sake of decorating a reply. What it *is* given is the tool **names**, as a
+fence — a chip the assistant cannot act on is worse than no chip. Their
+descriptions are written for a model deciding whether to call one, which is a
+different question, and would be the largest thing in the request.
+
+The transcript is the last six messages' denormalised `text`, never `blocks`: tool
+arguments, tool results and the contents of an attached document are not what a
+follow-up is written from, and they are the expensive part of the history.
+Filtering on non-empty `text` drops tool-result rows for free. Mention *labels*
+ride along, because "how did that brand do the month before?" is exactly the chip
+this exists to make cheap — the resolved dates behind them are the turn's business,
+not this one's.
+
+No tenant hook, yet. `chat_suggestion_filter` in the style of `chat_skill_filter`
+is the obvious next seam if a deployment needs to veto or rewrite what is offered,
+and nothing in the storage or the wire shape has to change when it lands.
+
 ## Charts
 
 A chart is a **prompt convention, not a channel**. `CHART_PROMPT` in `runner.py`
@@ -374,7 +440,9 @@ A tool round-trip is not its own doctype. It is an assistant message whose
 blocks contain `tool_use`, followed by a user message whose blocks are
 `tool_result` — the Anthropic wire shape exactly, so replaying history is a
 `json.loads` per row and nothing translates. `OS Chat Message.text` is the
-denormalised text blocks, for display only.
+denormalised text blocks, for display only. `OS Chat Message.suggestions` is the
+same kind of column — display-only, written after the fact, and never read back
+into the model's context.
 
 Deleting a session deletes its messages and any staged attachments
 (`OSChatSession.on_trash`), after which Frappe's own cascade unlinks the uploaded
@@ -489,6 +557,19 @@ Runs the loop in-process — no worker, no browser, traceback on stdout instead
 of in the Error Log. Costs one real LLM call.
 
 ```bash
+bench --site <site> execute alaiy_os.chat.smoke.run_suggest
+```
+
+The follow-up chips against a scripted client: no network, no cost, a fixed
+answer and a fixed suggestion payload. Checks that the extra call happens with no
+tools and with the conversation in it, that the chips are stored, that
+`get_messages` serves them to a caller whose cursor is already past the last
+message — the one failure that would make the feature invisible while everything
+else passed — that a `Running` session offers none, and that `chat_suggestions:
+false` leaves the turn identical and silent. The parser is exercised separately on
+the payloads a real model produces: prose, a fenced array, objects, duplicates.
+
+```bash
 bench --site <site> execute alaiy_os.chat.smoke.run_stream
 ```
 
@@ -505,6 +586,7 @@ finished and grew, that the finished row is complete and no longer partial, that
 | `chat_model` | `gemini-3.1-flash-lite` | model for new sessions (per-session override on the record) |
 | `chat_max_turns` | 12 | LLM calls per user message |
 | `chat_streaming` | `true` | write the answer as it arrives (see **Streaming**); `false` restores one write per message |
+| `chat_suggestions` | `true` | offer follow-up questions under each answer (see **Suggested questions**); `false` skips the extra call |
 | `chat_tools` | unset | allow-list of tool names; unset = everything the user may call |
 | `chat_system_prompt` | built-in | replaces the whole system prompt |
 
