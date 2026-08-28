@@ -5,7 +5,8 @@ import type { Metadata } from "next";
 import { TooltipProvider } from "@/components/primitive/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
 import { fontVars } from "@/config/fonts";
-import { getServerUser } from "@/lib/frappe/server";
+import { getCompanyInfo, getOrganisationLogoSrc, getServerUser } from "@/lib/frappe/server";
+import { siteMetadataBase } from "@/lib/metadata";
 import { AuthProvider } from "@/runtime/store/auth/auth-provider";
 import { PreferencesStoreProvider } from "@/runtime/store/preferences/preferences-provider";
 import { ThemeBootScript } from "@/scripts/theme-boot";
@@ -15,13 +16,30 @@ import { Toaster } from "../components/primitive/sonner";
 
 import "../styles/globals.css";
 
-export const metadata: Metadata = {
-  title: APP_CONFIG.meta.title,
-  description: APP_CONFIG.meta.description,
-  icons: {
-    icon: "/assets/images/favicon/icon.png",
-  },
-};
+/** The favicon is the org's uploaded square logo when set (`OS Theme
+ * Settings`, same source `lib/frappe/server.ts`'s `getOrganisationLogoSrc()`
+ * resolves for the sidebars), falling back to this app's own default -
+ * dynamic per request, so `generateMetadata` rather than a static `metadata`
+ * export. Also where `metadataBase` is set once for the whole app - every
+ * other page's `generateMetadata` (`lib/metadata.ts`'s `buildPageMetadata`)
+ * hands back a relative `route`/OG image path, resolved against this. Every
+ * real page overrides `title`/`description` with its own full literal
+ * string, so this is only ever seen as a fallback (a route with no
+ * `generateMetadata` of its own). */
+export async function generateMetadata(): Promise<Metadata> {
+  const [logoSrc, company] = await Promise.all([
+    getOrganisationLogoSrc(),
+    getCompanyInfo(),
+  ]);
+  return {
+    metadataBase: siteMetadataBase(),
+    title: company?.name ? `${company.name} OS` : APP_CONFIG.meta.title,
+    description: APP_CONFIG.meta.description,
+    icons: {
+      icon: logoSrc.square,
+    },
+  };
+}
 
 export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
   const [preferences, user] = await Promise.all([getAllPreferences(), getServerUser()]);

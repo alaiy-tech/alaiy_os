@@ -1,6 +1,7 @@
 import type { DocFieldMeta } from "@/components/derived/list/types";
-import { formatDate, formatDateTime, formatQty } from "@/utils/format";
 import type { LogRow } from "@/types/logs";
+
+export { formatFieldValue } from "@/utils/format";
 
 /** How many of the doctype's own columns the table shows beside the timestamp.
  * A log doctype can mark any number of fields `in_list_view`; past about five
@@ -34,30 +35,6 @@ export function logColumns(fields: DocFieldMeta[]): DocFieldMeta[] {
   const chosen = declared.length > 0 ? declared : shortFields;
 
   return chosen.slice(0, MAX_COLUMNS);
-}
-
-/** A field's value as text, decided by its fieldtype alone.
- *
- * The page knows nothing about any particular log's fields, so there is no
- * per-field special-casing here — a status code and a duration are both Ints
- * and are rendered the same way. */
-export function formatFieldValue(value: unknown, fieldtype: string): string {
-  if (value === null || value === undefined || value === "") return "—";
-
-  switch (fieldtype) {
-    case "Datetime":
-      return formatDateTime(String(value));
-    case "Date":
-      return formatDate(String(value));
-    case "Check":
-      return value ? "Yes" : "No";
-    case "Int":
-    case "Float":
-    case "Percent":
-      return formatQty(Number(value));
-    default:
-      return String(value);
-  }
 }
 
 /** The fields worth showing in the drawer, in meta order.
