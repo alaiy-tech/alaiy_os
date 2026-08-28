@@ -16,7 +16,8 @@
   "text",
   "blocks",
   "attachments",
-  "mentions"
+  "mentions",
+  "suggestions"
  ],
  "fields": [
   {
@@ -93,10 +94,17 @@
    "fieldtype": "Code",
    "label": "Mentions (JSON)",
    "options": "JSON"
+  },
+  {
+   "description": "Follow-up questions offered under this reply, as a JSON array of strings. Written by `chat/suggest.attach` once the turn's answer has settled, on an assistant message only. Display-only and advisory: nothing reads it back into the model's context, and an absent or malformed value simply means no chips.",
+   "fieldname": "suggestions",
+   "fieldtype": "Code",
+   "label": "Suggestions (JSON)",
+   "options": "JSON"
   }
  ],
  "links": [],
- "modified": "2026-08-17 00:00:00.000000",
+ "modified": "2026-08-28 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Chat Message",
