@@ -28,18 +28,13 @@ export function operatorsForFieldtype(fieldtype: string | undefined): FilterOper
   }
 }
 
-/** Frappe's REST list filters are [fieldname, operator, value] triples. `like`
- * needs the %wildcards% Frappe's own report view adds automatically for you
- * elsewhere but not here; `in`/`not in`/`between` take an array, split from
- * the row's comma-separated text input; `is`/`is not` take the literal
- * strings "set"/"not set", not the row's (unused) value field. */
+/** Frappe's REST list filters are [fieldname, operator, value] triples.
+ * `in`/`not in`/`between` take an array, split from the row's
+ * comma-separated text input. */
 export function toFrappeFilters(rows: FilterRow[]): Array<[string, string, unknown]> {
   return rows
     .filter((r) => r.field)
     .map((r) => {
-      if (r.operator === "is" || r.operator === "is not") {
-        return [r.field, r.operator, "set"] as [string, string, unknown];
-      }
       if (r.operator === "in" || r.operator === "not in") {
         return [
           r.field,
@@ -52,9 +47,6 @@ export function toFrappeFilters(rows: FilterRow[]): Array<[string, string, unkno
       }
       if (r.operator === "between") {
         return [r.field, r.operator, r.value.split(",").map((v) => v.trim())] as [string, string, unknown];
-      }
-      if (r.operator === "like" || r.operator === "not like") {
-        return [r.field, r.operator, `%${r.value}%`] as [string, string, unknown];
       }
       return [r.field, r.operator, r.value] as [string, string, unknown];
     });
