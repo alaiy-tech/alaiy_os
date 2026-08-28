@@ -91,9 +91,7 @@ function SortableFieldRow({
           <GripVertical className="size-4" />
         </button>
       </TooltipWrap>
-      <span className="flex-1 truncate text-[13px] text-foreground">
-        {field.label}
-      </span>
+      <span className="flex-1 truncate text-foreground">{field.label}</span>
       <div className="flex items-center gap-0.5">
         <TooltipWrap label="Move up">
           <button
@@ -144,6 +142,9 @@ export interface ColumnSettingsPopoverProps {
   availableFields: ColumnField[];
   value: ColumnPrefs;
   onSave: (prefs: ColumnPrefs) => void;
+  /** The table's own default column order (what a never-customized table
+   * shows) - what the Reset button reverts the draft to. */
+  defaultColumnOrder: string[];
   /** Fewer than this many columns can never remain visible - the last N rows'
    * remove buttons disable once the list shrinks to exactly this size. */
   minVisibleColumns?: number;
@@ -153,6 +154,10 @@ export interface ColumnSettingsPopoverProps {
    * entirely (like the ID column), which is neither reorderable nor listed
    * here at all. */
   compulsoryFields?: string[];
+}
+
+function sameOrder(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((field, i) => field === b[i]);
 }
 
 /** Which columns show and in what order. Anchored to its own trigger, not a full-screen modal.
@@ -167,6 +172,7 @@ export function ColumnSettingsPopover({
   availableFields,
   value,
   onSave,
+  defaultColumnOrder,
   minVisibleColumns = 4,
   compulsoryFields = [],
 }: ColumnSettingsPopoverProps) {
@@ -176,6 +182,18 @@ export function ColumnSettingsPopover({
   useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
+
+  const hasChanges = !sameOrder(draft.columnOrder, value.columnOrder);
+
+  function handleSave() {
+    if (!hasChanges) return;
+    onSave(draft);
+    onOpenChange(false);
+  }
+
+  function handleReset() {
+    setDraft({ columnOrder: defaultColumnOrder });
+  }
 
   const compulsorySet = new Set(compulsoryFields);
   const fieldByName = new Map(availableFields.map((f) => [f.fieldname, f]));
@@ -230,20 +248,28 @@ export function ColumnSettingsPopover({
       <TooltipWrap label="Column settings">
         <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       </TooltipWrap>
-      <PopoverContent align="end" className="w-[320px] p-3.5">
+      <PopoverContent
+        align="end"
+        className="w-[320px] p-3.5"
+        onKeyDown={(e) => {
+          // Ignored while the nested "Add Fields" popover is open - Enter
+          // there means "select the highlighted field," not "save and close
+          // the whole thing."
+          if (e.key === "Enter" && !addOpen) {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+      >
         <div>
           <div className="mb-2 flex items-center justify-between">
-            <span className="text-[11px] font-medium tracking-[.08em] text-muted-foreground">
-              TABLE COLUMNS
+            <span className="text-xs font-medium tracking-[.08em] text-muted-foreground">
+              Table Columns ({visibleFields.length})
             </span>
             <Popover open={addOpen} onOpenChange={setAddOpen}>
               <TooltipWrap label="Add fields">
                 <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="gap-1 text-[12px]"
-                  >
+                  <Button variant="outline" size="sm" className="gap-1">
                     <Plus className="size-3.5" />
                     Add Fields
                   </Button>
@@ -306,18 +332,18 @@ export function ColumnSettingsPopover({
         </div>
 
         <div className="flex justify-end gap-2 border-t pt-2.5">
-          <TooltipWrap label="Discard changes">
-            <Button variant="outline" onClick={() => onOpenChange(false)}>
-              Cancel
+          <TooltipWrap label="Reset to the default column layout">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={sameOrder(draft.columnOrder, defaultColumnOrder)}
+              onClick={handleReset}
+            >
+              Reset
             </Button>
           </TooltipWrap>
           <TooltipWrap label="Save column settings">
-            <Button
-              onClick={() => {
-                onSave(draft);
-                onOpenChange(false);
-              }}
-            >
+            <Button size="sm" disabled={!hasChanges} onClick={handleSave}>
               Save
             </Button>
           </TooltipWrap>

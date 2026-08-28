@@ -13,6 +13,14 @@ import {
 } from "@/components/derived/list/types";
 import { Badge } from "@/components/primitive/badge";
 import { Button } from "@/components/primitive/button";
+import {
+  Combobox,
+  ComboboxContent,
+  ComboboxEmpty,
+  ComboboxInput,
+  ComboboxItem,
+  ComboboxList,
+} from "@/components/primitive/combobox";
 import { DatePicker } from "@/components/primitive/date-picker";
 import { Input } from "@/components/primitive/input";
 import {
@@ -20,13 +28,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/primitive/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/primitive/select";
 import { TooltipWrap } from "@/components/primitive/tooltip-wrap";
 
 function newRow(): FilterRow {
@@ -56,6 +57,28 @@ function isDateField(fieldtype: string | undefined, operator: FilterOperator) {
     operator !== "not in" &&
     operator !== "between"
   );
+}
+
+/** A single-value equality check ("=" / "!=") against a `Select` field (e.g.
+ * a status column) has a known, closed set of valid values - offer a
+ * dropdown instead of free text. Not `Link`: its `options` names the *target
+ * doctype*, not a list of values, so it falls back to plain text like any
+ * other field. Never for "in"/"not in" - those stay comma-separated text
+ * regardless of fieldtype. */
+function isDropdownField(fieldtype: string | undefined, operator: FilterOperator) {
+  return fieldtype === "Select" && (operator === "=" || operator === "!=");
+}
+
+/** A `Select` field's `options` is Frappe's own newline-separated choice
+ * list convention - a leading blank choice (common for "no default") isn't a
+ * real filterable value. */
+function parseSelectOptions(options: string | null | undefined): string[] {
+  return (options ?? "").split("\n").map((option) => option.trim()).filter(Boolean);
+}
+
+/** A row is ready to apply once its field is picked and its value is filled in too. */
+function isRowComplete(row: FilterRow): boolean {
+  return Boolean(row.field) && row.value !== "";
 }
 
 export interface FilterPopoverProps {
@@ -95,6 +118,21 @@ export function FilterPopover({
     setRows((rs) => rs.filter((r) => r.id !== id));
   }
 
+  const hasAnyContent = rows.some((r) => r.field || r.value);
+  const canApply = rows.length > 0 && rows.every(isRowComplete);
+
+  function handleApply() {
+    if (!canApply) return;
+    onApply(rows.filter((r) => r.field));
+    setOpen(false);
+  }
+
+  function handleClear() {
+    setRows([]);
+    onApply([]);
+    setOpen(false);
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <TooltipWrap label="Filter this list">
@@ -115,54 +153,59 @@ export function FilterPopover({
           {rows.map((row) => {
             const field = fieldByName.get(row.field);
             const operators = operatorsForFieldtype(field?.fieldtype);
-            const noValue = row.operator === "is" || row.operator === "is not";
 
             return (
               <div key={row.id} className="flex items-center gap-1.5">
-                <Select
-                  value={row.field}
-                  onValueChange={(v) => changeField(row.id, v)}
-                >
-                  <SelectTrigger className="h-8 w-[140px] text-[12.5px]">
-                    <SelectValue placeholder="Field" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableFields.map((f) => (
-                      <SelectItem key={f.fieldname} value={f.fieldname}>
-                        {f.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select
-                  value={row.operator}
-                  onValueChange={(v) =>
-                    updateRow(row.id, {
-                      operator: v as FilterOperator,
-                      value: "",
-                    })
+                <Combobox
+                  items={availableFields.map((f) => f.fieldname)}
+                  value={row.field || null}
+                  onValueChange={(fieldname) =>
+                    fieldname && changeField(row.id, fieldname)
+                  }
+                  itemToStringLabel={(fieldname) =>
+                    fieldByName.get(fieldname)?.label ?? fieldname
                   }
                 >
-                  <SelectTrigger className="h-8 w-[150px] text-[12.5px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {operators.map((op) => (
-                      <SelectItem key={op} value={op}>
-                        {OPERATOR_LABELS[op]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <ComboboxInput
+                    placeholder="Field"
+                    className="w-44"
+                  />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No fields found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(fieldname: string) => (
+                        <ComboboxItem key={fieldname} value={fieldname}>
+                          {fieldByName.get(fieldname)?.label ?? fieldname}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
 
-                {noValue ? (
-                  <div className="flex h-8 flex-1 items-center rounded-md border border-input bg-muted/50 px-3 text-[12.5px] text-muted-foreground">
-                    —
-                  </div>
-                ) : isDateField(field?.fieldtype, row.operator) ? (
+                <Combobox
+                  items={operators}
+                  value={row.operator}
+                  onValueChange={(op) =>
+                    op && updateRow(row.id, { operator: op, value: "" })
+                  }
+                  itemToStringLabel={(op) => OPERATOR_LABELS[op]}
+                >
+                  <ComboboxInput placeholder="Operator" className="w-32" />
+                  <ComboboxContent>
+                    <ComboboxEmpty>No operators found.</ComboboxEmpty>
+                    <ComboboxList>
+                      {(op: FilterOperator) => (
+                        <ComboboxItem key={op} value={op}>
+                          {OPERATOR_LABELS[op]}
+                        </ComboboxItem>
+                      )}
+                    </ComboboxList>
+                  </ComboboxContent>
+                </Combobox>
+
+                {isDateField(field?.fieldtype, row.operator) ? (
                   <DatePicker
-                    className="h-8 flex-1 text-[12.5px]"
+                    className="flex-1"
                     value={row.value ? new Date(row.value) : undefined}
                     onChange={(date) =>
                       updateRow(row.id, {
@@ -170,6 +213,27 @@ export function FilterPopover({
                       })
                     }
                   />
+                ) : isDropdownField(field?.fieldtype, row.operator) ? (
+                  <Combobox
+                    items={parseSelectOptions(field?.options)}
+                    value={row.value || null}
+                    onValueChange={(v) => updateRow(row.id, { value: v ?? "" })}
+                  >
+                    <ComboboxInput
+                      placeholder="Value"
+                      className="flex-1"
+                    />
+                    <ComboboxContent>
+                      <ComboboxEmpty>No options found.</ComboboxEmpty>
+                      <ComboboxList>
+                        {(option: string) => (
+                          <ComboboxItem key={option} value={option}>
+                            {option}
+                          </ComboboxItem>
+                        )}
+                      </ComboboxList>
+                    </ComboboxContent>
+                  </Combobox>
                 ) : (
                   <Input
                     type={valueInputType(field?.fieldtype, row.operator)}
@@ -177,6 +241,12 @@ export function FilterPopover({
                     onChange={(e) =>
                       updateRow(row.id, { value: e.target.value })
                     }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleApply();
+                      }
+                    }}
                     placeholder={
                       row.operator === "in" || row.operator === "not in"
                         ? "Comma-separated values"
@@ -184,16 +254,17 @@ export function FilterPopover({
                           ? "Start, End"
                           : "Value"
                     }
-                    className="h-8 flex-1 text-[12.5px]"
+                    className="flex-1"
                   />
                 )}
 
                 <TooltipWrap label="Remove filter">
                   <button
                     type="button"
+                    disabled={rows.length < 2}
                     onClick={() => removeRow(row.id)}
                     aria-label="Remove filter"
-                    className="flex size-7 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    className="flex size-7 flex-none items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:pointer-events-none disabled:opacity-50"
                   >
                     <X className="size-3.5" />
                   </button>
@@ -208,7 +279,7 @@ export function FilterPopover({
             <Button
               variant="outline"
               size="sm"
-              className="w-fit gap-1.5 text-[12px]"
+              className="w-fit gap-1.5"
               onClick={() => setRows((rs) => [...rs, newRow()])}
             >
               <Plus className="size-3" />
@@ -221,12 +292,8 @@ export function FilterPopover({
               <Button
                 variant="outline"
                 size="sm"
-                className="text-[12.5px]"
-                disabled={rows.length === 0}
-                onClick={() => {
-                  setRows([]);
-                  onApply([]);
-                }}
+                disabled={!hasAnyContent}
+                onClick={handleClear}
               >
                 Clear Filters
               </Button>
@@ -234,12 +301,8 @@ export function FilterPopover({
             <TooltipWrap label="Apply these filters">
               <Button
                 size="sm"
-                className="text-[12.5px]"
-                disabled={rows.length === 0}
-                onClick={() => {
-                  onApply(rows.filter((r) => r.field));
-                  setOpen(false);
-                }}
+                disabled={!canApply}
+                onClick={handleApply}
               >
                 Apply Filters
               </Button>
