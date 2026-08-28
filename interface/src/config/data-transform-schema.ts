@@ -38,7 +38,7 @@ const GROUP_STEP_SCHEMA = z
   .object({
     type: z.literal("group"),
     by: z.string().min(1),
-    granularity: z.enum(["day", "month", "year"]),
+    granularity: z.enum(["day", "month", "year", "auto"]),
     aggregate: z
       .object({
         type: z.enum(AGGREGATE_TYPES),
@@ -63,6 +63,17 @@ const FORMULA_STEP_SCHEMA = z
   })
   .strict();
 
+const LOOKUP_STEP_SCHEMA = z
+  .object({
+    type: z.literal("lookup"),
+    field: z.string().min(1),
+    cases: z.record(z.string(), z.string()),
+    default: z.string(),
+    as: z.string().min(1),
+  })
+  .partial({ default: true })
+  .strict();
+
 export const TRANSFORM_STEP_SCHEMA = z.discriminatedUnion("type", [
   SELECT_STEP_SCHEMA,
   FILTER_STEP_SCHEMA,
@@ -75,6 +86,7 @@ export const TRANSFORM_STEP_SCHEMA = z.discriminatedUnion("type", [
   NUMERIC_AGGREGATE_STEP_SCHEMA("max"),
   GROUP_STEP_SCHEMA,
   FORMULA_STEP_SCHEMA,
+  LOOKUP_STEP_SCHEMA,
 ]);
 
 export const TRANSFORM_SCHEMA = z.array(TRANSFORM_STEP_SCHEMA);

@@ -67,7 +67,7 @@ const OS_KPI_PROPS_SCHEMA = z
     trendUnit: z.enum(["percent", "points"]),
     trendPolarity: z.enum(["positive", "negative"]),
     trendLabel: z.string(),
-    borderTone: z.enum(KPI_BORDER_TONES),
+    className: z.string(),
   })
   .partial()
   .strict();
@@ -178,6 +178,11 @@ const OS_DATA_TABLE_PROPS_SCHEMA = z
     // binding (`{ ref: "<name>", path: "fields" }`), resolved the same way
     // `rows`/`pagination` already are - see `runtime/data/resolver.ts`.
     excludedFields: z.array(z.string()).optional(),
+    // The named entry this table's filters read/write when set (e.g.
+    // `"orders"`, matching `resolver.ts`'s `readNamedFilters` convention) -
+    // `data` is then assumed already filtered server-side. Omitted keeps
+    // today's local, current-page-only in-memory filtering.
+    filterParam: z.string().optional(),
     columnVisibility: z.boolean().default(true),
     defaultColumnOrder: z.array(z.string()).optional(),
     structuralColumnIds: z.array(z.string()).optional(),
@@ -251,6 +256,19 @@ const OS_CHART_PROPS_SCHEMA = z
     subtitle: z.string(),
     x: z.string(),
     series: z.array(CHART_SERIES_SCHEMA),
+    // Chart-wide field->colour overrides, checked before each series' own
+    // inline `color` - see chart.tsx's `ChartColorMap` doc comment. Any
+    // valid CSS colour string, not just a semantic token - a chart's own
+    // palette is allowed to be more expressive than the rest of the UI.
+    colors: z.record(z.string(), z.string()),
+    // How values read on the Y-axis/in the tooltip, and how the x-axis'
+    // own (typically date-shaped) values read as tick labels - see
+    // chart.tsx's `ChartValueFormat`/`ChartXAxisFormat` doc comments.
+    valueFormat: z.enum(["number", "currency", "percent"]),
+    currency: z.string(),
+    precision: z.number(),
+    xAxisFormat: z.enum(["auto", "day", "month", "year", "none"]),
+    className: z.string(),
     legend: z.boolean(),
     height: z.number(),
   })
@@ -286,6 +304,19 @@ const OS_FILTER_BAR_PROPS_SCHEMA = z
 
 const OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA = DYNAMIC_BADGE_PROPS_SCHEMA;
 
+const PERIOD_OPTION_SCHEMA = z
+  .object({
+    value: z.string().min(1),
+    // Never shown on the button itself - a separate consumer (e.g. a KPI
+    // card's `trendLabel`, via a `"lookup"` transform step keyed on the
+    // same `value`) reads it through its own `data` binding instead, since
+    // components can't read each other's `props` in this runtime. See
+    // `period-toggle.tsx`'s `PeriodOption` doc comment.
+    label: z.string(),
+  })
+  .partial({ label: true })
+  .strict();
+
 const OS_PERIOD_TOGGLE_PROPS_SCHEMA = z
   .object({
     paramName: z.string(),
@@ -293,10 +324,11 @@ const OS_PERIOD_TOGGLE_PROPS_SCHEMA = z
     // default (no separate `defaultPeriod`/`defaultValue` prop to keep in
     // sync with it by hand). Not constrained to `PERIODS`: this is a
     // generic button-group-driven-by-config toggle, not period-specific -
-    // whether a given set of codes means anything to the data it scopes is
-    // the author's responsibility (e.g. `/os`'s dashboard only understands
-    // 1D/1W/1M/1Y today - see `runtime/data/resolver.ts`'s `PERIOD_TO_DAYS`).
-    options: z.array(z.string()).min(1),
+    // whether a given set of `value`s means anything to the data it scopes
+    // is the author's responsibility (e.g. `/os`'s dashboard only
+    // understands 1D/1W/1M/1Y today - see `runtime/data/resolver.ts`'s
+    // `PERIOD_TO_DAYS`).
+    options: z.array(PERIOD_OPTION_SCHEMA).min(1),
   })
   .partial({ paramName: true })
   .strict();
