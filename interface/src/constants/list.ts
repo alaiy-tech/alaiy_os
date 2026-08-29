@@ -64,3 +64,9 @@ export const NUMERIC_OPERATORS: FilterOperator[] = ["=", "!=", ">", "<", ">=", "
 export const DATE_OPERATORS: FilterOperator[] = ["=", ">", "<", ">=", "<=", "between", "is", "is not"];
 export const SELECT_OPERATORS: FilterOperator[] = ["=", "!=", "in", "not in", "is", "is not"];
 export const TEXT_OPERATORS: FilterOperator[] = ["like", "not like", "=", "!=", "in", "not in", "is", "is not"];
+
+/** The rows-per-page choices every table's pagination footer offers - also
+ * the whitelist `resolver.ts`'s `readNamedPageSize` validates a URL-supplied
+ * page size against, so a server-paginated table never lets an arbitrary
+ * value reach Frappe. */
+export const PAGE_SIZE_OPTIONS = [10, 20, 30, 40, 50] as const;

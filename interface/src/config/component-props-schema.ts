@@ -3,6 +3,7 @@ import { z } from "zod";
 import { KPI_BORDER_TONES } from "@/config/kpi-classes";
 import { KPI_ICON_NAMES } from "@/config/kpi-icons";
 import { PERIODS } from "@/constants/list";
+import { ERPNEXT_BADGE_CATEGORIES } from "@/utils/get-badge-style";
 
 /**
  * Per-type `propsSchema` values for `runtime/registry/component-registry.ts`'s
@@ -64,7 +65,11 @@ const COLUMN_SPEC_SCHEMA = z
     sortable: z.boolean(),
     filterable: z.boolean(),
     filterOptions: z.array(z.string()),
-    badgeTones: z.record(z.string(), z.string()),
+    badgeCategory: z.enum(ERPNEXT_BADGE_CATEGORIES),
+    // Marks this column's filter as server-driven (see docs/UI_RUNTIME.md's
+    // "Generic List Query State") - only meaningful alongside
+    // `filterable: true`.
+    filterParam: z.string(),
     width: z.number(),
   })
   .partial({
@@ -73,7 +78,8 @@ const COLUMN_SPEC_SCHEMA = z
     sortable: true,
     filterable: true,
     filterOptions: true,
-    badgeTones: true,
+    badgeCategory: true,
+    filterParam: true,
     width: true,
   })
   .strict();
@@ -103,6 +109,15 @@ const OS_DATA_TABLE_PROPS_SCHEMA = z
     // "suppliers_sort") - see docs/UI_RUNTIME.md's "Generic List Query
     // State". No name here means a sortable header click does nothing.
     sortParam: z.string(),
+    // Same convention again, for the table's own search box - only
+    // meaningful alongside `searchable: true`. No name here means the search
+    // box filters only the in-memory `data` it was given (correct for a
+    // small/local table; incomplete for a paginated one).
+    searchParam: z.string(),
+    // Same convention again, for the per-page size selector - only
+    // meaningful alongside `pagination`/`pageParam`. No name here means no
+    // per-page selector renders.
+    pageSizeParam: z.string(),
   })
   .partial()
   .strict();
@@ -158,17 +173,7 @@ const OS_FILTER_BAR_PROPS_SCHEMA = z
 
 const OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA = z
   .object({
-    category: z.enum([
-      "docstatus",
-      "job",
-      "payment",
-      "sales",
-      "stock",
-      "project",
-      "hr",
-      "manufacturing",
-      "generic",
-    ]),
+    category: z.enum(ERPNEXT_BADGE_CATEGORIES),
     content: z.string(),
   })
   .partial()
