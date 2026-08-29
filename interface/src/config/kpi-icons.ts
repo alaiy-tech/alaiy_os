@@ -58,7 +58,7 @@ import {
  * component - not a wildcard import of every lucide icon, for the same
  * tree-shaking reason `config/nav-icons.ts` documents. Keys are the exact
  * PascalCase lucide component names (matching every `icon` value already
- * authored in `seeds/seed.ts`), unlike `nav-icons.ts`'s kebab-case keys -
+ * authored in `seed.ts`), unlike `nav-icons.ts`'s kebab-case keys -
  * changing that convention would break every existing seeded KPI node for
  * no benefit. */
 export const KPI_ICONS = {
