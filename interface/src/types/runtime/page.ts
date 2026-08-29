@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 
-import type { FrappeCountSourceConfig } from "./frappe-count";
-import type { FrappeListSourceConfig } from "./frappe-list";
+import type { DataDefinition } from "./data-definition";
 import type { UINode } from "./node";
 import type { ComponentRegistry } from "./registry";
 
@@ -13,23 +12,18 @@ import type { ComponentRegistry } from "./registry";
 export type UIPageDefinition = {
   id: string;
   kind: "page";
-  /** Named, page-scoped data sources - resolved once each
+  /** Named, page-scoped data definitions - resolved once each
    * (`runtime/data/resolver.ts`), then referenced by name from any
-   * component's `data` binding via `{ ref: "<name>", path? }`
-   * (`DataSourceRef`) instead of
-   * duplicating the source config at every binding site. A named entry's
-   * result lands in the flat data record under `` `page-data:${name}` `` -
-   * a keyspace deliberately separate from `sourceKey`'s structural dedup
-   * for anonymous inline/registry bindings, so an anonymous binding
-   * elsewhere on the page will *not* dedup against a named entry even if
-   * byte-for-byte identical - a disclosed non-goal, not an oversight.
-   * `runtime/mutations.ts`'s `applyUIAction` vocabulary doesn't have a verb
-   * for this field yet (nothing calls it in production regardless). Also
-   * where a `frappe-list` entry's pagination/sort/search/filters become
-   * URL-addressable (`resolver.ts`'s `readNamed*` functions) - an
-   * *anonymous* inline `frappe-list` binding has no name to namespace a URL
-   * param on, so it always uses its own static config, deliberately. */
-  data?: Record<string, FrappeListSourceConfig | FrappeCountSourceConfig>;
+   * component's `data` binding via `{ ref: "<name>", path? }` instead of
+   * duplicating the definition at every binding site. A named entry's
+   * result lands in the flat data record under `` `page-data:${name}` ``.
+   * Also where a definition's pagination/sort/search/filters become
+   * URL-addressable (`resolver.ts`'s `readNamed*` functions, driven by
+   * `DataDefinition.query`) - a name is what makes a URL param safe to
+   * namespace. `runtime/mutations.ts`'s `applyUIAction` vocabulary doesn't
+   * have a verb for this field yet (nothing calls it in production
+   * regardless). */
+  data?: Record<string, DataDefinition>;
   children: UINode[];
 };
 
