@@ -223,31 +223,14 @@ describe("validateAgainstRegistry", () => {
   });
 
   it("does not flag a { ref } binding naming a real page data entry", () => {
-    const config = pageWithData({ customers: { type: "frappe-count", doctype: "Customer" } }, [
-      { id: "kpi", kind: "component", type: "os-kpi", props: { title: "x" }, data: { value: { ref: "customers" } } },
-    ]);
+    const config = pageWithData(
+      { customers: { request: { type: "frappe", operation: "count", doctype: "Customer" } } },
+      [{ id: "kpi", kind: "component", type: "os-kpi", props: { title: "x" }, data: { value: { ref: "customers" } } }],
+    );
 
     const errors = validateAgainstRegistry(config, {
       componentRegistry: baseComponentRegistry,
       isDataSourceRegistered,
-    });
-    expect(errors).toEqual([]);
-  });
-
-  it("never flags an inline declarative source as unregistered, regardless of isDataSourceRegistered's answer", () => {
-    const config = page([
-      {
-        id: "kpi",
-        kind: "component",
-        type: "os-kpi",
-        props: { title: "x" },
-        data: { value: { source: { type: "frappe-count", doctype: "Customer" } } },
-      },
-    ]);
-
-    const errors = validateAgainstRegistry(config, {
-      componentRegistry: baseComponentRegistry,
-      isDataSourceRegistered: () => false,
     });
     expect(errors).toEqual([]);
   });
