@@ -1,4 +1,5 @@
 import { ORDER_BY_PATTERN, parseOrderByFields } from "@/config/data-request-schema";
+import { PAGE_SIZE_OPTIONS } from "@/constants/list";
 import type { DataDefinition } from "@/types/runtime/data-definition";
 import type { DataRequest, FrappeFilter } from "@/types/runtime/data-request";
 import type { DataSourceContext } from "@/types/runtime/data-source";
@@ -93,6 +94,19 @@ function readNamedPage(searchParams: DataSourceContext["searchParams"], name: st
   return Number.isInteger(page) && page > 0 ? page : undefined;
 }
 
+/** Reads `` `?<name>_page_size=` `` for a named entry - only a value from the
+ * fixed `PAGE_SIZE_OPTIONS` whitelist is honoured (the same set the
+ * per-page `<Select>` offers), so an arbitrary URL-supplied number never
+ * reaches Frappe as a page size. An invalid/missing value falls through to
+ * the request's own static `params.pageSize`. */
+function readNamedPageSize(searchParams: DataSourceContext["searchParams"], name: string): number | undefined {
+  const raw = searchParams[`${name}_page_size`];
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value) return undefined;
+  const size = Number(value);
+  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(size) ? size : undefined;
+}
+
 /** Reads `` `?<name>_sort=` `` - the same `"fieldname asc|desc"` format
  * `orderBy` itself uses. The actual security boundary: the value must match
  * `ORDER_BY_PATTERN` *and* every referenced field must be one of the
@@ -156,6 +170,9 @@ async function resolveDataDefinition(
 
   if (request.operation === "list" && definition.query) {
     const page = readNamedPage(context.searchParams, name) ?? request.params.page ?? 1;
+    const pageSize = definition.query.pagination
+      ? (readNamedPageSize(context.searchParams, name) ?? request.params.pageSize)
+      : request.params.pageSize;
     const orderBy = readNamedSort(context.searchParams, name, request) ?? request.params.orderBy;
     const dynamicFilters = readNamedFilters(context.searchParams, name, definition.query.filters);
     const searchTerm = readNamedSearch(context.searchParams, name);
@@ -173,6 +190,7 @@ async function resolveDataDefinition(
       params: {
         ...request.params,
         page,
+        pageSize,
         orderBy,
         filters: [...(request.params.filters ?? []), ...dynamicFilters],
       },

@@ -35,10 +35,14 @@ import type { PageConfigFile } from "@/types/runtime/page";
  *
  * `recentOrders` is the third required proof: a real generic list with
  * request-driven search/filter/sort/pagination, all namespaced by this
- * entry's own name (`orders_page`/`orders_sort`/`orders_search`/
- * `orders_filter_status`) - no `frappe-list` abstraction, and (unlike the
- * disclosed console-warning bug this replaces) real `pageParam`/`sortParam`
- * bindings this time.
+ * entry's own name (`orders_page`/`orders_page_size`/`orders_sort`/
+ * `orders_search`/`orders_filter_status`) - no `frappe-list` abstraction, and
+ * (unlike the disclosed console-warning bug this replaces) real
+ * `pageParam`/`sortParam` bindings this time. Search, the status filter, and
+ * column visibility all live in the table's own toolbar (`searchParam`/a
+ * `filterParam` column/`columnVisibility`) rather than a separate
+ * `os-filter-bar` node - see docs/UI_RUNTIME.md's "Generic List Query
+ * State".
  */
 export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
   id: "dashboard",
@@ -302,50 +306,42 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
             ],
           },
           {
-            id: "recent-orders-header",
-            kind: "layout",
-            type: "inline",
-            children: [
-              {
-                id: "recent-orders-filter-bar",
-                kind: "component",
-                type: "os-filter-bar",
-                props: {
-                  filters: [
-                    {
-                      id: "search",
-                      type: "text",
-                      label: "Search",
-                      searchParam: "orders_search",
-                      placeholder: "Search orders...",
-                    },
-                    {
-                      id: "status",
-                      type: "text",
-                      label: "Status",
-                      searchParam: "orders_filter_status",
-                      placeholder: "Status",
-                    },
-                  ],
-                  resetPageParams: ["orders_page"],
-                },
-              },
-            ],
-          },
-          {
             id: "recent-orders-table",
             kind: "component",
             type: "os-data-table",
             props: {
               title: "Recent Orders",
+              subtitle: "View your recent orders",
               rowId: "name",
               pageParam: "orders_page",
+              pageSizeParam: "orders_page_size",
               sortParam: "orders_sort",
+              searchable: true,
+              searchParam: "orders_search",
+              searchPlaceholder: "Search orders...",
+              columnVisibility: true,
               emptyMessage: "No orders found.",
               columns: [
                 { field: "name", label: "Order" },
                 { field: "customer", label: "Customer" },
-                { field: "status", label: "Status" },
+                {
+                  field: "status",
+                  label: "Status",
+                  format: "badge",
+                  badgeCategory: "sales",
+                  filterable: true,
+                  filterParam: "orders_filter_status",
+                  filterOptions: [
+                    "Draft",
+                    "To Deliver and Bill",
+                    "To Bill",
+                    "To Deliver",
+                    "Completed",
+                    "Cancelled",
+                    "Closed",
+                    "On Hold",
+                  ],
+                },
                 { field: "transaction_date", label: "Date", format: "date", sortable: true },
                 { field: "grand_total", label: "Total", format: "currency", align: "right", sortable: true },
               ],
