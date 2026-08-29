@@ -15,56 +15,19 @@ describe("DATA_SOURCE_REF_SCHEMA", () => {
     expect(DATA_SOURCE_REF_SCHEMA.safeParse({ source: "" }).success).toBe(false);
   });
 
-  it("accepts an inline frappe-list source", () => {
-    const result = DATA_SOURCE_REF_SCHEMA.safeParse({
-      source: {
-        type: "frappe-list",
-        doctype: "Customer",
-        fields: ["name", "customer_name"],
-        pagination: { pageSize: 20 },
-      },
-      path: "data",
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("accepts an inline frappe-count source", () => {
-    const result = DATA_SOURCE_REF_SCHEMA.safeParse({
-      source: { type: "frappe-count", doctype: "Customer", filters: [{ field: "disabled", operator: "=", value: 0 }] },
-    });
-    expect(result.success).toBe(true);
-  });
-
-  it("rejects an inline frappe-list source missing doctype", () => {
-    const result = DATA_SOURCE_REF_SCHEMA.safeParse({
-      source: { type: "frappe-list", fields: ["name"], pagination: { pageSize: 20 } },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects an inline source with a bad filter operator", () => {
-    const result = DATA_SOURCE_REF_SCHEMA.safeParse({
-      source: {
-        type: "frappe-count",
-        doctype: "Customer",
-        filters: [{ field: "status", operator: "between", value: ["a", "b"] }],
-      },
-    });
-    expect(result.success).toBe(false);
-  });
-
-  it("rejects an inline source with an unrecognised type", () => {
-    const result = DATA_SOURCE_REF_SCHEMA.safeParse({ source: { type: "frappe-bogus", doctype: "Customer" } });
-    expect(result.success).toBe(false);
-  });
-
   it("rejects a source that is neither a string nor an object", () => {
     expect(DATA_SOURCE_REF_SCHEMA.safeParse({ source: 42 }).success).toBe(false);
   });
 
+  it("rejects an inline object source - every generic data need is a named page.data entry now", () => {
+    expect(
+      DATA_SOURCE_REF_SCHEMA.safeParse({ source: { type: "frappe", operation: "count", doctype: "Customer" } }).success,
+    ).toBe(false);
+  });
+
   it("accepts a { ref } binding referencing a page-level data entry", () => {
     expect(DATA_SOURCE_REF_SCHEMA.safeParse({ ref: "customers" }).success).toBe(true);
-    expect(DATA_SOURCE_REF_SCHEMA.safeParse({ ref: "customers", path: "data" }).success).toBe(true);
+    expect(DATA_SOURCE_REF_SCHEMA.safeParse({ ref: "customers", path: "rows" }).success).toBe(true);
   });
 
   it("rejects an empty ref", () => {
@@ -96,13 +59,27 @@ describe("PAGE_CONFIG_FILE_SCHEMA - definition.data", () => {
     // this has to assert the *shape survives*, not just that parsing succeeds.
     const result = PAGE_CONFIG_FILE_SCHEMA.safeParse(
       pageJson({
-        customers: { type: "frappe-list", doctype: "Customer", fields: ["name"], pagination: { pageSize: 10 } },
+        customers: {
+          request: {
+            type: "frappe",
+            operation: "list",
+            doctype: "Customer",
+            params: { fields: ["name"], pageSize: 10 },
+          },
+        },
       }),
     );
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.definition.data).toEqual({
-        customers: { type: "frappe-list", doctype: "Customer", fields: ["name"], pagination: { pageSize: 10 } },
+        customers: {
+          request: {
+            type: "frappe",
+            operation: "list",
+            doctype: "Customer",
+            params: { fields: ["name"], pageSize: 10 },
+          },
+        },
       });
     }
   });
@@ -113,7 +90,7 @@ describe("PAGE_CONFIG_FILE_SCHEMA - definition.data", () => {
 
   it("rejects a malformed definition.data entry", () => {
     const result = PAGE_CONFIG_FILE_SCHEMA.safeParse(
-      pageJson({ customers: { type: "frappe-list", fields: ["name"] } }),
+      pageJson({ customers: { request: { type: "frappe", operation: "list", doctype: "Customer" } } }),
     );
     expect(result.success).toBe(false);
   });
