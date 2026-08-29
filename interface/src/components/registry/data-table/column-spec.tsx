@@ -94,7 +94,7 @@ function SortableHeader({
   onClick: () => void;
 }) {
   return (
-    <Button variant="ghost" size="sm" className="-ml-3 h-8" onClick={onClick}>
+    <Button variant="ghost" className="-ml-3" onClick={onClick}>
       {label}
       <ArrowUpDown className="size-3.5" />
     </Button>

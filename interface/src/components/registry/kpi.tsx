@@ -14,7 +14,7 @@ import type {
   OsKpiTrendUnit,
 } from "@/types/kpi";
 
-import { StatCard } from "./stat-card";
+import { StatCard } from "../derived/stat-card";
 
 /** Auto-typecasts a raw value into display text: a string from the Data
  * Source passes through unchanged, a number is formatted per `format`. This
