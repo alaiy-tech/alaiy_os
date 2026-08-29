@@ -10,7 +10,7 @@ import {
   SQLiteSidebarStore,
   syncCodeDefinedSidebar,
 } from "@/runtime/store/sqlite-sidebar-store";
-import { buildCodeDefinedSidebar } from "@/seeds/seed";
+import { buildCodeDefinedSidebar } from "@/seed";
 
 import { DatabaseSync } from "node:sqlite";
 

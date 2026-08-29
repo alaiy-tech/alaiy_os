@@ -13,7 +13,7 @@ import {
   SQLiteUIPageStore,
   upsertPage,
 } from "@/runtime/store/sqlite-page-store";
-import { SEED_PAGES } from "@/seeds/seed";
+import { SEED_PAGES } from "@/seed";
 import type { PageConfigFile } from "@/types/runtime/page";
 
 import { DatabaseSync } from "node:sqlite";

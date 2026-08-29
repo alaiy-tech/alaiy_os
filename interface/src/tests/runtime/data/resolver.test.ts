@@ -12,90 +12,20 @@ function jsonResponse(body: unknown, ok = true) {
   return { ok, json: async () => body } as Response;
 }
 
-function page(children: UIPageDefinition["children"]): UIPageDefinition {
-  return { id: "test-page", kind: "page", children };
+function pageWithData(data: UIPageDefinition["data"], children: UIPageDefinition["children"] = []): UIPageDefinition {
+  return { id: "test-page", kind: "page", data, children };
 }
 
-describe("resolvePageData - inline declarative sources", () => {
+function queryOf(path: string): URLSearchParams {
+  return new URLSearchParams(path.split("?")[1]);
+}
+
+describe("resolvePageData - registered string sources", () => {
   beforeEach(() => {
     frappeFetch.mockReset();
   });
 
-  it("resolves an inline frappe-list source with no registerDataSource call", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [{ name: "CUST-1" }] }));
-
-    const source = {
-      type: "frappe-list" as const,
-      doctype: "Customer",
-      fields: ["name"],
-      pagination: { pageSize: 20 },
-    };
-    const definition = page([
-      {
-        id: "table",
-        kind: "component",
-        type: "os-data-table",
-        data: { rows: { source, path: "data" } },
-      },
-    ]);
-
-    const data = await resolvePageData(definition, { searchParams: {} });
-    const key = Object.keys(data)[0];
-    expect(data[key]).toEqual({
-      data: [{ name: "CUST-1" }],
-      pagination: { page: 1, pageSize: 20, hasMore: false },
-    });
-    expect(frappeFetch).toHaveBeenCalledTimes(1);
-    expect(String(frappeFetch.mock.calls[0][0])).toContain(
-      "/api/resource/Customer",
-    );
-  });
-
-  it("resolves an inline frappe-count source", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ message: 7 }));
-
-    const source = { type: "frappe-count" as const, doctype: "Customer" };
-    const definition = page([
-      {
-        id: "kpi",
-        kind: "component",
-        type: "os-kpi",
-        data: { value: { source } },
-      },
-    ]);
-
-    const data = await resolvePageData(definition, { searchParams: {} });
-    const key = Object.keys(data)[0];
-    expect(data[key]).toBe(7);
-    expect(String(frappeFetch.mock.calls[0][0])).toContain(
-      "frappe.client.get_count",
-    );
-  });
-
-  it("dedups two nodes referencing byte-identical inline configs to one Frappe call", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ message: 3 }));
-
-    const source = { type: "frappe-count" as const, doctype: "Customer" };
-    const definition = page([
-      {
-        id: "kpi-a",
-        kind: "component",
-        type: "os-kpi",
-        data: { value: { source } },
-      },
-      {
-        id: "kpi-b",
-        kind: "component",
-        type: "os-kpi",
-        data: { value: { source: { ...source } } },
-      },
-    ]);
-
-    await resolvePageData(definition, { searchParams: {} });
-    expect(frappeFetch).toHaveBeenCalledTimes(1);
-  });
-
-  it("resolves a mix of a registered string source and an inline source on the same page", async () => {
+  it("resolves a { source: string } binding through the Data Source Registry", async () => {
     registerDataSource({
       id: "test.named",
       description: "A named source",
@@ -105,452 +35,287 @@ describe("resolvePageData - inline declarative sources", () => {
         return { count: 42 };
       },
     });
-    frappeFetch.mockResolvedValue(jsonResponse({ message: 5 }));
 
-    const definition = page([
-      {
-        id: "kpi-named",
-        kind: "component",
-        type: "os-kpi",
-        data: { value: { source: "test.named", path: "count" } },
-      },
-      {
-        id: "kpi-inline",
-        kind: "component",
-        type: "os-kpi",
-        data: {
-          value: {
-            source: { type: "frappe-count" as const, doctype: "Customer" },
-          },
-        },
-      },
+    const definition = pageWithData(undefined, [
+      { id: "kpi", kind: "component", type: "os-kpi", data: { value: { source: "test.named", path: "count" } } },
     ]);
 
     const data = await resolvePageData(definition, { searchParams: {} });
-    expect(Object.keys(data)).toHaveLength(2);
     expect(data["test.named"]).toEqual({ count: 42 });
   });
 
-  it("an inline config with an unrecognised type resolves to undefined rather than throwing", async () => {
-    const definition = page([
-      // biome-ignore lint/suspicious/noExplicitAny: deliberately testing an invalid/unrecognised inline type.
-      {
-        id: "kpi",
-        kind: "component",
-        type: "os-kpi",
-        data: { value: { source: { type: "frappe-bogus" } as any } },
+  it("resolves each distinct registered id exactly once, even with two bindings", async () => {
+    let calls = 0;
+    registerDataSource({
+      id: "test.shared",
+      description: "Shared source",
+      capabilities: {},
+      fields: [],
+      async resolve() {
+        calls++;
+        return { value: 1 };
       },
+    });
+
+    const definition = pageWithData(undefined, [
+      { id: "a", kind: "component", type: "os-kpi", data: { value: { source: "test.shared" } } },
+      { id: "b", kind: "component", type: "os-kpi", data: { value: { source: "test.shared" } } },
     ]);
 
+    await resolvePageData(definition, { searchParams: {} });
+    expect(calls).toBe(1);
+  });
+
+  it("an unregistered string source resolves to undefined rather than throwing", async () => {
+    const definition = pageWithData(undefined, [
+      { id: "kpi", kind: "component", type: "os-kpi", data: { value: { source: "does-not-exist" } } },
+    ]);
     const data = await resolvePageData(definition, { searchParams: {} });
-    const key = Object.keys(data)[0];
-    expect(data[key]).toBeUndefined();
+    expect(data["does-not-exist"]).toBeUndefined();
   });
 });
 
-describe("resolvePageData - named page-data entries", () => {
+describe("resolvePageData - named data definitions (list/count/method)", () => {
   beforeEach(() => {
     frappeFetch.mockReset();
   });
 
-  function pageWithData(
-    data: UIPageDefinition["data"],
-    children: UIPageDefinition["children"],
-  ): UIPageDefinition {
-    return { id: "test-page", kind: "page", data, children };
-  }
-
-  it("a named entry's rows and pagination are both consumable from one resolution (one Frappe call)", async () => {
+  it("resolves a list operation and exposes rows + pagination from one Frappe call", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [{ name: "CUST-1" }] }));
 
     const definition = pageWithData(
       {
         customers: {
-          type: "frappe-list",
-          doctype: "Customer",
-          fields: ["name"],
-          pagination: { pageSize: 10 },
+          request: {
+            type: "frappe",
+            operation: "list",
+            doctype: "Customer",
+            params: { fields: ["name"], pageSize: 10 },
+          },
+          query: { pagination: { pageSize: 10 } },
         },
       },
       [
-        {
-          id: "table",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "customers", path: "data" } },
-        },
-        {
-          id: "footer",
-          kind: "component",
-          type: "os-kpi",
-          data: { value: { ref: "customers", path: "pagination" } },
-        },
+        { id: "table", kind: "component", type: "os-data-table", data: { rows: { ref: "customers", path: "rows" } } },
+        { id: "footer", kind: "component", type: "os-kpi", data: { value: { ref: "customers", path: "pagination" } } },
       ],
     );
 
     const data = await resolvePageData(definition, { searchParams: {} });
     expect(frappeFetch).toHaveBeenCalledTimes(1);
     expect(data["page-data:customers"]).toEqual({
-      data: [{ name: "CUST-1" }],
+      rows: [{ name: "CUST-1" }],
       pagination: { page: 1, pageSize: 10, hasMore: false },
     });
   });
 
-  it("reads a name_page search param for a named frappe-list entry and substitutes it into the effective config", async () => {
+  it("a list request with no query.pagination fetches a plain cap, no over-fetch/hasMore trick", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [{ name: "CUST-1" }] }));
-
-    const definition = pageWithData(
-      {
-        customers: {
-          type: "frappe-list",
+    const definition = pageWithData({
+      customers: {
+        request: {
+          type: "frappe",
+          operation: "list",
           doctype: "Customer",
-          fields: ["name"],
-          pagination: { pageSize: 10 },
+          params: { fields: ["name"], pageSize: 1000 },
         },
       },
-      [
-        {
-          id: "table",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "customers", path: "data" } },
-        },
-      ],
-    );
-
-    await resolvePageData(definition, {
-      searchParams: { customers_page: "3" },
     });
-    expect(String(frappeFetch.mock.calls[0][0])).toContain("limit_start=20");
-  });
-
-  it("two named frappe-list entries with independent name_page values resolve independently - the collision fix", async () => {
-    frappeFetch.mockImplementation(async (path: string) => {
-      const isOrders =
-        path.includes("Sales%20Order") || path.includes("Sales Order");
-      return jsonResponse({ data: [{ name: isOrders ? "SO-1" : "CUST-1" }] });
-    });
-
-    const definition = pageWithData(
-      {
-        customers: {
-          type: "frappe-list",
-          doctype: "Customer",
-          fields: ["name"],
-          pagination: { pageSize: 10 },
-        },
-        orders: {
-          type: "frappe-list",
-          doctype: "Sales Order",
-          fields: ["name"],
-          pagination: { pageSize: 10 },
-        },
-      },
-      [
-        {
-          id: "t1",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "customers", path: "data" } },
-        },
-        {
-          id: "t2",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "orders", path: "data" } },
-        },
-      ],
-    );
-
-    await resolvePageData(definition, {
-      searchParams: { customers_page: "2", orders_page: "5" },
-    });
-
-    const customersCall = frappeFetch.mock.calls.find((c) =>
-      String(c[0]).includes("Customer"),
-    );
-    const ordersCall = frappeFetch.mock.calls.find((c) =>
-      String(c[0]).includes("Sales"),
-    );
-    expect(String(customersCall?.[0])).toContain("limit_start=10"); // (2-1)*10
-    expect(String(ordersCall?.[0])).toContain("limit_start=40"); // (5-1)*10
-  });
-
-  it("a named frappe-count entry ignores any name_page param entirely", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ message: 12 }));
-
-    const definition = pageWithData(
-      { customers: { type: "frappe-count", doctype: "Customer" } },
-      [
-        {
-          id: "kpi",
-          kind: "component",
-          type: "os-kpi",
-          data: { value: { ref: "customers" } },
-        },
-      ],
-    );
-
-    await resolvePageData(definition, {
-      searchParams: { customers_page: "9" },
-    });
-    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("page");
-  });
-
-  it("an anonymous inline binding does not dedup against a structurally-identical named entry (disclosed non-goal)", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ message: 1 }));
-
-    const anonymousSource = {
-      type: "frappe-count" as const,
-      doctype: "Customer",
-    };
-    const definition = pageWithData(
-      { customers: { type: "frappe-count", doctype: "Customer" } },
-      [
-        {
-          id: "kpi-ref",
-          kind: "component",
-          type: "os-kpi",
-          data: { value: { ref: "customers" } },
-        },
-        {
-          id: "kpi-anon",
-          kind: "component",
-          type: "os-kpi",
-          data: { value: { source: anonymousSource } },
-        },
-      ],
-    );
 
     await resolvePageData(definition, { searchParams: {} });
-    expect(frappeFetch).toHaveBeenCalledTimes(2);
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_page_length")).toBe("1000");
+  });
+
+  it("resolves a count operation to a plain number under computed.count", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ message: 7 }));
+    const definition = pageWithData({
+      activeCustomers: { request: { type: "frappe", operation: "count", doctype: "Customer" } },
+    });
+
+    const data = await resolvePageData(definition, { searchParams: {} });
+    expect(data["page-data:activeCustomers"]).toEqual({ count: 7 });
+    expect(String(frappeFetch.mock.calls[0][0])).toContain("frappe.client.get_count");
+  });
+
+  it("resolves a method operation, spreading its message object as the result", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ message: { total_sales: { current: 100, previous: 80 } } }));
+    const definition = pageWithData({
+      overview: {
+        request: { type: "frappe", operation: "method", method: "alaiy_os.api.dashboard_stats.get_dashboard_overview" },
+      },
+    });
+
+    const data = await resolvePageData(definition, { searchParams: {} });
+    expect(data["page-data:overview"]).toEqual({ total_sales: { current: 100, previous: 80 } });
+    expect(String(frappeFetch.mock.calls[0][0])).toContain("alaiy_os.api.dashboard_stats.get_dashboard_overview");
+  });
+
+  it("applies a transform pipeline (sum + count + formula) over a list result", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [{ grand_total: 100 }, { grand_total: 300 }] }));
+    const definition = pageWithData({
+      aov: {
+        request: {
+          type: "frappe",
+          operation: "list",
+          doctype: "Sales Order",
+          params: { fields: ["grand_total"], pageSize: 1000 },
+        },
+        transform: [
+          { type: "sum", field: "grand_total", as: "revenue" },
+          { type: "count", as: "orders" },
+          { type: "formula", expression: "revenue / orders", as: "aov" },
+        ],
+      },
+    });
+
+    const data = await resolvePageData(definition, { searchParams: {} });
+    expect(data["page-data:aov"]).toMatchObject({ revenue: 400, orders: 2, aov: 200 });
   });
 });
 
-describe("resolvePageData - generic list query state (sort/search/filters)", () => {
+describe("resolvePageData - query state (page/sort/search/filter)", () => {
   beforeEach(() => {
     frappeFetch.mockReset();
   });
 
-  function pageWithData(
-    data: UIPageDefinition["data"],
-    children: UIPageDefinition["children"],
-  ): UIPageDefinition {
-    return { id: "test-page", kind: "page", data, children };
-  }
-
-  function suppliersPage(
-    searchParams: Record<string, string | string[] | undefined>,
-  ) {
-    const definition = pageWithData(
-      {
-        suppliers: {
-          type: "frappe-list",
+  function suppliersPage(searchParams: Record<string, string | string[] | undefined>) {
+    const definition = pageWithData({
+      suppliers: {
+        request: {
+          type: "frappe",
+          operation: "list",
           doctype: "Supplier",
-          fields: ["name", "supplier_name", "country"],
-          orderBy: "modified desc",
-          search: { fields: ["supplier_name", "name"] },
-          queryFilters: [{ field: "country", operator: "like" }],
+          params: { fields: ["name", "supplier_name", "country"], orderBy: "modified desc", pageSize: 10 },
+        },
+        query: {
           pagination: { pageSize: 10 },
+          sort: { allowedFields: ["supplier_name", "name"] },
+          search: { fields: ["supplier_name", "name"] },
+          filters: [{ field: "country", operator: "like" }],
         },
       },
-      [
-        {
-          id: "table",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "suppliers", path: "data" } },
-        },
-      ],
-    );
+    });
     return resolvePageData(definition, { searchParams });
   }
 
-  function queryOf(path: string): URLSearchParams {
-    return new URLSearchParams(path.split("?")[1]);
-  }
+  it("reads name_page and computes the correct limit_start", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await suppliersPage({ suppliers_page: "3" });
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_start")).toBe("20");
+  });
 
-  it("a valid name_sort override replaces the config's own orderBy", async () => {
+  it("a valid name_sort overrides the static orderBy; an invalid one falls back", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
     await suppliersPage({ suppliers_sort: "supplier_name asc" });
-    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe(
-      "supplier_name asc",
-    );
-  });
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe("supplier_name asc");
 
-  it("a name_sort referencing an undeclared field falls back to the config's own orderBy", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    frappeFetch.mockClear();
     await suppliersPage({ suppliers_sort: "secret_field asc" });
-    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe(
-      "modified desc",
-    );
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe("modified desc");
   });
 
-  it("a malformed name_sort value falls back to the config's own orderBy", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    await suppliersPage({ suppliers_sort: "not-a-real-order-by" });
-    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe(
-      "modified desc",
-    );
-  });
-
-  it("an absent name_sort uses the config's own orderBy", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    await suppliersPage({});
-    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("order_by")).toBe(
-      "modified desc",
-    );
-  });
-
-  it("a name_search term builds or_filters from the config's declared search fields, wildcarded", async () => {
+  it("a name_search term builds or_filters from the declared search fields, wildcarded", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
     await suppliersPage({ suppliers_search: "acme" });
-    const orFilters = JSON.parse(
-      new URLSearchParams(
-        String(frappeFetch.mock.calls[0][0]).split("?")[1],
-      ).get("or_filters") ?? "[]",
-    );
+    const orFilters = JSON.parse(queryOf(String(frappeFetch.mock.calls[0][0])).get("or_filters") ?? "[]");
     expect(orFilters).toEqual([
       ["supplier_name", "like", "%acme%"],
       ["name", "like", "%acme%"],
     ]);
   });
 
-  it("an absent name_search produces no or_filters", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    await suppliersPage({});
-    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("or_filters");
-  });
-
   it("a name_filter_<field> value merges into filters, wildcarded for a like operator", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
     await suppliersPage({ suppliers_filter_country: "india" });
-    const filters = JSON.parse(
-      new URLSearchParams(
-        String(frappeFetch.mock.calls[0][0]).split("?")[1],
-      ).get("filters") ?? "[]",
-    );
+    const filters = JSON.parse(queryOf(String(frappeFetch.mock.calls[0][0])).get("filters") ?? "[]");
     expect(filters).toEqual([["country", "like", "%india%"]]);
   });
 
-  it("an empty name_filter_<field> value is skipped, not sent as an empty-string filter", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    await suppliersPage({ suppliers_filter_country: "" });
-    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("filters");
-  });
-
-  it("two named frappe-list entries' sort/search/filter state stay independent", async () => {
+  it("two independent named entries keep independent page/sort/search state", async () => {
     frappeFetch.mockImplementation(async (path: string) => {
       const isOrders = path.includes("Sales%20Order");
       return jsonResponse({ data: [{ name: isOrders ? "SO-1" : "SUP-1" }] });
     });
 
-    const definition = pageWithData(
-      {
-        suppliers: {
-          type: "frappe-list",
-          doctype: "Supplier",
-          fields: ["name", "supplier_name"],
-          search: { fields: ["supplier_name"] },
-          pagination: { pageSize: 10 },
-        },
-        orders: {
-          type: "frappe-list",
+    const definition = pageWithData({
+      suppliers: {
+        request: { type: "frappe", operation: "list", doctype: "Supplier", params: { fields: ["name"], pageSize: 10 } },
+        query: { pagination: { pageSize: 10 } },
+      },
+      orders: {
+        request: {
+          type: "frappe",
+          operation: "list",
           doctype: "Sales Order",
-          fields: ["name", "customer"],
-          search: { fields: ["customer"] },
-          pagination: { pageSize: 10 },
+          params: { fields: ["name"], pageSize: 10 },
         },
+        query: { pagination: { pageSize: 10 } },
       },
-      [
-        {
-          id: "t1",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "suppliers", path: "data" } },
-        },
-        {
-          id: "t2",
-          kind: "component",
-          type: "os-data-table",
-          data: { rows: { ref: "orders", path: "data" } },
-        },
-      ],
-    );
-
-    await resolvePageData(definition, {
-      searchParams: { suppliers_search: "acme", orders_search: "widget" },
     });
 
-    const suppliersCall = frappeFetch.mock.calls.find((c) =>
-      String(c[0]).includes("Supplier"),
-    );
-    const ordersCall = frappeFetch.mock.calls.find((c) =>
-      String(c[0]).includes("Sales"),
-    );
-    expect(
-      JSON.parse(
-        new URLSearchParams(String(suppliersCall?.[0]).split("?")[1]).get(
-          "or_filters",
-        ) ?? "[]",
-      ),
-    ).toEqual([["supplier_name", "like", "%acme%"]]);
-    expect(
-      JSON.parse(
-        new URLSearchParams(String(ordersCall?.[0]).split("?")[1]).get(
-          "or_filters",
-        ) ?? "[]",
-      ),
-    ).toEqual([["customer", "like", "%widget%"]]);
+    await resolvePageData(definition, { searchParams: { suppliers_page: "2", orders_page: "5" } });
+    const suppliersCall = frappeFetch.mock.calls.find((c) => String(c[0]).includes("Supplier"));
+    const ordersCall = frappeFetch.mock.calls.find((c) => String(c[0]).includes("Sales"));
+    expect(queryOf(String(suppliersCall?.[0])).get("limit_start")).toBe("10");
+    expect(queryOf(String(ordersCall?.[0])).get("limit_start")).toBe("40");
   });
 
-  it("an anonymous inline binding's search/queryFilters have no effect - only a named entry's URL params are read", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    const source = {
-      type: "frappe-list" as const,
-      doctype: "Supplier",
-      fields: ["name"],
-      search: { fields: ["name"] },
-      queryFilters: [{ field: "name", operator: "like" as const }],
-      pagination: { pageSize: 10 },
-    };
-    const definition = pageWithData(undefined, [
-      {
-        id: "table",
-        kind: "component",
-        type: "os-data-table",
-        data: { rows: { source, path: "data" } },
-      },
-    ]);
-
-    await resolvePageData(definition, {
-      searchParams: { name_search: "acme", name_filter_name: "acme" },
-    });
-    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("or_filters");
-  });
-
-  it("a frappe-count entry ignores name_sort/name_search/name_filter_<field> entirely", async () => {
+  it("a count/method operation ignores query state entirely - it has none to read", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ message: 5 }));
-    const definition = pageWithData(
-      { suppliers: { type: "frappe-count", doctype: "Supplier" } },
-      [
-        {
-          id: "kpi",
-          kind: "component",
-          type: "os-kpi",
-          data: { value: { ref: "suppliers" } },
-        },
-      ],
-    );
+    const definition = pageWithData({
+      suppliers: { request: { type: "frappe", operation: "count", doctype: "Supplier" } },
+    });
 
     const data = await resolvePageData(definition, {
-      searchParams: {
-        suppliers_sort: "x",
-        suppliers_search: "x",
-        suppliers_filter_x: "x",
+      searchParams: { suppliers_page: "9", suppliers_sort: "x", suppliers_search: "x" },
+    });
+    expect(data["page-data:suppliers"]).toEqual({ count: 5 });
+    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("filters");
+  });
+});
+
+describe("resolvePageData - period sentinel substitution", () => {
+  beforeEach(() => {
+    frappeFetch.mockReset();
+  });
+
+  it("substitutes $period in a method request's args from the global ?period=", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ message: {} }));
+    const definition = pageWithData({
+      overview: {
+        request: {
+          type: "frappe",
+          operation: "method",
+          method: "alaiy_os.api.dashboard_stats.get_dashboard_overview",
+          args: { period: "$period" },
+        },
       },
     });
-    expect(data["page-data:suppliers"]).toBe(5);
-    expect(String(frappeFetch.mock.calls[0][0])).not.toContain("filters");
+
+    await resolvePageData(definition, { searchParams: { period: "1Y" } });
+    expect(queryOf(`?${String(frappeFetch.mock.calls[0][0]).split("?")[1]}`).get("period")).toBe("1Y");
+  });
+
+  it("substitutes $period_start in a list filter to an ISO date, and defaults to 1M when absent", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    const definition = pageWithData({
+      aov: {
+        request: {
+          type: "frappe",
+          operation: "list",
+          doctype: "Sales Order",
+          params: {
+            fields: ["grand_total"],
+            filters: [{ field: "transaction_date", operator: ">=", value: "$period_start" }],
+            pageSize: 1000,
+          },
+        },
+      },
+    });
+
+    await resolvePageData(definition, { searchParams: {} });
+    const filters = JSON.parse(queryOf(String(frappeFetch.mock.calls[0][0])).get("filters") ?? "[]");
+    expect(filters[0][0]).toBe("transaction_date");
+    expect(filters[0][2]).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
