@@ -31,7 +31,9 @@ export const RESPONSIVE_VALUE_SCHEMA = z
   })
   .partial();
 
-export const NODE_LAYOUT_SCHEMA = z.object({ span: RESPONSIVE_VALUE_SCHEMA.optional() });
+export const NODE_LAYOUT_SCHEMA = z.object({
+  span: RESPONSIVE_VALUE_SCHEMA.optional(),
+});
 
 // A binding is either `{ source, path? }` (a Data Source Registry id - a
 // domain-specific source with real business logic) or `{ ref, path? }` - a
@@ -56,6 +58,7 @@ export const LAYOUT_NODE_BASE_SCHEMA = z.object({
   kind: z.literal("layout"),
   type: z.enum(["section", "stack", "inline", "grid"]),
   columns: RESPONSIVE_VALUE_SCHEMA.optional(),
+  gap: z.number().nonnegative().optional(),
   layout: NODE_LAYOUT_SCHEMA.optional(),
 });
 
@@ -78,7 +81,9 @@ export type UINodeInput =
 export const UI_NODE_SCHEMA: z.ZodType<UINodeInput> = z.lazy(() =>
   z.discriminatedUnion("kind", [
     LAYOUT_NODE_BASE_SCHEMA.extend({ children: z.array(UI_NODE_SCHEMA) }),
-    COMPONENT_NODE_BASE_SCHEMA.extend({ children: z.array(UI_NODE_SCHEMA).optional() }),
+    COMPONENT_NODE_BASE_SCHEMA.extend({
+      children: z.array(UI_NODE_SCHEMA).optional(),
+    }),
   ]),
 );
 

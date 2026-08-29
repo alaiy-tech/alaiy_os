@@ -87,6 +87,25 @@ export const DATE_OPERATORS: FilterOperator[] = [
 export const SELECT_OPERATORS: FilterOperator[] = ["=", "!=", "in", "not in"];
 export const TEXT_OPERATORS: FilterOperator[] = ["=", "!=", "in", "not in"];
 
+/** The operator vocabulary a server-driven ("manual") filter can actually
+ * use - every `FilterOperator` except `between`, since a Frappe list filter
+ * has no single matching operator for it (there's no translation that
+ * doesn't also mean changing what "between" means). Shared between
+ * `FilterPopover` (which operator choices to even offer once a table is
+ * server-filtered) and `runtime/data/resolver.ts` (which operator a
+ * URL-supplied `${name}_filter_<field>_op` value is checked against) - kept
+ * in one place so the two can't quietly drift apart. */
+export const MANUAL_FILTER_OPERATORS: Exclude<FilterOperator, "between">[] = [
+  "=",
+  "!=",
+  ">",
+  "<",
+  ">=",
+  "<=",
+  "in",
+  "not in",
+];
+
 /** The rows-per-page choices every table's pagination footer offers - also
  * the whitelist `resolver.ts`'s `readNamedPageSize` validates a URL-supplied
  * page size against, so a server-paginated table never lets an arbitrary
