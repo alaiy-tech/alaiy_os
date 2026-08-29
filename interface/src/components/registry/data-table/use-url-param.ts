@@ -26,13 +26,31 @@ export function useUrlParam(paramName: string, resetParams: string[] = []) {
 
   function setValue(next: string | null) {
     if (!paramName) return;
+    // An empty string must collapse to null too (both mean "clear this
+    // param"), which ?? doesn't do.
+    // biome-ignore lint/nursery/useNullishCoalescing: see comment above
+    const normalizedNext = next || null;
+    // Bail before touching `resetParams` at all if this param's own value
+    // isn't actually changing - without this, a caller whose effect refires
+    // for an unrelated reason (e.g. a debounced search effect re-running
+    // because its own setter is a fresh closure every render) would still
+    // delete `resetParams` (typically this table's own page number) even
+    // though nothing the user did should have reset it.
+    if (normalizedNext === value) return;
+
     const params = new URLSearchParams(searchParams);
-    if (next) params.set(paramName, next);
+    if (normalizedNext) params.set(paramName, normalizedNext);
     else params.delete(paramName);
     for (const resetParam of resetParams) params.delete(resetParam);
 
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // No-op guard: without this, a caller that writes the same value on every
+    // render (e.g. a debounced effect) triggers a `router.replace` every time
+    // anyway, which re-renders the page and re-fires the effect - an infinite loop.
+    if (query === searchParams.toString()) return;
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
   }
 
   return { value, setValue };

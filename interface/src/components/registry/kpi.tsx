@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-import { TrendingDown, TrendingUp } from "lucide-react";
+import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 
 import { Badge } from "@/components/primitive/badge";
 import { KPI_ICONS } from "@/config/kpi-icons";
@@ -51,10 +51,28 @@ function normalizeNumber(
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/** A safe period-over-period percent change: `null` (not a plain `0`) when
+ * there's genuinely nothing to compare against - a missing/undecided
+ * `previousValue`, or `0` itself, which would make the percentage
+ * meaningless (divide-by-zero) rather than merely large. A non-numeric
+ * `value` (an already-formatted string from the Data Source, per
+ * `formatValue`'s own doc comment) can't be compared either. */
+function computeTrend(
+  value: number | string,
+  previousValue: number | string | null | undefined,
+): number | null {
+  if (typeof value !== "number") return null;
+  const previous = normalizeNumber(previousValue);
+  if (previous === null || previous === 0) return null;
+  return ((value - previous) / previous) * 100;
+}
+
 /** The badge shown next to the value - green/destructive per whether the
  * movement is good news (`trendPolarity` flips this for metrics like Return
- * Requests, where a rising count is bad). `null` (no comparison available)
- * renders nothing here; `TrendSummary` below carries that state instead. */
+ * Requests, where a rising count is bad), grey when unchanged (a rise or
+ * fall is never "good" or "bad" at exactly 0). `null` (no comparison
+ * available) renders nothing here; `TrendSummary` below carries that state
+ * instead. */
 function TrendBadge({
   trend,
   trendUnit = "percent",
@@ -67,9 +85,22 @@ function TrendBadge({
   const normalizedTrend = normalizeNumber(trend);
   if (normalizedTrend === null) return null;
 
-  const isUp = normalizedTrend >= 0;
-  const isGood = isUp === (trendPolarity === "positive");
   const suffix = trendUnit === "points" ? " pts" : "%";
+
+  if (normalizedTrend === 0) {
+    return (
+      <Badge
+        variant="outline"
+        className="border-muted-foreground/20 bg-muted text-muted-foreground"
+      >
+        <Minus />
+        {`0${suffix}`}
+      </Badge>
+    );
+  }
+
+  const isUp = normalizedTrend > 0;
+  const isGood = isUp === (trendPolarity === "positive");
   const TrendIcon = isUp ? TrendingUp : TrendingDown;
 
   return (
@@ -90,7 +121,10 @@ function TrendBadge({
 }
 
 /** The summary line at the card's bottom - the delta badge's caption, once
- * the badge itself moved up next to the value. */
+ * the badge itself moved up next to the value. `trendLabel` is just the
+ * comparison point's own name (e.g. the active period toggle's option,
+ * "1D") - this is what prepends the "vs " every caller would otherwise have
+ * to repeat. */
 function TrendSummary({
   trend,
   trendLabel,
@@ -108,7 +142,7 @@ function TrendSummary({
 
   return (
     <span className="text-muted-foreground">
-      {trendLabel ?? "vs last period"}
+      vs {trendLabel ?? "last period"}
     </span>
   );
 }
@@ -117,12 +151,14 @@ function TrendSummary({
  * The `os-kpi` registry entry - fully generic across every page. `title`,
  * `icon`, `format`/`currency`/`precision`, `trendUnit`/`trendPolarity`/
  * `trendLabel`, and `borderTone` are presentation config (`props`, editable
- * via `UPDATE_COMPONENT`); `value`/`trend` are the raw already-fetched
- * number (or a pre-formatted string) and an already-computed delta,
- * resolved from a Data Source Registry source (see `runtime/data/`). No
- * metric-specific math lives here at all - a data source's `resolve()` is
- * the only place a period comparison ever gets turned into a plain delta
- * number.
+ * via `UPDATE_COMPONENT`); `value`/`trend`/`previousValue` are raw
+ * already-fetched numbers (or a pre-formatted string for `value`), resolved
+ * from a Data Source Registry source (see `runtime/data/`). A source can
+ * either hand over an already-computed delta directly (`trend`) or the two
+ * raw numbers being compared (`value`+`previousValue`) and let this
+ * component do the (safe, divide-by-zero-aware) percent-change math itself
+ * - `computeTrend` above - since that's generic period-over-period
+ * arithmetic, not metric-specific.
  */
 export function OsKpi({
   title,
@@ -132,6 +168,7 @@ export function OsKpi({
   currency,
   precision,
   trend,
+  previousValue,
   trendUnit,
   trendPolarity,
   trendLabel,
@@ -144,12 +181,16 @@ export function OsKpi({
   currency?: string;
   precision?: number;
   trend?: number | null;
+  /** The prior period's raw value for the same metric - ignored when
+   * `trend` is given directly. */
+  previousValue?: number | string | null;
   trendUnit?: OsKpiTrendUnit;
   trendPolarity?: OsKpiTrendPolarity;
   trendLabel?: string;
   borderTone?: OsKpiBorderTone;
 }): ReactNode {
   const Icon = (icon && KPI_ICONS[icon]) || KPI_ICONS.DollarSign;
+  const effectiveTrend = trend ?? computeTrend(value, previousValue);
 
   return (
     <StatCard
@@ -158,12 +199,14 @@ export function OsKpi({
       value={formatValue(value, format, precision, currency)}
       delta={
         <TrendBadge
-          trend={trend}
+          trend={effectiveTrend}
           trendUnit={trendUnit}
           trendPolarity={trendPolarity}
         />
       }
-      summary={<TrendSummary trend={trend} trendLabel={trendLabel} />}
+      summary={
+        <TrendSummary trend={effectiveTrend} trendLabel={trendLabel} />
+      }
       borderTone={borderTone}
     />
   );

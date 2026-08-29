@@ -28,7 +28,7 @@ export function DynamicBadge({
     <Badge
       variant={category !== "generic" ? "outline" : variant || "default"}
       className={cn(
-        "flex items-center gap-1.5 w-fit font-medium capitalize",
+        "flex items-center gap-1.5 font-medium capitalize",
         mappedStyle,
         className,
       )}
