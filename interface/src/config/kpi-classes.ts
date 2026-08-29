@@ -1,6 +1,6 @@
 /** Semantic tone names for `os-kpi`'s optional accent bar - never a
- * hardcoded colour (see docs/DESIGN.md). `types/kpi.ts`'s `OsKpiBorderTone`
- * and `component-props-schema.ts`'s `borderTone` enum both derive from this
+ * hardcoded colour (see docs/DESIGN.md). `types/kpi.ts`'s 
+ * and `component-props-schema.ts`'s  enum both derive from this
  * one list. */
 export const KPI_BORDER_TONES = ["primary", "success", "warning", "caution", "destructive", "info"] as const;
 
