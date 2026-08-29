@@ -1,0 +1,21 @@
+{
+ "action": "Create Entry",
+ "action_label": "New Sales Order",
+ "creation": "2026-08-31 11:07:18.413294",
+ "description": "Record your first customer order.",
+ "docstatus": 0,
+ "doctype": "Onboarding Step",
+ "idx": 0,
+ "is_complete": 0,
+ "is_single": 0,
+ "is_skipped": 0,
+ "modified": "2026-09-01 11:21:06.593774",
+ "modified_by": "Administrator",
+ "name": "Alaiy OS - Create a Sales Order",
+ "owner": "Administrator",
+ "reference_document": "Sales Order",
+ "show_form_tour": 0,
+ "show_full_form": 0,
+ "title": "Create a Sales Order",
+ "validate_action": 1
+}
