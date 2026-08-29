@@ -10,16 +10,19 @@ import {
   stockStatusColorMap,
 } from "@/constants/badge-tones";
 
-export type ERPNextBadgeCategory =
-  | "docstatus"
-  | "job"
-  | "payment"
-  | "sales"
-  | "stock"
-  | "project"
-  | "hr"
-  | "manufacturing"
-  | "generic";
+export const ERPNEXT_BADGE_CATEGORIES = [
+  "docstatus",
+  "job",
+  "payment",
+  "sales",
+  "stock",
+  "project",
+  "hr",
+  "manufacturing",
+  "generic",
+] as const;
+
+export type ERPNextBadgeCategory = (typeof ERPNEXT_BADGE_CATEGORIES)[number];
 
 const categoryMapRegistry: Record<ERPNextBadgeCategory, Record<string, string>> = {
   docstatus: docStatusColorMap,
