@@ -126,6 +126,23 @@ describe("resolvePageData - named data definitions (list/count/method)", () => {
     expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_page_length")).toBe("1000");
   });
 
+  it("a name_page_size on a non-paginated definition (no query.pagination) is ignored", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [{ name: "CUST-1" }] }));
+    const definition = pageWithData({
+      customers: {
+        request: {
+          type: "frappe",
+          operation: "list",
+          doctype: "Customer",
+          params: { fields: ["name"], pageSize: 1000 },
+        },
+      },
+    });
+
+    await resolvePageData(definition, { searchParams: { customers_page_size: "10" } });
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_page_length")).toBe("1000");
+  });
+
   it("resolves a count operation to a plain number under computed.count", async () => {
     frappeFetch.mockResolvedValue(jsonResponse({ message: 7 }));
     const definition = pageWithData({
@@ -202,6 +219,18 @@ describe("resolvePageData - query state (page/sort/search/filter)", () => {
     frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
     await suppliersPage({ suppliers_page: "3" });
     expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_start")).toBe("20");
+  });
+
+  it("a whitelisted name_page_size overrides the static pageSize (limit_page_length reflects it, plus one for the hasMore trick)", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await suppliersPage({ suppliers_page_size: "50" });
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_page_length")).toBe("51");
+  });
+
+  it("a non-whitelisted name_page_size is ignored and falls back to the static pageSize", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    await suppliersPage({ suppliers_page_size: "999" });
+    expect(queryOf(String(frappeFetch.mock.calls[0][0])).get("limit_page_length")).toBe("11");
   });
 
   it("a valid name_sort overrides the static orderBy; an invalid one falls back", async () => {
