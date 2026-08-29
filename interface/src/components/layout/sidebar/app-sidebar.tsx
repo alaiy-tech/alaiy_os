@@ -76,10 +76,18 @@ function resolveSidebarGroups(groups: readonly SidebarNavGroupData[]): NavGroup[
 export function AppSidebar({
   companyName,
   items,
+  squareLogoSrc = "/assets/images/client-logo-square.png",
+  horizontalLogoSrc = "/assets/images/client-logo-hor.png",
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   companyName?: string | null;
   items: SidebarNavGroupData[];
+  /** The org's uploaded logo, resolved server-side by `os/layout.tsx` via
+   * `lib/frappe/server.ts`'s `getOrganisationLogoSrc()` - already falls back
+   * to this same default itself, so the prop default here only covers a
+   * caller (e.g. a test) that omits it entirely. */
+  squareLogoSrc?: string;
+  horizontalLogoSrc?: string;
 }) {
   const pathname = usePathname();
   const { sidebarVariant, sidebarCollapsible, isSynced } = usePreferencesStore(
@@ -108,17 +116,19 @@ export function AppSidebar({
             <SidebarMenuButton className="w-fit group-data-[collapsible=icon]:p-0!">
               <Link prefetch={false} href="/os">
                 <Image
-                  src="/assets/images/client-logo-hor.png"
+                  src={horizontalLogoSrc}
                   alt={APP_CONFIG.name}
                   width={175 / 2}
                   height={35 / 2}
+                  unoptimized={horizontalLogoSrc.startsWith("/frappe-assets/")}
                   className="group-data-[collapsible=icon]:hidden"
                 />
                 <Image
-                  src="/assets/images/client-logo-square.png"
+                  src={squareLogoSrc}
                   alt={APP_CONFIG.name}
                   width={32}
                   height={32}
+                  unoptimized={squareLogoSrc.startsWith("/frappe-assets/")}
                   className="hidden size-8 group-data-[collapsible=icon]:block"
                 />
               </Link>

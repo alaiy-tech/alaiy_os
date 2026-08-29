@@ -68,7 +68,17 @@ const SETTINGS_NAV_ITEMS: SettingsNavItem[] = [
   { id: "logs", title: "Logs", url: "/settings/logs", icon: Server },
 ];
 
-export function SettingsSidebar(props: React.ComponentProps<typeof Sidebar>) {
+export function SettingsSidebar({
+  squareLogoSrc = "/assets/images/client-logo-square.png",
+  horizontalLogoSrc = "/assets/images/client-logo-hor.png",
+  ...props
+}: React.ComponentProps<typeof Sidebar> & {
+  /** The org's uploaded logo, resolved server-side by `settings/layout.tsx`
+   * via `lib/frappe/server.ts`'s `getOrganisationLogoSrc()` - mirrors
+   * `AppSidebar`'s own props. */
+  squareLogoSrc?: string;
+  horizontalLogoSrc?: string;
+}) {
   const pathname = usePathname();
 
   // Same sync as `AppSidebar`: the store starts from `props` (the SSR-read
@@ -96,17 +106,19 @@ export function SettingsSidebar(props: React.ComponentProps<typeof Sidebar>) {
             <SidebarMenuButton className="w-fit group-data-[collapsible=icon]:p-0!">
               <Link prefetch={false} href="/settings">
                 <Image
-                  src="/assets/images/client-logo-hor.png"
+                  src={horizontalLogoSrc}
                   alt={APP_CONFIG.name}
                   width={175 / 2}
                   height={35 / 2}
+                  unoptimized={horizontalLogoSrc.startsWith("/frappe-assets/")}
                   className="group-data-[collapsible=icon]:hidden"
                 />
                 <Image
-                  src="/assets/images/client-logo-square.png"
+                  src={squareLogoSrc}
                   alt={APP_CONFIG.name}
                   width={32}
                   height={32}
+                  unoptimized={squareLogoSrc.startsWith("/frappe-assets/")}
                   className="hidden size-8 group-data-[collapsible=icon]:block"
                 />
               </Link>
