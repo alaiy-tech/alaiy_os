@@ -108,7 +108,16 @@ function truncateDate(value: unknown, granularity: "day" | "month" | "year"): st
 function groupRows(rows: Row[], step: Extract<TransformStep, { type: "group" }>): Row[] {
   const groups = new Map<string, Row[]>();
   for (const row of rows) {
-    const key = step.granularity ? truncateDate(row[step.by], step.granularity) : String(row[step.by] ?? "");
+    // `"auto"` is always resolved to a real day/month/year by
+    // `resolver.ts`'s `substituteTransformSentinels` before this ever runs -
+    // this engine has no notion of a period to resolve it against itself.
+    // Falling back to ungrouped-by-literal-value (same as `granularity`
+    // omitted) rather than throwing is just this file's usual
+    // degrade-gracefully stance for an input that "shouldn't happen".
+    const key =
+      step.granularity && step.granularity !== "auto"
+        ? truncateDate(row[step.by], step.granularity)
+        : String(row[step.by] ?? "");
     const bucket = groups.get(key);
     if (bucket) bucket.push(row);
     else groups.set(key, [row]);
@@ -155,6 +164,12 @@ function applyStep(context: TransformContext, step: TransformStep): TransformCon
         ...context,
         computed: { ...context.computed, [step.as]: evaluateFormula(step.expression, context.computed) },
       };
+    case "lookup": {
+      const raw = context.computed[step.field];
+      const key = raw === null || raw === undefined ? undefined : String(raw);
+      const value = key !== undefined && key in step.cases ? step.cases[key] : step.default;
+      return { ...context, computed: { ...context.computed, [step.as]: value } };
+    }
     default: {
       const _exhaustive: never = step;
       return context;

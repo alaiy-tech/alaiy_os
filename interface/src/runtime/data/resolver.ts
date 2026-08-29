@@ -2,11 +2,16 @@ import {
   ORDER_BY_PATTERN,
   parseOrderByFields,
 } from "@/config/data-request-schema";
-import { PAGE_SIZE_OPTIONS, PERIODS } from "@/constants/list";
+import {
+  MANUAL_FILTER_OPERATORS,
+  PAGE_SIZE_OPTIONS,
+  PERIODS,
+} from "@/constants/list";
 import type { DocFieldMeta } from "@/types/list";
 import type { DataDefinition } from "@/types/runtime/data-definition";
 import type { DataRequest, FrappeFilter } from "@/types/runtime/data-request";
 import type { DataSourceContext } from "@/types/runtime/data-source";
+import type { TransformStep } from "@/types/runtime/data-transform";
 import type { UINode } from "@/types/runtime/node";
 import type { UIPageDefinition } from "@/types/runtime/page";
 
@@ -62,6 +67,37 @@ function periodStartDate(period: string): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
+}
+
+/** What `group.granularity: "auto"` resolves to for each period - day-level
+ * buckets for anything a month or shorter (still a readable number of
+ * points: at most ~30), month-level once the window is a year (day-level
+ * over 365 days would be unreadable, and 12 points is the same shape the
+ * previous hardcoded "always group by month" behavior had). Unrecognised
+ * periods fall back to "month", the safest (fewest-points) default. */
+const PERIOD_TO_GRANULARITY: Record<string, "day" | "month" | "year"> = {
+  "1D": "day",
+  "1W": "day",
+  "1M": "day",
+  "1Y": "month",
+};
+
+/** Resolves every `group` step's `granularity: "auto"` to the real
+ * day/month/year value for the current period *before* `transform-engine.ts`
+ * ever sees it - keeps that module itself fully period-agnostic (a `group`
+ * step there just gets a literal granularity, same as it always has),
+ * exactly mirroring how `substituteRequestSentinels` resolves `$period`/
+ * `$period_start` for a request without `frappe-request-executor.ts` needing
+ * to know what a period even is. */
+function substituteTransformSentinels(
+  steps: TransformStep[] | undefined,
+  period: string,
+): TransformStep[] | undefined {
+  return steps?.map((step) =>
+    step.type === "group" && step.granularity === "auto"
+      ? { ...step, granularity: PERIOD_TO_GRANULARITY[period] ?? "month" }
+      : step,
+  );
 }
 
 /** Substitutes the two recognised sentinels - `"$period"` (the raw period
@@ -173,25 +209,12 @@ function readNamedSearch(
   return trimmed || undefined;
 }
 
-/** The operator vocabulary a URL-supplied filter operator is checked
- * against - the intersection of what the client's `FilterPopover` can
- * actually produce (`types/list.ts`'s `FilterOperator` - no `between`, since
- * a Frappe list filter has no matching single operator) and what a Frappe
- * list filter accepts (`FrappeFilterOperator` - no `like`/`not like` here:
- * unlike an author-written static filter, the *field* is already the
- * request-driven part for this dynamic path, so substring-matching an
- * unbounded field server-side is a wider risk than this opts into). An
- * unrecognised/missing operator falls back to `"="`. */
-const SAFE_FILTER_OPERATORS = new Set<FrappeFilter["operator"]>([
-  "=",
-  "!=",
-  ">",
-  "<",
-  ">=",
-  "<=",
-  "in",
-  "not in",
-]);
+/** `MANUAL_FILTER_OPERATORS` (the same whitelist `FilterPopover` restricts
+ * itself to for a server-filtered table), as a `Set` for the membership
+ * check below. An unrecognised/missing operator falls back to `"="`. */
+const SAFE_FILTER_OPERATORS = new Set<FrappeFilter["operator"]>(
+  MANUAL_FILTER_OPERATORS,
+);
 
 /** Reads `` `?<name>_filter_<field>=` `` (value) and
  * `` `?<name>_filter_<field>_op=` `` (operator) for every field in `fields` -
@@ -304,15 +327,22 @@ async function resolveDataDefinition(
 
   const withTotal = Boolean(definition.query?.pagination?.withTotal);
 
+  // Already fetched (and awaited) above when `query.filters` needed it first
+  // - reused here rather than fetched twice. Otherwise, `exposeFields` alone
+  // still fetches it, just in parallel with the request below.
+  let fieldsPromise = Promise.resolve(fieldsForFilters);
+  if (fieldsForFilters === undefined && definition.exposeFields && doctype) {
+    fieldsPromise = fetchDoctypeFields(doctype);
+  }
+
   const [rawContext, fields] = await Promise.all([
     executeRequest(request, { orFilters, paginate, withTotal }),
-    fieldsForFilters !== undefined
-      ? Promise.resolve(fieldsForFilters)
-      : definition.exposeFields && doctype
-        ? fetchDoctypeFields(doctype)
-        : Promise.resolve(undefined),
+    fieldsPromise,
   ]);
-  const transformed = applyTransforms(rawContext, definition.transform);
+  const transformed = applyTransforms(
+    rawContext,
+    substituteTransformSentinels(definition.transform, period),
+  );
   const resolved = toResolvedValue(transformed);
   return fields ? { ...resolved, fields } : resolved;
 }
