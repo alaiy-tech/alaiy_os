@@ -1,6 +1,8 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { TooltipProvider } from "@/components/primitive/tooltip";
 
 const { replace, usePathnameMock, useSearchParamsMock } = vi.hoisted(() => ({
   replace: vi.fn(),
@@ -189,5 +191,179 @@ describe("OsDataTable - sort contract", () => {
 
     // Purely local TanStack state - no navigation at all.
     expect(replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("OsDataTable - search contract", () => {
+  beforeEach(() => {
+    replace.mockReset();
+    useSearchParamsMock.mockReturnValue(new URLSearchParams());
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("with searchParam: typing debounces into a URL write, and never locally filters `data`", () => {
+    const rows: Row[] = [
+      { id: "R0", name: "Alice" },
+      { id: "R1", name: "Bob" },
+    ];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={columns}
+        searchable
+        searchParam="orders_search"
+        pagination={{ page: 1, pageSize: 10, hasMore: false }}
+        pageParam="orders_page"
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Search..."), { target: { value: "alice" } });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const [url] = replace.mock.calls.at(-1) ?? [];
+    expect(url).toContain("orders_search=alice");
+    // Server-driven mode: `data` is assumed already filtered, so both rows
+    // given still both render - the box never scans them itself.
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("Bob")).toBeInTheDocument();
+  });
+
+  it("with searchParam: writing search also clears pageParam in the same navigation", () => {
+    const rows: Row[] = [{ id: "R0", name: "Alice" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={columns}
+        searchable
+        searchParam="orders_search"
+        pagination={{ page: 3, pageSize: 10, hasMore: true }}
+        pageParam="orders_page"
+      />,
+    );
+
+    fireEvent.change(screen.getByPlaceholderText("Search..."), { target: { value: "alice" } });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    const [url] = replace.mock.calls.at(-1) ?? [];
+    expect(url).toContain("orders_search=alice");
+    expect(url).not.toContain("orders_page");
+  });
+
+  it("with searchable but no searchParam: today's local in-memory search is unchanged (regression)", () => {
+    const rows: Row[] = [
+      { id: "R0", name: "Alice" },
+      { id: "R1", name: "Bob" },
+    ];
+    render(<OsDataTable data={rows} columns={columns} searchable />);
+
+    fireEvent.change(screen.getByPlaceholderText("Search..."), { target: { value: "alice" } });
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.queryByText("Bob")).not.toBeInTheDocument();
+    expect(replace).not.toHaveBeenCalled();
+  });
+});
+
+describe("OsDataTable - manual filter toolbar", () => {
+  beforeEach(() => {
+    replace.mockReset();
+    useSearchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  it("renders the Filters trigger when only manualFilterFields is set (no searchable/filterable)", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <TooltipProvider>
+        <OsDataTable
+          data={rows}
+          columns={columns}
+          manualFilterFields={[{ field: "status", label: "Status", param: "orders_filter_status", options: ["Open"] }]}
+        />
+      </TooltipProvider>,
+    );
+
+    expect(screen.getByRole("button", { name: /Filters/ })).toBeInTheDocument();
+  });
+
+  it("with neither searchable/filterable/columnVisibility/manualFilterFields: no toolbar row renders", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(<OsDataTable data={rows} columns={columns} />);
+
+    expect(screen.queryByRole("button", { name: /Filters/ })).not.toBeInTheDocument();
+    expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
+  });
+});
+
+describe("OsDataTable - advanced pagination (external/server mode)", () => {
+  beforeEach(() => {
+    replace.mockReset();
+    useSearchParamsMock.mockReturnValue(new URLSearchParams());
+  });
+
+  it("with pageSizeParam: shows the source's current pageSize in the per-page selector", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={columns}
+        pagination={{ page: 1, pageSize: 20, hasMore: false }}
+        pageParam="orders_page"
+        pageSizeParam="orders_page_size"
+      />,
+    );
+
+    expect(screen.getByText("Per page")).toBeInTheDocument();
+    expect(screen.getByText("20")).toBeInTheDocument();
+  });
+
+  it("without pageSizeParam: no per-page selector renders", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={columns}
+        pagination={{ page: 1, pageSize: 20, hasMore: false }}
+        pageParam="orders_page"
+      />,
+    );
+
+    expect(screen.queryByText("Per page")).not.toBeInTheDocument();
+  });
+
+  it("with pageParam: typing a page number into 'Go to page' and pressing Enter jumps there", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(
+      <OsDataTable
+        data={rows}
+        columns={columns}
+        pagination={{ page: 1, pageSize: 10, hasMore: true }}
+        pageParam="orders_page"
+      />,
+    );
+
+    const input = screen.getByLabelText("Go to page");
+    fireEvent.change(input, { target: { value: "5" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    const [url] = replace.mock.calls.at(-1) ?? [];
+    expect(url).toContain("orders_page=5");
+  });
+
+  it("without pageParam: no 'Go to page' input renders", () => {
+    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
+    render(<OsDataTable data={rows} columns={columns} pagination={{ page: 1, pageSize: 10, hasMore: true }} />);
+
+    expect(screen.queryByLabelText("Go to page")).not.toBeInTheDocument();
   });
 });

@@ -13,28 +13,28 @@ vi.mock("next/navigation", () => ({
   useSearchParams: useSearchParamsMock,
 }));
 
-const { useSortParam } = await import("@/components/registry/data-table/use-sort-param");
+const { useUrlParam } = await import("@/components/registry/data-table/use-url-param");
 
-describe("useSortParam", () => {
+describe("useUrlParam", () => {
   beforeEach(() => {
     replace.mockReset();
     useSearchParamsMock.mockReturnValue(new URLSearchParams());
   });
 
   it("returns null when the param is absent", () => {
-    const { result } = renderHook(() => useSortParam("suppliers_sort"));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort"));
     expect(result.current.value).toBeNull();
   });
 
   it("reads the current value from the named param", () => {
     useSearchParamsMock.mockReturnValue(new URLSearchParams("suppliers_sort=supplier_name+desc"));
-    const { result } = renderHook(() => useSortParam("suppliers_sort"));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort"));
     expect(result.current.value).toBe("supplier_name desc");
   });
 
   it("setValue writes the named param and preserves unrelated existing params", () => {
     useSearchParamsMock.mockReturnValue(new URLSearchParams("orders_sort=name+asc&other=keep"));
-    const { result } = renderHook(() => useSortParam("suppliers_sort"));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort"));
 
     result.current.setValue("supplier_name asc");
 
@@ -48,7 +48,7 @@ describe("useSortParam", () => {
 
   it("setValue(null) deletes the param", () => {
     useSearchParamsMock.mockReturnValue(new URLSearchParams("suppliers_sort=name+asc"));
-    const { result } = renderHook(() => useSortParam("suppliers_sort"));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort"));
 
     result.current.setValue(null);
 
@@ -58,7 +58,7 @@ describe("useSortParam", () => {
 
   it("setValue clears every param listed in resetParams in the same navigation", () => {
     useSearchParamsMock.mockReturnValue(new URLSearchParams("suppliers_page=3"));
-    const { result } = renderHook(() => useSortParam("suppliers_sort", ["suppliers_page"]));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort", ["suppliers_page"]));
 
     result.current.setValue("supplier_name asc");
 
@@ -68,7 +68,7 @@ describe("useSortParam", () => {
   });
 
   it("does nothing when paramName is empty (no stable identity to write to)", () => {
-    const { result } = renderHook(() => useSortParam(""));
+    const { result } = renderHook(() => useUrlParam(""));
     result.current.setValue("supplier_name asc");
     expect(replace).not.toHaveBeenCalled();
   });
