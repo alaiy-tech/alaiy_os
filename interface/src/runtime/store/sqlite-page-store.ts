@@ -11,7 +11,7 @@
 // one file by the `UIPageStore` interface - swapping to `better-sqlite3` (a
 // native dependency) or a future `FrappeUIPageStore` is a change here only.
 
-import { SEED_PAGES } from "@/seeds/seed";
+import { SEED_PAGES } from "@/seed";
 import type { PageConfigFile } from "@/types/runtime/page";
 import type { UIPageStore } from "@/types/runtime/store";
 
@@ -55,7 +55,7 @@ export function createSchema(db: DatabaseSync): void {
 
 /** Insert-or-update a page by id, bumping `version` on every update. Used
  * both by `ensureSeeded` (first-run auto-seed) and `scripts/seed-headless-db.ts`
- * (explicit reseed after editing `seeds/seed.ts`) - the same idempotent
+ * (explicit reseed after editing `seed.ts`) - the same idempotent
  * operation either way. */
 export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
   const now = new Date().toISOString();
@@ -80,14 +80,11 @@ export function upsertPage(db: DatabaseSync, page: PageConfigFile): void {
   );
 }
 
-/** Icons picked by hand for the two known seed pages - unlike a page
- * created through `createPageWithSidebarEntry` later, these are genuinely
- * relevant, not the generic fallback. */
+/** Icons picked by hand for the known seed pages - unlike a page created
+ * through `createPageWithSidebarEntry` later, these are genuinely relevant,
+ * not the generic fallback. */
 const SEED_PAGE_ICONS: Record<string, string> = {
   dashboard: "layout-dashboard",
-  customers: "users",
-  "headless-data-test": "database",
-  suppliers: "truck",
 };
 
 /** Seeds the two Headless OS pages if the table is empty - a fresh clone

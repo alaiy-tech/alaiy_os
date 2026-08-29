@@ -3,10 +3,10 @@
  * (interface/public/headless-os.sqlite). The store already auto-seeds an
  * empty database on first open (`sqlite-page-store.ts`'s `ensureSeeded`),
  * so this is only for forcing a *reseed* during development, e.g. after
- * editing `src/seeds/seed.ts`.
+ * editing `src/seed.ts`.
  *
  * Just deletes the database file rather than re-running the seed data
- * directly - `seeds/seed.ts` uses `@/*` aliases that plain ts-node (how this
+ * directly - `seed.ts` uses `@/*` aliases that plain ts-node (how this
  * script runs, per `tsconfig.scripts.json`) can't resolve, unlike Next's own
  * bundler. The next `next dev`/`next start` request reopens the store,
  * finds an empty table, and re-seeds through the app's own module

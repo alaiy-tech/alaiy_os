@@ -4,7 +4,7 @@
 // file's own constructor pattern exactly (default-param `dbPath`, private
 // handle, `createSchema` + a sync step run in the constructor).
 
-import { buildCodeDefinedSidebar } from "@/seeds/seed";
+import { buildCodeDefinedSidebar } from "@/seed";
 import type {
   SidebarNavGroupData,
   SidebarNavItemData,
@@ -227,7 +227,7 @@ function nestItems(items: SidebarItemRow[]): SidebarNavItemData[] {
 /**
  * Reads the `/os/*` sidebar from the local SQLite `sidebar_groups`/`sidebar_items`
  * tables (same file as `SQLiteUIPageStore`). See `sidebar-store.ts` for why
- * this is behind an interface, and `seeds/seed.ts`/`syncCodeDefinedSidebar`
+ * this is behind an interface, and `seed.ts`/`syncCodeDefinedSidebar`
  * above for how `source = 'code'` rows stay in sync with that seed and
  * `contributed-nav.ts`.
  */
