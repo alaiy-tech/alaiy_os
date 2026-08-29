@@ -1,7 +1,6 @@
 import { z } from "zod";
 
-import { FRAPPE_COUNT_SOURCE_CONFIG_SCHEMA } from "./frappe-count-schema";
-import { FRAPPE_LIST_SOURCE_CONFIG_SCHEMA } from "./frappe-list-schema";
+import { DATA_DEFINITION_SCHEMA } from "./data-definition-schema";
 
 /**
  * The structural specification of a UI Definition, as read from the
@@ -34,26 +33,14 @@ export const RESPONSIVE_VALUE_SCHEMA = z
 
 export const NODE_LAYOUT_SCHEMA = z.object({ span: RESPONSIVE_VALUE_SCHEMA.optional() });
 
-// A data binding's `source` is either a named Data Source Registry id
-// (a plain string, the original and still-primary case), or an inline
-// declarative config for a generic Frappe source - dispatched by its own
-// `type` at resolve time (`runtime/data/resolver.ts`), never registered.
-// Nested in their own discriminated union (keyed on `type`) rather than
-// flattened into one 3-way `z.union` with the string branch, so a malformed
-// inline config gets a precise error pointing at exactly the
-// "frappe-list"/"frappe-count" branch instead of three unrelated failures.
-const INLINE_DATA_SOURCE_SCHEMA = z.discriminatedUnion("type", [
-  FRAPPE_LIST_SOURCE_CONFIG_SCHEMA,
-  FRAPPE_COUNT_SOURCE_CONFIG_SCHEMA,
-]);
-
-// A binding is either `{ source, path? }` (a registry id or inline config,
-// as above) or `{ ref, path? }` - a named lookup into the page's own
-// `data` dict (`PAGE_DEFINITION_SCHEMA` below), for sharing one resolved
-// source across multiple bindings without duplicating its config.
+// A binding is either `{ source, path? }` (a Data Source Registry id - a
+// domain-specific source with real business logic) or `{ ref, path? }` - a
+// named lookup into the page's own `data` dict (`PAGE_DEFINITION_SCHEMA`
+// below), for sharing one resolved `DataDefinition` across multiple
+// bindings without duplicating it.
 export const DATA_SOURCE_REF_SCHEMA = z.union([
   z.object({
-    source: z.union([z.string().min(1), INLINE_DATA_SOURCE_SCHEMA]),
+    source: z.string().min(1),
     path: z.string().min(1).optional(),
   }),
   z.object({
@@ -98,14 +85,14 @@ export const UI_NODE_SCHEMA: z.ZodType<UINodeInput> = z.lazy(() =>
 export const PAGE_DEFINITION_SCHEMA = z.object({
   id: z.string().min(1),
   kind: z.literal("page"),
-  // Named, page-scoped source declarations - see `types/runtime/page.ts`'s
+  // Named, page-scoped data definitions - see `types/runtime/page.ts`'s
   // `UIPageDefinition.data` doc comment. This schema is NOT `.strict()`
   // (see this file's module doc), so this field must be declared here
   // explicitly - zod's default behavior for an undeclared key is to
   // silently strip it from the parsed output, not error, which would make
   // every page's `data` dict quietly vanish on its way through
   // `validatePageConfig` otherwise.
-  data: z.record(z.string(), INLINE_DATA_SOURCE_SCHEMA).optional(),
+  data: z.record(z.string(), DATA_DEFINITION_SCHEMA).optional(),
   children: z.array(UI_NODE_SCHEMA),
 });
 
