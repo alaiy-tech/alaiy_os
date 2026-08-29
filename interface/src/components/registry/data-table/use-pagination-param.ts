@@ -32,7 +32,11 @@ export function usePaginationParam(paramName: string, fallbackPage: number) {
     else params.set(paramName, String(next));
 
     const query = params.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    // Same no-op guard as `useUrlParam.setValue` - see its comment.
+    if (query === searchParams.toString()) return;
+    router.replace(query ? `${pathname}?${query}` : pathname, {
+      scroll: false,
+    });
   }
 
   return { page, setPage };

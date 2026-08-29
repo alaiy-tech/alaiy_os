@@ -2,8 +2,17 @@
 
 import * as React from "react";
 
-import { buildColumnDefs, buildFilterFields, buildManualFilterFields, type ColumnSpec } from "./column-spec";
+import type { DocFieldMeta } from "@/components/derived/list/types";
+
+import {
+  buildColumnDefs,
+  buildCompulsoryColumns,
+  buildExtraColumnDefs,
+  type ColumnSpec,
+} from "./column-spec";
 import { OsDataTable } from "./data-table";
+import type { RowActionGroup } from "./row-actions";
+import type { BulkActionGroup } from "./selection-actions";
 
 export type OsDataTableViewProps = {
   title?: string;
@@ -18,6 +27,18 @@ export type OsDataTableViewProps = {
    * array - a JSON page whose `source` id has a typo should render an empty
    * table, not crash. */
   rows: Record<string, unknown>[] | undefined;
+  /** The doctype's own field metadata - a `data`-bound prop (e.g. `{ ref:
+   * "orders", path: "fields" }`), resolved only when that named
+   * entry's `DataDefinition.exposeFields` is `true` (see
+   * `runtime/data/resolver.ts`). This, not `columns`, is the pool the
+   * filter and column popovers draw from - `columns` is just the
+   * default/initial visible set. Omitted (the source didn't opt in) means
+   * the popovers only ever offer what's in `columns`. */
+  fields?: DocFieldMeta[];
+  /** Doctype fields that never show up in either popover, even though
+   * `fields` includes them - e.g. one already folded into another column's
+   * cell. */
+  excludedFields?: string[];
   rowId?: string;
   /** Org-default currency for any `format: "currency"` column - applied
    * uniformly to every row (a disclosed simplification: a genuine per-row
@@ -29,16 +50,29 @@ export type OsDataTableViewProps = {
   /** Mirrors `OsDataTable`'s own `searchParam` - see its doc comment. */
   searchParam?: string;
   columnVisibility?: boolean;
-  compulsoryColumns?: string[];
   minVisibleColumns?: number;
   selectable?: boolean;
+  /** Declarative row-actions ("3 dots") column - see `row-actions.tsx`'s doc
+   * comment for the closed navigate/edit/delete vocabulary. Omitted means no
+   * actions column at all. */
+  actions?: RowActionGroup[];
+  /** Declarative bulk "Actions (N)" button - see `selection-actions.tsx`'s
+   * doc comment for the closed edit/delete vocabulary. Required (by
+   * `component-props-schema.ts`'s `superRefine`) whenever `selectable` is
+   * true. */
+  selectionActions?: BulkActionGroup[];
   paginated?: boolean;
   pageSize?: number;
   /** Server/generic-source pagination metadata - a `data`-bound prop (e.g.
    * `{ ref: "customers", path: "pagination" }`), resolved from the same
    * source `rows` came from. See `docs/UI_RUNTIME.md`'s "Paginated Data
    * Sources" and `OsDataTable`'s own doc comment. */
-  pagination?: { page: number; pageSize: number; hasMore: boolean };
+  pagination?: {
+    page: number;
+    pageSize: number;
+    hasMore: boolean;
+    total?: number;
+  };
   /** The URL search param this table's page reads/writes when `pagination`
    * is set (e.g. `"customers_page"`) - a plain `props` value, not resolved
    * from any source. */
@@ -72,15 +106,18 @@ export function OsDataTableView({
   subtitle,
   columns,
   rows,
+  fields,
+  excludedFields,
   rowId,
   currency,
   searchable,
   searchPlaceholder,
   searchParam,
   columnVisibility,
-  compulsoryColumns,
   minVisibleColumns,
   selectable,
+  actions,
+  selectionActions,
   paginated,
   pageSize,
   pagination,
@@ -90,10 +127,32 @@ export function OsDataTableView({
   sortParam,
   emptyMessage,
 }: OsDataTableViewProps) {
-  const columnDefs = React.useMemo(() => buildColumnDefs(columns, currency), [columns, currency]);
-  const filterFields = React.useMemo(() => buildFilterFields(columns), [columns]);
-  const manualFilterFields = React.useMemo(() => buildManualFilterFields(columns), [columns]);
-  const filterable = filterFields.length > 0 || manualFilterFields.length > 0;
+  const columnDefs = React.useMemo(
+    () => [
+      ...buildColumnDefs(columns, currency),
+      ...buildExtraColumnDefs(columns, fields ?? [], excludedFields),
+    ],
+    [columns, currency, fields, excludedFields],
+  );
+  const compulsoryColumns = React.useMemo(
+    () => buildCompulsoryColumns(columns),
+    [columns],
+  );
+  // Only the authored `columns` start visible - the doctype fields folded
+  // in by `buildExtraColumnDefs` are part of `manageableColumnIds` too (so
+  // the "Add Fields" picker can offer them), but must start unchecked until
+  // the user actually adds one. Without this, `OsDataTable`'s own default
+  // (`defaultColumnOrder ?? manageableColumnIds`) would show every doctype
+  // field as already visible.
+  const defaultColumnOrder = React.useMemo(
+    () => columns.map((column) => column.field),
+    [columns],
+  );
+  const filterFields = React.useMemo(() => {
+    const excluded = new Set(excludedFields ?? []);
+    return (fields ?? []).filter((field) => !excluded.has(field.fieldname));
+  }, [fields, excludedFields]);
+  const filterable = filterFields.length > 0;
 
   return (
     <OsDataTable
@@ -101,17 +160,23 @@ export function OsDataTableView({
       subtitle={subtitle}
       columns={columnDefs}
       data={rows ?? []}
-      getRowId={rowId ? (row) => String((row as Record<string, unknown>)[rowId]) : undefined}
+      getRowId={
+        rowId
+          ? (row) => String((row as Record<string, unknown>)[rowId])
+          : undefined
+      }
       searchable={searchable}
       searchPlaceholder={searchPlaceholder}
       searchParam={searchParam}
       filterable={filterable}
       filterFields={filterFields}
-      manualFilterFields={manualFilterFields}
       columnVisibility={columnVisibility}
+      defaultColumnOrder={defaultColumnOrder}
       compulsoryColumns={compulsoryColumns}
       minVisibleColumns={minVisibleColumns}
       selectable={selectable}
+      actions={actions}
+      selectionActions={selectionActions}
       paginated={paginated}
       pageSize={pageSize}
       pagination={pagination}
