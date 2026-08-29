@@ -45,17 +45,6 @@ function matchesRow(
   const raw = row[filterRow.field];
   const operator: FilterOperator = filterRow.operator;
 
-  if (operator === "is") return raw !== null && raw !== undefined && raw !== "";
-  if (operator === "is not")
-    return raw === null || raw === undefined || raw === "";
-
-  if (operator === "like" || operator === "not like") {
-    const matches = String(raw ?? "")
-      .toLowerCase()
-      .includes(filterRow.value.toLowerCase());
-    return operator === "like" ? matches : !matches;
-  }
-
   if (operator === "in" || operator === "not in") {
     const values = filterRow.value
       .split(",")

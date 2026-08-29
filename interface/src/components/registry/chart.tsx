@@ -25,6 +25,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/primitive/chart";
+import { cn } from "@/utils";
 
 /** The `chart` capability contract's series shape (brief §21) - one generic
  * composed chart covering exactly the two shapes this app actually has
@@ -63,7 +64,7 @@ export function OsChart({
   series,
   rows,
   legend = false,
-  height = 280,
+  height,
 }: {
   title?: string;
   subtitle?: string;
@@ -88,13 +89,24 @@ export function OsChart({
   const body =
     !rows || rows.length === 0 ? (
       <div
-        className="grid w-full place-items-center text-muted-foreground text-sm"
+        className="grid w-full h-full place-items-center text-muted-foreground text-sm"
         style={{ height }}
       >
         No data available.
       </div>
     ) : (
-      <ChartContainer config={config} className="w-full" style={{ height }}>
+      <ChartContainer
+        config={config}
+        // No explicit `height` - fill whatever height this chart's own
+        // parent grid cell stretches to (its default grid behavior:
+        // `align-items: stretch` gives every row's items equal height), so
+        // a chart next to a taller sibling (e.g. a KPI grid) grows to match
+        // it instead of getting cropped/gapped at `aspect-video`'s fixed
+        // 16:9 ratio. An explicit `height` still wins - `cn` (tailwind-merge)
+        // correctly drops `aspect-video`/`h-full` in favor of the inline style.
+        className={cn("w-full", !height && "aspect-auto h-full")}
+        style={{ height }}
+      >
         <ComposedChart
           data={rows}
           margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
@@ -156,14 +168,16 @@ export function OsChart({
   if (!title && !subtitle) return body;
 
   return (
-    <Card>
+    <Card className={height ? undefined : "h-full"}>
       <CardHeader>
         {title && (
           <CardTitle className="font-normal leading-none">{title}</CardTitle>
         )}
         {subtitle && <CardDescription>{subtitle}</CardDescription>}
       </CardHeader>
-      <CardContent>{body}</CardContent>
+      <CardContent className={height ? undefined : "min-h-0 flex-1"}>
+        {body}
+      </CardContent>
     </Card>
   );
 }
