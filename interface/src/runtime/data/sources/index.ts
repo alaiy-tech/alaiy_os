@@ -4,6 +4,5 @@
  * before the first `resolvePageData` call - the registry itself stays a
  * plain `Map` with no built-in discovery/auto-import mechanism, since a
  * one-line import list is simpler than a filesystem-scanning loader for the
- * two sources that exist today. */
+ * one domain-specific source that exists today. */
 import "./dashboard";
-import "./customers";
