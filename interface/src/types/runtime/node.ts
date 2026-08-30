@@ -40,6 +40,8 @@ export type LayoutNode = {
   type: LayoutType;
   /** Only meaningful for `type: "grid"` - e.g. `{ base: 1, xl: 12 }`. */
   columns?: ResponsiveValue;
+  /** Spacing between direct child nodes. Defaults to 4 when omitted. */
+  gap?: number;
   layout?: NodeLayout;
   children: UINode[];
 };
