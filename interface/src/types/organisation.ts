@@ -19,3 +19,12 @@ export type OrganisationInfo = {
  * context value) - previously declared independently, identically, in both
  * files. */
 export type CompanyInfo = { name: string; defaultCurrency: string | null };
+
+/** Resolved `<img>`/`<Image>` `src` values for the org's branding, computed
+ * server-side by `lib/frappe/server.ts`'s `getOrganisationLogoSrc()` - each
+ * is either a same-origin `/frappe-assets/images/*` path (an uploaded logo,
+ * rewritten straight through to the bench's own shared assets folder - see
+ * `next.config.mjs`) or this app's own public-folder default
+ * (`/assets/images/client-logo-*.png`), never a raw Frappe File attachment
+ * URL. */
+export type OrganisationLogoSrc = { square: string; horizontal: string };

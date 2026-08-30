@@ -30,7 +30,7 @@ export type UIPageDefinition = {
 export type PageConfigFile = {
   id: string;
   route: string;
-  metadata?: { title?: string; description?: string };
+  metadata?: { title?: string; description?: string; keywords?: string[] };
   definition: UIPageDefinition;
 };
 

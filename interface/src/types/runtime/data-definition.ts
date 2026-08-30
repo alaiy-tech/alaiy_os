@@ -1,4 +1,4 @@
-import type { DataRequest, FrappeFilterOperator } from "./data-request";
+import type { DataRequest } from "./data-request";
 import type { TransformStep } from "./data-transform";
 
 /** Which parts of a `list`-operation `request` are URL-driven, namespaced by
@@ -8,10 +8,25 @@ import type { TransformStep } from "./data-transform";
  * a `count`/`method` request has no `params.filters`/`orderBy`/pagination
  * to substitute into, so it simply has no `query`. */
 export type QueryBinding = {
-  pagination?: { pageSize: number };
+  /** `withTotal` fetches a real row count (a second Frappe request) so the
+   * table can render numbered page links instead of just Prev/Next off
+   * `hasMore` - see `runtime/data/frappe-request-executor.ts`'s
+   * `buildTotalCountRequestPath`. Costs one extra request per resolve. */
+  pagination?: { pageSize: number; withTotal?: boolean };
   sort?: { allowedFields: string[] };
   search?: { fields: string[] };
-  filters?: { field: string; operator: FrappeFilterOperator }[];
+  /** Opts into per-field server-side filtering, one active filter per field,
+   * read from `` `${name}_filter_<field>` `` (value) and
+   * `` `${name}_filter_<field>_op` `` (operator, defaults to `"="`) - see
+   * `runtime/data/resolver.ts`'s `readNamedFilters`. Unlike `sort`/`search`,
+   * there is no separate field allowlist here: `exposeFields: true` (see
+   * below - required whenever `filters` is true) already fetches this
+   * request's doctype's own field list, and *that* is the safety boundary a
+   * URL-supplied field name is checked against - both field and operator are
+   * request-driven, since a table's own filter popover now lets a user pick
+   * any doctype field and any (whitelisted) operator, not just one
+   * author-fixed operator per author-declared field. */
+  filters?: boolean;
 };
 
 /** A page-level named data definition (`UIPageDefinition.data[name]`):
@@ -24,4 +39,14 @@ export type DataDefinition = {
   request: DataRequest;
   query?: QueryBinding;
   transform?: TransformStep[];
+  /** When true, the resolver also fetches the request's doctype's own field
+   * metadata (the same whitelisted `alaiy_os.api.list_view.get_doctype_fields`
+   * method `hooks/use-doctype-meta.ts` calls client-side, via
+   * `runtime/data/fetch-doctype-fields.ts` server-side instead) and exposes
+   * it as `computed.fields` - the pool `os-data-table`'s filter/column
+   * popovers draw from (every field the doctype has), independent of which
+   * columns are authored to show by default. One extra request, run in
+   * parallel with the main one; only meaningful for `list`/`count`
+   * operations (the only ones with a `doctype`). */
+  exposeFields?: boolean;
 };
