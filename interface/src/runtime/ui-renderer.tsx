@@ -46,7 +46,10 @@ function renderNode(
       );
 
     return (
-      <div key={key} className={layout.className({ columns: node.columns })}>
+      <div
+        key={key}
+        className={layout.className({ columns: node.columns }, node.gap ?? 4)}
+      >
         {node.children.map((child, index) =>
           renderChild(child, data, registry, index),
         )}
