@@ -4,7 +4,11 @@
 // the `/os/*` sidebar (`buildCodeDefinedSidebar`).
 import { contributedNav } from "@/config/contributed-nav";
 import { iconName } from "@/config/nav-icons";
-import type { NavContribution, SidebarNavGroupData, SidebarNavItemData } from "@/types/navigation";
+import type {
+  NavContribution,
+  SidebarNavGroupData,
+  SidebarNavItemData,
+} from "@/types/navigation";
 import type { PageConfigFile } from "@/types/runtime/page";
 
 /**
@@ -33,23 +37,21 @@ import type { PageConfigFile } from "@/types/runtime/page";
  * deliberately doesn't support yet; showing current values without arrows
  * is the disclosed simplification.
  *
- * `recentOrders` is the third required proof: a real generic list with
+ * `orders` is the third required proof: a real generic list with
  * request-driven search/filter/sort/pagination, all namespaced by this
- * entry's own name (`orders_page`/`orders_page_size`/`orders_sort`/
- * `orders_search`/`orders_filter_status`) - no `frappe-list` abstraction, and
- * (unlike the disclosed console-warning bug this replaces) real
- * `pageParam`/`sortParam` bindings this time. Search, the status filter, and
- * column visibility all live in the table's own toolbar (`searchParam`/a
- * `filterParam` column/`columnVisibility`) rather than a separate
- * `os-filter-bar` node - see docs/UI_RUNTIME.md's "Generic List Query
- * State".
+ * entry's own name (`orders_page`/`orders_sort`/`orders_search`/
+ * `orders_filter_status`) - no `frappe-list` abstraction, and (unlike the
+ * disclosed console-warning bug this replaces) real `pageParam`/`sortParam`
+ * bindings this time.
  */
 export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
   id: "dashboard",
   route: "/os",
   metadata: {
     title: "Dashboard",
-    description: "The /os dashboard, composed through the generic request+transform data model.",
+    description:
+      "Your sales, orders, and stock at a glance - the Alaiy OS dashboard.",
+    keywords: ["dashboard", "sales", "orders", "analytics", "Alaiy OS"],
   },
   definition: {
     id: "headless-dashboard",
@@ -72,7 +74,11 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
         },
       },
       stockMix: {
-        request: { type: "frappe", operation: "method", method: "alaiy_os.api.item_stats.get_stock_mix" },
+        request: {
+          type: "frappe",
+          operation: "method",
+          method: "alaiy_os.api.item_stats.get_stock_mix",
+        },
       },
       aov: {
         request: {
@@ -83,7 +89,11 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
             fields: ["grand_total"],
             filters: [
               { field: "docstatus", operator: "=", value: 1 },
-              { field: "transaction_date", operator: ">=", value: "$period_start" },
+              {
+                field: "transaction_date",
+                operator: ">=",
+                value: "$period_start",
+              },
             ],
             pageSize: 1000,
           },
@@ -116,23 +126,37 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
           { type: "limit", count: 12 },
         ],
       },
-      recentOrders: {
+      orders: {
         request: {
           type: "frappe",
           operation: "list",
           doctype: "Sales Order",
           params: {
-            fields: ["name", "customer", "grand_total", "status", "transaction_date"],
+            fields: [
+              "name",
+              "customer",
+              "grand_total",
+              "status",
+              "transaction_date",
+            ],
             orderBy: "transaction_date desc",
             pageSize: 10,
           },
         },
         query: {
-          pagination: { pageSize: 10 },
-          sort: { allowedFields: ["transaction_date", "grand_total", "name", "customer"] },
+          pagination: { pageSize: 10, withTotal: true },
+          sort: {
+            allowedFields: [
+              "transaction_date",
+              "grand_total",
+              "name",
+              "customer",
+            ],
+          },
           search: { fields: ["name", "customer"] },
-          filters: [{ field: "status", operator: "=" }],
+          filters: true,
         },
+        exposeFields: true,
       },
     },
     children: [
@@ -156,20 +180,12 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                 type: "inline",
                 children: [
                   {
-                    id: "filter-bar",
+                    id: "period-toggle",
                     kind: "component",
-                    type: "os-filter-bar",
+                    type: "os-period-toggle",
                     props: {
-                      filters: [
-                        {
-                          id: "period",
-                          type: "select",
-                          label: "Period",
-                          searchParam: "period",
-                          options: ["1D", "1W", "1M", "1Y"],
-                          defaultValue: "1M",
-                        },
-                      ],
+                      paramName: "period",
+                      options: ["1D", "1W", "1M", "1Y"],
                     },
                   },
                 ],
@@ -193,43 +209,127 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                     id: "kpi-total-sales",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Total Sales", icon: "DollarSign", format: "currency" },
-                    data: { value: { ref: "overview", path: "total_sales.current" } },
+                    props: {
+                      title: "Total Sales",
+                      icon: "DollarSign",
+                      format: "currency",
+                    },
+                    data: {
+                      value: { ref: "overview", path: "total_sales.current" },
+                      previousValue: {
+                        ref: "overview",
+                        path: "total_sales.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                   {
                     id: "kpi-total-orders",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Total Orders", icon: "ShoppingBag", format: "number" },
-                    data: { value: { ref: "overview", path: "total_orders.current" } },
+                    props: {
+                      title: "Total Orders",
+                      icon: "ShoppingBag",
+                      format: "number",
+                    },
+                    data: {
+                      value: { ref: "overview", path: "total_orders.current" },
+                      previousValue: {
+                        ref: "overview",
+                        path: "total_orders.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                   {
                     id: "kpi-customer-growth",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Customer Growth", icon: "Users", format: "number" },
-                    data: { value: { ref: "overview", path: "customer_growth.current" } },
+                    props: {
+                      title: "Customer Growth",
+                      icon: "Users",
+                      format: "number",
+                    },
+                    data: {
+                      value: {
+                        ref: "overview",
+                        path: "customer_growth.current",
+                      },
+                      previousValue: {
+                        ref: "overview",
+                        path: "customer_growth.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                   {
                     id: "kpi-average-order",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Average Order", icon: "ReceiptText", format: "currency" },
-                    data: { value: { ref: "aov", path: "aov" } },
+                    props: {
+                      title: "Average Order",
+                      icon: "ReceiptText",
+                      format: "currency",
+                    },
+                    // `value` stays the transform-pipeline-computed `aov`
+                    // (the deliberate proof that a KPI can come from raw
+                    // doctype rows + `transform`, not a bespoke source) -
+                    // `previousValue` borrows `overview`'s own
+                    // `average_order.previous` for the comparison, since
+                    // `aov`'s own request has no notion of a "previous
+                    // period" and computes the exact same
+                    // sum(grand_total)/count as `overview` does.
+                    data: {
+                      value: { ref: "aov", path: "aov" },
+                      previousValue: {
+                        ref: "overview",
+                        path: "average_order.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                   {
                     id: "kpi-return-requests",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Return Requests", icon: "RotateCcw", format: "number", trendPolarity: "negative" },
-                    data: { value: { ref: "overview", path: "return_requests.current" } },
+                    props: {
+                      title: "Return Requests",
+                      icon: "RotateCcw",
+                      format: "number",
+                      trendPolarity: "negative",
+                    },
+                    data: {
+                      value: {
+                        ref: "overview",
+                        path: "return_requests.current",
+                      },
+                      previousValue: {
+                        ref: "overview",
+                        path: "return_requests.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                   {
                     id: "kpi-stock-accuracy",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Stock Accuracy", icon: "PackageCheck", format: "percent" },
-                    data: { value: { ref: "overview", path: "stock_accuracy.current" } },
+                    props: {
+                      title: "Stock Accuracy",
+                      icon: "PackageCheck",
+                      format: "percent",
+                    },
+                    data: {
+                      value: {
+                        ref: "overview",
+                        path: "stock_accuracy.current",
+                      },
+                      previousValue: {
+                        ref: "overview",
+                        path: "stock_accuracy.previous",
+                      },
+                      trendLabel: { ref: "overview", path: "period" },
+                    },
                   },
                 ],
               },
@@ -240,10 +340,13 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                 layout: { span: { xl: 7 } },
                 props: {
                   title: "Sales Overview",
-                  subtitle: "Revenue by month, computed from Sales Order rows via the generic transform pipeline.",
+                  subtitle:
+                    "Revenue by month, computed from Sales Order rows via the generic transform pipeline.",
                   x: "key",
                   legend: true,
-                  series: [{ field: "revenue", label: "Revenue", type: "area" }],
+                  series: [
+                    { field: "revenue", label: "Revenue", type: "area" },
+                  ],
                 },
                 data: { rows: { ref: "salesByMonth", path: "rows" } },
               },
@@ -262,13 +365,27 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                 layout: { span: { xl: 6 } },
                 props: {
                   title: "Top Products",
+                  searchable: false,
+                  filterable: false,
+                  columnVisibility: false,
+                  selectable: false,
                   paginated: false,
                   emptyMessage: "No sales in this period.",
                   columns: [
                     { field: "item_name", label: "Product" },
                     { field: "category", label: "Category" },
-                    { field: "share", label: "Share", format: "number", align: "right" },
-                    { field: "amount", label: "Sales", format: "currency", align: "right" },
+                    {
+                      field: "share",
+                      label: "Share",
+                      format: "number",
+                      align: "right",
+                    },
+                    {
+                      field: "amount",
+                      label: "Sales",
+                      format: "currency",
+                      align: "right",
+                    },
                   ],
                 },
                 data: { rows: { ref: "topProducts", path: "products" } },
@@ -284,21 +401,33 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                     id: "kpi-in-stock",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "In Stock", icon: "PackageCheck", format: "number" },
+                    props: {
+                      title: "In Stock",
+                      icon: "PackageCheck",
+                      format: "number",
+                    },
                     data: { value: { ref: "stockMix", path: "in_stock" } },
                   },
                   {
                     id: "kpi-low-stock",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Low Stock", icon: "Package", format: "number" },
+                    props: {
+                      title: "Low Stock",
+                      icon: "Package",
+                      format: "number",
+                    },
                     data: { value: { ref: "stockMix", path: "low_stock" } },
                   },
                   {
                     id: "kpi-out-of-stock",
                     kind: "component",
                     type: "os-kpi",
-                    props: { title: "Out of Stock", icon: "Package", format: "number" },
+                    props: {
+                      title: "Out of Stock",
+                      icon: "Package",
+                      format: "number",
+                    },
                     data: { value: { ref: "stockMix", path: "out_of_stock" } },
                   },
                 ],
@@ -310,45 +439,86 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
             kind: "component",
             type: "os-data-table",
             props: {
-              title: "Recent Orders",
-              subtitle: "View your recent orders",
               rowId: "name",
+              searchable: true,
+              searchPlaceholder: "Search Recent Orders...",
+              searchFields: ["name", "customer"],
+              searchParam: "orders_search",
+              columnVisibility: true,
+              minVisibleColumns: 5,
+              selectable: true,
+              actions: [
+                {
+                  items: [
+                    {
+                      label: "View",
+                      action: {
+                        type: "navigate",
+                        url: "/os/sales/orders/{name}",
+                      },
+                    },
+                    { label: "Edit", action: { type: "edit" } },
+                  ],
+                },
+                {
+                  items: [
+                    {
+                      label: "Delete",
+                      tone: "destructive",
+                      action: { type: "delete" },
+                    },
+                  ],
+                },
+              ],
+              selectionActions: [
+                {
+                  items: [{ label: "Edit", action: { type: "edit" } }],
+                },
+                {
+                  items: [
+                    {
+                      label: "Delete",
+                      tone: "destructive",
+                      action: { type: "delete" },
+                    },
+                  ],
+                },
+              ],
+              paginated: true,
               pageParam: "orders_page",
+              pageSize: 10,
+              pagination: { page: 1, pageSize: 10, hasMore: false },
               pageSizeParam: "orders_page_size",
               sortParam: "orders_sort",
-              searchable: true,
-              searchParam: "orders_search",
-              searchPlaceholder: "Search orders...",
-              columnVisibility: true,
               emptyMessage: "No orders found.",
               columns: [
-                { field: "name", label: "Order" },
+                { field: "name", label: "Order", compulsory: true },
                 { field: "customer", label: "Customer" },
                 {
                   field: "status",
                   label: "Status",
                   format: "badge",
                   badgeCategory: "sales",
-                  filterable: true,
-                  filterParam: "orders_filter_status",
-                  filterOptions: [
-                    "Draft",
-                    "To Deliver and Bill",
-                    "To Bill",
-                    "To Deliver",
-                    "Completed",
-                    "Cancelled",
-                    "Closed",
-                    "On Hold",
-                  ],
                 },
-                { field: "transaction_date", label: "Date", format: "date", sortable: true },
-                { field: "grand_total", label: "Total", format: "currency", align: "right", sortable: true },
+                {
+                  field: "transaction_date",
+                  label: "Date",
+                  format: "date",
+                  sortable: true,
+                },
+                {
+                  field: "grand_total",
+                  label: "Total",
+                  format: "currency",
+                  sortable: true,
+                  textStyle: ["semibold"],
+                },
               ],
             },
             data: {
-              rows: { ref: "recentOrders", path: "rows" },
-              pagination: { ref: "recentOrders", path: "pagination" },
+              rows: { ref: "orders", path: "rows" },
+              pagination: { ref: "orders", path: "pagination" },
+              fields: { ref: "orders", path: "fields" },
             },
           },
         ],
@@ -379,11 +549,20 @@ const baseSidebarGroups: SidebarNavGroupData[] = [
   {
     id: "os",
     label: "OS",
-    items: [{ id: "ask-alaiy", title: "Ask Alaiy", url: "/os/ask-alaiy", icon: "sparkles" }],
+    items: [
+      {
+        id: "ask-alaiy",
+        title: "Ask Alaiy",
+        url: "/os/ask-alaiy",
+        icon: "sparkles",
+      },
+    ],
   },
 ];
 
-function contributionToItemData(item: NavContribution["items"][number]): SidebarNavItemData {
+function contributionToItemData(
+  item: NavContribution["items"][number],
+): SidebarNavItemData {
   // `NavMainItem` is a union of a link and a parent; a parent's `subItems`
   // is a required array (an empty one is still truthy), so testing for
   // `url` (present only on the link variant) is what narrows correctly.
@@ -429,7 +608,10 @@ function contributionToItemData(item: NavContribution["items"][number]): Sidebar
 export function buildCodeDefinedSidebar(): SidebarNavGroupData[] {
   if (contributedNav.length === 0) return baseSidebarGroups;
 
-  const merged = baseSidebarGroups.map((group) => ({ ...group, items: [...group.items] }));
+  const merged = baseSidebarGroups.map((group) => ({
+    ...group,
+    items: [...group.items],
+  }));
 
   for (const contribution of contributedNav) {
     let target = merged.find((group) => group.label === contribution.group);
@@ -445,7 +627,9 @@ export function buildCodeDefinedSidebar(): SidebarNavGroupData[] {
     for (const rawItem of contribution.items) {
       const item = contributionToItemData(rawItem);
       if (isConnectorsGroup && !item.icon) item.icon = "plug";
-      const existing = target.items.findIndex((candidate) => candidate.id === item.id);
+      const existing = target.items.findIndex(
+        (candidate) => candidate.id === item.id,
+      );
       if (existing === -1) target.items.push(item);
       else target.items[existing] = item;
     }

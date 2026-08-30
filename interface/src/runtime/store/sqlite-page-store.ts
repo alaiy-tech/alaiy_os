@@ -99,11 +99,22 @@ const SEED_PAGE_ICONS: Record<string, string> = {
  * gets a sidebar store bound to that same database instead of silently
  * falling back to the real on-disk file's singleton. */
 export function ensureSeeded(db: DatabaseSync, dbPath: string = DB_PATH): void {
-  const row = db.prepare("SELECT COUNT(*) as count FROM ui_pages").get() as {
-    count: number;
-  };
-  if (row.count === 0) {
-    for (const page of SEED_PAGES) upsertPage(db, page);
+  const existing = db
+    .prepare("SELECT id, definition_json FROM ui_pages")
+    .all() as Array<{ id: string; definition_json: string }>;
+
+  for (const page of SEED_PAGES) {
+    const current = existing.find((row) => row.id === page.id);
+    // Reseeds whenever the stored row doesn't match `seed.ts` verbatim (not
+    // just when it's outright invalid) - an edit to a seed page's `data`/
+    // `children` would otherwise never reach an already-seeded database,
+    // silently drifting from the source of truth until a manual reseed.
+    const needsRepair =
+      !current || current.definition_json !== JSON.stringify(page.definition);
+
+    if (needsRepair) {
+      upsertPage(db, page);
+    }
   }
 
   const sidebarStore = getSidebarStore(dbPath);
