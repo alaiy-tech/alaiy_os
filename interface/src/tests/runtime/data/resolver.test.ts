@@ -208,7 +208,6 @@ describe("resolvePageData - query state (page/sort/search/filter)", () => {
           pagination: { pageSize: 10 },
           sort: { allowedFields: ["supplier_name", "name"] },
           search: { fields: ["supplier_name", "name"] },
-          filters: [{ field: "country", operator: "like" }],
         },
       },
     });
@@ -253,13 +252,6 @@ describe("resolvePageData - query state (page/sort/search/filter)", () => {
     ]);
   });
 
-  it("a name_filter_<field> value merges into filters, wildcarded for a like operator", async () => {
-    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
-    await suppliersPage({ suppliers_filter_country: "india" });
-    const filters = JSON.parse(queryOf(String(frappeFetch.mock.calls[0][0])).get("filters") ?? "[]");
-    expect(filters).toEqual([["country", "like", "%india%"]]);
-  });
-
   it("two independent named entries keep independent page/sort/search state", async () => {
     frappeFetch.mockImplementation(async (path: string) => {
       const isOrders = path.includes("Sales%20Order");
@@ -300,6 +292,108 @@ describe("resolvePageData - query state (page/sort/search/filter)", () => {
     });
     expect(data["page-data:suppliers"]).toEqual({ count: 5 });
     expect(String(frappeFetch.mock.calls[0][0])).not.toContain("filters");
+  });
+});
+
+describe("resolvePageData - dynamic per-field filters (query.filters: true)", () => {
+  beforeEach(() => {
+    frappeFetch.mockReset();
+  });
+
+  const COUNTRY_FIELD = {
+    fieldname: "country",
+    label: "Country",
+    fieldtype: "Data",
+    read_only: false,
+    unique: false,
+    permlevel: 0,
+    in_list_view: true,
+  };
+
+  function suppliersFilterPage(
+    searchParams: Record<string, string | string[] | undefined>,
+    fields: (typeof COUNTRY_FIELD)[] = [COUNTRY_FIELD],
+  ) {
+    frappeFetch.mockImplementation(async (path: string) => {
+      if (path.includes("get_doctype_fields")) {
+        return jsonResponse({ message: { fields } });
+      }
+      return jsonResponse({ data: [] });
+    });
+
+    const definition = pageWithData({
+      suppliers: {
+        request: {
+          type: "frappe",
+          operation: "list",
+          doctype: "Supplier",
+          params: { fields: ["name", "supplier_name", "country"], pageSize: 10 },
+        },
+        query: { pagination: { pageSize: 10 }, filters: true },
+        exposeFields: true,
+      },
+    });
+    return resolvePageData(definition, { searchParams });
+  }
+
+  function listCallFilters(): unknown[] {
+    const listCall = frappeFetch.mock.calls.find(
+      (c) => !String(c[0]).includes("get_doctype_fields"),
+    );
+    return JSON.parse(queryOf(String(listCall?.[0])).get("filters") ?? "[]");
+  }
+
+  it("a name_filter_<field> value merges into filters, defaulting to '='", async () => {
+    await suppliersFilterPage({ suppliers_filter_country: "india" });
+    expect(listCallFilters()).toEqual([["country", "=", "india"]]);
+  });
+
+  it("a valid name_filter_<field>_op picks that operator", async () => {
+    await suppliersFilterPage({
+      suppliers_filter_country: "india",
+      suppliers_filter_country_op: "!=",
+    });
+    expect(listCallFilters()).toEqual([["country", "!=", "india"]]);
+  });
+
+  it("an unsafe operator (e.g. 'like', or one the client can't even produce) falls back to '='", async () => {
+    await suppliersFilterPage({
+      suppliers_filter_country: "india",
+      suppliers_filter_country_op: "like",
+    });
+    expect(listCallFilters()).toEqual([["country", "=", "india"]]);
+  });
+
+  it("'in'/'not in' split the value on commas", async () => {
+    await suppliersFilterPage({
+      suppliers_filter_country: "india, nepal ,bhutan",
+      suppliers_filter_country_op: "in",
+    });
+    expect(listCallFilters()).toEqual([["country", "in", ["india", "nepal", "bhutan"]]]);
+  });
+
+  it("a field not in the doctype's own fetched field list is ignored, even if present in the URL", async () => {
+    await suppliersFilterPage({ suppliers_filter_secret_field: "x" }, [COUNTRY_FIELD]);
+    expect(listCallFilters()).toEqual([]);
+  });
+
+  it("query.filters: false (or absent) never reads filter params, even with exposeFields", async () => {
+    frappeFetch.mockResolvedValue(jsonResponse({ data: [] }));
+    const definition = pageWithData({
+      suppliers: {
+        request: {
+          type: "frappe",
+          operation: "list",
+          doctype: "Supplier",
+          params: { fields: ["name", "country"], pageSize: 10 },
+        },
+        query: { pagination: { pageSize: 10 } },
+        exposeFields: true,
+      },
+    });
+
+    await resolvePageData(definition, { searchParams: { suppliers_filter_country: "india" } });
+    expect(listCallFilters()).toEqual([]);
   });
 });
 

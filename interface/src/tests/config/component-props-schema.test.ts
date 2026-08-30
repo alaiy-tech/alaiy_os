@@ -24,7 +24,6 @@ describe("component-props-schema", () => {
         icon: "DollarSign",
         format: "currency",
         trendPolarity: "negative",
-        borderTone: "success",
       });
       expect(result.success).toBe(true);
     });
