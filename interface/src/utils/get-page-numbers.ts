@@ -1,8 +1,8 @@
 /** Which page-number links to show around the current page - always the
  * current page plus one neighbour on each side, clamped to the real range,
- * so the caller knows when to render an ellipsis on either end. Shared by
- * every table with a known total page count (`PaginationFooter`'s local
- * branch, `UsersTable`). */
+ * so the caller knows when to render an ellipsis on either end. Used by
+ * `OsDataTable`'s own local (known-total) pagination branch
+ * (`components/registry/data-table/data-table.tsx`). */
 export function getPageNumbers(currentPage: number, pageCount: number): number[] {
   if (pageCount <= 3) {
     return Array.from({ length: pageCount }, (_, index) => index + 1);

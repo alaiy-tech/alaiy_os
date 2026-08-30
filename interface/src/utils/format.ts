@@ -72,3 +72,26 @@ export function formatDateTime(value: string | null | undefined): string {
 
   return format(new Date(year, month - 1, day, hour, minute, second), "d MMM yyyy, HH:mm:ss");
 }
+
+/** A field's value as text, decided by its Frappe fieldtype alone - no
+ * per-field special-casing, so any doctype-meta-driven column (the settings
+ * Logs table, the Users table's dynamically-added extra columns) can render
+ * a value it knows nothing else about beyond its declared fieldtype. */
+export function formatFieldValue(value: unknown, fieldtype: string): string {
+  if (value === null || value === undefined || value === "") return EM_DASH;
+
+  switch (fieldtype) {
+    case "Datetime":
+      return formatDateTime(String(value));
+    case "Date":
+      return formatDate(String(value));
+    case "Check":
+      return value ? "Yes" : "No";
+    case "Int":
+    case "Float":
+    case "Percent":
+      return formatQty(Number(value));
+    default:
+      return String(value);
+  }
+}
