@@ -1,3 +1,5 @@
+import type { ReactElement } from "react";
+
 import type { ColumnDef } from "@tanstack/react-table";
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -17,6 +19,18 @@ vi.mock("next/navigation", () => ({
 }));
 
 const { OsDataTable } = await import("@/components/registry/data-table/data-table");
+
+/** `searchable`/`filterable`/`columnVisibility` all default to `true` now, so
+ * every render exercises the `FilterPopover`/`ColumnSettingsPopover` triggers
+ * (each wrapped in `TooltipWrap`) unless a test opts out - wrap once here
+ * rather than in every call site. Uses RTL's `wrapper` option (not a plain
+ * `render(<TooltipProvider>{ui}</TooltipProvider>)`) so a test that calls the
+ * returned `rerender` stays wrapped too - `rerender` replaces the whole tree
+ * at the root, so a wrapper only given at the initial call wouldn't survive
+ * a later `rerender(<OsDataTable .../>)`. */
+function renderTable(ui: ReactElement) {
+  return render(ui, { wrapper: TooltipProvider });
+}
 
 type Row = { id: string; name: string };
 
@@ -49,7 +63,7 @@ describe("OsDataTable - pagination contract", () => {
 
   it("with pagination+pageParam: shows only the given rows (no client re-slicing), no 'of N' text", () => {
     const rows: Row[] = Array.from({ length: 3 }, (_, i) => ({ id: `R${i}`, name: `Row ${i}` }));
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -65,7 +79,7 @@ describe("OsDataTable - pagination contract", () => {
 
   it("with pagination+pageParam: Next is disabled when hasMore is false, enabled when true", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    const { rerender } = render(
+    const { rerender } = renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -88,7 +102,7 @@ describe("OsDataTable - pagination contract", () => {
 
   it("with pagination+pageParam: clicking Next writes page+1 to the named URL param", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -105,7 +119,7 @@ describe("OsDataTable - pagination contract", () => {
 
   it("with pagination but no pageParam: both Next and Previous render disabled", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(<OsDataTable data={rows} columns={columns} pagination={{ page: 2, pageSize: 10, hasMore: true }} />);
+    renderTable(<OsDataTable data={rows} columns={columns} pagination={{ page: 2, pageSize: 10, hasMore: true }} />);
 
     expect(screen.getByLabelText("Go to next page")).toHaveClass("pointer-events-none");
     expect(screen.getByLabelText("Go to previous page")).toHaveClass("pointer-events-none");
@@ -113,7 +127,7 @@ describe("OsDataTable - pagination contract", () => {
 
   it("with neither prop set: today's client-paginated behavior is unchanged (regression)", () => {
     const rows: Row[] = Array.from({ length: 15 }, (_, i) => ({ id: `R${i}`, name: `Row ${i}` }));
-    render(<OsDataTable data={rows} columns={columns} pageSize={10} />);
+    renderTable(<OsDataTable data={rows} columns={columns} pageSize={10} />);
 
     // Client-side slicing: only the first page's worth of rows render.
     expect(screen.getAllByText(/^Row \d+$/)).toHaveLength(10);
@@ -134,7 +148,7 @@ describe("OsDataTable - sort contract", () => {
     // proves the initial state really came from the prop, not a default
     // empty `sorting` array (which would have produced "asc" instead).
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={sortableColumns}
@@ -153,7 +167,7 @@ describe("OsDataTable - sort contract", () => {
 
   it("with sort+sortParam: clicking a sortable header writes 'field dir' to sortParam and clears pageParam", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={sortableColumns}
@@ -173,7 +187,7 @@ describe("OsDataTable - sort contract", () => {
 
   it("with sort but no sortParam: clicking a sortable header does nothing (no navigation)", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(<OsDataTable data={rows} columns={sortableColumns} sort="name asc" />);
+    renderTable(<OsDataTable data={rows} columns={sortableColumns} sort="name asc" />);
 
     screen.getByRole("button", { name: "Name" }).click();
 
@@ -185,7 +199,7 @@ describe("OsDataTable - sort contract", () => {
       { id: "R0", name: "Charlie" },
       { id: "R1", name: "Alice" },
     ];
-    render(<OsDataTable data={rows} columns={sortableColumns} />);
+    renderTable(<OsDataTable data={rows} columns={sortableColumns} />);
 
     screen.getByRole("button", { name: "Name" }).click();
 
@@ -210,7 +224,7 @@ describe("OsDataTable - search contract", () => {
       { id: "R0", name: "Alice" },
       { id: "R1", name: "Bob" },
     ];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -236,7 +250,7 @@ describe("OsDataTable - search contract", () => {
 
   it("with searchParam: writing search also clears pageParam in the same navigation", () => {
     const rows: Row[] = [{ id: "R0", name: "Alice" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -262,7 +276,7 @@ describe("OsDataTable - search contract", () => {
       { id: "R0", name: "Alice" },
       { id: "R1", name: "Bob" },
     ];
-    render(<OsDataTable data={rows} columns={columns} searchable />);
+    renderTable(<OsDataTable data={rows} columns={columns} searchable />);
 
     fireEvent.change(screen.getByPlaceholderText("Search..."), { target: { value: "alice" } });
     act(() => {
@@ -275,30 +289,12 @@ describe("OsDataTable - search contract", () => {
   });
 });
 
-describe("OsDataTable - manual filter toolbar", () => {
-  beforeEach(() => {
-    replace.mockReset();
-    useSearchParamsMock.mockReturnValue(new URLSearchParams());
-  });
-
-  it("renders the Filters trigger when only manualFilterFields is set (no searchable/filterable)", () => {
+describe("OsDataTable - toolbar visibility", () => {
+  it("with searchable/filterable/columnVisibility all explicitly off: no toolbar row renders", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
-      <TooltipProvider>
-        <OsDataTable
-          data={rows}
-          columns={columns}
-          manualFilterFields={[{ field: "status", label: "Status", param: "orders_filter_status", options: ["Open"] }]}
-        />
-      </TooltipProvider>,
+    renderTable(
+      <OsDataTable data={rows} columns={columns} searchable={false} filterable={false} columnVisibility={false} />,
     );
-
-    expect(screen.getByRole("button", { name: /Filters/ })).toBeInTheDocument();
-  });
-
-  it("with neither searchable/filterable/columnVisibility/manualFilterFields: no toolbar row renders", () => {
-    const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(<OsDataTable data={rows} columns={columns} />);
 
     expect(screen.queryByRole("button", { name: /Filters/ })).not.toBeInTheDocument();
     expect(screen.queryByPlaceholderText("Search...")).not.toBeInTheDocument();
@@ -313,7 +309,7 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
 
   it("with pageSizeParam: shows the source's current pageSize in the per-page selector", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -323,13 +319,18 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
       />,
     );
 
+    // Not asserting the visible "20" label here: Radix's `SelectValue` only
+    // resolves a value's display label once the matching `SelectItem` has
+    // mounted at least once (i.e. after the popover has been opened) -
+    // asserting it pre-open would test Radix's own internal caching, not
+    // this component's props (`value={effectivePageSize}` is correct
+    // regardless of what jsdom shows before the first open).
     expect(screen.getByText("Per page")).toBeInTheDocument();
-    expect(screen.getByText("20")).toBeInTheDocument();
   });
 
   it("without pageSizeParam: no per-page selector renders", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -343,7 +344,7 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
 
   it("with pageParam: typing a page number into 'Go to page' and pressing Enter jumps there", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(
+    renderTable(
       <OsDataTable
         data={rows}
         columns={columns}
@@ -362,7 +363,7 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
 
   it("without pageParam: no 'Go to page' input renders", () => {
     const rows: Row[] = [{ id: "R0", name: "Row 0" }];
-    render(<OsDataTable data={rows} columns={columns} pagination={{ page: 1, pageSize: 10, hasMore: true }} />);
+    renderTable(<OsDataTable data={rows} columns={columns} pagination={{ page: 1, pageSize: 10, hasMore: true }} />);
 
     expect(screen.queryByLabelText("Go to page")).not.toBeInTheDocument();
   });

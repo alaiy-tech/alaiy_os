@@ -72,4 +72,18 @@ describe("useUrlParam", () => {
     result.current.setValue("supplier_name asc");
     expect(replace).not.toHaveBeenCalled();
   });
+
+  it("setValue with the param's current value is a no-op, even with resetParams set", () => {
+    // Regression: a caller whose effect re-fires for an unrelated reason
+    // (e.g. a debounced search effect re-running because its own setter is
+    // a fresh closure every render) must not delete resetParams (typically
+    // a table's own page number) just because it called setValue again with
+    // nothing actually changed.
+    useSearchParamsMock.mockReturnValue(new URLSearchParams("suppliers_page=3"));
+    const { result } = renderHook(() => useUrlParam("suppliers_sort", ["suppliers_page"]));
+
+    result.current.setValue(null);
+
+    expect(replace).not.toHaveBeenCalled();
+  });
 });
