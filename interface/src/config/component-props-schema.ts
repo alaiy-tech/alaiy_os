@@ -2,7 +2,6 @@ import { z } from "zod";
 
 import { KPI_BORDER_TONES } from "@/config/kpi-classes";
 import { KPI_ICON_NAMES } from "@/config/kpi-icons";
-import { PERIODS } from "@/constants/list";
 import { ERPNEXT_BADGE_CATEGORIES } from "@/utils/get-badge-style";
 
 /**
@@ -39,6 +38,23 @@ const OS_CARD_PROPS_SCHEMA = z
   .partial()
   .strict();
 
+const DYNAMIC_BADGE_PROPS_SCHEMA = z
+  .object({
+    content: z.string(),
+    category: z.enum(ERPNEXT_BADGE_CATEGORIES),
+    variant: z.enum([
+      "default",
+      "secondary",
+      "destructive",
+      "outline",
+      "ghost",
+      "link",
+    ]),
+    className: z.string(),
+  })
+  .partial()
+  .strict();
+
 const OS_KPI_PROPS_SCHEMA = z
   .object({
     title: z.string(),
@@ -63,64 +79,161 @@ const COLUMN_SPEC_SCHEMA = z
     format: z.enum(["text", "number", "currency", "date", "badge"]),
     align: z.enum(["left", "right", "center"]),
     sortable: z.boolean(),
-    filterable: z.boolean(),
-    filterOptions: z.array(z.string()),
     badgeCategory: z.enum(ERPNEXT_BADGE_CATEGORIES),
-    // Marks this column's filter as server-driven (see docs/UI_RUNTIME.md's
-    // "Generic List Query State") - only meaningful alongside
-    // `filterable: true`.
-    filterParam: z.string(),
+    // Can never be removed via the column picker, regardless of how many
+    // columns are visible - see column-spec.tsx's `buildCompulsoryColumns`.
+    compulsory: z.boolean(),
+    // Cell values only, never the header - see column-spec.tsx's
+    // `textStyleClass`. `.min(1)`: an empty array has nothing to opt into,
+    // so it's rejected rather than silently accepted as a no-op.
+    textStyle: z
+      .array(z.enum(["bold", "italic", "underline", "medium", "semibold"]))
+      .min(1),
     width: z.number(),
   })
   .partial({
     format: true,
     align: true,
     sortable: true,
-    filterable: true,
-    filterOptions: true,
     badgeCategory: true,
-    filterParam: true,
+    compulsory: true,
+    textStyle: true,
     width: true,
   })
   .strict();
 
-const OS_DATA_TABLE_PROPS_SCHEMA = z
+const ROW_ACTION_SCHEMA = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("navigate"), url: z.string().min(1) }).strict(),
+  z.object({ type: z.literal("edit") }).strict(),
+  z.object({ type: z.literal("delete") }).strict(),
+]);
+
+const ROW_ACTION_ITEM_SCHEMA = z
   .object({
-    title: z.string(),
-    subtitle: z.string(),
-    columns: z.array(COLUMN_SPEC_SCHEMA),
-    rowId: z.string(),
-    currency: z.string(),
-    searchable: z.boolean(),
-    searchPlaceholder: z.string(),
-    columnVisibility: z.boolean(),
-    compulsoryColumns: z.array(z.string()),
-    minVisibleColumns: z.number(),
-    selectable: z.boolean(),
-    paginated: z.boolean(),
+    label: z.string().min(1),
+    tone: z.enum(["default", "destructive"]),
+    action: ROW_ACTION_SCHEMA,
+  })
+  .partial({ tone: true })
+  .strict();
+
+const ROW_ACTION_GROUP_SCHEMA = z
+  .object({
+    items: z.array(ROW_ACTION_ITEM_SCHEMA).min(1),
+  })
+  .strict();
+
+// The bulk "Actions (N)" button's own, narrower vocabulary - no "navigate"
+// (jumping to one URL doesn't mean anything for an arbitrary selected set).
+const BULK_ACTION_SCHEMA = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("edit") }).strict(),
+  z.object({ type: z.literal("delete") }).strict(),
+]);
+
+const BULK_ACTION_ITEM_SCHEMA = z
+  .object({
+    label: z.string().min(1),
+    tone: z.enum(["default", "destructive"]),
+    action: BULK_ACTION_SCHEMA,
+  })
+  .partial({ tone: true })
+  .strict();
+
+const BULK_ACTION_GROUP_SCHEMA = z
+  .object({
+    // Unlike a row-actions group, a bulk-actions group may carry its own
+    // label (`selection-actions.tsx`'s `DropdownMenuLabel`).
+    label: z.string(),
+    items: z.array(BULK_ACTION_ITEM_SCHEMA).min(1),
+  })
+  .partial({ label: true })
+  .strict();
+
+const TABLE_PAGINATION_SCHEMA = z
+  .object({
+    page: z.number(),
     pageSize: z.number(),
-    emptyMessage: z.string(),
-    // The URL search param this table's page number reads/writes when its
-    // `rows`/`pagination` are bound to a paginated source (e.g.
-    // "customers_page") - see docs/UI_RUNTIME.md's "Paginated Data Sources".
-    // No name here means Next/Previous render disabled, deliberately.
-    pageParam: z.string(),
-    // Same convention as `pageParam`, for sort instead of page number (e.g.
-    // "suppliers_sort") - see docs/UI_RUNTIME.md's "Generic List Query
-    // State". No name here means a sortable header click does nothing.
-    sortParam: z.string(),
-    // Same convention again, for the table's own search box - only
-    // meaningful alongside `searchable: true`. No name here means the search
-    // box filters only the in-memory `data` it was given (correct for a
-    // small/local table; incomplete for a paginated one).
-    searchParam: z.string(),
-    // Same convention again, for the per-page size selector - only
-    // meaningful alongside `pagination`/`pageParam`. No name here means no
-    // per-page selector renders.
-    pageSizeParam: z.string(),
+    hasMore: z.boolean(),
+    total: z.number(),
   })
   .partial()
   .strict();
+
+const OS_DATA_TABLE_PROPS_SCHEMA = z
+  .object({
+    title: z.string().optional(),
+    subtitle: z.string().optional(),
+    columns: z.array(COLUMN_SPEC_SCHEMA).optional(),
+    rowId: z.string().optional(),
+    currency: z.string().optional(),
+    searchable: z.boolean().default(true),
+    searchPlaceholder: z.string().optional(),
+    searchFields: z.array(z.string()).optional(),
+    searchParam: z.string().optional(),
+    filterable: z.boolean().default(true),
+    // Which resolved `fields` (the doctype's own field metadata - see
+    // `DataDefinition.exposeFields`) never show up in the filter/column
+    // popovers - e.g. a field already folded into another column's cell.
+    // `fields` itself is never a literal `props` value: it's a `data`
+    // binding (`{ ref: "<name>", path: "fields" }`), resolved the same way
+    // `rows`/`pagination` already are - see `runtime/data/resolver.ts`.
+    excludedFields: z.array(z.string()).optional(),
+    columnVisibility: z.boolean().default(true),
+    defaultColumnOrder: z.array(z.string()).optional(),
+    structuralColumnIds: z.array(z.string()).optional(),
+    minVisibleColumns: z.number().optional(),
+    selectable: z.boolean().default(true),
+    // A declarative "3 dots" actions column - see `row-actions.tsx`'s doc
+    // comment for the closed navigate/edit/delete vocabulary. Omitted means
+    // no actions column at all.
+    actions: z.array(ROW_ACTION_GROUP_SCHEMA).optional(),
+    // The bulk "Actions (N)" button, shown once a row is checkbox-selected -
+    // see `selection-actions.tsx`'s doc comment. Required whenever
+    // `selectable` is true (checked below) - a selectable table with nothing
+    // to do with a selection is half-finished, not a valid minimal config.
+    selectionActions: z.array(BULK_ACTION_GROUP_SCHEMA).optional(),
+    paginated: z.boolean().default(true),
+    // Client-mode-only: the table's own local page-slicing size, used only
+    // when `pagination`/`pageParam` are both absent. Defaults to 10
+    // (`OsDataTable`'s own default) when omitted entirely - a plain
+    // `paginated: true` with nothing else is already a complete, working
+    // config, so this is never required. Distinct from `pagination.pageSize`
+    // (the server-resolved size a manual/server-paginated table actually
+    // used) - the two are never both relevant at once.
+    pageSize: z.number().optional(),
+    pagination: TABLE_PAGINATION_SCHEMA.optional(),
+    pageParam: z.string().optional(),
+    pageSizeParam: z.string().optional(),
+    sort: z.string().optional(),
+    sortParam: z.string().optional(),
+    emptyMessage: z.string().optional(),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.searchable && !value.searchPlaceholder) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "searchPlaceholder is required when searchable is true.",
+        path: ["searchPlaceholder"],
+      });
+    }
+
+    if (value.columnVisibility && value.minVisibleColumns === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "minVisibleColumns is required when columnVisibility is true.",
+        path: ["minVisibleColumns"],
+      });
+    }
+
+    if (value.selectable && !value.selectionActions?.length) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "selectionActions is required when selectable is true.",
+        path: ["selectionActions"],
+      });
+    }
+  });
 
 const CHART_SERIES_SCHEMA = z
   .object({
@@ -171,20 +284,21 @@ const OS_FILTER_BAR_PROPS_SCHEMA = z
   .partial()
   .strict();
 
-const OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA = z
-  .object({
-    category: z.enum(ERPNEXT_BADGE_CATEGORIES),
-    content: z.string(),
-  })
-  .partial()
-  .strict();
+const OS_PAGE_DYNAMIC_BADGE_PROPS_SCHEMA = DYNAMIC_BADGE_PROPS_SCHEMA;
 
 const OS_PERIOD_TOGGLE_PROPS_SCHEMA = z
   .object({
     paramName: z.string(),
-    defaultPeriod: z.enum(PERIODS),
+    // The full, author-ordered button list - the *first* entry is the
+    // default (no separate `defaultPeriod`/`defaultValue` prop to keep in
+    // sync with it by hand). Not constrained to `PERIODS`: this is a
+    // generic button-group-driven-by-config toggle, not period-specific -
+    // whether a given set of codes means anything to the data it scopes is
+    // the author's responsibility (e.g. `/os`'s dashboard only understands
+    // 1D/1W/1M/1Y today - see `runtime/data/resolver.ts`'s `PERIOD_TO_DAYS`).
+    options: z.array(z.string()).min(1),
   })
-  .partial()
+  .partial({ paramName: true })
   .strict();
 
 export const COMPONENT_PROPS_SCHEMAS = {
