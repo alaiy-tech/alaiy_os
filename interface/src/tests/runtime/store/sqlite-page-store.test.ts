@@ -65,6 +65,33 @@ describe("SQLiteUIPageStore", () => {
     expect(getSidebarStore(":memory:")).not.toBe(getSidebarStore(":memory:"));
   });
 
+  it("repairs stale invalid seed rows instead of leaving the page invalid", async () => {
+    const db = new DatabaseSync(":memory:");
+    createSchema(db);
+    const now = new Date().toISOString();
+    db.prepare(
+      `INSERT INTO ui_pages (id, route, title, definition_json, metadata_json, is_enabled, version, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, 1, 1, ?, ?)`,
+    ).run(
+      "dashboard",
+      "/os",
+      "Dashboard",
+      JSON.stringify({ id: "broken-def", kind: "not-a-page" }),
+      now,
+      now,
+    );
+
+    const { ensureSeeded } = await import("@/runtime/store/sqlite-page-store");
+    ensureSeeded(db, ":memory:");
+
+    const row = db
+      .prepare("SELECT definition_json FROM ui_pages WHERE id = ?")
+      .get("dashboard") as { definition_json: string };
+    const page = JSON.parse(row.definition_json);
+    expect(page.kind).toBe("page");
+    expect(page.id).toBe("headless-dashboard");
+  });
+
   it("auto-seeding is idempotent - re-opening an already-seeded database doesn't duplicate rows", async () => {
     const db = new DatabaseSync(":memory:");
     createSchema(db);
