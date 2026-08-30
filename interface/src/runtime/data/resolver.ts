@@ -1,5 +1,9 @@
-import { ORDER_BY_PATTERN, parseOrderByFields } from "@/config/data-request-schema";
-import { PAGE_SIZE_OPTIONS } from "@/constants/list";
+import {
+  ORDER_BY_PATTERN,
+  parseOrderByFields,
+} from "@/config/data-request-schema";
+import { PAGE_SIZE_OPTIONS, PERIODS } from "@/constants/list";
+import type { DocFieldMeta } from "@/types/list";
 import type { DataDefinition } from "@/types/runtime/data-definition";
 import type { DataRequest, FrappeFilter } from "@/types/runtime/data-request";
 import type { DataSourceContext } from "@/types/runtime/data-source";
@@ -8,6 +12,7 @@ import type { UIPageDefinition } from "@/types/runtime/page";
 
 import { isComponentNode, isLayoutNode } from "../node";
 import { getDataSource } from "../registry/data-source-registry";
+import { fetchDoctypeFields } from "./fetch-doctype-fields";
 import { executeRequest } from "./frappe-request-executor";
 import { PAGE_DATA_PREFIX } from "./resolve-data-source";
 import { applyTransforms, toResolvedValue } from "./transform-engine";
@@ -22,27 +27,41 @@ function collectStringSources(node: UINode, collected: Set<string>): void {
     for (const ref of Object.values(node.data ?? {})) {
       if ("source" in ref) collected.add(ref.source);
     }
-    for (const child of node.children ?? []) collectStringSources(child, collected);
+    for (const child of node.children ?? [])
+      collectStringSources(child, collected);
   } else if (isLayoutNode(node)) {
     for (const child of node.children) collectStringSources(child, collected);
   }
 }
 
-const PERIOD_TO_DAYS: Record<string, number> = { "1D": 1, "1W": 7, "1M": 30, "1Y": 365 };
+const PERIOD_TO_DAYS: Record<string, number> = {
+  "1D": 1,
+  "1W": 7,
+  "1M": 30,
+  "1Y": 365,
+};
 
 /** Reads the site's one global period toggle (`?period=`, the same
  * convention `components/derived/list/period.ts`'s `readPeriod` and every
  * `os-period-toggle`/`os-filter-bar` period select already use) - not a new
- * per-definition concept. */
-function readGlobalPeriod(searchParams: DataSourceContext["searchParams"]): string {
+ * per-definition concept. Falls back to `PERIODS[0]` - `os-period-toggle`
+ * treats its first configured option as the default and never writes a
+ * `?period=` param for it (a clean URL at the default), so this fallback
+ * must resolve to the *same* value or the first server render would show
+ * data computed for one period while the toggle highlights another. */
+function readGlobalPeriod(
+  searchParams: DataSourceContext["searchParams"],
+): string {
   const raw = searchParams.period;
   const value = Array.isArray(raw) ? raw[0] : raw;
-  return value && value in PERIOD_TO_DAYS ? value : "1M";
+  return value && value in PERIOD_TO_DAYS ? value : PERIODS[0];
 }
 
 function periodStartDate(period: string): string {
   const days = PERIOD_TO_DAYS[period] ?? 30;
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
 }
 
 /** Substitutes the two recognised sentinels - `"$period"` (the raw period
@@ -56,7 +75,10 @@ function substituteSentinel(value: unknown, period: string): unknown {
   return value;
 }
 
-function substituteRequestSentinels(request: DataRequest, period: string): DataRequest {
+function substituteRequestSentinels(
+  request: DataRequest,
+  period: string,
+): DataRequest {
   if (request.operation === "list") {
     return {
       ...request,
@@ -64,7 +86,10 @@ function substituteRequestSentinels(request: DataRequest, period: string): DataR
         ...request.params,
         filters: request.params.filters?.map((filter) => ({
           ...filter,
-          value: substituteSentinel(filter.value, period) as FrappeFilter["value"],
+          value: substituteSentinel(
+            filter.value,
+            period,
+          ) as FrappeFilter["value"],
         })),
       },
     };
@@ -74,7 +99,10 @@ function substituteRequestSentinels(request: DataRequest, period: string): DataR
       ...request,
       args: request.args
         ? (Object.fromEntries(
-            Object.entries(request.args).map(([key, value]) => [key, substituteSentinel(value, period)]),
+            Object.entries(request.args).map(([key, value]) => [
+              key,
+              substituteSentinel(value, period),
+            ]),
           ) as Record<string, string | number | boolean | null>)
         : request.args,
     };
@@ -86,7 +114,10 @@ function substituteRequestSentinels(request: DataRequest, period: string): DataR
  * falls through to the request's own default. Only meaningful for a `list`
  * operation with `query.pagination` declared - a source needs a name to get
  * URL-addressable pagination at all. */
-function readNamedPage(searchParams: DataSourceContext["searchParams"], name: string): number | undefined {
+function readNamedPage(
+  searchParams: DataSourceContext["searchParams"],
+  name: string,
+): number | undefined {
   const raw = searchParams[`${name}_page`];
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (!value) return undefined;
@@ -99,12 +130,17 @@ function readNamedPage(searchParams: DataSourceContext["searchParams"], name: st
  * per-page `<Select>` offers), so an arbitrary URL-supplied number never
  * reaches Frappe as a page size. An invalid/missing value falls through to
  * the request's own static `params.pageSize`. */
-function readNamedPageSize(searchParams: DataSourceContext["searchParams"], name: string): number | undefined {
+function readNamedPageSize(
+  searchParams: DataSourceContext["searchParams"],
+  name: string,
+): number | undefined {
   const raw = searchParams[`${name}_page_size`];
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (!value) return undefined;
   const size = Number(value);
-  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(size) ? size : undefined;
+  return (PAGE_SIZE_OPTIONS as readonly number[]).includes(size)
+    ? size
+    : undefined;
 }
 
 /** Reads `` `?<name>_sort=` `` - the same `"fieldname asc|desc"` format
@@ -122,35 +158,84 @@ function readNamedSort(
   if (!value || !ORDER_BY_PATTERN.test(value)) return undefined;
 
   const allowedFields = new Set([...request.params.fields, "name"]);
-  return parseOrderByFields(value).every((field) => allowedFields.has(field)) ? value : undefined;
+  return parseOrderByFields(value).every((field) => allowedFields.has(field))
+    ? value
+    : undefined;
 }
 
-function readNamedSearch(searchParams: DataSourceContext["searchParams"], name: string): string | undefined {
+function readNamedSearch(
+  searchParams: DataSourceContext["searchParams"],
+  name: string,
+): string | undefined {
   const raw = searchParams[`${name}_search`];
   const value = Array.isArray(raw) ? raw[0] : raw;
   const trimmed = value?.trim();
   return trimmed || undefined;
 }
 
-/** Reads `` `?<name>_filter_<field>=` `` for each field `query.filters`
- * declares - the field name/operator are always author-declared, never
- * taken from the URL, so only the *value* is request-driven. `like`/
- * `not like` values are auto-wrapped in `%...%` (live end-user text, unlike
- * a request's own static filters, which are developer-authored literal
- * values). */
+/** The operator vocabulary a URL-supplied filter operator is checked
+ * against - the intersection of what the client's `FilterPopover` can
+ * actually produce (`types/list.ts`'s `FilterOperator` - no `between`, since
+ * a Frappe list filter has no matching single operator) and what a Frappe
+ * list filter accepts (`FrappeFilterOperator` - no `like`/`not like` here:
+ * unlike an author-written static filter, the *field* is already the
+ * request-driven part for this dynamic path, so substring-matching an
+ * unbounded field server-side is a wider risk than this opts into). An
+ * unrecognised/missing operator falls back to `"="`. */
+const SAFE_FILTER_OPERATORS = new Set<FrappeFilter["operator"]>([
+  "=",
+  "!=",
+  ">",
+  "<",
+  ">=",
+  "<=",
+  "in",
+  "not in",
+]);
+
+/** Reads `` `?<name>_filter_<field>=` `` (value) and
+ * `` `?<name>_filter_<field>_op=` `` (operator) for every field in `fields` -
+ * the doctype's own fetched field list (`exposeFields`, required whenever
+ * `query.filters` is true - see `data-definition-schema.ts`'s `.refine()`),
+ * which is the actual safety boundary here: a URL-supplied field name is
+ * only ever honoured if it's genuinely one of this doctype's own fields (the
+ * same permission-checked list `os-data-table`'s filter/column popovers
+ * already draw from), and a URL-supplied operator only if it's in
+ * `SAFE_FILTER_OPERATORS`. Both field *and* operator are request-driven here
+ * (unlike a `count`/static request filter) because a table's filter popover
+ * now lets a user pick any doctype field and any operator, not just one
+ * author-fixed operator per author-declared field. `in`/`not in` split the
+ * value on commas - the same convention `FilterPopover`'s own value input
+ * already uses. */
 function readNamedFilters(
   searchParams: DataSourceContext["searchParams"],
   name: string,
-  queryFilters: { field: string; operator: FrappeFilter["operator"] }[] | undefined,
+  fields: DocFieldMeta[],
 ): FrappeFilter[] {
-  return (queryFilters ?? []).flatMap((queryFilter): FrappeFilter[] => {
-    const raw = searchParams[`${name}_filter_${queryFilter.field}`];
+  return fields.flatMap((field): FrappeFilter[] => {
+    const raw = searchParams[`${name}_filter_${field.fieldname}`];
     const value = Array.isArray(raw) ? raw[0] : raw;
     const trimmed = value?.trim();
     if (!trimmed) return [];
 
-    const isWildcard = queryFilter.operator === "like" || queryFilter.operator === "not like";
-    return [{ field: queryFilter.field, operator: queryFilter.operator, value: isWildcard ? `%${trimmed}%` : trimmed }];
+    const rawOp = searchParams[`${name}_filter_${field.fieldname}_op`];
+    const opValue = Array.isArray(rawOp) ? rawOp[0] : rawOp;
+    const operator = (
+      opValue && SAFE_FILTER_OPERATORS.has(opValue as FrappeFilter["operator"])
+        ? opValue
+        : "="
+    ) as FrappeFilter["operator"];
+
+    if (operator === "in" || operator === "not in") {
+      const values = trimmed
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      return values.length
+        ? [{ field: field.fieldname, operator, value: values }]
+        : [];
+    }
+    return [{ field: field.fieldname, operator, value: trimmed }];
   });
 }
 
@@ -166,15 +251,35 @@ async function resolveDataDefinition(
   const period = readGlobalPeriod(context.searchParams);
   let request = substituteRequestSentinels(definition.request, period);
   let orFilters: FrappeFilter[] | undefined;
-  const paginate = Boolean(definition.query?.pagination) && request.operation === "list";
+  const paginate =
+    Boolean(definition.query?.pagination) && request.operation === "list";
+  const doctype = request.operation !== "method" ? request.doctype : undefined;
+
+  // `query.filters: true` needs the doctype's own field list *before* the
+  // request can be built - it's the safety boundary a URL-supplied filter
+  // field is checked against (see `readNamedFilters`). Fetched sequentially
+  // only in that case, and reused below rather than fetched twice;
+  // `exposeFields` alone (no `query.filters`) keeps the original
+  // fetch-in-parallel-with-the-request timing, since nothing needs it
+  // before building filters then.
+  const fieldsForFilters =
+    request.operation === "list" && definition.query?.filters && doctype
+      ? await fetchDoctypeFields(doctype)
+      : undefined;
 
   if (request.operation === "list" && definition.query) {
-    const page = readNamedPage(context.searchParams, name) ?? request.params.page ?? 1;
+    const page =
+      readNamedPage(context.searchParams, name) ?? request.params.page ?? 1;
     const pageSize = definition.query.pagination
-      ? (readNamedPageSize(context.searchParams, name) ?? request.params.pageSize)
+      ? (readNamedPageSize(context.searchParams, name) ??
+        request.params.pageSize)
       : request.params.pageSize;
-    const orderBy = readNamedSort(context.searchParams, name, request) ?? request.params.orderBy;
-    const dynamicFilters = readNamedFilters(context.searchParams, name, definition.query.filters);
+    const orderBy =
+      readNamedSort(context.searchParams, name, request) ??
+      request.params.orderBy;
+    const dynamicFilters = definition.query.filters
+      ? readNamedFilters(context.searchParams, name, fieldsForFilters ?? [])
+      : [];
     const searchTerm = readNamedSearch(context.searchParams, name);
     orFilters =
       searchTerm && definition.query.search
@@ -197,9 +302,19 @@ async function resolveDataDefinition(
     };
   }
 
-  const rawContext = await executeRequest(request, { orFilters, paginate });
+  const withTotal = Boolean(definition.query?.pagination?.withTotal);
+
+  const [rawContext, fields] = await Promise.all([
+    executeRequest(request, { orFilters, paginate, withTotal }),
+    fieldsForFilters !== undefined
+      ? Promise.resolve(fieldsForFilters)
+      : definition.exposeFields && doctype
+        ? fetchDoctypeFields(doctype)
+        : Promise.resolve(undefined),
+  ]);
   const transformed = applyTransforms(rawContext, definition.transform);
-  return toResolvedValue(transformed);
+  const resolved = toResolvedValue(transformed);
+  return fields ? { ...resolved, fields } : resolved;
 }
 
 async function resolveNamedData(
@@ -209,7 +324,10 @@ async function resolveNamedData(
   return Promise.all(
     Object.entries(data ?? {}).map(
       async ([name, definition]) =>
-        [`${PAGE_DATA_PREFIX}${name}`, await resolveDataDefinition(name, definition, context)] as const,
+        [
+          `${PAGE_DATA_PREFIX}${name}`,
+          await resolveDataDefinition(name, definition, context),
+        ] as const,
     ),
   );
 }
@@ -229,10 +347,15 @@ export async function resolvePageData(
   context: DataSourceContext,
 ): Promise<Record<string, unknown>> {
   const collected = new Set<string>();
-  for (const child of definition.children) collectStringSources(child, collected);
+  for (const child of definition.children)
+    collectStringSources(child, collected);
 
   const [registeredEntries, namedEntries] = await Promise.all([
-    Promise.all([...collected].map(async (id) => [id, await getDataSource(id)?.resolve(context)] as const)),
+    Promise.all(
+      [...collected].map(
+        async (id) => [id, await getDataSource(id)?.resolve(context)] as const,
+      ),
+    ),
     resolveNamedData(definition.data, context),
   ]);
 

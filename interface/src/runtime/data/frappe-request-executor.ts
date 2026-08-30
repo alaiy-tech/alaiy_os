@@ -6,7 +6,9 @@ import type { TransformContext } from "./transform-engine";
 /** Turns one `[field, operator, value]`-shaped filter list into Frappe's own
  * REST filter tuple shape. Shared by `list`/`count` operations so the
  * mapping can't drift between them. */
-function toFrappeFilterTuples(filters: FrappeFilter[] | undefined): Array<[string, string, FrappeFilter["value"]]> {
+function toFrappeFilterTuples(
+  filters: FrappeFilter[] | undefined,
+): Array<[string, string, FrappeFilter["value"]]> {
   return (filters ?? []).map((f) => [f.field, f.operator, f.value]);
 }
 
@@ -29,24 +31,77 @@ export function buildListRequestPath(
 
   const query = new URLSearchParams();
   query.set("fields", JSON.stringify(fields));
-  if (params.filters?.length) query.set("filters", JSON.stringify(toFrappeFilterTuples(params.filters)));
-  if (options.orFilters?.length) query.set("or_filters", JSON.stringify(toFrappeFilterTuples(options.orFilters)));
+  if (params.filters?.length)
+    query.set("filters", JSON.stringify(toFrappeFilterTuples(params.filters)));
+  if (options.orFilters?.length)
+    query.set(
+      "or_filters",
+      JSON.stringify(toFrappeFilterTuples(options.orFilters)),
+    );
   if (params.orderBy) query.set("order_by", params.orderBy);
   if (options.paginate) query.set("limit_start", String((page - 1) * pageSize));
-  query.set("limit_page_length", String(options.paginate ? pageSize + 1 : pageSize));
+  query.set(
+    "limit_page_length",
+    String(options.paginate ? pageSize + 1 : pageSize),
+  );
 
   return `/api/resource/${encodeURIComponent(doctype)}?${query.toString()}`;
 }
 
-function buildCountRequestPath(request: Extract<DataRequest, { operation: "count" }>): string {
+function buildCountRequestPath(
+  request: Extract<DataRequest, { operation: "count" }>,
+): string {
   const query = new URLSearchParams();
   query.set("doctype", request.doctype);
   if (request.params?.filters?.length)
-    query.set("filters", JSON.stringify(toFrappeFilterTuples(request.params.filters)));
+    query.set(
+      "filters",
+      JSON.stringify(toFrappeFilterTuples(request.params.filters)),
+    );
   return `/api/method/frappe.client.get_count?${query.toString()}`;
 }
 
-function buildMethodRequestPath(request: Extract<DataRequest, { operation: "method" }>): string {
+/** The total-row-count sibling of `buildListRequestPath`, for a `list`
+ * operation's `query.pagination.withTotal` - targets
+ * `frappe.desk.reportview.get_count` rather than `frappe.client.get_count`
+ * since only the former also accepts `or_filters` (needed so the total
+ * reflects an active `name_search` term the same way the paginated rows
+ * themselves do). */
+function buildTotalCountRequestPath(
+  request: Extract<DataRequest, { operation: "list" }>,
+  orFilters: FrappeFilter[] | undefined,
+): string {
+  const query = new URLSearchParams();
+  query.set("doctype", request.doctype);
+  query.set("fields", "[]");
+  query.set("distinct", "false");
+  if (request.params.filters?.length)
+    query.set(
+      "filters",
+      JSON.stringify(toFrappeFilterTuples(request.params.filters)),
+    );
+  if (orFilters?.length)
+    query.set("or_filters", JSON.stringify(toFrappeFilterTuples(orFilters)));
+  return `/api/method/frappe.desk.reportview.get_count?${query.toString()}`;
+}
+
+/** Fetches a real total row count for a paginated `list` request - one
+ * extra request, only made when `query.pagination.withTotal` opts in.
+ * Failure degrades to `undefined` (Prev/Next-only rendering), matching this
+ * module's own silent-null convention. */
+async function fetchTotalCount(
+  request: Extract<DataRequest, { operation: "list" }>,
+  orFilters: FrappeFilter[] | undefined,
+): Promise<number | undefined> {
+  const res = await frappeFetch(buildTotalCountRequestPath(request, orFilters));
+  if (!res.ok) return undefined;
+  const body = (await res.json()) as { message?: number };
+  return typeof body.message === "number" ? body.message : undefined;
+}
+
+function buildMethodRequestPath(
+  request: Extract<DataRequest, { operation: "method" }>,
+): string {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(request.args ?? {})) {
     if (value !== null && value !== undefined) query.set(key, String(value));
@@ -65,7 +120,11 @@ function buildMethodRequestPath(request: Extract<DataRequest, { operation: "meth
  */
 export async function executeRequest(
   request: DataRequest,
-  options: { orFilters?: FrappeFilter[]; paginate: boolean },
+  options: {
+    orFilters?: FrappeFilter[];
+    paginate: boolean;
+    withTotal?: boolean;
+  },
 ): Promise<TransformContext> {
   if (request.operation === "list") {
     const path = buildListRequestPath(request, options);
@@ -75,7 +134,11 @@ export async function executeRequest(
         ? {
             rows: [],
             computed: {
-              pagination: { page: request.params.page ?? 1, pageSize: request.params.pageSize, hasMore: false },
+              pagination: {
+                page: request.params.page ?? 1,
+                pageSize: request.params.pageSize,
+                hasMore: false,
+              },
             },
           }
         : { rows: [], computed: {} };
@@ -85,9 +148,19 @@ export async function executeRequest(
     if (!options.paginate) return { rows, computed: {} };
 
     const hasMore = rows.length > request.params.pageSize;
+    const total = options.withTotal
+      ? await fetchTotalCount(request, options.orFilters)
+      : undefined;
     return {
       rows: hasMore ? rows.slice(0, request.params.pageSize) : rows,
-      computed: { pagination: { page: request.params.page ?? 1, pageSize: request.params.pageSize, hasMore } },
+      computed: {
+        pagination: {
+          page: request.params.page ?? 1,
+          pageSize: request.params.pageSize,
+          hasMore,
+          ...(total !== undefined ? { total } : {}),
+        },
+      },
     };
   }
 

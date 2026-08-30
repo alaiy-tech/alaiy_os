@@ -167,6 +167,7 @@ export const baseComponentRegistry: ComponentRegistry = {
     capabilities: { movable: true, resizable: false },
     allowedParents: [...ANY_CONTAINER, "inline"],
     supportsChildren: false,
+    requiredFields: ["options"],
     propsSchema: COMPONENT_PROPS_SCHEMAS["os-period-toggle"],
   },
 };
