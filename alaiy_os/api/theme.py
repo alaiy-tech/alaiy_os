@@ -3,28 +3,15 @@ from frappe.utils.file_manager import save_file
 
 _LOGO_FIELD_BY_TYPE = {"square": "square_logo", "horizontal": "horizontal_logo"}
 
-# The real PNG file signature - checked against the actual bytes, not just the
-# filename extension, so a renamed .jpg/.svg can't slip through as ".png".
-_PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
-
-
-def _ensure_png(filename, content):
-	if not (filename or "").lower().endswith(".png"):
-		frappe.throw(frappe._("Only PNG files are allowed for the organisation logo."))
-	if not content.startswith(_PNG_MAGIC):
-		frappe.throw(frappe._("That file isn't a valid PNG image."))
-
 
 @frappe.whitelist()
 def upload_organisation_logo(logo_type):
 	"""Attaches an uploaded square/horizontal logo to the shared OS Theme
 	Settings singleton and saves it, so that doctype's own on_update hook
 	(_apply_logos) copies the file into the site's shared assets folder as
-	client-logo-square.png / client-logo-hor.png (plus logo-square.png /
-	icon.png / logo-hor.png for the Next.js frontend's own favicon/sidebar
-	fallback convention - see _apply_logos) - the exact mechanism the desk
-	Theme Settings form's own logo fields already use, so this endpoint and
-	that form can never drift out of sync on what the live logo is.
+	client-logo-square.png / client-logo-hor.png - the exact mechanism the
+	desk Theme Settings form's own logo fields already use, so this endpoint
+	and that form can never drift out of sync on what the live logo is.
 	"""
 	if logo_type not in _LOGO_FIELD_BY_TYPE:
 		frappe.throw(frappe._("Invalid logo type."))
@@ -35,11 +22,8 @@ def upload_organisation_logo(logo_type):
 	if not uploaded:
 		frappe.throw(frappe._("No file uploaded."))
 
-	content = uploaded.stream.read()
-	_ensure_png(uploaded.filename, content)
-
 	settings = frappe.get_single("OS Theme Settings")
-	file_doc = save_file(uploaded.filename, content, "OS Theme Settings", settings.name, is_private=0)
+	file_doc = save_file(uploaded.filename, uploaded.stream.read(), "OS Theme Settings", settings.name, is_private=0)
 	settings.set(_LOGO_FIELD_BY_TYPE[logo_type], file_doc.file_url)
 	settings.save(ignore_permissions=True)
 	frappe.db.commit()

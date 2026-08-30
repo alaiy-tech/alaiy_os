@@ -6,6 +6,13 @@ POST /api/method/alaiy_os.api.chat.delete_attachment -> {"deleted": "..."}
 POST /api/method/alaiy_os.api.chat.send_message    -> {"seq": n, "status": "Running"}
 GET  /api/method/alaiy_os.api.chat.get_messages    -> messages after a cursor + status
                                                      + the newest answer's follow-ups
+GET  /api/method/alaiy_os.api.chat.stream_messages -> the same feed as get_messages, pushed
+                                                     over SSE instead of polled (see chat/SSE_PLAN.md
+                                                     for why this isn't yet safe in production)
+GET  /api/method/alaiy_os.api.chat.preview_file    -> an xlsx/pptx/docx attachment
+                                                     parsed for the file panel
+                                                     (pdf/images/csv/text are read
+                                                     straight off the file URL)
 GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
@@ -32,10 +39,12 @@ Isolation is Frappe's, not ours: both DocTypes grant the `All` role only
 """
 
 import json
+import time
 
 import frappe
 from frappe.utils import cint
 from frappe.utils.file_manager import save_file
+from werkzeug.wrappers import Response
 
 # `mentions` is aliased because `send_message` already takes a parameter of that
 # name, exactly as it does for `attachments` — a bare import would be shadowed
@@ -70,11 +79,24 @@ def list_sessions(limit=50):
 
 
 @frappe.whitelist()
-def send_message(session, text=None, attachments=None, skill=None, screen=None, mentions=None):
+def send_message(
+	session,
+	text=None,
+	attachments=None,
+	skill=None,
+	skill_args=None,
+	screen=None,
+	mentions=None,
+):
 	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
 
 	An unknown skill throws here rather than on the worker, so the picker gets a
 	real error instead of a conversation that quietly answers the wrong thing.
+
+	`skill_args` is that skill's arguments, as an object or a JSON string — the
+	shape `list_skills` publishes as its `input_schema`. Validated against that
+	schema on this request, so a form can show the error against the field that
+	caused it. Omit it for a skill that takes none, which is most of them.
 
 	`mentions` is `[{kind, value}]` from `list_mentions` — the records the user
 	picked with `@`. Each is re-resolved server-side, so only `kind` and `value`
@@ -84,7 +106,13 @@ def send_message(session, text=None, attachments=None, skill=None, screen=None, 
 	# permission is the gate, since a chat can only reach what its owner can. It
 	# also validates every attachment name against that session.
 	seq = runner.start_turn(
-		session, text, attachments=attachments, skill=skill, screen=screen, mentions=mentions
+		session,
+		text,
+		attachments=attachments,
+		skill=skill,
+		skill_args=skill_args,
+		screen=screen,
+		mentions=mentions,
 	)
 	return {"seq": seq, "status": "Running"}
 
@@ -147,6 +175,263 @@ def upload_attachment(session):
 		"file_size": len(content),
 		"chars": len(text),
 	}
+
+
+#: One request's worth of spreadsheet. Not a cap on what is *viewable* — the
+#: panel pages through the sheet and `total_rows` says how far it goes — just a
+#: bound on how much rides in a single response.
+PREVIEW_PAGE_ROWS = 200
+PREVIEW_MAX_COLS = 40
+
+
+def _preview_file_doc(file_url):
+	"""The File behind a chip's URL, once the caller has proved they may read it.
+
+	`file_url` rather than an attachment id because that is what a chip
+	carries: uploads and generated artifacts denormalise onto the message with
+	only their URL (see `_present`), and an artifact has no `OS Chat
+	Attachment` row at all.
+
+	Permission comes from the chat the file hangs off. Both kinds are saved
+	against their `OS Chat Session` (`api/chat.upload_attachment` and
+	`chat/artifacts.py` both pass it to `save_file`), so reading that session as
+	the caller applies the same `if_owner` rule as every other endpoint here.
+	Anything not attached to a chat session is refused outright — this must
+	never become a way to read arbitrary files off the site.
+	"""
+	rows = frappe.get_all(
+		"File",
+		filters={"file_url": file_url},
+		fields=["name", "attached_to_doctype", "attached_to_name", "file_name"],
+		limit=1,
+	)
+	if not rows:
+		frappe.throw(frappe._("That file no longer exists."), frappe.DoesNotExistError)
+
+	meta = rows[0]
+	if meta.attached_to_doctype != "OS Chat Session" or not meta.attached_to_name:
+		raise frappe.PermissionError
+
+	# Raises if this user doesn't own the chat.
+	frappe.get_doc("OS Chat Session", meta.attached_to_name).check_permission("read")
+	return meta
+
+
+def _cell_text(value):
+	"""A cell as the panel should show it, not as Python repr()s it."""
+	if value is None:
+		return ""
+	if isinstance(value, bool):
+		# Before the int check: bool is a subclass of int.
+		return "TRUE" if value else "FALSE"
+	if isinstance(value, float) and value.is_integer():
+		# openpyxl hands back every number as a float, so a plain count would
+		# otherwise read as "42.0".
+		return str(int(value))
+	return str(value)
+
+
+def _preview_workbook(content, sheet_name, offset, limit):
+	from io import BytesIO
+
+	from openpyxl import load_workbook
+
+	# read_only keeps a large workbook off the heap; data_only returns the last
+	# computed value of a formula cell instead of the formula text, which is
+	# what someone looking at a report wants to see.
+	book = load_workbook(BytesIO(content), read_only=True, data_only=True)
+	try:
+		names = list(book.sheetnames)
+		active = sheet_name if sheet_name in names else names[0]
+		sheet = book[active]
+
+		table = []
+		seen = 0
+		for row in sheet.iter_rows(max_col=PREVIEW_MAX_COLS, values_only=True):
+			# A wholly blank row is padding, not data, and must not consume a
+			# slot in the window or the caller's paging would drift.
+			if all(cell is None for cell in row):
+				continue
+			seen += 1
+			if seen <= offset:
+				continue
+			if len(table) < limit:
+				table.append([_cell_text(cell) for cell in row])
+
+		# `max_col` pads every row out to the cap, so a three-column sheet comes
+		# back as three values and thirty-seven empty strings. Trim to the widest
+		# row that actually holds something.
+		width = max(
+			(len(r) - next((i for i, c in enumerate(reversed(r)) if c != ""), len(r)) for r in table),
+			default=0,
+		)
+
+		return {
+			"kind": "sheet",
+			"sheet": active,
+			"sheets": names,
+			"rows": [r[:width] for r in table],
+			"offset": offset,
+			"total_rows": seen,
+		}
+	finally:
+		# read_only mode holds the zip open until told otherwise.
+		book.close()
+
+
+def _preview_presentation(content, file_doc=None, session=None):
+	from io import BytesIO
+
+	from pptx import Presentation
+
+	deck = Presentation(BytesIO(content))
+	# The aspect the deck was authored at (our own writer sets 16:9; an uploaded
+	# 4:3 deck must not be stretched into it), passed through so the viewer can
+	# shape its slide frame to match.
+	ratio = None
+	if deck.slide_width and deck.slide_height:
+		ratio = round(deck.slide_width / deck.slide_height, 4)
+
+	slides = []
+	for index, slide in enumerate(deck.slides, start=1):
+		title = ""
+		body = []
+		table = None
+		chart = None
+
+		for shape in slide.shapes:
+			# Tables and charts before text: `create_presentation` builds
+			# table and chart slides too (see chat/presentations.py), and
+			# reading only text frames dropped them entirely — a table came
+			# through as loose cell text, a chart as nothing but its heading.
+			if getattr(shape, "has_table", False):
+				table = [[cell.text.strip() for cell in row.cells] for row in shape.table.rows]
+				continue
+
+			if getattr(shape, "has_chart", False):
+				# Chart XML is the least predictable thing here, so anything
+				# unreadable degrades to "a chart is on this slide" rather than
+				# failing the whole preview.
+				try:
+					plot = shape.chart.plots[0]
+					chart = {
+						"categories": [str(c) for c in plot.categories],
+						"series": [
+							{"name": s.name or "", "points": [None if v is None else float(v) for v in s.values]}
+							for s in shape.chart.series
+						],
+					}
+				except Exception:
+					chart = {"categories": [], "series": []}
+				continue
+
+			if not shape.has_text_frame:
+				continue
+			text = shape.text_frame.text.strip()
+			if not text:
+				continue
+			# The placeholder marked as the title is the slide's heading; every
+			# other text frame is body copy, in the order the deck lays it out.
+			if not title and shape == slide.shapes.title:
+				title = text
+			else:
+				body.extend(line for line in text.split("\n") if line.strip())
+
+		# Our own decks draw the heading in a plain textbox rather than the
+		# title placeholder, so `shapes.title` is None and the heading would
+		# otherwise read as the first bullet.
+		if not title and body:
+			title = body.pop(0)
+
+		notes = ""
+		if slide.has_notes_slide:
+			notes = slide.notes_slide.notes_text_frame.text.strip()
+
+		slides.append(
+			{
+				"index": index,
+				"title": title,
+				"bullets": body,
+				"notes": notes,
+				"table": table,
+				"chart": chart,
+			}
+		)
+
+	# The real thing, if this site can render it: one image per slide, exactly
+	# as PowerPoint would draw it. The structural read above still ships
+	# alongside it — it carries the speaker notes, and it is what shows if
+	# rendering is unavailable or fails (see chat/slide_render.py).
+	images = None
+	if file_doc is not None and session:
+		try:
+			from alaiy_os.chat import slide_render
+
+			images = slide_render.render_slides(file_doc, session)
+		except Exception:
+			# A preview must never be the thing that breaks a conversation.
+			frappe.log_error(frappe.get_traceback(), "Slide render")
+
+	return {"kind": "slides", "slides": slides, "ratio": ratio, "images": images}
+
+
+def _preview_document(content):
+	from io import BytesIO
+
+	from docx import Document
+
+	doc = Document(BytesIO(content))
+	blocks = []
+	for para in doc.paragraphs:
+		text = para.text.strip()
+		if not text:
+			continue
+		style = (para.style.name or "").lower()
+		if style.startswith("heading"):
+			# "Heading 2" -> level 2, so the panel can size it.
+			level = "".join(ch for ch in style if ch.isdigit())
+			blocks.append({"type": "heading", "text": text, "level": int(level or 1)})
+		elif "list" in style:
+			blocks.append({"type": "list", "text": text, "level": 0})
+		else:
+			blocks.append({"type": "paragraph", "text": text, "level": 0})
+
+	return {"kind": "doc", "blocks": blocks}
+
+
+@frappe.whitelist()
+def preview_file(file_url, sheet=None, offset=0, limit=PREVIEW_PAGE_ROWS):
+	"""An office attachment, in the shape the UI's file panel renders.
+
+	Only the formats a browser can't open by itself come through here: xlsx,
+	pptx, docx. pdf, images, csv/tsv and plain text are read straight off the
+	file URL by the client — a round trip would buy nothing.
+
+	Parsed server-side because `openpyxl`, `python-pptx` and `python-docx` are
+	already installed in the bench env (Frappe itself imports openpyxl in
+	`frappe/utils/xlsxutils.py`), while the browser has no parser for any of
+	them. The npm equivalents would each be a new dependency and a bigger
+	bundle, and the spreadsheet one is a known-vulnerable package on a repo
+	that already carries dependabot alerts.
+
+	This is a *reading* view, faithful to content rather than appearance: real
+	slide layouts, charts and images need a renderer we don't have. See
+	`ask-alaiy-file-viewer.md` §5 for the LibreOffice→PDF path that would make
+	it pixel-exact.
+	"""
+	meta = _preview_file_doc(file_url)
+	name = (meta.file_name or "").lower()
+	file_doc = frappe.get_doc("File", meta.name)
+	content = file_doc.get_content()
+
+	if name.endswith((".xlsx", ".xlsm")):
+		return _preview_workbook(content, sheet, cint(offset), cint(limit) or PREVIEW_PAGE_ROWS)
+	if name.endswith(".pptx"):
+		return _preview_presentation(content, file_doc=file_doc, session=meta.attached_to_name)
+	if name.endswith(".docx"):
+		return _preview_document(content)
+
+	frappe.throw(frappe._("This file type is read directly by the browser."))
 
 
 @frappe.whitelist()
@@ -215,6 +500,132 @@ def get_messages(session, after=0, partial=0):
 		"messages": [_present(row) for row in rows],
 		"suggestions": _suggestions(doc),
 	}
+
+
+#: Hard cap on one stream's wall-clock lifetime, so a client that never
+#: disconnects (a dead tab, a network blip that doesn't fire onerror) can't
+#: pin a worker forever. A live client just reconnects — `Last-Event-ID`
+#: below picks the cursor back up where this left off.
+MAX_STREAM_SECONDS = 180
+
+#: Same cadence as today's poll-while-partial interval and the server's own
+#: STREAM_FLUSH_SECONDS — no reason for the server-side loop to check faster
+#: than the worker can possibly have written something new.
+STREAM_POLL_SECONDS = 0.4
+
+
+@frappe.whitelist()
+def stream_messages(session, after=0):
+	"""SSE alternative to polling `get_messages`.
+
+	**Not yet safe for the production gunicorn setup.** This holds a single
+	worker + one DB connection for the whole stream's lifetime (a turn with
+	tool calls can run tens of seconds) — see `chat/SSE_PLAN.md`'s "Why the
+	production server matters" section for the full accounting and the
+	prerequisites (async worker class, nginx response buffering disabled)
+	before this runs anywhere but `bench serve`'s dev threaded mode, where a
+	held-open connection costs nothing. `chat/SSE_PLAN.md` recommends Frappe's
+	realtime channel instead for exactly this reason; this endpoint exists
+	as the literal-SSE option documented there, at the caller's request.
+
+	Same permission gate as `get_messages` — an SSE response bypasses
+	`frappe.response` entirely (returning a raw `werkzeug.wrappers.Response`
+	short-circuits both `frappe/handler.py` and `frappe/api/__init__.py`), so
+	the ownership check has to happen explicitly, before the generator below
+	ever starts, rather than falling out of the usual whitelisted-method
+	machinery.
+	"""
+	doc = frappe.get_doc("OS Chat Session", session)
+	doc.check_permission("read")
+
+	# EventSource resends the last id it saw as Last-Event-ID on an automatic
+	# reconnect (a dropped connection, a laptop waking from sleep) rather than
+	# re-requesting with the original `after` query param, which never
+	# changes. Preferring it here is what makes reconnect resume instead of
+	# replaying the whole conversation.
+	last_event_id = frappe.get_request_header("Last-Event-ID")
+	cursor = int(last_event_id) if last_event_id else int(after)
+
+	def sse(data: dict, event: str | None = None) -> bytes:
+		"""One SSE frame, as bytes.
+
+		Bytes, not str, and that is load-bearing: `direct_passthrough=True`
+		below hands this generator straight to the WSGI server with no
+		encoding step in between, and WSGI only accepts bytes. Yielding str
+		there sends the headers and then silently drops every frame — a 200
+		with `text/event-stream` and an empty body.
+
+		`frappe.as_json`, not `json.dumps`, for the same reason `get_messages`
+		gets away with returning a row untouched: `_present` hands back
+		`creation` as a `datetime`, which plain `json.dumps` refuses. On the
+		normal endpoint Frappe's own encoder handles that during response
+		building; here nothing does it for us. Using the same encoder also
+		keeps both endpoints' wire format byte-identical, so the client can
+		parse either without caring which one it came from.
+
+		`indent=None` because the default (`indent=1`) pretty-prints across
+		multiple lines, and a newline inside an SSE `data:` field terminates
+		the field — the frame would arrive truncated to its first line.
+		"""
+		head = f"event: {event}\n" if event else ""
+		return f"{head}data: {frappe.as_json(data, indent=None)}\n\n".encode()
+
+	def gen():
+		nonlocal cursor
+		started = time.monotonic()
+
+		while True:
+			if time.monotonic() - started > MAX_STREAM_SECONDS:
+				yield sse({"status": "timeout"}, event="done")
+				return
+
+			# Frappe's request-scoped transaction is REPEATABLE READ (InnoDB's
+			# default): without committing between iterations, every query in
+			# this generator would keep re-reading the snapshot from the
+			# moment the stream opened and never see the worker's writes.
+			# get_messages never needed this — a poll is a fresh request, and
+			# a fresh request is a fresh transaction.
+			frappe.db.commit()
+
+			rows = frappe.get_all(
+				"OS Chat Message",
+				filters={"session": session, "seq": (">", cursor)},
+				fields=[
+					"name", "seq", "role", "text", "blocks", "attachments",
+					"mentions", "skill_used", "is_partial", "creation",
+				],
+				order_by="seq asc",
+			)
+			for row in rows:
+				# `id:` is what the browser echoes back as Last-Event-ID on a
+				# reconnect, and it is sent only for a settled message — the
+				# same cursor rule the client applies to `lastSeq`. Tagging a
+				# partial would let a reconnect mid-answer resume *past* the
+				# message still being written, and its finished text would
+				# never be sent again.
+				if row.is_partial:
+					yield sse(_present(row))
+					continue
+
+				cursor = max(cursor, row.seq)
+				yield b"id: %d\n" % row.seq + sse(_present(row))
+
+			status = frappe.db.get_value("OS Chat Session", session, "status")
+			if status != "Running":
+				done_doc = frappe.get_doc("OS Chat Session", session)
+				yield sse(
+					{
+						"status": status,
+						"error": done_doc.error,
+						"suggestions": _suggestions(done_doc),
+					},
+					event="done",
+				)
+				return
+
+			time.sleep(STREAM_POLL_SECONDS)
+
+	return Response(gen(), mimetype="text/event-stream", direct_passthrough=True)
 
 
 @frappe.whitelist()
