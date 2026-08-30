@@ -7,7 +7,10 @@ import {
   mergeRegistries,
   resolveComponent,
 } from "@/runtime/registry/component-registry";
-import { layoutRegistry, resolveLayout } from "@/runtime/registry/layout-registry";
+import {
+  layoutRegistry,
+  resolveLayout,
+} from "@/runtime/registry/layout-registry";
 import type { ComponentRegistry } from "@/types/runtime/registry";
 
 describe("component registry", () => {
@@ -28,8 +31,12 @@ describe("component registry", () => {
   });
 
   it("fails predictably (returns undefined, does not throw) for an unknown component type", () => {
-    expect(() => resolveComponent(baseComponentRegistry, "does-not-exist")).not.toThrow();
-    expect(resolveComponent(baseComponentRegistry, "does-not-exist")).toBeUndefined();
+    expect(() =>
+      resolveComponent(baseComponentRegistry, "does-not-exist"),
+    ).not.toThrow();
+    expect(
+      resolveComponent(baseComponentRegistry, "does-not-exist"),
+    ).toBeUndefined();
   });
 
   it("every base entry declares capabilities, allowedParents, and supportsChildren (the machine-readable contract)", () => {
@@ -63,18 +70,34 @@ describe("component registry", () => {
     });
 
     // base-only entries survive the merge untouched
-    expect(resolveComponent(merged, "os-page-header")).toBe(baseComponentRegistry["os-page-header"]);
+    expect(resolveComponent(merged, "os-page-header")).toBe(
+      baseComponentRegistry["os-page-header"],
+    );
     // a feature entry that collides with a base key wins (last-registry-wins)
-    expect(resolveComponent(merged, "os-kpi")?.description).toBe("feature override");
+    expect(resolveComponent(merged, "os-kpi")?.description).toBe(
+      "feature override",
+    );
     // a feature-only entry is present too
-    expect(resolveComponent(merged, "os-chart")?.description).toBe("dashboard-only type");
+    expect(resolveComponent(merged, "os-chart")?.description).toBe(
+      "dashboard-only type",
+    );
     // the base registry itself is never mutated by merging
-    expect(baseComponentRegistry["os-kpi"]?.description).not.toBe("feature override");
+    expect(baseComponentRegistry["os-kpi"]?.description).not.toBe(
+      "feature override",
+    );
   });
 
   it("two registries declaring the same type collapse to the last one, not a field-level merge", () => {
-    const entryA = { type: "os-kpi", component: () => null, description: "A" } as const;
-    const entryB = { type: "os-kpi", component: () => null, description: "B" } as const;
+    const entryA = {
+      type: "os-kpi",
+      component: () => null,
+      description: "A",
+    } as const;
+    const entryB = {
+      type: "os-kpi",
+      component: () => null,
+      description: "B",
+    } as const;
 
     const merged = mergeRegistries({ "os-kpi": entryA }, { "os-kpi": entryB });
 
@@ -93,15 +116,31 @@ describe("component registry", () => {
   });
 
   it("listAiExposedComponents returns every base entry today", () => {
-    const exposed = listAiExposedComponents(baseComponentRegistry).map((entry) => entry.type);
+    const exposed = listAiExposedComponents(baseComponentRegistry).map(
+      (entry) => entry.type,
+    );
     expect(exposed.sort()).toEqual(Object.keys(baseComponentRegistry).sort());
   });
 
   it("listAiExposedComponents excludes an entry marked ai.exposed: false and one that omits ai entirely", () => {
     const fixture: ComponentRegistry = {
-      "os-kpi": { type: "os-kpi", component: () => null, description: "exposed", ai: { exposed: true } },
-      "os-card": { type: "os-card", component: () => null, description: "not exposed", ai: { exposed: false } },
-      "os-chart": { type: "os-chart", component: () => null, description: "no ai field at all" },
+      "os-kpi": {
+        type: "os-kpi",
+        component: () => null,
+        description: "exposed",
+        ai: { exposed: true },
+      },
+      "os-card": {
+        type: "os-card",
+        component: () => null,
+        description: "not exposed",
+        ai: { exposed: false },
+      },
+      "os-chart": {
+        type: "os-chart",
+        component: () => null,
+        description: "no ai field at all",
+      },
     };
 
     const exposed = listAiExposedComponents(fixture);
@@ -111,7 +150,10 @@ describe("component registry", () => {
   });
 
   it("the components extension point is additive - base merged with today's empty contributedComponents equals the base registry", () => {
-    const merged = mergeRegistries(baseComponentRegistry, contributedComponents);
+    const merged = mergeRegistries(
+      baseComponentRegistry,
+      contributedComponents,
+    );
     expect(merged).toEqual(baseComponentRegistry);
   });
 });
@@ -131,6 +173,16 @@ describe("layout registry", () => {
     const className = layout?.className({ columns: { base: 1, xl: 12 } }) ?? "";
     expect(className).toContain("grid-cols-1");
     expect(className).toContain("xl:grid-cols-12");
+  });
+
+  it("uses the default gap of 4 for every layout type and honors custom overrides", () => {
+    for (const type of ["stack", "inline", "section", "grid"] as const) {
+      const layout = resolveLayout(type);
+      expect(layout).toBeDefined();
+      expect(layout?.className({ columns: { base: 1 } }, 4)).toContain("gap-4");
+      expect(layout?.className({ columns: { base: 1 } }, 2)).toContain("gap-2");
+      expect(layout?.className({ columns: { base: 1 } })).toContain("gap-4");
+    }
   });
 
   it("fails predictably (returns undefined, does not throw) for an unknown layout type", () => {

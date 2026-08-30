@@ -78,6 +78,43 @@ describe("applyTransforms - select/filter/sort", () => {
   });
 });
 
+describe("applyTransforms - lookup (static value->value mapping)", () => {
+  it("maps a matching computed value through cases", () => {
+    const context = { computed: { period: "1D" } };
+    const result = applyTransforms(context, [
+      {
+        type: "lookup",
+        field: "period",
+        cases: { "1D": "since last day", "1M": "since last month" },
+        as: "periodLabel",
+      },
+    ]);
+    expect(result.computed.periodLabel).toBe("since last day");
+  });
+
+  it("falls back to `default` when the value matches no case", () => {
+    const context = { computed: { period: "1Q" } };
+    const result = applyTransforms(context, [
+      {
+        type: "lookup",
+        field: "period",
+        cases: { "1D": "since last day" },
+        default: "last period",
+        as: "periodLabel",
+      },
+    ]);
+    expect(result.computed.periodLabel).toBe("last period");
+  });
+
+  it("is undefined (not thrown) when there's no default and no match", () => {
+    const context = { computed: { period: "1Q" } };
+    const result = applyTransforms(context, [
+      { type: "lookup", field: "period", cases: { "1D": "since last day" }, as: "periodLabel" },
+    ]);
+    expect(result.computed.periodLabel).toBeUndefined();
+  });
+});
+
 describe("applyTransforms - an empty/absent pipeline is a no-op", () => {
   it("returns the context unchanged", () => {
     const context = { rows: [{ a: 1 }], computed: { existing: true } };
