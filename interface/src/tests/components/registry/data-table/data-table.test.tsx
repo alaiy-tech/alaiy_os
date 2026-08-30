@@ -324,8 +324,12 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
     // mounted at least once (i.e. after the popover has been opened) -
     // asserting it pre-open would test Radix's own internal caching, not
     // this component's props (`value={effectivePageSize}` is correct
-    // regardless of what jsdom shows before the first open).
-    expect(screen.getByText("Per page")).toBeInTheDocument();
+    // regardless of what jsdom shows before the first open). The per-page
+    // selector has no text label of its own (just the bare Select), so its
+    // presence is checked via its `role="combobox"` trigger instead - the
+    // only combobox this render produces (no `filterFields`, so no
+    // FilterPopover either).
+    expect(screen.getByRole("combobox")).toBeInTheDocument();
   });
 
   it("without pageSizeParam: no per-page selector renders", () => {
@@ -339,7 +343,7 @@ describe("OsDataTable - advanced pagination (external/server mode)", () => {
       />,
     );
 
-    expect(screen.queryByText("Per page")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
   });
 
   it("with pageParam: typing a page number into 'Go to page' and pressing Enter jumps there", () => {

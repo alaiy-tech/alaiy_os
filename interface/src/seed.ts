@@ -11,6 +11,21 @@ import type {
 } from "@/types/navigation";
 import type { PageConfigFile } from "@/types/runtime/page";
 
+/** The dashboard's one period-toggle's labels, single-sourced so the
+ * `os-period-toggle` node's own `options` and `overview`'s `lookup`
+ * transform step (which computes each KPI's `trendLabel` from the same
+ * codes) can't quietly drift apart within this file - though the codes
+ * themselves still have to independently match what the backend's own
+ * `PERIOD_DAYS`/`_period_bounds` understands (`dashboard_stats.py`), since
+ * component `props` and a page's `data` are never cross-readable at
+ * runtime. */
+const DASHBOARD_PERIOD_LABELS: Record<string, string> = {
+  "1D": "vs last day",
+  "1W": "vs last week",
+  "1M": "vs last month",
+  "1Y": "vs last year",
+};
+
 /**
  * The rebuilt `/os` dashboard, on the generic request+transform data model
  * (see docs/UI_RUNTIME.md) - same visual content as before (KPI row, sales
@@ -25,24 +40,32 @@ import type { PageConfigFile } from "@/types/runtime/page";
  * `$period`/`$period_start` are the two sentinels the resolver substitutes
  * from the page's own period filter - see `runtime/data/resolver.ts`.
  *
- * `aov` and `salesByMonth` are the two required proofs that a computed KPI
+ * `aov` and `salesOverTime` are the two required proofs that a computed KPI
  * and a chart's grouped data can come from raw doctype rows plus a
  * `transform` pipeline, not a bespoke source: `aov` sums/counts/divides
  * Sales Order rows itself (replacing the old pre-computed "Average Order"
- * KPI); `salesByMonth` groups Sales Order rows by month client-side
- * (replacing the old `dashboard.salesTrend` method call - the "profit"
- * series is dropped, since profit isn't a raw Sales Order field). Trend/
- * delta arrows are dropped for every KPI in this rebuild - a safe
- * `(current - previous) / previous` needs a conditional the formula grammar
- * deliberately doesn't support yet; showing current values without arrows
- * is the disclosed simplification.
+ * KPI); `salesOverTime` groups Sales Order rows by the active period's own
+ * day/month granularity (`group.granularity: "auto"` - replacing the old
+ * `dashboard.salesTrend` method call, and its own always-by-month, never
+ * period-scoped bug - the "profit" series is dropped, since profit isn't a
+ * raw Sales Order field). Every KPI's
+ * trend badge/caption is wired from `overview`'s own period-over-period
+ * `{current, previous}` shape (`OsKpi`'s `previousValue` prop computes the
+ * safe, divide-by-zero-aware percent change itself - see `kpi.tsx`) except
+ * Average Order's `value`, which still deliberately comes from `aov` (the
+ * transform-pipeline proof) - its `previousValue` borrows `overview`'s own
+ * `average_order.previous` instead, since `aov` has no notion of a prior
+ * period to compare against.
  *
  * `orders` is the third required proof: a real generic list with
  * request-driven search/filter/sort/pagination, all namespaced by this
  * entry's own name (`orders_page`/`orders_sort`/`orders_search`/
- * `orders_filter_status`) - no `frappe-list` abstraction, and (unlike the
+ * `orders_filter_<field>`) - no `frappe-list` abstraction, and (unlike the
  * disclosed console-warning bug this replaces) real `pageParam`/`sortParam`
- * bindings this time.
+ * bindings this time. Filtering is dynamic-field, not a fixed `status`
+ * column - `query.filters: true` (paired with `exposeFields: true`) lets the
+ * filter popover filter by *any* Sales Order field, not just one
+ * author-declared one - see `runtime/data/resolver.ts`'s `readNamedFilters`.
  */
 export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
   id: "dashboard",
@@ -64,6 +87,19 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
           method: "alaiy_os.api.dashboard_stats.get_dashboard_overview",
           args: { period: "$period", channel: null },
         },
+        // `get_dashboard_overview` echoes the active period code back as
+        // `period` - `lookup` maps it to the same human phrase the period
+        // toggle's own `options[].label` uses, so every KPI's `trendLabel`
+        // (below) can bind `overview.periodLabel` directly.
+        transform: [
+          {
+            type: "lookup",
+            field: "period",
+            cases: DASHBOARD_PERIOD_LABELS,
+            default: "last period",
+            as: "periodLabel",
+          },
+        ],
       },
       topProducts: {
         request: {
@@ -104,14 +140,25 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
           { type: "formula", expression: "revenue / orders", as: "aov" },
         ],
       },
-      salesByMonth: {
+      salesOverTime: {
         request: {
           type: "frappe",
           operation: "list",
           doctype: "Sales Order",
           params: {
             fields: ["transaction_date", "grand_total"],
-            filters: [{ field: "docstatus", operator: "=", value: 1 }],
+            filters: [
+              { field: "docstatus", operator: "=", value: 1 },
+              // Scopes the chart to the active period toggle, same
+              // sentinel `aov` already uses - without this the chart
+              // always summed *every* Sales Order ever placed, regardless
+              // of which period was selected.
+              {
+                field: "transaction_date",
+                operator: ">=",
+                value: "$period_start",
+              },
+            ],
             pageSize: 1000,
           },
         },
@@ -119,11 +166,14 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
           {
             type: "group",
             by: "transaction_date",
-            granularity: "month",
+            // Bucket width follows the active period (day-level for
+            // 1D/1W/1M, month-level for 1Y) instead of always being a
+            // fixed month, regardless of how wide the selected window is -
+            // see `resolver.ts`'s `PERIOD_TO_GRANULARITY`.
+            granularity: "auto",
             aggregate: { type: "sum", field: "grand_total", as: "revenue" },
           },
           { type: "sort", field: "key", direction: "asc" },
-          { type: "limit", count: 12 },
         ],
       },
       orders: {
@@ -185,7 +235,9 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                     type: "os-period-toggle",
                     props: {
                       paramName: "period",
-                      options: ["1D", "1W", "1M", "1Y"],
+                      options: Object.entries(DASHBOARD_PERIOD_LABELS).map(
+                        ([value, label]) => ({ value, label }),
+                      ),
                     },
                   },
                 ],
@@ -202,6 +254,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                 id: "kpi-grid",
                 kind: "layout",
                 type: "grid",
+                gap: 0,
                 columns: { base: 1, md: 2 },
                 layout: { span: { xl: 5 } },
                 children: [
@@ -213,6 +266,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       title: "Total Sales",
                       icon: "DollarSign",
                       format: "currency",
+                      className: "rounded-none rounded-tl-lg",
                     },
                     data: {
                       value: { ref: "overview", path: "total_sales.current" },
@@ -220,7 +274,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "total_sales.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                   {
@@ -231,6 +285,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       title: "Total Orders",
                       icon: "ShoppingBag",
                       format: "number",
+                      className: "rounded-none rounded-tr-lg",
                     },
                     data: {
                       value: { ref: "overview", path: "total_orders.current" },
@@ -238,7 +293,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "total_orders.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                   {
@@ -249,6 +304,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       title: "Customer Growth",
                       icon: "Users",
                       format: "number",
+                      className: "rounded-none",
                     },
                     data: {
                       value: {
@@ -259,7 +315,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "customer_growth.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                   {
@@ -270,6 +326,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       title: "Average Order",
                       icon: "ReceiptText",
                       format: "currency",
+                      className: "rounded-none",
                     },
                     // `value` stays the transform-pipeline-computed `aov`
                     // (the deliberate proof that a KPI can come from raw
@@ -285,7 +342,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "average_order.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                   {
@@ -297,6 +354,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       icon: "RotateCcw",
                       format: "number",
                       trendPolarity: "negative",
+                      className: "rounded-none rounded-bl-lg",
                     },
                     data: {
                       value: {
@@ -307,7 +365,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "return_requests.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                   {
@@ -318,6 +376,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       title: "Stock Accuracy",
                       icon: "PackageCheck",
                       format: "percent",
+                      className: "rounded-none rounded-br-lg",
                     },
                     data: {
                       value: {
@@ -328,112 +387,125 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                         ref: "overview",
                         path: "stock_accuracy.previous",
                       },
-                      trendLabel: { ref: "overview", path: "period" },
+                      trendLabel: { ref: "overview", path: "periodLabel" },
                     },
                   },
                 ],
               },
               {
-                id: "sales-overview-chart",
-                kind: "component",
-                type: "os-chart",
-                layout: { span: { xl: 7 } },
-                props: {
-                  title: "Sales Overview",
-                  subtitle:
-                    "Revenue by month, computed from Sales Order rows via the generic transform pipeline.",
-                  x: "key",
-                  legend: true,
-                  series: [
-                    { field: "revenue", label: "Revenue", type: "area" },
-                  ],
-                },
-                data: { rows: { ref: "salesByMonth", path: "rows" } },
-              },
-            ],
-          },
-          {
-            id: "products-stock-row",
-            kind: "layout",
-            type: "grid",
-            columns: { base: 1, xl: 12 },
-            children: [
-              {
-                id: "top-products-table",
-                kind: "component",
-                type: "os-data-table",
-                layout: { span: { xl: 6 } },
-                props: {
-                  title: "Top Products",
-                  searchable: false,
-                  filterable: false,
-                  columnVisibility: false,
-                  selectable: false,
-                  paginated: false,
-                  emptyMessage: "No sales in this period.",
-                  columns: [
-                    { field: "item_name", label: "Product" },
-                    { field: "category", label: "Category" },
-                    {
-                      field: "share",
-                      label: "Share",
-                      format: "number",
-                      align: "right",
-                    },
-                    {
-                      field: "amount",
-                      label: "Sales",
-                      format: "currency",
-                      align: "right",
-                    },
-                  ],
-                },
-                data: { rows: { ref: "topProducts", path: "products" } },
-              },
-              {
-                id: "stock-kpi-grid",
+                id: "chart-kpi-stack",
                 kind: "layout",
-                type: "grid",
-                columns: { base: 1, md: 3 },
-                layout: { span: { xl: 6 } },
+                type: "stack",
+                gap: 0,
+                layout: { span: { xl: 7 } },
                 children: [
                   {
-                    id: "kpi-in-stock",
+                    id: "sales-overview-chart",
                     kind: "component",
-                    type: "os-kpi",
+                    type: "os-chart",
+                    layout: { span: { xl: 12 } },
                     props: {
-                      title: "In Stock",
-                      icon: "PackageCheck",
-                      format: "number",
+                      title: "Sales Overview",
+                      subtitle:
+                        "Revenue over the selected period, computed from Sales Order rows via the generic transform pipeline.",
+                      x: "key",
+                      className: "rounded-lg flex-1 h-full",
+                      legend: true,
+                      series: [
+                        { field: "revenue", label: "Revenue", type: "area" },
+                      ],
+                      // Demonstrates the chart-wide colour map (`ChartColorMap`
+                      // in chart.tsx) - a literal RGB value, not a semantic
+                      // token, since a chart's own palette is allowed to be more
+                      // expressive than the rest of the UI. Equivalent to
+                      // setting `color` inline on the "revenue" series itself;
+                      // this form is what's reusable across multiple charts
+                      // that share the same field name.
+                      colors: { revenue: "rgb(37 99 235)" },
+                      // Revenue reads as currency on the Y-axis and in the
+                      // tooltip; the x-axis' own `key` values (day- or
+                      // month-shaped, depending on the active period - see
+                      // `salesOverTime`'s `granularity: "auto"`) format
+                      // themselves without any extra config here, since
+                      // `xAxisFormat` defaults to `"auto"`.
+                      valueFormat: "currency",
                     },
-                    data: { value: { ref: "stockMix", path: "in_stock" } },
+                    data: { rows: { ref: "salesOverTime", path: "rows" } },
                   },
                   {
-                    id: "kpi-low-stock",
-                    kind: "component",
-                    type: "os-kpi",
-                    props: {
-                      title: "Low Stock",
-                      icon: "Package",
-                      format: "number",
-                    },
-                    data: { value: { ref: "stockMix", path: "low_stock" } },
-                  },
-                  {
-                    id: "kpi-out-of-stock",
-                    kind: "component",
-                    type: "os-kpi",
-                    props: {
-                      title: "Out of Stock",
-                      icon: "Package",
-                      format: "number",
-                    },
-                    data: { value: { ref: "stockMix", path: "out_of_stock" } },
+                    id: "products-stock-row",
+                    kind: "layout",
+                    type: "grid",
+                    gap: 0,
+                    columns: { base: 1, xl: 12 },
+                    children: [
+                      {
+                        id: "stock-kpi-grid",
+                        kind: "layout",
+                        type: "grid",
+                        columns: { base: 1, md: 3 },
+                        layout: { span: { xl: 12 } },
+                        gap: 0,
+                        children: [
+                          {
+                            id: "kpi-in-stock",
+                            kind: "component",
+                            type: "os-kpi",
+                            // `get_stock_mix` is a live snapshot, not a period-over-period
+                            // metric (see its own doc comment - deliberately not scoped
+                            // to the period toggle) - `trendLabel` is a literal static
+                            // caption here, not a `data` binding, and no `previousValue`
+                            // is set, so no numeric trend badge renders alongside it.
+                            props: {
+                              title: "In Stock",
+                              icon: "PackageCheck",
+                              format: "number",
+                              trendLabel: "Live snapshot",
+                              className: "rounded-none rounded-l-lg",
+                            },
+                            data: {
+                              value: { ref: "stockMix", path: "in_stock" },
+                            },
+                          },
+                          {
+                            id: "kpi-low-stock",
+                            kind: "component",
+                            type: "os-kpi",
+                            props: {
+                              title: "Low Stock",
+                              icon: "Package",
+                              format: "number",
+                              trendLabel: "Live snapshot",
+                              className: "rounded-none",
+                            },
+                            data: {
+                              value: { ref: "stockMix", path: "low_stock" },
+                            },
+                          },
+                          {
+                            id: "kpi-out-of-stock",
+                            kind: "component",
+                            type: "os-kpi",
+                            props: {
+                              title: "Out of Stock",
+                              icon: "Package",
+                              format: "number",
+                              trendLabel: "Live snapshot",
+                              className: "rounded-none rounded-r-lg",
+                            },
+                            data: {
+                              value: { ref: "stockMix", path: "out_of_stock" },
+                            },
+                          },
+                        ],
+                      },
+                    ],
                   },
                 ],
               },
             ],
           },
+
           {
             id: "recent-orders-table",
             kind: "component",
@@ -444,6 +516,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
               searchPlaceholder: "Search Recent Orders...",
               searchFields: ["name", "customer"],
               searchParam: "orders_search",
+              filterParam: "orders",
               columnVisibility: true,
               minVisibleColumns: 5,
               selectable: true,
@@ -511,7 +584,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                   label: "Total",
                   format: "currency",
                   sortable: true,
-                  textStyle: ["semibold"],
+                  textStyle: ["medium"],
                 },
               ],
             },
