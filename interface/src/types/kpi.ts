@@ -15,9 +15,3 @@ export type OsKpiFormat = "number" | "currency" | "percent";
 
 export type OsKpiTrendUnit = "percent" | "points";
 export type OsKpiTrendPolarity = "positive" | "negative";
-
-/** Optional accent bar down the card's leading edge. A semantic tone name,
- * not a colour - resolved to a token class by
- * `config/kpi-classes.ts`'s `KPI_BORDER_TONE_CLASSES`. `undefined` (the
- * default for every KPI node seeded today) renders no accent bar at all. */
-export type OsKpiBorderTone = (typeof KPI_BORDER_TONES)[number];
