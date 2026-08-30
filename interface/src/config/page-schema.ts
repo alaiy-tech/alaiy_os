@@ -103,6 +103,9 @@ export const PAGE_CONFIG_FILE_SCHEMA = z.object({
     .object({
       title: z.string().optional(),
       description: z.string().optional(),
+      // Reused verbatim in generateMetadata (lib/metadata.ts's
+      // buildPageMetadata) for the dynamic page's own <meta name="keywords">.
+      keywords: z.array(z.string()).optional(),
     })
     .optional(),
   definition: PAGE_DEFINITION_SCHEMA,
