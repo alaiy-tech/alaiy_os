@@ -290,10 +290,55 @@ def _core_tools():
 	Imported here rather than at module scope: `artifacts` imports `exports`,
 	which reaches for openpyxl and Frappe's pdf writer, and this module is
 	imported on every turn including the ones that never write a file.
+
+	`web_search` is offered only where the site can actually reach the web, which
+	on this seam means a gateway rather than Anthropic direct. A tool that is
+	always present and always fails would teach the model to keep trying it, and
+	would have it telling users it can look things up on a bench where it cannot
+	— the same discipline DOWNLOAD_PROMPT follows: never advertise a capability
+	the turn does not have.
 	"""
 	from alaiy_os.chat.artifacts import TOOL_SPEC
 
-	return [TOOL_SPEC]
+	tools = [TOOL_SPEC]
+
+	from alaiy_os.chat.websearch import TOOL_SPEC as WEB_SEARCH_SPEC
+	from alaiy_os.engine import llm
+
+	try:
+		available = llm.web_search_support()
+	except Exception:
+		# Resolving the client reads site config and a hook. Neither failing is a
+		# reason to take the whole tool surface down with it — and `_surface`
+		# fails closed, so raising here would leave the user with no tools at all.
+		frappe.log_error(title="chat web_search availability check failed")
+		available = False
+
+	if available:
+		tools.append(WEB_SEARCH_SPEC)
+	return tools
+
+
+#: FAC tools hidden from the chat and from nothing else.
+#:
+#: `search` and `fetch` exist in FAC only to satisfy ChatGPT's MCP rule that a
+#: connector expose tools named exactly that. They are thin wrappers over
+#: `search_documents` and `get_document`, which are already on this surface under
+#: names that say what they do — so in the chat they are pure duplicates, and
+#: duplicates with the most grabbable names on the whole list.
+#:
+#: That is not theoretical. Asked "what is the weather today?", the model
+#: correctly refused, correctly offered a web search, and was told "yes use a
+#: search tool" — whereupon it called `search` twice, got this site's documents
+#: back both times, and concluded it had no web access. `web_search` was on the
+#: surface throughout. Five tools here have "search" in the name and one *is*
+#: "search"; a model reaching for "a search tool" takes the literal match, and no
+#: amount of prompt text outranks a tool name.
+#:
+#: Hidden here rather than disabled in FAC Tool Configuration on purpose:
+#: unticking those rows would also strip them from FAC's MCP endpoint, which is
+#: the one place they are the right answer.
+_CHATGPT_SHIMS = frozenset({"search", "fetch"})
 
 
 def _fac_specs():
@@ -304,7 +349,7 @@ def _fac_specs():
 	specs = []
 	for meta in registry.get_available_tools(user=frappe.session.user):
 		name = meta.get("name")
-		if not name:
+		if not name or name in _CHATGPT_SHIMS:
 			continue
 		specs.append(
 			{

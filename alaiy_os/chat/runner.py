@@ -35,6 +35,7 @@ from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import skills as chat_skills
 from alaiy_os.chat import tools as chat_tools
+from alaiy_os.chat import websearch as chat_websearch
 from alaiy_os.engine import llm
 
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
@@ -642,6 +643,41 @@ DOWNLOAD_PROMPT = (
 	"answer, and an empty spreadsheet is not."
 )
 
+#: Appended only where the site can actually reach the web, same discipline as
+#: DOWNLOAD_PROMPT. Its job is the *sequencing* — offer, stop, search next turn —
+#: which the tool description also carries, because this paragraph is what a long
+#: conversation pushes out of attention first.
+#:
+#: **Why the offer is mandatory rather than advisory.** Everything else this
+#: assistant says is traceable to a document someone can open. A web answer is
+#: not, it costs money per query, and in a chat bubble it looks exactly like a
+#: figure read out of the database. Making the user ask for it keeps the two
+#: kinds of claim visibly different, and keeps the person — not a small model's
+#: judgement — deciding when this business's questions go to a search engine.
+WEB_SEARCH_PROMPT = (
+	"You have one tool that reads outside this business: `web_search`. Everything "
+	"else you can see is this site's own data.\n"
+	"- `web_search` is the only one, and its name is exact. `search_documents`, "
+	"`search_doctype` and `search_link` all search THIS SITE's records and cannot "
+	"see the public web — reaching for one of those when the user agreed to a web "
+	"search returns internal documents and looks like the web having nothing to "
+	"say. When someone says \"yes\" or \"search for it\", call `web_search`.\n"
+	"- Never search without being asked. Answer from your other tools first, "
+	"always, even when you are fairly sure the web would be quicker.\n"
+	"- When a question genuinely needs the public web — a competitor's price, a "
+	"supplier with no record here, a marketplace policy, market rates, anything "
+	"dated after your training — do not guess and do not simply refuse. Say what "
+	"you did and did not establish from this site's data, then end your reply "
+	"with: \"I can look this up on the web — want me to go ahead?\" Then stop. "
+	"Do not call `web_search` in that same turn.\n"
+	"- Call it on the next turn only if they agree, or any time they ask for a "
+	"search outright. One yes covers the one search you just offered; a later "
+	"question that needs the web gets a fresh offer.\n"
+	"- Report what comes back as someone else's claim, not as your own finding. "
+	"Name the source and its date, give the links you were handed, and where the "
+	"web disagrees with a record here, report both and say which is which."
+)
+
 #: Appended only when this user's surface actually holds pack tools — the same
 #: discipline as DOWNLOAD_PROMPT: never describe a capability the turn lacks.
 #:
@@ -762,6 +798,9 @@ def _system_prompt(specs=None):
 	parts = [prompt, CHART_PROMPT]
 	if any(spec.get("name") == chat_artifacts.TOOL for spec in specs or []):
 		parts.append(DOWNLOAD_PROMPT)
+
+	if any(spec.get("name") == chat_websearch.TOOL for spec in specs or []):
+		parts.append(WEB_SEARCH_PROMPT)
 
 	if any(chat_tools.PACK_SEPARATOR in (spec.get("name") or "") for spec in specs or []):
 		parts.append(PACK_PROMPT)
