@@ -5,6 +5,7 @@ POST /api/method/alaiy_os.api.chat.upload_attachment -> a staged file's chip (mu
 POST /api/method/alaiy_os.api.chat.delete_attachment -> {"deleted": "..."}
 POST /api/method/alaiy_os.api.chat.send_message    -> {"seq": n, "status": "Running"}
 GET  /api/method/alaiy_os.api.chat.get_messages    -> messages after a cursor + status
+                                                     + the newest answer's follow-ups
 GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
@@ -69,11 +70,24 @@ def list_sessions(limit=50):
 
 
 @frappe.whitelist()
-def send_message(session, text=None, attachments=None, skill=None, screen=None, mentions=None):
+def send_message(
+	session,
+	text=None,
+	attachments=None,
+	skill=None,
+	skill_args=None,
+	screen=None,
+	mentions=None,
+):
 	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
 
 	An unknown skill throws here rather than on the worker, so the picker gets a
 	real error instead of a conversation that quietly answers the wrong thing.
+
+	`skill_args` is that skill's arguments, as an object or a JSON string — the
+	shape `list_skills` publishes as its `input_schema`. Validated against that
+	schema on this request, so a form can show the error against the field that
+	caused it. Omit it for a skill that takes none, which is most of them.
 
 	`mentions` is `[{kind, value}]` from `list_mentions` — the records the user
 	picked with `@`. Each is re-resolved server-side, so only `kind` and `value`
@@ -83,7 +97,13 @@ def send_message(session, text=None, attachments=None, skill=None, screen=None, 
 	# permission is the gate, since a chat can only reach what its owner can. It
 	# also validates every attachment name against that session.
 	seq = runner.start_turn(
-		session, text, attachments=attachments, skill=skill, screen=screen, mentions=mentions
+		session,
+		text,
+		attachments=attachments,
+		skill=skill,
+		skill_args=skill_args,
+		screen=screen,
+		mentions=mentions,
 	)
 	return {"seq": seq, "status": "Running"}
 
@@ -177,6 +197,9 @@ def get_messages(session, after=0, partial=0):
 	writing, flagged `partial: true` (see the module docstring, and `chat/runner.py`
 	for how it comes to exist). Off by default because a client that has not been
 	taught the cursor rule would skip past it and never see the finished message.
+
+	`suggestions` rides every response rather than the message it belongs to — see
+	`_suggestions` for why that is not a style choice.
 	"""
 	doc = frappe.get_doc("OS Chat Session", session)
 	doc.check_permission("read")
@@ -209,6 +232,7 @@ def get_messages(session, after=0, partial=0):
 		"status": doc.status,
 		"error": doc.error,
 		"messages": [_present(row) for row in rows],
+		"suggestions": _suggestions(doc),
 	}
 
 
@@ -246,6 +270,38 @@ def list_mentions(q=None, kind=None):
 	whether a group's search actually runs.
 	"""
 	return chat_mentions.catalogue(q, kind)
+
+
+def _suggestions(doc):
+	"""The follow-up chips for this session's newest answer: [str].
+
+	**Top-level and not on the message**, which is load-bearing. A poller advances
+	its cursor past every complete message, and `chat/suggest.attach` writes these
+	after the final assistant message is committed — so by then that row is behind
+	the cursor and would never be sent again. A field on it would be written and
+	never read. Returned beside `status` instead, it reaches every poll, including
+	the one that sees the turn finish.
+
+	Empty while a turn is Running: the newest answer is then the *previous* one,
+	and offering its follow-ups next to a question already being answered invites
+	a click that is refused ("this chat is still working on the previous message").
+	"""
+	if doc.status == "Running":
+		return []
+
+	stored = frappe.db.get_value(
+		"OS Chat Message",
+		{"session": doc.name, "role": "assistant", "is_partial": 0},
+		"suggestions",
+		order_by="seq desc",
+	)
+	if not stored:
+		return []
+	try:
+		items = json.loads(stored)
+	except ValueError:
+		return []
+	return items if isinstance(items, list) else []
 
 
 def _present(row):

@@ -126,6 +126,8 @@ class AlaiyAskPage {
 		this.last_seq = 0; // poll cursor
 		this.running = false;
 		this.poll_timer = null;
+		// The follow-up chips under the newest answer, if any are on screen.
+		this.$suggest = null;
 		this.sessions = [];
 		this.query = "";
 		// Staged uploads, keyed by a client id so a chip exists (and can show a
@@ -475,6 +477,14 @@ class AlaiyAskPage {
 			.ask-alaiy-chip:hover {
 				border-color: var(--s-black); background: var(--s-hover); transform: translateY(-1px);
 			}
+
+			/* Follow-ups under an answer. The same chip, moved: 38px is the mark's
+			   26px plus the turn's 12px gap, so they line up with the text above
+			   rather than with the spark. The negative margin pulls them back
+			   against that answer, out of the thread's 22px turn spacing — they
+			   belong to it, and floating them mid-gap reads as a new turn. */
+			.ask-alaiy-suggest { display: block; padding-left: 38px; margin-top: -10px; }
+			.ask-alaiy-suggest .ask-alaiy-chips { justify-content: flex-start; margin-top: 0; }
 
 			/* ── Composer ────────────────────────────────────────────────── */
 			.ask-alaiy-composer-wrap {
@@ -1445,6 +1455,10 @@ class AlaiyAskPage {
 		// A new user turn starts a new reply to react to — the trail from
 		// whatever was answered before is done accumulating.
 		this._reply_tools = new Map();
+		// Before the new turn goes on screen, not after: `_set_running(true)`
+		// would take them down a moment later anyway, having briefly left them
+		// sitting under the question they were meant to replace.
+		this._drop_suggestions();
 		this._add(this._user_turn(text, attached, mentions));
 		this.pending.clear();
 		this._draw_tray();
@@ -1590,6 +1604,9 @@ class AlaiyAskPage {
 			}
 
 			this._set_running(false);
+			// After `_set_running(false)`, which is what clears the flag the
+			// drawing guards on.
+			this._draw_suggestions(data.suggestions);
 			if (data.status === "Failed") {
 				// The stored error is a traceback; the last line is the part a
 				// person can act on.
@@ -2122,6 +2139,10 @@ class AlaiyAskPage {
 		this._sync_send();
 		this.$attach.prop("disabled", running || this.pending.size >= MAX_ATTACHMENTS);
 		this.$thread.find(".ask-alaiy-typing-turn").remove();
+		// The follow-ups belong to the answer above them, and the moment a new
+		// question is on its way they are last turn's. Only on the way *in*:
+		// `_poll` clears the running flag before it draws the new set.
+		if (running) this._drop_suggestions();
 		if (running) {
 			this.$thread.append(`
 				<div class="ask-alaiy-turn ask-alaiy-typing-turn">
@@ -2177,6 +2198,44 @@ class AlaiyAskPage {
 		this.$scroll.prepend($welcome);
 		this.$welcome = $welcome;
 		this.$scroll.css("display", "flex").css("flex-direction", "column");
+	}
+
+	/** The follow-up chips under the newest answer.
+	 *
+	 * One set per thread, appended after the last turn rather than drawn inside
+	 * it: `_draw` runs per message and would otherwise leave a set under every
+	 * assistant reply in a reopened chat. The server sends only the newest set
+	 * (see `api/chat._suggestions`), so this replaces rather than accumulates.
+	 */
+	_draw_suggestions(list) {
+		this._drop_suggestions();
+		// Nothing to offer, or a question already on its way — the answer these
+		// belong to is about to stop being the last thing said.
+		if (this.running || !Array.isArray(list) || !list.length) return;
+
+		const $block = $('<div class="ask-alaiy-turn ask-alaiy-suggest"></div>');
+		const $chips = $('<div class="ask-alaiy-chips"></div>').appendTo($block);
+		list.forEach((label) => {
+			if (typeof label !== "string" || !label.trim()) return;
+			// `.text`, never `.html`: this is model output.
+			$('<button type="button" class="ask-alaiy-chip"></button>')
+				.text(label)
+				.on("click", () => this._send(label))
+				.appendTo($chips);
+		});
+		if (!$chips.children().length) return;
+
+		const stick = this._near_bottom();
+		this.$thread.append($block);
+		this.$suggest = $block;
+		if (stick) this._scroll_to_end();
+	}
+
+	_drop_suggestions() {
+		if (this.$suggest) {
+			this.$suggest.remove();
+			this.$suggest = null;
+		}
 	}
 
 	_clear_welcome() {
@@ -2304,6 +2363,9 @@ class AlaiyAskPage {
 			if (this.session !== name) return;
 
 			const streaming = this._absorb(data.messages);
+			// Stored on the message, so reopening a chat from the rail restores
+			// the follow-ups it ended on rather than a dead end.
+			this._draw_suggestions(data.suggestions);
 			this._scroll_to_end();
 
 			// It may still be mid-turn — started in another tab, or before a reload.
@@ -2335,6 +2397,7 @@ class AlaiyAskPage {
 		this.mentions = [];
 		this._close_mentions();
 		this._set_running(false);
+		this._drop_suggestions();
 		this.$thread.empty();
 		this.rail_failed = false;
 		if (!this.$welcome) this._show_welcome();

@@ -394,6 +394,9 @@ export function AskAlaiyPanel({
                 />
               );
             })}
+            {!chat.running && chat.followUps.length > 0 && (
+              <FollowUps items={chat.followUps} onPick={submit} />
+            )}
             {chat.running && !streamingNow && !toolStatusShowing && <ThinkingIndicator />}
             {chat.error && <ErrorTurn text={chat.error} />}
           </div>
@@ -680,6 +683,34 @@ function ThinkingIndicator() {
         <Sparkles className="size-3.5 animate-pulse" />
       </div>
       <span className="text-[13.5px] text-muted-foreground">{THINKING_WORDS[i]}</span>
+    </div>
+  );
+}
+
+/** Follow-up questions under the newest answer -- the welcome screen's chips,
+ * kept alive past the first message.
+ *
+ * Anchored to the bottom of the thread rather than to the last assistant turn:
+ * `groupAssistantTurns` merges a multi-step exchange into one object here but
+ * not in every client, so "the last turn" is not a portable place to hang
+ * these. The server only ever sends the newest set, so there is never a second
+ * row of them further up.
+ *
+ * Left-aligned, unlike the welcome screen's centred row: these sit under an
+ * answer rather than in the middle of an empty pane. */
+function FollowUps({ items, onPick }: { items: string[]; onPick: (text: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-2 pl-8.5">
+      {items.map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onPick(s)}
+          className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-[12.5px] transition-colors hover:border-primary hover:bg-primary/5"
+        >
+          {s}
+        </button>
+      ))}
     </div>
   );
 }

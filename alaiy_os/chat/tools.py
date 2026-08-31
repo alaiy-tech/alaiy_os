@@ -63,6 +63,8 @@ and it is the right way round: a source that cannot be evaluated cannot say
 whether this user may export anything.
 """
 
+import json
+
 import frappe
 
 # Anthropic and MCP describe a tool's arguments with the same JSON Schema under
@@ -139,34 +141,55 @@ def _surface():
 	sources = _sources()
 	fac = _fac_specs()
 	core = {tool["name"]: tool for tool in _core_tools()}
+	packs = {tool["name"]: tool for tool in _pack_tools()}
 	tenant = _provided(sources)
 
-	# Three-way, not two: a tenant tool shadowing a core one is the same accident
+	# Four-way, not two: a tenant tool shadowing a core one is the same accident
 	# as one shadowing an FAC tool, and precedence-by-import-order is exactly
-	# what this check exists to refuse.
-	clash = sorted(
-		(set(core) | set(tenant)) & {spec["name"] for spec in fac} | (set(core) & set(tenant))
-	)
+	# what this check exists to refuse. Pack names are namespaced by pack id, so
+	# they should never collide — they are checked anyway, because "should never"
+	# is what this list is for.
+	local = [core, packs, tenant]
+	fac_names = {spec["name"] for spec in fac}
+	clash = set()
+	for i, group in enumerate(local):
+		clash |= set(group) & fac_names
+		for other in local[i + 1 :]:
+			clash |= set(group) & set(other)
 	if clash:
-		frappe.log_error(title=f"Chat tool name collision: {', '.join(clash)}")
+		frappe.log_error(title=f"Chat tool name collision: {', '.join(sorted(clash))}")
 		raise _SourceError("name collision")
 
-	provided = {**core, **tenant}
+	provided = {**core, **packs, **tenant}
 
-	# Core's names are narrowed with FAC's rather than bypassing `_narrow` with
-	# the tenant tools. A `filter` may only ever shrink what it was given, so
-	# nothing is at risk — and it is the only way a deployment can withhold a
-	# core tool from a scoped role.
-	offered = [spec["name"] for spec in fac] + list(core)
+	# Core's and the packs' names are narrowed with FAC's rather than bypassing
+	# `_narrow` with the tenant tools. A `filter` may only ever shrink what it was
+	# given, so nothing is at risk — and it is the only way a deployment can
+	# withhold a core or pack tool from a scoped role.
+	offered = [spec["name"] for spec in fac] + list(core) + list(packs)
 	kept = set(_narrow(offered, sources))
-	specs = [spec for spec in fac if spec["name"] in kept]
+
+	# Pack tools lead. The order in this list is the order the model reads, and a
+	# curated connector tool should be the first thing it considers for a question
+	# about that connector — a generic `list_documents` over the same doctype is a
+	# worse answer, and it is the one the model reaches for when it sees it first.
+	specs = [
+		{
+			"name": tool["name"],
+			"description": tool.get("description") or "",
+			ANTHROPIC_SCHEMA_KEY: tool.get(ANTHROPIC_SCHEMA_KEY) or EMPTY_SCHEMA,
+		}
+		for name, tool in packs.items()
+		if name in kept
+	]
+	specs.extend(spec for spec in fac if spec["name"] in kept)
 	specs.extend(
 		{
 			"name": tool["name"],
 			"description": tool.get("description") or "",
 			ANTHROPIC_SCHEMA_KEY: tool.get(ANTHROPIC_SCHEMA_KEY) or EMPTY_SCHEMA,
 		}
-		for name, tool in provided.items()
+		for name, tool in {**core, **tenant}.items()
 		if name not in core or name in kept
 	)
 
@@ -179,6 +202,88 @@ def _surface():
 	return specs, provided
 
 
+#: Separates a pack id from a tool id in the name the model sees. Two underscores
+#: rather than a dot because Anthropic tool names are `^[a-zA-Z0-9_-]{1,64}$`.
+#:
+#: Namespacing is not decoration. It removes a whole class of failure — a pack
+#: that names a tool `search` would otherwise collide with FAC's and, because
+#: `_surface` refuses collisions rather than ranking them, take every tool on the
+#: site down with it. It also tells the model which connector a tool belongs to
+#: at the point it is choosing, which is most of what it needs to choose well.
+PACK_SEPARATOR = "__"
+
+
+def _pack_tools():
+	"""Every enabled pack's tools, in the tenant-source shape.
+
+	This is what lets "what is my account health?" reach a connector without the
+	user naming one. The alternative — a `run_pack(pack, question)` dispatch tool
+	over a nested loop — keeps the model's context smaller and is the right answer
+	once there are enough packs for that to matter. Flat is right while there are
+	two: the model sees the actual tools, so it picks one on its description
+	rather than on a summary of a pack, and there is no second loop to budget.
+
+	**Read the note on effect before letting a pack register a write tool.** Every
+	tool here is directly callable by the model, and `OS Agent Tool` has no
+	`effect` field yet, so nothing in a row can tell this module that a tool
+	publishes. Both packs on this site register reads only and say so in their
+	manifests; that is a property of those manifests, not a guarantee this code
+	enforces.
+
+	Two gates, both mirroring `engine/factory.py` so a tool cannot be reachable
+	here and refused there:
+
+	  - the connector must be enabled, when the row names one;
+	  - the user must hold what the row declares, so the surface never advertises
+	    a tool whose first call would be a refusal. A row declaring nothing is not
+	    filtered — `unmet` returns empty for it, the same way factory treats it.
+	"""
+	from alaiy_os.engine import permissions
+
+	tools = []
+	for agent_id in frappe.get_all(
+		"OS Agent Registry", filters={"is_enabled": 1}, pluck="name", order_by="name asc"
+	):
+		doc = frappe.get_cached_doc("OS Agent Registry", agent_id)
+		for row in doc.tools:
+			if row.connector and not frappe.db.get_value(
+				"OS Connector Registry", row.connector, "is_enabled"
+			):
+				continue
+			if permissions.unmet([row.as_dict()], frappe.session.user):
+				continue
+			tools.append(_pack_tool(doc, row))
+	return tools
+
+
+def _pack_tool(agent, row):
+	"""One `OS Agent Tool` row as a callable tool spec."""
+	schema = EMPTY_SCHEMA
+	if row.parameters_schema:
+		try:
+			schema = json.loads(row.parameters_schema)
+		except ValueError:
+			# Validated by the child controller on save and re-checked every
+			# migrate, so this means the row was edited by hand. An empty schema
+			# is the safe read: the model sends nothing rather than guessing.
+			frappe.log_error(title=f"Pack tool {row.tool_id} has unparseable parameters_schema")
+
+	def run(arguments, _handler=row.handler):
+		# Resolved per call, not at surface-build time: importing every pack's
+		# handler module to *describe* the tools would pull each connector's
+		# client into a turn that never calls one.
+		return frappe.get_attr(_handler)(**(arguments or {}))
+
+	return {
+		"name": f"{agent.name}{PACK_SEPARATOR}{row.tool_id}",
+		# The pack's own name leads, so a model scanning a flat list can see which
+		# connector each tool speaks to before reading the description.
+		"description": f"[{agent.agent_name}] {row.description or ''}".strip(),
+		ANTHROPIC_SCHEMA_KEY: schema,
+		"run": run,
+	}
+
+
 def _core_tools():
 	"""Tools core provides itself, in the tenant-source shape.
 
@@ -186,10 +291,55 @@ def _core_tools():
 	and `presentations`, which reach for openpyxl/python-pptx and Frappe's pdf
 	writer, and this module is imported on every turn including the ones that
 	never write a file.
+
+	`web_search` is offered only where the site can actually reach the web, which
+	on this seam means a gateway rather than Anthropic direct. A tool that is
+	always present and always fails would teach the model to keep trying it, and
+	would have it telling users it can look things up on a bench where it cannot
+	— the same discipline DOWNLOAD_PROMPT follows: never advertise a capability
+	the turn does not have.
 	"""
 	from alaiy_os.chat.artifacts import PRESENTATION_TOOL_SPEC, TOOL_SPEC
 
-	return [TOOL_SPEC, PRESENTATION_TOOL_SPEC]
+	tools = [TOOL_SPEC, PRESENTATION_TOOL_SPEC]
+
+	from alaiy_os.chat.websearch import TOOL_SPEC as WEB_SEARCH_SPEC
+	from alaiy_os.engine import llm
+
+	try:
+		available = llm.web_search_support()
+	except Exception:
+		# Resolving the client reads site config and a hook. Neither failing is a
+		# reason to take the whole tool surface down with it — and `_surface`
+		# fails closed, so raising here would leave the user with no tools at all.
+		frappe.log_error(title="chat web_search availability check failed")
+		available = False
+
+	if available:
+		tools.append(WEB_SEARCH_SPEC)
+	return tools
+
+
+#: FAC tools hidden from the chat and from nothing else.
+#:
+#: `search` and `fetch` exist in FAC only to satisfy ChatGPT's MCP rule that a
+#: connector expose tools named exactly that. They are thin wrappers over
+#: `search_documents` and `get_document`, which are already on this surface under
+#: names that say what they do — so in the chat they are pure duplicates, and
+#: duplicates with the most grabbable names on the whole list.
+#:
+#: That is not theoretical. Asked "what is the weather today?", the model
+#: correctly refused, correctly offered a web search, and was told "yes use a
+#: search tool" — whereupon it called `search` twice, got this site's documents
+#: back both times, and concluded it had no web access. `web_search` was on the
+#: surface throughout. Five tools here have "search" in the name and one *is*
+#: "search"; a model reaching for "a search tool" takes the literal match, and no
+#: amount of prompt text outranks a tool name.
+#:
+#: Hidden here rather than disabled in FAC Tool Configuration on purpose:
+#: unticking those rows would also strip them from FAC's MCP endpoint, which is
+#: the one place they are the right answer.
+_CHATGPT_SHIMS = frozenset({"search", "fetch"})
 
 
 def _fac_specs():
@@ -200,7 +350,7 @@ def _fac_specs():
 	specs = []
 	for meta in registry.get_available_tools(user=frappe.session.user):
 		name = meta.get("name")
-		if not name:
+		if not name or name in _CHATGPT_SHIMS:
 			continue
 		specs.append(
 			{

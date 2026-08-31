@@ -400,6 +400,27 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
           );
         })}
 
+        {/* Follow-ups under the newest answer. Indented to the bubble text
+            (size-6 avatar + gap-3), and anchored to the end of the thread
+            rather than to the last turn -- groupAssistantTurns merges a
+            multi-step exchange into one object, so "the last turn" is not a
+            stable place to hang these. The server only ever sends the newest
+            set, so no second row can appear further up. */}
+        {!chat.running && chat.followUps.length > 0 && (
+          <div className="flex flex-wrap gap-2 pl-9">
+            {chat.followUps.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => sendMessage(suggestion)}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-left text-[12.5px] transition-colors hover:border-primary hover:bg-primary/5"
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
+
         {isThinking && (
           <div className="flex items-center gap-3">
             <AssistantAvatar />

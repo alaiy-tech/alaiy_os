@@ -148,6 +148,14 @@ export interface GetMessagesResult {
   status: ChatStatus;
   error: string | null;
   messages: ChatMessage[];
+  /** Follow-up questions to offer under the newest answer.
+   *
+   * Sent beside `status` rather than on the message they belong to, and that is
+   * deliberate: the server writes them after the final assistant message is
+   * committed, by which point this client's cursor is already past that seq and
+   * would never be sent the row again. Empty while `status` is "Running" — the
+   * newest answer is then the previous one. */
+  suggestions: string[];
 }
 
 export const createChatSession = (params: { title?: string; model?: string } = {}) =>
