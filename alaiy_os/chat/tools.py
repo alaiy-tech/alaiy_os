@@ -182,13 +182,14 @@ def _surface():
 def _core_tools():
 	"""Tools core provides itself, in the tenant-source shape.
 
-	Imported here rather than at module scope: `artifacts` imports `exports`,
-	which reaches for openpyxl and Frappe's pdf writer, and this module is
-	imported on every turn including the ones that never write a file.
+	Imported here rather than at module scope: `artifacts` imports `exports`
+	and `presentations`, which reach for openpyxl/python-pptx and Frappe's pdf
+	writer, and this module is imported on every turn including the ones that
+	never write a file.
 	"""
-	from alaiy_os.chat.artifacts import TOOL_SPEC
+	from alaiy_os.chat.artifacts import PRESENTATION_TOOL_SPEC, TOOL_SPEC
 
-	return [TOOL_SPEC]
+	return [TOOL_SPEC, PRESENTATION_TOOL_SPEC]
 
 
 def _fac_specs():
