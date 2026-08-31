@@ -211,6 +211,15 @@ under its reply. `chat/exports.py` is the writer (rows → bytes, pure, no Frapp
 documents — the mirror of `attachments.py`), `chat/artifacts.py` is the Frappe
 side, and `create_download` is the tool the model calls. xlsx, csv and pdf.
 
+`create_presentation` (`chat/presentations.py`) is a second, independent tool
+on the same channel — a slide outline (title/bullets/table/chart slides) in, a
+`.pptx` out. It is not a fourth `create_download` format: a presentation
+isn't a table, so it gets its own schema rather than encoding slide structure
+as columns/rows. It shares `artifacts.py`'s session/collector/`MAX_PER_TURN`
+machinery with `create_download` outright — a deck counts against the same
+three-files-per-turn cap a spreadsheet does — and follows the identical path
+below, just with `artifacts.create_presentation` in place of `artifacts.create`.
+
 ```
 model calls create_download  ──▶ artifacts.create  ──▶ save_file(… "OS Chat Session" …)
                                         │
@@ -273,11 +282,12 @@ every cell anyway, and `_typed` turns a figure back into a real number when
 writing xlsx, so a model that sends `412000.5` and one that sends `"412000.5"`
 produce the same spreadsheet. Keep new tool schemas to single types.
 
-`create_download` is core's first own tool, contributed through `_core_tools()` in
-the same shape a tenant source uses. It is **not** privileged: its name goes through
-every tenant `filter` alongside FAC's, so a deployment can withhold it — and one
-that scopes its users to a subset of the generic surface has to name it to keep it
-(`alaiy_os_globali` does).
+`create_download` and `create_presentation` are core's own tools, both
+contributed through `_core_tools()` in the same shape a tenant source uses.
+Neither is privileged: both names go through every tenant `filter` alongside
+FAC's, so a deployment can withhold either one — and one that scopes its
+users to a subset of the generic surface has to name them to keep them
+(`alaiy_os_globali` does, for `create_download`).
 
 **Exports are request-driven, and that is a cost decision rather than caution.**
 Claude's artifacts and ChatGPT's Code Interpreter both produce files unprompted,
@@ -545,39 +555,6 @@ PDF that is mostly one embedded scan.
 Most of the limits above are therefore an `inline`-mode concern. On the `tool`
 path the reader's own ceilings apply instead — 50 MB and a `max_pages` argument
 defaulting to 50 — and `MAX_CHARS_PER_FILE` never enters into it.
-
-## Testing a turn without the UI
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run
-bench --site <site> execute alaiy_os.chat.smoke.run --kwargs "{'question': '...', 'user': 'x@y.com'}"
-```
-
-Runs the loop in-process — no worker, no browser, traceback on stdout instead
-of in the Error Log. Costs one real LLM call.
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run_suggest
-```
-
-The follow-up chips against a scripted client: no network, no cost, a fixed
-answer and a fixed suggestion payload. Checks that the extra call happens with no
-tools and with the conversation in it, that the chips are stored, that
-`get_messages` serves them to a caller whose cursor is already past the last
-message — the one failure that would make the feature invisible while everything
-else passed — that a `Running` session offers none, and that `chat_suggestions:
-false` leaves the turn identical and silent. The parser is exercised separately on
-the payloads a real model produces: prose, a fenced array, objects, duplicates.
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run_stream
-```
-
-The streaming path against a scripted client rather than a provider: no network,
-no cost, a fixed answer. Checks that the text was readable *before* the turn
-finished and grew, that the finished row is complete and no longer partial, that
-`chat_streaming: false` produces identical text, and that a client with no
-`stream` method takes the buffered path in silence.
 
 ## site_config keys
 
