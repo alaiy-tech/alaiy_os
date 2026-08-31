@@ -212,7 +212,7 @@ documents — the mirror of `attachments.py`), `chat/artifacts.py` is the Frappe
 side, and `create_download` is the tool the model calls. xlsx, csv and pdf.
 
 `create_presentation` (`chat/presentations.py`) is a second, independent tool
-on the same channel — a slide outline (title/bullets/table slides) in, a
+on the same channel — a slide outline (title/bullets/table/chart slides) in, a
 `.pptx` out. It is not a fourth `create_download` format: a presentation
 isn't a table, so it gets its own schema rather than encoding slide structure
 as columns/rows. It shares `artifacts.py`'s session/collector/`MAX_PER_TURN`
