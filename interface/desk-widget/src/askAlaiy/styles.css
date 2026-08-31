@@ -321,6 +321,95 @@
   margin: 2px 0 0;
 }
 
+/* Feedback control -- see FeedbackControl.tsx */
+.ask-alaiy-feedback-thumbs {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ask-alaiy-feedback-thumb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--disabled-text-color, #888);
+  cursor: pointer;
+}
+.ask-alaiy-feedback-thumb-btn:hover {
+  color: var(--text-color, #1c2126);
+}
+.ask-alaiy-feedback-thumb-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.ask-alaiy-feedback-sent {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--disabled-text-color, #888);
+}
+.ask-alaiy-feedback-form {
+  margin-top: 6px;
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ask-alaiy-feedback-input {
+  resize: none;
+  border: 1px solid var(--border-color, #d1d8dd);
+  background: var(--control-bg, rgba(0, 0, 0, 0.02));
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  font-family: inherit;
+  color: inherit;
+  outline: none;
+}
+.ask-alaiy-feedback-input:focus {
+  border-color: var(--primary-color, #2490ef);
+}
+.ask-alaiy-feedback-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--alert-text-danger, #d33);
+}
+.ask-alaiy-feedback-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.ask-alaiy-feedback-cancel,
+.ask-alaiy-feedback-send {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.ask-alaiy-feedback-cancel {
+  background: none;
+  color: var(--disabled-text-color, #888);
+}
+.ask-alaiy-feedback-cancel:hover {
+  color: var(--text-color, #1c2126);
+}
+.ask-alaiy-feedback-send {
+  background: var(--primary-color, #2490ef);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+}
+.ask-alaiy-feedback-cancel:disabled,
+.ask-alaiy-feedback-send:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Rendered markdown -- see markdown.ts */
 .ask-alaiy-answer p {
   margin: 0 0 8px;

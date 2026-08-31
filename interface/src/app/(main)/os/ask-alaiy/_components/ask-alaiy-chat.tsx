@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { AnswerBody } from "@/components/ask-alaiy/answer-body";
 import "@/components/ask-alaiy/ask-alaiy.css";
 import { useAskAlaiyContext } from "@/components/ask-alaiy/ask-alaiy-provider";
+import { FeedbackControl } from "@/components/ask-alaiy/feedback-control";
 import { ATTACHMENT_ACCEPT, AttachmentChip, ToolTrail, useTypedText } from "@/components/ask-alaiy/ask-alaiy-panel";
 import { groupAssistantTurns, MAX_ATTACHMENTS, type ThreadTurn } from "@/hooks/use-ask-alaiy";
 
@@ -85,7 +86,14 @@ function AssistantAvatar({ centered }: { readonly centered?: boolean } = {}) {
   );
 }
 
-function ChatBubble({ turn, showToolStatus }: { readonly turn: ThreadTurn; readonly showToolStatus?: boolean }) {
+function ChatBubble({
+  turn, showToolStatus, settled, sessionId,
+}: {
+  readonly turn: ThreadTurn;
+  readonly showToolStatus?: boolean;
+  readonly settled?: boolean;
+  readonly sessionId?: string | null;
+}) {
   const typed = useTypedText(turn.text, turn.partial);
 
   if (turn.role === "user") {
@@ -120,6 +128,23 @@ function ChatBubble({ turn, showToolStatus }: { readonly turn: ThreadTurn; reado
           <div className="mt-2 flex flex-wrap gap-1.5">
             {turn.attachments.map((a, i) => <AttachmentChip key={i} attachment={a} />)}
           </div>
+        )}
+        {/* Every settled reply gets this, tool-using or not -- see
+            feedback-control.tsx's own comment. */}
+        {settled && sessionId && (
+          <FeedbackControl
+            session={sessionId}
+            message={turn.key}
+            screen="Interface Page"
+            agentTrail={{
+              text: turn.text,
+              tools: turn.toolCalls.map((call) => ({
+                tool: call.name,
+                input: call.input,
+                failed: turn.toolErrors.has(call.id),
+              })),
+            }}
+          />
         )}
       </div>
     </div>
@@ -359,13 +384,21 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
           below instead of scrolling right underneath it -- sized to the
           composer's actual measured height, not a guess. */}
       <div className="space-y-6 py-6" style={{ paddingBottom: composerHeight }}>
-        {visibleTurns.map((turn, i) => (
-          <ChatBubble
-            key={turn.key}
-            turn={turn}
-            showToolStatus={toolStatusShowing && i === visibleTurns.length - 1}
-          />
-        ))}
+        {visibleTurns.map((turn, i) => {
+          const isLast = i === visibleTurns.length - 1;
+          return (
+            <ChatBubble
+              key={turn.key}
+              turn={turn}
+              showToolStatus={toolStatusShowing && isLast}
+              // Not turn.partial -- same reasoning as toolStatusShowing: a
+              // sub-message can individually settle while the overall reply
+              // is still being built.
+              settled={!(chat.running && isLast)}
+              sessionId={chat.sessionId}
+            />
+          );
+        })}
 
         {/* Follow-ups under the newest answer. Indented to the bubble text
             (size-6 avatar + gap-3), and anchored to the end of the thread

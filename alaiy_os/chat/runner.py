@@ -821,6 +821,28 @@ DOWNLOAD_PROMPT = (
 	"answer, and an empty spreadsheet is not."
 )
 
+#: Appended only when the user can actually call `create_presentation` — same
+#: request-driven reasoning as `DOWNLOAD_PROMPT`, and the same "never write a
+#: URL" clause for the same reason.
+PRESENTATION_PROMPT = (
+	"You can give the user an actual slide deck to download, with the "
+	"create_presentation tool.\n"
+	"- Create one when the user asks for a presentation, slides, or a deck. Not "
+	"for a plain data export — use create_download for that, and do not reach for "
+	"a presentation just because an answer has a table in it.\n"
+	"- Create it in the same reply — do not ask whether they want it, they just "
+	"said so.\n"
+	"- Structure it: a title slide first, then a bullets slide per section, and a "
+	"table slide only for a genuinely small table (a slide is read at a glance, "
+	"not scrolled). Write bullets as short, presentable phrases, not full "
+	"sentences copied from your prose answer.\n"
+	"- Use figures you actually retrieved with another tool. Never placeholder or "
+	"invented content.\n"
+	"- The file is attached to your reply automatically, as a chip the user can "
+	"click. You never see where it is stored and you must not invent it: no "
+	"markdown link, no file path, no file name. Just say what the deck contains."
+)
+
 #: Appended only where the site can actually reach the web, same discipline as
 #: DOWNLOAD_PROMPT. Its job is the *sequencing* — offer, stop, search next turn —
 #: which the tool description also carries, because this paragraph is what a long
@@ -976,6 +998,8 @@ def _system_prompt(specs=None):
 	parts = [prompt, CHART_PROMPT]
 	if any(spec.get("name") == chat_artifacts.TOOL for spec in specs or []):
 		parts.append(DOWNLOAD_PROMPT)
+	if any(spec.get("name") == chat_artifacts.PRESENTATION_TOOL for spec in specs or []):
+		parts.append(PRESENTATION_PROMPT)
 
 	if any(spec.get("name") == chat_websearch.TOOL for spec in specs or []):
 		parts.append(WEB_SEARCH_PROMPT)

@@ -1,0 +1,111 @@
+{
+ "autoname": "hash",
+ "creation": "2026-08-29 00:00:00.000000",
+ "docstatus": 0,
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "user",
+  "sentiment",
+  "screen",
+  "column_break_1",
+  "session",
+  "message",
+  "feedback",
+  "agent_trail"
+ ],
+ "fields": [
+  {
+   "description": "Set server-side from frappe.session.user on insert -- never trust a client-supplied value here, see os_chat_feedback.py.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "User",
+   "options": "User",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "sentiment",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Sentiment",
+   "options": "Up\nDown",
+   "reqd": 1
+  },
+  {
+   "fieldname": "screen",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Screen",
+   "options": "Desk\nInterface Panel\nInterface Page",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "session",
+   "fieldtype": "Link",
+   "label": "Session",
+   "options": "OS Chat Session",
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The specific message the control was attached to -- a convenience link for click-through context, not the record of record. See agent_trail.",
+   "fieldname": "message",
+   "fieldtype": "Link",
+   "label": "Message",
+   "options": "OS Chat Message",
+   "reqd": 1
+  },
+  {
+   "description": "Required when sentiment is Down (the whole point is capturing what went wrong); optional on Up -- a thumbs-up needs no explanation to be useful. Enforced in alaiy_os.api.feedback.submit_feedback, not by `reqd` here, since it's conditional on another field.",
+   "fieldname": "feedback",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Feedback"
+  },
+  {
+   "description": "Snapshot of what produced the reply -- {text, tools: [{tool, input, failed}, ...]} -- built client-side from the already-grouped turn at submission time. This is the record of record: it survives even if the linked session/message is later pruned. See interface/docs/feedback-system.md.",
+   "fieldname": "agent_trail",
+   "fieldtype": "Code",
+   "label": "Agent Trail (JSON)",
+   "options": "JSON",
+   "reqd": 1
+  }
+ ],
+ "links": [],
+ "modified": "2026-08-29 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "OS Chat Feedback",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "if_owner": 1,
+   "read": 1,
+   "role": "All"
+  }
+ ],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

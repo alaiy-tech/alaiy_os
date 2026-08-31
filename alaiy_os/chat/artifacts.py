@@ -46,13 +46,17 @@ tool to avoid.
 import frappe
 from frappe.utils.file_manager import save_file
 
-from alaiy_os.chat import exports
+from alaiy_os.chat import exports, presentations
 
 # A turn that produces a fourth file is a model looping, not a user with four
-# questions — and each one is a `save_file` plus, for pdf, a subprocess.
+# questions — and each one is a `save_file` plus, for pdf, a subprocess. Both
+# tools below share this one cap: a deck counts as a file exactly the way a
+# spreadsheet does, so a turn that makes two of each is still "too many
+# files," not "two files of each kind, fine."
 MAX_PER_TURN = 3
 
 TOOL = "create_download"
+PRESENTATION_TOOL = "create_presentation"
 
 _LOCAL = "chat_artifacts"
 _LOCAL_SESSION = "chat_artifacts_session"
@@ -269,4 +273,150 @@ TOOL_SPEC = {
 		"required": ["format", "file_name", "columns", "rows"],
 	},
 	"run": lambda args: create(**{k: args.get(k) for k in ("file_name", "format", "columns", "rows", "title")}),
+}
+
+
+# ── The presentation tool ───────────────────────────────────────────────────
+def create_presentation(file_name=None, title=None, slides=None):
+	"""Write a slide outline to a .pptx file and stage it as a download.
+
+	Mirrors `create()` almost line for line — same session/cap/attach
+	machinery, see that function's own comments for why each piece is shaped
+	the way it is. The only real difference is the writer: `presentations.py`
+	takes a slide outline instead of a table.
+	"""
+	target = session()
+	if not target:
+		frappe.throw(frappe._("Files can only be created inside a chat."))
+
+	existing = getattr(frappe.local, _LOCAL, None) or []
+	if len(existing) >= MAX_PER_TURN:
+		frappe.throw(
+			frappe._(
+				"You have already made {0} files in this reply, which is the limit. "
+				"Answer with what you have."
+			).format(len(existing))
+		)
+
+	normalised = presentations.normalise(slides)
+	content = presentations.write_pptx(normalised, deck_title=title or file_name)
+
+	if len(content) > presentations.MAX_BYTES:
+		frappe.throw(
+			frappe._("That presentation came to {0} MB; the limit is {1} MB. Cut some slides.").format(
+				round(len(content) / 1024 / 1024, 1), round(presentations.MAX_BYTES / 1024 / 1024, 1)
+			)
+		)
+
+	# No `exports.safe_file_name`: that helper looks up the extension in
+	# `exports.EXTENSIONS`, which pptx deliberately isn't part of -- see
+	# `presentations.py`'s own module docstring for why this is a separate
+	# tool rather than a fourth `create_download` format.
+	name = presentations.safe_file_name(file_name) + ".pptx"
+	stem = name[: -len(".pptx")]
+	name = f"{stem}-{frappe.generate_hash(length=6)}.pptx"
+
+	file_doc = save_file(name, content, "OS Chat Session", target, is_private=1)
+
+	meta = {
+		"kind": "artifact",
+		"file_name": name,
+		"file_url": file_doc.file_url,
+		"file_size": len(content),
+		"format": "pptx",
+		"slides": len(normalised),
+	}
+	record(meta)
+
+	return {
+		"status": "done",
+		"format": "pptx",
+		"slides": len(normalised),
+		"size_kb": round(len(content) / 1024, 1),
+		"delivered": (
+			"The user can already see and download this presentation: a chip is "
+			"attached beneath your reply automatically. You have not been told its "
+			"name or location because you do not need them and must not repeat "
+			"them. Say what the deck contains, in prose. Do not write a link, a "
+			"path, or a file name."
+		),
+	}
+
+
+#: Same `{name, description, input_schema, run}` shape as `TOOL_SPEC` above.
+PRESENTATION_TOOL_SPEC = {
+	"name": PRESENTATION_TOOL,
+	"description": (
+		"Write an actual slide deck (.pptx) the user can download — a title "
+		"slide, narrative sections, and/or a small data table per slide. Not for "
+		"exporting a full dataset; use create_download for that. Use this when "
+		"someone asks for a presentation, slides, or a deck."
+	),
+	"input_schema": {
+		"type": "object",
+		"properties": {
+			"file_name": {
+				"type": "string",
+				"description": "What to call it, without an extension. Descriptive, not generic.",
+			},
+			"title": {
+				"type": "string",
+				"description": "The deck's title. Defaults to the file name.",
+			},
+			"slides": {
+				"type": "array",
+				"description": f"The slides, in order. At most {presentations.MAX_SLIDES}.",
+				"items": {
+					"type": "object",
+					"properties": {
+						"type": {
+							"type": "string",
+							"enum": list(presentations.SLIDE_TYPES),
+							"description": (
+								'"title" for a heading/subtitle slide (normally the first slide), '
+								'"bullets" for a heading plus a short list of points, "table" for '
+								"a heading plus a small data table."
+							),
+						},
+						"heading": {"type": "string", "description": "Every slide needs one."},
+						"subtitle": {
+							"type": "string",
+							"description": '"title" slides only.',
+						},
+						"bullets": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": (
+								f'"bullets" slides only. At most {presentations.MAX_BULLETS_PER_SLIDE} '
+								"— split a longer list across more slides rather than shrinking "
+								"the text to fit."
+							),
+						},
+						"columns": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": (
+								f'"table" slides only. Column headings, in order. At most '
+								f"{presentations.MAX_TABLE_COLUMNS} — a slide is read at a glance, "
+								"not scrolled, so use create_download instead for a full table."
+							),
+						},
+						"rows": {
+							"type": "array",
+							"items": {"type": "array", "items": {"type": "string"}},
+							"description": (
+								f'"table" slides only. One array per row, values in the same order '
+								f"as columns. At most {presentations.MAX_TABLE_ROWS}."
+							),
+						},
+					},
+					"required": ["type", "heading"],
+				},
+			},
+		},
+		"required": ["file_name", "slides"],
+	},
+	"run": lambda args: create_presentation(
+		**{k: args.get(k) for k in ("file_name", "title", "slides")}
+	),
 }

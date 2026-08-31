@@ -11,6 +11,7 @@ import type {
   ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
 } from "./chat";
 import { AnswerBody } from "./AnswerBody";
+import { FeedbackControl } from "./FeedbackControl";
 import { cn } from "./utils";
 
 type MentionRow = MentionOption & { kind: string };
@@ -342,9 +343,21 @@ export function AskAlaiyPanel({
           </div>
         ) : (
           <div className="ask-alaiy-thread">
-            {visibleTurns.map((turn) => (
-              <Turn key={turn.key} turn={turn} suppressTools={chat.running} />
-            ))}
+            {visibleTurns.map((turn, i) => {
+              const isLast = i === visibleTurns.length - 1;
+              return (
+                <Turn
+                  key={turn.key}
+                  turn={turn}
+                  suppressTools={chat.running}
+                  // Only gate the turn currently being generated -- an
+                  // older, already-finished turn stays feedback-able even
+                  // while a newer message is running.
+                  settled={!(chat.running && isLast)}
+                  sessionId={chat.sessionId}
+                />
+              );
+            })}
             {chat.running && !streamingNow && <ThinkingIndicator />}
             {chat.error && <ErrorTurn text={chat.error} />}
           </div>
@@ -498,7 +511,14 @@ function useTypedText(text: string, partial: boolean): string {
   return shown < text.length ? typedPrefix(text, shown) : text;
 }
 
-function Turn({ turn, suppressTools }: { turn: ThreadTurn; suppressTools?: boolean }) {
+function Turn({
+  turn, suppressTools, settled, sessionId,
+}: {
+  turn: ThreadTurn;
+  suppressTools?: boolean;
+  settled?: boolean;
+  sessionId?: string | null;
+}) {
   const typed = useTypedText(turn.text, turn.partial);
 
   if (turn.role === "user") {
@@ -528,6 +548,22 @@ function Turn({ turn, suppressTools }: { turn: ThreadTurn; suppressTools?: boole
           <div className="ask-alaiy-turn-attachments ask-alaiy-turn-attachments-below">
             {turn.attachments.map((a, i) => <AttachmentChip key={i} attachment={a} />)}
           </div>
+        )}
+        {/* Every settled reply gets this, tool-using or not -- see
+            FeedbackControl.tsx's own comment. */}
+        {settled && sessionId && (
+          <FeedbackControl
+            session={sessionId}
+            message={turn.key}
+            agentTrail={{
+              text: turn.text,
+              tools: turn.toolCalls.map((call) => ({
+                tool: call.name,
+                input: call.input,
+                failed: turn.toolErrors.has(call.id),
+              })),
+            }}
+          />
         )}
       </div>
     </div>

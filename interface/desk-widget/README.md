@@ -23,9 +23,9 @@ any of its own tokens.
 ## Building
 
 ```bash
-cd apps/alaiy_os/frontend
+cd apps/alaiy_os/interface/desk-widget
 npm install
-npm run build      # -> ../alaiy_os/public/dist/ask_alaiy.{js,css}
+npm run build      # -> ../../alaiy_os/public/dist/ask_alaiy.{js,css}
 ```
 
 No `bench build` step needed -- Frappe serves anything under an app's

@@ -210,10 +210,10 @@ app_include_js = [
     f"/assets/alaiy_os/js/route_guard.js?v={_V}",
     f"/assets/alaiy_os/js/alaiy_connector_card.js?v={_V}",
     # Ask Alaiy floating launcher + panel -- a self-contained React bundle
-    # (frontend/, built with `npm run build`), independent of the vanilla-JS
-    # constellation above: it owns its own DOM node and never reads window
-    # globals those scripts define, so it's order-independent and safe to
-    # load last. See frontend/README.md for the build.
+    # (interface/desk-widget/, built with `npm run build`), independent of the
+    # vanilla-JS constellation above: it owns its own DOM node and never reads
+    # window globals those scripts define, so it's order-independent and safe
+    # to load last. See interface/desk-widget/README.md for the build.
     f"/assets/alaiy_os/dist/ask_alaiy.js?v={_V}",
 ]
 app_include_css = [

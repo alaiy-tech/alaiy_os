@@ -14,6 +14,7 @@ import type {
   ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
 } from "@/lib/frappe/chat";
 import { AnswerBody } from "./answer-body";
+import { FeedbackControl } from "./feedback-control";
 import "./ask-alaiy.css";
 
 type MentionRow = MentionOption & { kind: string };
@@ -377,9 +378,22 @@ export function AskAlaiyPanel({
           </div>
         ) : (
           <div className="flex flex-col gap-4 px-4 py-4">
-            {visibleTurns.map((turn, i) => (
-              <Turn key={turn.key} turn={turn} showToolStatus={toolStatusShowing && i === visibleTurns.length - 1} />
-            ))}
+            {visibleTurns.map((turn, i) => {
+              const isLast = i === visibleTurns.length - 1;
+              return (
+                <Turn
+                  key={turn.key}
+                  turn={turn}
+                  showToolStatus={toolStatusShowing && isLast}
+                  // Not turn.partial -- same reasoning as toolStatusShowing above:
+                  // a sub-message can individually settle while the overall reply
+                  // is still being built. A reply only counts as done once it's
+                  // no longer the turn chat.running is actively generating.
+                  settled={!(chat.running && isLast)}
+                  sessionId={chat.sessionId}
+                />
+              );
+            })}
             {!chat.running && chat.followUps.length > 0 && (
               <FollowUps items={chat.followUps} onPick={submit} />
             )}
@@ -537,7 +551,14 @@ export function useTypedText(text: string, partial: boolean): string {
   return shown < text.length ? typedPrefix(text, shown) : text;
 }
 
-function Turn({ turn, showToolStatus }: { turn: ThreadTurn; showToolStatus?: boolean }) {
+function Turn({
+  turn, showToolStatus, settled, sessionId,
+}: {
+  turn: ThreadTurn;
+  showToolStatus?: boolean;
+  settled?: boolean;
+  sessionId?: string | null;
+}) {
   const typed = useTypedText(turn.text, turn.partial);
 
   if (turn.role === "user") {
@@ -583,6 +604,23 @@ function Turn({ turn, showToolStatus }: { turn: ThreadTurn; showToolStatus?: boo
           <div className="mt-2 flex flex-wrap gap-1.5">
             {turn.attachments.map((a, i) => <AttachmentChip key={i} attachment={a} />)}
           </div>
+        )}
+        {/* Every settled reply gets this, tool-using or not -- see
+            feedback-control.tsx's own comment. */}
+        {settled && sessionId && (
+          <FeedbackControl
+            session={sessionId}
+            message={turn.key}
+            screen="Interface Panel"
+            agentTrail={{
+              text: turn.text,
+              tools: turn.toolCalls.map((call) => ({
+                tool: call.name,
+                input: call.input,
+                failed: turn.toolErrors.has(call.id),
+              })),
+            }}
+          />
         )}
       </div>
     </div>

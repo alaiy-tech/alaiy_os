@@ -287,9 +287,10 @@ def _pack_tool(agent, row):
 def _core_tools():
 	"""Tools core provides itself, in the tenant-source shape.
 
-	Imported here rather than at module scope: `artifacts` imports `exports`,
-	which reaches for openpyxl and Frappe's pdf writer, and this module is
-	imported on every turn including the ones that never write a file.
+	Imported here rather than at module scope: `artifacts` imports `exports`
+	and `presentations`, which reach for openpyxl/python-pptx and Frappe's pdf
+	writer, and this module is imported on every turn including the ones that
+	never write a file.
 
 	`web_search` is offered only where the site can actually reach the web, which
 	on this seam means a gateway rather than Anthropic direct. A tool that is
@@ -298,9 +299,9 @@ def _core_tools():
 	— the same discipline DOWNLOAD_PROMPT follows: never advertise a capability
 	the turn does not have.
 	"""
-	from alaiy_os.chat.artifacts import TOOL_SPEC
+	from alaiy_os.chat.artifacts import PRESENTATION_TOOL_SPEC, TOOL_SPEC
 
-	tools = [TOOL_SPEC]
+	tools = [TOOL_SPEC, PRESENTATION_TOOL_SPEC]
 
 	from alaiy_os.chat.websearch import TOOL_SPEC as WEB_SEARCH_SPEC
 	from alaiy_os.engine import llm
