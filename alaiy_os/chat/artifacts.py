@@ -337,8 +337,10 @@ def create_presentation(file_name=None, title=None, slides=None):
 			"The user can already see and download this presentation: a chip is "
 			"attached beneath your reply automatically. You have not been told its "
 			"name or location because you do not need them and must not repeat "
-			"them. Say what the deck contains, in prose. Do not write a link, a "
-			"path, or a file name."
+			"them. Your reply must still contain prose — a short summary of what "
+			"the deck covers and its key takeaway. Never send this tool call with "
+			"nothing else written; a file with no words around it is not an "
+			"answer. Do not write a link, a path, or a file name."
 		),
 	}
 
@@ -348,9 +350,9 @@ PRESENTATION_TOOL_SPEC = {
 	"name": PRESENTATION_TOOL,
 	"description": (
 		"Write an actual slide deck (.pptx) the user can download — a title "
-		"slide, narrative sections, and/or a small data table per slide. Not for "
-		"exporting a full dataset; use create_download for that. Use this when "
-		"someone asks for a presentation, slides, or a deck."
+		"slide, narrative sections, data tables, and bar/line/pie charts. Not "
+		"for exporting a full dataset; use create_download for that. Use this "
+		"when someone asks for a presentation, slides, or a deck."
 	),
 	"input_schema": {
 		"type": "object",
@@ -375,7 +377,10 @@ PRESENTATION_TOOL_SPEC = {
 							"description": (
 								'"title" for a heading/subtitle slide (normally the first slide), '
 								'"bullets" for a heading plus a short list of points, "table" for '
-								"a heading plus a small data table."
+								'a heading plus a small data table, "chart" for a heading plus a '
+								"real bar/line/pie chart — reach for a chart instead of a table "
+								"whenever the point is the shape of the numbers (a trend, a "
+								"comparison, a share of a total) rather than the exact values."
 							),
 						},
 						"heading": {"type": "string", "description": "Every slide needs one."},
@@ -389,7 +394,7 @@ PRESENTATION_TOOL_SPEC = {
 							"description": (
 								f'"bullets" slides only. At most {presentations.MAX_BULLETS_PER_SLIDE} '
 								"— split a longer list across more slides rather than shrinking "
-								"the text to fit."
+								"the text to fit. Short, presentable phrases, not full sentences."
 							),
 						},
 						"columns": {
@@ -407,6 +412,56 @@ PRESENTATION_TOOL_SPEC = {
 							"description": (
 								f'"table" slides only. One array per row, values in the same order '
 								f"as columns. At most {presentations.MAX_TABLE_ROWS}."
+							),
+						},
+						"chart_type": {
+							"type": "string",
+							"enum": list(presentations.CHART_TYPES),
+							"description": (
+								'"chart" slides only. "bar" for a comparison across categories, '
+								'"line" for a trend over time, "pie" only for shares of one total '
+								"(exactly one series). Defaults to \"bar\" if omitted."
+							),
+						},
+						"unit": {
+							"type": "string",
+							"enum": list(presentations.CHART_UNITS),
+							"description": (
+								'"chart" slides only. Decides the chart\'s number formatting. '
+								'Defaults to "number" if omitted.'
+							),
+						},
+						"labels": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": (
+								f'"chart" slides only. The categories or dates, in order. At most '
+								f"{presentations.MAX_CHART_LABELS} ({presentations.MAX_PIE_LABELS} "
+								"for a pie) — a chart on a slide is read from across a room, so "
+								"chart the top few and mention the rest in a bullets slide instead "
+								"of cramming more in."
+							),
+						},
+						"series": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"properties": {
+									"name": {"type": "string"},
+									"points": {
+										"type": "array",
+										"items": {"type": "number"},
+										"description": (
+											"Plain numbers only — no currency symbols, no thousands "
+											"separators, no \"%\" — one per label, in the same order."
+										),
+									},
+								},
+								"required": ["name", "points"],
+							},
+							"description": (
+								f'"chart" slides only. At most {presentations.MAX_CHART_SERIES} '
+								"series. Every series needs exactly one point per label."
 							),
 						},
 					},
