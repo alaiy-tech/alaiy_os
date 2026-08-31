@@ -25,11 +25,7 @@ chain outlives any sane request timeout).
 """
 
 import json
-<<<<<<< HEAD
 import re
-=======
-import time
->>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 import traceback
 
 import frappe
@@ -692,13 +688,8 @@ def _append(
 	attachments=None,
 	mentions=None,
 	skill=None,
-<<<<<<< HEAD
 	skill_args=None,
 	screen=None,
-=======
-	screen=None,
-	is_partial=False,
->>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 ):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")

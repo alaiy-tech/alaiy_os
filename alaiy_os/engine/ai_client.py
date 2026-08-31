@@ -129,7 +129,6 @@ class ByokClient:
 		# integration for. The managed client serves it via the billing service.
 		return {"generate": bool(self._image_key), "translate": False}
 
-<<<<<<< HEAD
 	def web_search_support(self):
 		"""Whether this site can reach the public web, without making a call.
 
@@ -188,15 +187,6 @@ class ByokClient:
 		return {"answer": text.strip(), "citations": []}
 
 	def complete(self, model, system, messages, tools=None):
-=======
-	def _prepare(self, model, system, messages, tools=None):
-		"""The provider client and request kwargs, shared by both call paths.
-
-		Factored out so `complete` and `stream` cannot drift: a model, key or
-		header that works buffered must work streamed, or the flag that chooses
-		between them stops being a safe thing to flip.
-		"""
->>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 		import anthropic
 
 		api_key = frappe.conf.get("ai_api_key") or frappe.conf.get("anthropic_api_key")
