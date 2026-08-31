@@ -55,5 +55,11 @@
     "**/*.ts",
     "**/*.tsx"
   ],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    // A separate Vite/React project (the Desk widget), not part of this
+    // Next.js app -- it has its own tsconfig.json and build. Nested here
+    // physically for tidiness, not merged into this project.
+    "desk-widget"
+  ]
 }

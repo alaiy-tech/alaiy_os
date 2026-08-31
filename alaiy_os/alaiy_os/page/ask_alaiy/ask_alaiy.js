@@ -156,6 +156,15 @@ class AlaiyAskPage {
 			() => this._sync_mentions_now(),
 			MENTION_DEBOUNCE_MS,
 		);
+		// Tool calls seen since the last real user turn, keyed by call id so a
+		// redraw (poll, or the swap from partial to settled) never double-counts
+		// one. This is what `_feedback_control`'s agent_trail is built from: a
+		// multi-step reply is several separate `OS Chat Message` rows (one tool
+		// round-trip each, see `_draw`'s own comment), not one growing row, so
+		// the trail has to be accumulated across them rather than read off the
+		// single row that finally carries the text. Reset in `_reset()` and in
+		// `_send()` — see interface/docs/feedback-system.md.
+		this._reply_tools = new Map();
 
 		this._ensure_styles();
 		this._render();
@@ -387,16 +396,58 @@ class AlaiyAskPage {
 				color: var(--s-red); font-size: 13.5px; line-height: 1.5;
 			}
 
-			/* Copy action, revealed on hover over a finished answer. */
-			.ask-alaiy-tools { margin-top: 8px; height: 20px; }
-			.ask-alaiy-copy {
-				border: none; background: none; cursor: pointer; padding: 2px 6px;
-				border-radius: var(--s-radius-sm); color: var(--s-muted);
-				font-family: var(--s-font); font-size: 11.5px;
-				opacity: 0; transition: opacity .12s, background .12s;
+			/* One row: Copy and the feedback thumbs sit side by side, both
+			   plain icon buttons, both always visible -- Copy used to be a
+			   hover-only text link, but a judgement (thumb) and a utility
+			   (copy) read as the same *kind* of control once they share a
+			   row, so they now share a style too. flex-wrap is what lets the
+			   thumbs-down textarea, given flex-basis: 100% below, drop onto
+			   its own full-width line without needing a second container. */
+			.ask-alaiy-tools {
+				margin-top: 8px; display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px;
 			}
-			.ask-alaiy-turn:hover .ask-alaiy-copy, .ask-alaiy-copy:focus-visible { opacity: 1; }
-			.ask-alaiy-copy:hover { background: var(--s-hover); color: var(--s-ink); }
+			.ask-alaiy-copy {
+				display: flex; align-items: center; justify-content: center;
+				border: none; background: none; padding: 0; color: var(--s-muted); cursor: pointer;
+			}
+			.ask-alaiy-copy:hover { color: var(--s-ink); }
+
+			/* Feedback control -- see _feedback_control(). A flex item inside
+			   .ask-alaiy-tools, alongside Copy. Always visible, unlike Copy: a
+			   thumb is a judgement about the reply, not a utility action someone
+			   reaches for only when they already know they want it. */
+			.ask-alaiy-feedback { display: flex; align-items: center; gap: 10px; }
+			.ask-alaiy-feedback-thumb {
+				display: flex; align-items: center; justify-content: center;
+				border: none; background: none; padding: 0; color: var(--s-muted); cursor: pointer;
+			}
+			.ask-alaiy-feedback-thumb:hover { color: var(--s-ink); }
+			.ask-alaiy-feedback-thumb:disabled { opacity: .5; cursor: default; }
+			.ask-alaiy-feedback-sent { font-size: 12.5px; color: var(--s-muted); }
+			.ask-alaiy-feedback-form {
+				/* Always its own full-width line below Copy + thumbs, never
+				   squeezed beside them -- a textarea sharing a row with a 12px
+				   Copy button is not a usable row. */
+				flex-basis: 100%; margin-top: 2px; display: flex; flex-direction: column; gap: 6px;
+			}
+			.ask-alaiy-feedback-input {
+				resize: none; width: 100%;
+				border: var(--s-border-width) var(--s-border-style) var(--s-border);
+				background: var(--s-cream); border-radius: var(--s-radius-sm); padding: 7px 10px;
+				font-family: var(--s-font); font-size: 12.5px; color: var(--s-ink); outline: none;
+			}
+			.ask-alaiy-feedback-input:focus { border-color: var(--s-black); }
+			.ask-alaiy-feedback-error { margin: 0; font-size: 12px; color: var(--s-red); }
+			.ask-alaiy-feedback-actions { display: flex; justify-content: flex-end; gap: 6px; }
+			.ask-alaiy-feedback-cancel, .ask-alaiy-feedback-send {
+				border: none; border-radius: var(--s-radius-sm); padding: 4px 10px;
+				font-size: 12px; font-family: var(--s-font); cursor: pointer;
+				display: flex; align-items: center; justify-content: center; min-width: 44px;
+			}
+			.ask-alaiy-feedback-cancel { background: none; color: var(--s-muted); }
+			.ask-alaiy-feedback-cancel:hover { color: var(--s-ink); }
+			.ask-alaiy-feedback-send { background: var(--s-black); color: var(--s-on-black); }
+			.ask-alaiy-feedback-cancel:disabled, .ask-alaiy-feedback-send:disabled { opacity: .5; cursor: default; }
 
 			/* ── Welcome ─────────────────────────────────────────────────── */
 			.ask-alaiy-welcome {
@@ -611,6 +662,8 @@ class AlaiyAskPage {
 		const paths = {
 			search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
 			trash: '<path d="M4 6h16"/><path d="M9 6V4h6v2"/><path d="M7 6l1 14h8l1-14"/>',
+			copy: '<rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/>',
+			check: '<path d="M20 6 9 17l-5-5"/>',
 			send: '<path d="M12 19V5"/><path d="M5 12l7-7 7 7"/>',
 			caret: '<path d="M9 6l6 6-6 6"/>',
 			spark: '<path d="M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17.5l-1.9-5.6L4.5 10l5.6-1.4z"/>',
@@ -620,6 +673,10 @@ class AlaiyAskPage {
 			file: '<path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z"/><path d="M14 3v5h5"/>',
 			close: '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
 			download: '<path d="M12 4v11"/><path d="M8 11l4 4 4-4"/><path d="M5 19h14"/>',
+			"thumbs-up":
+				'<path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/>',
+			"thumbs-down":
+				'<path d="M17 14V2"/><path d="M9 18.12 10 14H4.17a2 2 0 0 1-1.92-2.56l2.33-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-2.76a2 2 0 0 0-1.79 1.11L12 22h0a3.13 3.13 0 0 1-3-3.88Z"/>',
 			// Mention kinds. A mention source picks one of these by name; an
 			// unrecognised name draws nothing rather than breaking the row, so a
 			// deployment can add a kind without needing a path here first.
@@ -1385,6 +1442,9 @@ class AlaiyAskPage {
 		const attached = this._ready_attachments();
 
 		this._clear_welcome();
+		// A new user turn starts a new reply to react to — the trail from
+		// whatever was answered before is done accumulating.
+		this._reply_tools = new Map();
 		this._add(this._user_turn(text, attached, mentions));
 		this.pending.clear();
 		this._draw_tray();
@@ -1580,12 +1640,26 @@ class AlaiyAskPage {
 			// that was sent — the tokens are marked again from the record, not
 			// re-guessed out of the text.
 			if (message.text || files.length) {
+				// A new exchange starts here — replaying an old chat's full
+				// history must not let one exchange's trail bleed into the next
+				// via `this._reply_tools`. `_send()` resets the same way for a
+				// message typed live, which never reaches this branch (it is
+				// added to the thread directly, not polled back).
+				this._reply_tools = new Map();
 				this._add(this._user_turn(message.text, files, message.mentions));
 			}
 			return;
 		}
 
 		const tools = message.tool_calls || [];
+		const failed = new Set(message.tool_errors || []);
+		// Accumulate into the running trail for this exchange regardless of
+		// whether this particular row also carries text — see `_reply_tools`'s
+		// own comment. Keyed by call id, so redrawing an already-seen message
+		// (a poll, or the swap from partial to settled) never double-counts.
+		tools.forEach((call) => {
+			if (call.id) this._reply_tools.set(call.id, { tool: call.name, input: call.input, failed: failed.has(call.id) });
+		});
 		// A generated file counts as something to show: the model can hand over a
 		// spreadsheet and stop, and the chip is then the whole message.
 		const produced = message.attachments || [];
@@ -1604,7 +1678,7 @@ class AlaiyAskPage {
 		$(`<div class="ask-alaiy-mark">${this._icon("spark")}</div>`).appendTo($turn);
 		const $body = $('<div class="ask-alaiy-body"></div>').appendTo($turn);
 
-		if (tools.length) $body.append(this._trail(tools, new Set(message.tool_errors || [])));
+		if (tools.length) $body.append(this._trail(tools, failed));
 
 		if (message.text || message.partial) {
 			// Model output is untrusted text: escape first, then apply our own
@@ -1612,8 +1686,22 @@ class AlaiyAskPage {
 			$body.append($('<div class="ask-alaiy-answer"></div>').html(this._markdown(message.text)));
 			// No copy button until the answer is finished — copying half of one
 			// is never what someone meant, and the button moving down the screen
-			// as the text grows invites exactly that misclick.
-			if (!message.partial) $body.append(this._copy_button(message.text));
+			// as the text grows invites exactly that misclick. Same rule for
+			// feedback: every settled reply gets it, tool-using or not, so
+			// `agent_trail.tools` is legitimately `[]` for a plain-text answer.
+			if (!message.partial) {
+				// One shared row so Copy and the thumbs sit on the same line —
+				// see `.ask-alaiy-tools`'s own comment for how the thumbs-down
+				// textarea still gets its own line when it opens.
+				const $tools = $('<div class="ask-alaiy-tools"></div>').appendTo($body);
+				$tools.append(this._copy_button(message.text));
+				$tools.append(
+					this._feedback_control(this.session, message.name, {
+						text: message.text,
+						tools: Array.from(this._reply_tools.values()),
+					}),
+				);
+			}
 		}
 
 		// Below the answer, unlike a user turn: a generated file is the reply's
@@ -1708,17 +1796,130 @@ class AlaiyAskPage {
 		return $trail;
 	}
 
+	/** Just the button -- the caller supplies the `.ask-alaiy-tools` row so
+	 * this can sit on the same line as `_feedback_control`'s thumbs. An icon,
+	 * not text, and always visible -- matching the thumbs it now shares a
+	 * row with, not the hover-only text link it used to be. */
 	_copy_button(text) {
-		const $wrap = $('<div class="ask-alaiy-tools"></div>');
-		$('<button type="button" class="ask-alaiy-copy"></button>')
-			.text(__("Copy"))
-			.on("click", function () {
-				navigator.clipboard.writeText(text);
-				const $btn = $(this);
-				$btn.text(__("Copied"));
-				setTimeout(() => $btn.text(__("Copy")), 1400);
-			})
-			.appendTo($wrap);
+		const $btn = $('<button type="button" class="ask-alaiy-copy"></button>')
+			.attr("aria-label", __("Copy"))
+			.html(this._icon("copy"));
+		$btn.on("click", () => {
+			navigator.clipboard.writeText(text);
+			$btn.html(this._icon("check"));
+			setTimeout(() => $btn.html(this._icon("copy")), 1400);
+		});
+		return $btn;
+	}
+
+	/** Thumbs up/down on one settled reply -- see interface/docs/feedback-
+	 * system.md. Thumbs-up submits immediately, a bare positive signal being
+	 * complete on its own; thumbs-down opens a textarea first, since the
+	 * point of a negative rating is finding out what was wrong. Vanilla-JS
+	 * equivalent of interface/src/components/ask-alaiy/feedback-control.tsx
+	 * and interface/desk-widget/src/askAlaiy/FeedbackControl.tsx -- same state machine and
+	 * API contract, hand-rolled here since this page cannot import a React
+	 * component from either bundle. */
+	_feedback_control(session, message, agent_trail) {
+		const $wrap = $("<div></div>");
+		const state = { status: "idle", sentiment: null, error: null };
+
+		const submit = async (chosen, reason) => {
+			state.status = "sending";
+			state.sentiment = chosen;
+			render();
+			try {
+				await frappe.xcall("alaiy_os.api.feedback.submit_feedback", {
+					session: session,
+					message: message,
+					sentiment: chosen,
+					feedback: reason || "",
+					screen: "Desk",
+					agent_trail: JSON.stringify(agent_trail),
+				});
+				state.status = "sent";
+			} catch (e) {
+				state.status = "error";
+				state.error = this._error_text(e, __("Couldn't send that — try again."));
+			}
+			render();
+		};
+
+		const render_down = () => {
+			$wrap.empty().attr("class", "ask-alaiy-feedback-form");
+			const sending = state.status === "sending";
+			const $textarea = $(
+				`<textarea class="ask-alaiy-feedback-input" rows="2" placeholder="${__(
+					"What was wrong with this reply?",
+				)}"></textarea>`,
+			)
+				.prop("disabled", sending)
+				.appendTo($wrap);
+			if (state.status === "error" && state.error) {
+				$('<p class="ask-alaiy-feedback-error"></p>').text(state.error).appendTo($wrap);
+			}
+			const $actions = $('<div class="ask-alaiy-feedback-actions"></div>').appendTo($wrap);
+			$('<button type="button" class="ask-alaiy-feedback-cancel"></button>')
+				.text(__("Cancel"))
+				.prop("disabled", sending)
+				.on("click", () => {
+					state.status = "idle";
+					state.sentiment = null;
+					state.error = null;
+					render();
+				})
+				.appendTo($actions);
+			const $send = $('<button type="button" class="ask-alaiy-feedback-send"></button>').appendTo($actions);
+			const paint_send = () => $send.prop("disabled", sending || !($textarea.val() || "").trim());
+			$send.html(sending ? '<span class="ask-alaiy-file-spinner"></span>' : __("Send"));
+			$textarea.on("input", paint_send);
+			$send.on("click", () => void submit("Down", ($textarea.val() || "").trim()));
+			paint_send();
+			if (!sending) setTimeout(() => $textarea.trigger("focus"), 0);
+		};
+
+		const render_thumbs = () => {
+			$wrap.empty().attr("class", "ask-alaiy-feedback");
+			const sending = state.status === "sending";
+			$('<button type="button" class="ask-alaiy-feedback-thumb"></button>')
+				.attr("aria-label", __("Good reply"))
+				.prop("disabled", sending)
+				.html(
+					sending && state.sentiment === "Up"
+						? '<span class="ask-alaiy-file-spinner"></span>'
+						: this._icon("thumbs-up"),
+				)
+				.on("click", () => void submit("Up"))
+				.appendTo($wrap);
+			$('<button type="button" class="ask-alaiy-feedback-thumb"></button>')
+				.attr("aria-label", __("Bad reply"))
+				.prop("disabled", sending)
+				.html(this._icon("thumbs-down"))
+				.on("click", () => {
+					state.status = "idle";
+					state.sentiment = "Down";
+					render_down();
+				})
+				.appendTo($wrap);
+			if (state.status === "error" && state.error) {
+				$('<span class="ask-alaiy-feedback-error"></span>').text(state.error).appendTo($wrap);
+			}
+		};
+
+		// Branches primarily on `state.sentiment`, not `state.status`: once Down
+		// is chosen the textarea stays up through open/sending/error, while an
+		// Up submission's sending and error states render inline on the thumbs
+		// themselves rather than ever showing a textarea.
+		const render = () => {
+			if (state.status === "sent") {
+				$wrap.empty().attr("class", "ask-alaiy-feedback-sent").text(__("Feedback sent — thanks."));
+				return;
+			}
+			if (state.sentiment === "Down") return render_down();
+			render_thumbs();
+		};
+
+		render();
 		return $wrap;
 	}
 
@@ -2122,6 +2323,7 @@ class AlaiyAskPage {
 		// database, this page just stops following them.
 		this.session = null;
 		this.last_seq = 0;
+		this._reply_tools = new Map();
 		// Staged uploads belong to the session being left behind. Dropping them
 		// from the tray is enough — they are attached to that session and go
 		// with it if it is ever deleted.

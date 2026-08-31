@@ -16,7 +16,8 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: "../alaiy_os/public/dist",
+    // Two levels up: repos/alaiy_os/interface/desk-widget -> repos/alaiy_os/alaiy_os/public/dist.
+    outDir: "../../alaiy_os/public/dist",
     emptyOutDir: true,
     cssCodeSplit: false,
     lib: {

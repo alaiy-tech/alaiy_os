@@ -10,7 +10,7 @@ alaiy_os/workspace/
 .DS_Store
 /node_modules
 
-# Ask Alaiy widget (frontend/) -- built output only; the source ships, the
-# bundle doesn't. See frontend/README.md.
-frontend/node_modules/
+# Ask Alaiy widget (interface/desk-widget/) -- built output only; the source
+# ships, the bundle doesn't. See interface/desk-widget/README.md.
+interface/desk-widget/node_modules/
 alaiy_os/public/dist/

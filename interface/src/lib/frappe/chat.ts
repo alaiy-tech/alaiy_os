@@ -189,7 +189,7 @@ export const uploadChatAttachment = async (session: string, file: File): Promise
     exception?: string;
     _server_messages?: string;
   };
-  if (!res.ok) throw new FrappeError(frappeErrorMessage(body, "Upload failed."));
+  if (!res.ok) throw new FrappeError(frappeErrorMessage(body, "Upload failed."), res.status);
   return body.message as UploadAttachmentResult;
 };
 
