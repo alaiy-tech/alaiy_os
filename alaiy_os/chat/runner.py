@@ -25,6 +25,7 @@ chain outlives any sane request timeout).
 """
 
 import json
+import re
 import traceback
 
 import frappe
@@ -46,6 +47,11 @@ TITLE_LENGTH = 80
 # model cannot use and the customer still pays for, so the result is truncated
 # with a visible marker — the model can re-query more narrowly when it matters.
 MAX_TOOL_RESULT_CHARS = 20_000
+
+# Markup in a tool failure, for `_tool_error`. Not `frappe.utils.strip_html_tags`:
+# that deletes the tag outright, and frappe separates the halves of a throw
+# message with `<br>` — dropping it runs the last word into the first.
+_HTML_TAG = re.compile(r"<[^>]*>")
 
 # Every turn re-sends the conversation, so an unbounded session eventually
 # exceeds the context window (and costs a fortune on the way there). Older
@@ -332,8 +338,51 @@ def _run_tools(blocks):
 			# Tool failures go back to the model, not up the stack: a rejected
 			# permission or a bad argument is something it can respond to.
 			# Only the message, not the traceback — the user can see this text.
-			results.append(_tool_result(block["id"], f"{type(exc).__name__}: {exc}", is_error=True))
+			#
+			# The traceback is logged rather than dropped. It was the only record of
+			# why a tool failed and it existed nowhere: a user reporting "it said it
+			# couldn't reach X" left nothing on the site to read, and the message the
+			# model relayed was its own guess at a cause (see `_tool_error`).
+			try:
+				frappe.log_error(title=f"Chat tool {block.get('name')} failed")
+			except Exception:
+				# Logging may never be what ends a turn. The Error Log insert can fail
+				# on its own — an aborted transaction, most often, which is exactly the
+				# state a tool that failed *at* the database leaves behind — and the
+				# model can still be told about the tool failure without it.
+				pass
+			results.append(_tool_result(block["id"], _tool_error(exc), is_error=True))
 	return results
+
+
+def _tool_error(exc):
+	"""What the model is told when a tool raises.
+
+	Two things the raw `f"{type(exc).__name__}: {exc}"` got wrong, both of which end up
+	in front of the user because this text is relayed as prose:
+
+	  - `frappe.throw` messages are HTML, so the model was reading markup and quoting
+	    it back;
+	  - the message can be empty, leaving nothing but a class name. Given
+	    `ValidationError` and no detail a model does not say "a tool failed and I don't
+	    know why" — it infers a plausible cause, and the user reads that inference as a
+	    diagnosis. A real case: a connector raising past its own error handling became
+	    "the catalogue service is unreachable, please try again shortly", advice which
+	    was wrong in both halves.
+
+	So: strip the markup, and when no message survives, say what is actually known —
+	the tool failed, the reason is in the log — instead of leaving a bare exception name
+	to be interpreted.
+	"""
+	message = " ".join(_HTML_TAG.sub(" ", str(exc)).split())
+	if message:
+		return f"{type(exc).__name__}: {message}"
+	return (
+		f"{type(exc).__name__} (no message). The tool failed for a reason it did not "
+		"report; the traceback is in this site's Error Log. Tell the user the tool "
+		"failed and that an administrator needs to check the log. Do not guess at a "
+		"cause, and do not describe it as a temporary or network problem."
+	)
 
 
 def _tool_result(tool_use_id, content, is_error=False):
