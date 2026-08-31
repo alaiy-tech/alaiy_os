@@ -36,6 +36,31 @@ def complete(model, system, messages, tools=None):
 	return _client().complete(model, system, messages, tools=tools)
 
 
+def streaming_available():
+	"""Whether the active client can stream — without making a call.
+
+	`stream` is optional on the client contract (see `engine/ai_client.py`), so a
+	managed client predating it is missing the method rather than failing on it.
+	A caller checks once up front and picks a path, the same way `image_support()`
+	is read before queueing image work.
+	"""
+	return hasattr(_client(), "stream")
+
+
+def stream(model, system, messages, tools=None, on_text=None):
+	"""`complete`, with each text delta handed to `on_text` as it arrives.
+
+	Returns the same dict `complete` does — the caller's handling of blocks,
+	`stop_reason` and usage is identical either way. Raises `Unsupported` rather
+	than silently buffering if this deployment's client cannot stream, so a caller
+	that asked for it learns that it did not happen.
+	"""
+	client = _client()
+	if not hasattr(client, "stream"):
+		raise Unsupported("This deployment's ai_client cannot stream responses.")
+	return client.stream(model, system, messages, tools=tools, on_text=on_text)
+
+
 def generate_image(prompt, reference_data_uri=None):
 	"""One generated image -> {"b64", "media_type", "usage"}.
 

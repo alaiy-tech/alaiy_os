@@ -25,7 +25,11 @@ chain outlives any sane request timeout).
 """
 
 import json
+<<<<<<< HEAD
 import re
+=======
+import time
+>>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 import traceback
 
 import frappe
@@ -35,6 +39,7 @@ from alaiy_os.chat import artifacts as chat_artifacts
 from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import skills as chat_skills
+from alaiy_os.chat import suggest as chat_suggest
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.chat import websearch as chat_websearch
 from alaiy_os.engine import llm
@@ -65,6 +70,15 @@ MAX_HISTORY_MESSAGES = 60
 # tool pointers are exempt: they are already tiny, and eliding one would strip
 # the file_url the model needs to read it again. See `_elide_old_attachments`.
 ATTACHMENT_MEMORY = 1
+
+# How often a streaming turn writes what it has so far. The row is the transport
+# (see `_streaming_step`), so every flush is an UPDATE plus a COMMIT — one per
+# token would make the database the bottleneck and turn a cheap answer into
+# thousands of writes. Either threshold triggers a flush, whichever comes first:
+# the interval keeps a slow model visibly moving, the char count keeps a fast one
+# from buffering a paragraph while it waits for the clock.
+STREAM_FLUSH_SECONDS = 0.4
+STREAM_FLUSH_CHARS = 200
 
 # Mentions have no equivalent and are never elided: a mention block is a handful
 # of tokens naming a few records, not a document. Dropping it from history would
@@ -224,6 +238,11 @@ def run_turn(session):
 		# conversation so far is the thing of value, and the user needs to see
 		# where it got to.
 		frappe.db.rollback()
+		# Including the half-written one, if the stream died mid-answer: its text
+		# is committed and worth reading. Clearing the flag is what makes it a
+		# finished message rather than one every client re-polls forever waiting
+		# for a worker that is gone.
+		_settle_partials(doc.name)
 		doc.reload()
 		doc.db_set(
 			{"status": "Failed", "error": traceback.format_exc(), "last_activity": now_datetime()},
@@ -233,6 +252,11 @@ def run_turn(session):
 		return
 
 	doc.reload()
+	# Before the status flip, not after: a client stops polling the moment a
+	# session reads Idle, so anything written past this line is written for
+	# nobody. `attach` never raises — a turn that answered must never be reported
+	# as failed because its follow-up chips could not be written.
+	chat_suggest.attach(doc)
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
 
 
@@ -284,6 +308,11 @@ def _loop(doc):
 	max_turns = int(frappe.conf.get("chat_max_turns") or DEFAULT_MAX_TURNS)
 	model = doc.model or default_model()
 
+	# Resolved once, not per iteration: the hook and the flag cannot change
+	# mid-turn, and a turn that streamed its first answer and buffered its second
+	# would be a worse experience than either.
+	streaming = bool(frappe.conf.get("chat_streaming", True)) and llm.streaming_available()
+
 	# Files a tool wrote on the previous pass, owed to the next assistant message.
 	# A tool only ever runs *after* the `stop_reason` check below, so a drain is
 	# always followed by another iteration — which is what puts the download chip
@@ -294,11 +323,14 @@ def _loop(doc):
 
 	for _ in range(max_turns):
 		messages = _history(doc.name)
-		response = llm.complete(model, system, messages, tools=specs or None)
-		_record_usage(doc, response.get("usage") or {})
+		# One LLM call, one assistant message written. The two differ only in
+		# whether the message is readable while it is being written; both return
+		# the same dict, so everything below is blind to which one ran.
+		step = _streaming_step if streaming else _buffered_step
+		response = step(doc, model, system, messages, specs, pending)
 
 		blocks = response["content"]
-		_append(doc.name, "assistant", blocks, text=_text_of(blocks), attachments=pending)
+		_record_usage(doc, response.get("usage") or {})
 		pending = None
 		frappe.db.commit()
 
@@ -322,6 +354,99 @@ def _loop(doc):
 	# unreachable by anyone.
 	_append(doc.name, "assistant", [{"type": "text", "text": note}], text=note, attachments=pending)
 	frappe.db.commit()
+
+
+def _buffered_step(doc, model, system, messages, specs, pending):
+	"""One LLM call, written once it is complete. The original behaviour."""
+	response = llm.complete(model, system, messages, tools=specs or None)
+	blocks = response["content"]
+	_append(doc.name, "assistant", blocks, text=_text_of(blocks), attachments=pending)
+	return response
+
+
+def _streaming_step(doc, model, system, messages, specs, pending):
+	"""One LLM call whose answer is readable while it is still being written.
+
+	The message row *is* the transport. A turn runs in a worker, in a different
+	process from any web request, so there is no response to stream down — but
+	`api.chat.get_messages` is already polled mid-turn, and a row it can re-read
+	as it grows carries the same tokens with no new channel. It also survives a
+	reload, which an open socket would not: the text is committed state, not bytes
+	in flight.
+
+	The row is inserted before the first token so the client has something to
+	grow, with empty blocks — `_history` skips those, so a stream that dies here
+	cannot feed the model a message with no content, which the API rejects
+	outright.
+	"""
+	session = doc.name
+	# `attachments=pending` here for the same reason as the buffered path: the
+	# chip belongs on the message where the model says "here it is".
+	seq = _append(session, "assistant", [], text="", attachments=pending, is_partial=True)
+	name = frappe.db.get_value("OS Chat Message", {"session": session, "seq": seq}, "name")
+	frappe.db.commit()
+
+	buffer = []
+	written = [0]  # chars already committed; lists so `on_text` can rebind them
+	last = [time.monotonic()]
+
+	def on_text(chunk):
+		buffer.append(chunk)
+		text = "".join(buffer)
+		grown = len(text) - written[0]
+		if grown < STREAM_FLUSH_CHARS and (time.monotonic() - last[0]) < STREAM_FLUSH_SECONDS:
+			return
+		frappe.db.set_value("OS Chat Message", name, "text", text, update_modified=False)
+		frappe.db.commit()
+		written[0] = len(text)
+		last[0] = time.monotonic()
+
+	try:
+		response = llm.stream(model, system, messages, tools=specs or None, on_text=on_text)
+	except Exception:
+		if buffer:
+			# Some of the answer arrived and is committed. Keep it and let the
+			# turn fail around it — same call as `run_turn` makes about the
+			# messages before this one.
+			raise
+		# Nothing arrived, so nothing is lost by pretending this never happened.
+		# A provider behind `ai_base_url` that refuses to stream should degrade to
+		# the old behaviour rather than break the site.
+		frappe.db.delete("OS Chat Message", {"name": name})
+		frappe.db.commit()
+		return _buffered_step(doc, model, system, messages, specs, pending)
+
+	# The final write is authoritative and rewrites `text` from the blocks rather
+	# than from the buffer, so a delta the provider sent twice or not at all
+	# cannot leave the stored message disagreeing with what the model said.
+	blocks = response["content"]
+	frappe.db.set_value(
+		"OS Chat Message",
+		name,
+		{
+			"text": _text_of(blocks),
+			"blocks": json.dumps(blocks, default=str),
+			"is_partial": 0,
+		},
+		update_modified=False,
+	)
+	return response
+
+
+def _settle_partials(session):
+	"""Finish any message left mid-stream, so nothing polls for a dead worker.
+
+	`blocks` is left as it is — empty, which `_history` skips — because there is
+	no way to know what the model would have gone on to say. What the row keeps is
+	the text that did arrive, which is the part a person can read.
+	"""
+	names = frappe.get_all(
+		"OS Chat Message", filters={"session": session, "is_partial": 1}, pluck="name"
+	)
+	for name in names:
+		frappe.db.set_value("OS Chat Message", name, "is_partial", 0, update_modified=False)
+	if names:
+		frappe.db.commit()
 
 
 def _run_tools(blocks):
@@ -567,8 +692,13 @@ def _append(
 	attachments=None,
 	mentions=None,
 	skill=None,
+<<<<<<< HEAD
 	skill_args=None,
 	screen=None,
+=======
+	screen=None,
+	is_partial=False,
+>>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 ):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
@@ -586,6 +716,7 @@ def _append(
 			"skill_used": skill,
 			"skill_args": json.dumps(skill_args) if skill_args else None,
 			"screen": screen,
+			"is_partial": 1 if is_partial else 0,
 		}
 	).insert(ignore_permissions=True)
 	return seq
@@ -599,6 +730,11 @@ def _history(session):
 		fields=["role", "blocks", "attachments"],
 		order_by="seq asc",
 	)
+	# A message with no blocks is one a streaming turn was still writing when it
+	# died (see `_streaming_step`). Its text is worth showing a person but there
+	# is nothing to replay, and the API rejects a message with empty content
+	# outright — the same failure mode `_trim` heals its seam to avoid.
+	rows = [row for row in rows if (row.blocks or "").strip() not in ("", "[]")]
 	return _trim(_elide_old_attachments(rows))
 
 

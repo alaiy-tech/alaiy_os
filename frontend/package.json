@@ -1,0 +1,24 @@
+{
+  "name": "alaiy-os-ask-alaiy-widget",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Ask Alaiy floating launcher + panel, injected into every Frappe Desk page via app_include_js/css. Builds to a single self-contained bundle -- no BFF, no router, no design-system dependency; it talks to Frappe with frappe.call and reads Frappe's own CSS custom properties for theming.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b --noCheck && vite build"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.15.4",
+    "lucide-react": "^0.462.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react-swc": "^4.3.3",
+    "typescript": "^5.6.3",
+    "vite": "^8.2.2"
+  }
+}

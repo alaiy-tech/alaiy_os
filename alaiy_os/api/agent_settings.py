@@ -121,6 +121,7 @@ def set_agent_enabled(agent, enabled, force=False):
 
 
 @frappe.whitelist()
+<<<<<<< HEAD
 def set_agent_run_as_user(agent, user=None):
 	"""
 	Set — or clear — the service user an agent's runs adopt.
@@ -140,10 +141,22 @@ def set_agent_run_as_user(agent, user=None):
 	`engine/factory.py` re-checks the declarations, such a run now fails loudly
 	instead of reporting zeros. The row comes back saying both — enabled, and
 	missing permissions.
+=======
+def set_agent_run_as_user(agent, user):
+	"""
+	Change which user an agent's tools run as, then hand back its recomputed
+	settings row -- one user change can flip every permission chip on the
+	card, so the caller should render what comes back rather than patch its
+	own copy.
+
+	An empty `user` means Administrator (site-wide reads), not "unset" --
+	`list_agents` already treats a falsy `run_as_user` that way.
+>>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665
 	"""
 	if not frappe.has_permission("OS Agent Registry", "write"):
 		frappe.throw("Not permitted.", frappe.PermissionError)
 
+<<<<<<< HEAD
 	if not frappe.db.exists("OS Agent Registry", agent):
 		frappe.throw(f"There is no agent {agent}.")
 
@@ -164,3 +177,20 @@ def set_agent_run_as_user(agent, user=None):
 	frappe.db.commit()
 
 	return next((a for a in list_agents() if a["agent_id"] == agent), None)
+=======
+	user = (user or "").strip()
+
+	if user:
+		if user == "Guest" or not frappe.db.exists("User", user):
+			frappe.throw(f"{user} is not a valid user.", title="Invalid Run As User")
+		if not frappe.db.get_value("User", user, "enabled"):
+			frappe.throw(f"{user} is disabled.", title="Invalid Run As User")
+
+	frappe.db.set_value("OS Agent Registry", agent, "run_as_user", user)
+	frappe.db.commit()
+
+	state = next((a for a in list_agents() if a["agent_id"] == agent), None)
+	if not state:
+		frappe.throw(f"Agent {agent} not found.")
+	return state
+>>>>>>> ead667ff3fabca092c1d4417be8d8eecc7359665

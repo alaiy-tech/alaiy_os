@@ -1,0 +1,77 @@
+/**
+ * Styling for the assistant's rendered markdown (see markdown.ts) and the
+ * streaming caret -- both are raw HTML injected via dangerouslySetInnerHTML,
+ * so Tailwind utility classes on the React tree can't reach inside them.
+ * Colors are this app's real Tailwind v4 tokens (src/app/globals.css), so
+ * this still tracks every theme preset and light/dark automatically.
+ */
+
+.ask-alaiy-answer p {
+  margin: 0 0 8px;
+}
+.ask-alaiy-answer p:last-child {
+  margin-bottom: 0;
+}
+.ask-alaiy-answer h4 {
+  font-size: 13.5px;
+  font-weight: 600;
+  margin: 12px 0 6px;
+  color: var(--color-foreground);
+}
+.ask-alaiy-answer ul,
+.ask-alaiy-answer ol {
+  margin: 0 0 8px;
+  padding-left: 20px;
+}
+.ask-alaiy-answer blockquote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--color-border);
+  color: var(--color-muted-foreground);
+}
+.ask-alaiy-answer pre {
+  background: var(--color-muted);
+  border-radius: 6px;
+  padding: 8px 10px;
+  overflow-x: auto;
+  font-size: 12px;
+  margin: 0 0 8px;
+}
+.ask-alaiy-answer code {
+  font-family: var(--font-mono, monospace);
+  font-size: 12px;
+}
+.ask-alaiy-table-wrap {
+  overflow-x: auto;
+  margin: 0 0 8px;
+}
+.ask-alaiy-table-wrap table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 12.5px;
+}
+.ask-alaiy-table-wrap th,
+.ask-alaiy-table-wrap td {
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  text-align: left;
+}
+.ask-alaiy-table-wrap th {
+  background: var(--color-muted);
+  font-weight: 600;
+}
+.ask-alaiy-streaming .ask-alaiy-answer p:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background: currentColor;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  animation: ask-alaiy-caret 0.9s steps(1) infinite;
+}
+@keyframes ask-alaiy-caret {
+  50% {
+    opacity: 0;
+  }
+}
