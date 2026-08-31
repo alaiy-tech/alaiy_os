@@ -26,6 +26,7 @@ chain outlives any sane request timeout).
 
 import json
 import re
+import time
 import traceback
 
 import frappe
@@ -690,6 +691,7 @@ def _append(
 	skill=None,
 	skill_args=None,
 	screen=None,
+	is_partial=False,
 ):
 	"""Write one message and return its seq."""
 	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
