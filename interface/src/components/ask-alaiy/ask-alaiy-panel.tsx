@@ -546,7 +546,16 @@ export function useTypedText(text: string, partial: boolean): string {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [partial]);
+    // `text` matters here, not just `partial`: `groupAssistantTurns` merges a
+    // tool-call message (often empty text) and its follow-up final-answer
+    // message into one turn that keeps the same key, so the text this hook
+    // reveals can jump to a completely different, longer string while
+    // `partial` itself never flips. Without `text` in the deps, a loop that
+    // already stopped (caught up to the old, shorter string while !partial)
+    // never restarts to notice the swap, and the reveal freezes empty forever
+    // -- exactly what showed up as a download-report reply with no text until
+    // a reload remounted this hook from scratch.
+  }, [partial, text]);
 
   return shown < text.length ? typedPrefix(text, shown) : text;
 }
