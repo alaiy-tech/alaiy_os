@@ -4,3 +4,6 @@
 anthropic
 # executor.py validates JSON agent output against the agent's output schema
 jsonschema
+# presentations.py writes .pptx decks -- unlike openpyxl (xlsx), nothing in
+# Frappe/ERPNext pulls this in transitively
+python-pptx

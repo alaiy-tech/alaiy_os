@@ -9,4 +9,8 @@ alaiy_os/desktop_icon/
 alaiy_os/workspace/
 .DS_Store
 /node_modules
-test.sh
+
+# Ask Alaiy widget (interface/desk-widget/) -- built output only; the source
+# ships, the bundle doesn't. See interface/desk-widget/README.md.
+interface/desk-widget/node_modules/
+alaiy_os/public/dist/
