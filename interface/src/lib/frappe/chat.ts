@@ -175,6 +175,11 @@ export const sendChatMessage = (params: {
 export const getChatMessages = (params: { session: string; after?: number; partial?: 0 | 1 }) =>
   call<GetMessagesResult>(`${NS}.get_messages`, params);
 
+/** GET, not `call()` -- EventSource only ever issues a plain GET and can't
+ * carry a JSON body, so `stream_messages`'s own args ride the query string. */
+export const streamMessagesUrl = (session: string, after: number) =>
+  `/api/method/${NS}.stream_messages?session=${encodeURIComponent(session)}&after=${after}`;
+
 export const deleteChatSession = (session: string) => call<{ deleted: string }>(`${NS}.delete_session`, { session });
 
 export const listChatSkills = () => call<ChatSkill[]>(`${NS}.list_skills`);
