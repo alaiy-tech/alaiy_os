@@ -11,6 +11,14 @@ import {
 
 const SESSION_KEY = "ask-alaiy-active-session";
 
+/** After this many consecutive failed (re)connects, stop retrying and
+ * surface an error instead -- an endpoint that is actually down (a stale
+ * server process, a proxy misconfiguration) would otherwise have the client
+ * hammer it in a tight fail-instantly loop forever, which looks exactly
+ * like the polling this was meant to replace. */
+const MAX_STREAM_FAILURES = 5;
+const streamBackoffMs = (failures: number) => Math.min(500 * 2 ** failures, 8_000);
+
 export const MAX_ATTACHMENTS = 5;
 
 /** Per-tab, not per-browser: switching away and back to the same tab must
@@ -118,6 +126,8 @@ export function useAskAlaiy() {
 
   const lastSeq = useRef(0);
   const eventSource = useRef<EventSource | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamFailures = useRef(0);
   const activeSession = useRef<string | null>(null);
   const uploadSeq = useRef(0);
   const skillsPromise = useRef<Promise<ChatSkill[]> | null>(null);
@@ -133,6 +143,10 @@ export function useAskAlaiy() {
   }, []);
 
   const stopStream = useCallback(() => {
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
     if (eventSource.current) {
       eventSource.current.close();
       eventSource.current = null;
@@ -210,6 +224,9 @@ export function useAskAlaiy() {
 
       es.onmessage = (e) => {
         if (activeSession.current !== session) return;
+        // A real event arrived, so the connection is genuinely healthy --
+        // whatever run of failures preceded it no longer counts.
+        streamFailures.current = 0;
         absorbMessage(JSON.parse(e.data) as ChatMessage);
       };
 
@@ -225,6 +242,7 @@ export function useAskAlaiy() {
         // The server's own wall-clock cap tripped, not a real end of turn --
         // just resume from wherever the cursor landed.
         if (data.status === "timeout") {
+          streamFailures.current = 0;
           startStream(session);
           return;
         }
@@ -232,24 +250,38 @@ export function useAskAlaiy() {
         settle(data.status, data.error, data.suggestions);
       });
 
-      // A dropped connection (a network blip, a laptop waking from sleep)
-      // rather than a clean `done`. EventSource would otherwise retry the
-      // exact same stream on its own after a fixed delay; catching up once
-      // over plain JSON first means the UI doesn't sit frozen for that
-      // delay, and confirms the turn is still actually running before
-      // reopening the stream at all.
+      // A dropped connection (a network blip, a laptop waking from sleep, an
+      // endpoint that 403s because the server hasn't loaded it) rather than
+      // a clean `done`. EventSource would otherwise retry the exact same
+      // stream on its own with no backoff; catching up once over plain JSON
+      // first means the UI doesn't sit frozen for that delay, confirms the
+      // turn is still actually running before reopening the stream at all,
+      // and -- paired with the failure cap/backoff above -- keeps a truly
+      // broken endpoint from being hammered forever.
       es.onerror = () => {
         if (activeSession.current !== session) return;
         stopStream();
+        streamFailures.current += 1;
+        const outOfRetries = streamFailures.current > MAX_STREAM_FAILURES;
+
         getChatMessages({ session, after: lastSeq.current, partial: 1 })
           .then((data) => {
             if (activeSession.current !== session) return;
             data.messages.forEach(absorbMessage);
-            if (data.status === "Running") {
-              startStream(session);
+            if (data.status !== "Running") {
+              settle(data.status, data.error, data.suggestions);
               return;
             }
-            settle(data.status, data.error, data.suggestions);
+            if (outOfRetries) {
+              setRunning(false);
+              setError("Lost contact with the assistant.");
+              refreshSessions();
+              return;
+            }
+            retryTimer.current = setTimeout(
+              () => startStream(session),
+              streamBackoffMs(streamFailures.current),
+            );
           })
           .catch((err) => {
             if (activeSession.current !== session) return;
@@ -258,7 +290,7 @@ export function useAskAlaiy() {
           });
       };
     },
-    [absorbMessage, settle, stopStream],
+    [absorbMessage, refreshSessions, settle, stopStream],
   );
 
   const ensureSession = useCallback(async (): Promise<string> => {
@@ -316,6 +348,7 @@ export function useAskAlaiy() {
           mentions: mentions.map((m) => ({ kind: m.kind, value: m.value })),
         });
         lastSeq.current = sent.seq;
+        streamFailures.current = 0;
         startStream(session);
       } catch (e) {
         setRunning(false);
@@ -406,6 +439,7 @@ export function useAskAlaiy() {
 
         if (data.status === "Running") {
           setRunning(true);
+          streamFailures.current = 0;
           startStream(name);
         }
       } catch (e) {
