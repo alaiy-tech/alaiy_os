@@ -5,7 +5,7 @@ import {
   MoreHorizontal, Package, Paperclip, Plus, Search, Send, Slash, Sparkles, Store, Tag,
   Trash2, TriangleAlert, X,
 } from "lucide-react";
-import { MAX_ATTACHMENTS, type useAskAlaiy, type PendingAttachment, type ThreadTurn } from "./useAskAlaiy";
+import { groupAssistantTurns, MAX_ATTACHMENTS, type useAskAlaiy, type PendingAttachment, type ThreadTurn } from "./useAskAlaiy";
 import { listChatMentions } from "./chat";
 import type {
   ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
@@ -286,9 +286,17 @@ export function AskAlaiyPanel({
   const showWelcome = chat.turns.length === 0 && !chat.running && !chat.error;
 
   const lastUserIdx = chat.turns.reduce((acc, t, i) => (t.role === "user" ? i : acc), -1);
-  const visibleTurns = chat.running
-    ? chat.turns.filter((t, i) => i <= lastUserIdx || t.text.length > 0)
-    : chat.turns;
+  // toolCalls.length > 0 matters here: an assistant turn with tool calls but
+  // no text yet (still working, nothing written back) used to be filtered
+  // out entirely, hiding the tool trail until text started streaming -- i.e.
+  // real-time tool progress never showed up in "real time" at all. See
+  // interface/src/components/ask-alaiy/ask-alaiy-panel.tsx, which carries
+  // the same fix -- this copy had drifted behind it.
+  const visibleTurns = groupAssistantTurns(
+    chat.running
+      ? chat.turns.filter((t, i) => i <= lastUserIdx || t.text.length > 0 || t.toolCalls.length > 0)
+      : chat.turns,
+  );
   const streamingNow = chat.running && visibleTurns.some((t) => t.partial && t.text.length > 0);
 
   return (
@@ -349,7 +357,6 @@ export function AskAlaiyPanel({
                 <Turn
                   key={turn.key}
                   turn={turn}
-                  suppressTools={chat.running}
                   // Only gate the turn currently being generated -- an
                   // older, already-finished turn stays feedback-able even
                   // while a newer message is running.
@@ -358,7 +365,7 @@ export function AskAlaiyPanel({
                 />
               );
             })}
-            {chat.running && !streamingNow && <ThinkingIndicator />}
+            {chat.running && !streamingNow && !visibleTurns[visibleTurns.length - 1]?.toolCalls.length && <ThinkingIndicator />}
             {chat.error && <ErrorTurn text={chat.error} />}
           </div>
         )}
@@ -506,16 +513,24 @@ function useTypedText(text: string, partial: boolean): string {
     };
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
-  }, [partial]);
+    // `text` matters here, not just `partial`: `groupAssistantTurns` merges a
+    // tool-call message (often empty text) and its follow-up final-answer
+    // message into one turn that keeps the same key, so the text this hook
+    // reveals can jump to a completely different, longer string while
+    // `partial` itself never flips. Without `text` in the deps, a loop that
+    // already stopped (caught up to the old, shorter string while !partial)
+    // never restarts to notice the swap, and the reveal freezes empty forever
+    // -- exactly what showed up as a download-report reply with no text until
+    // a reload remounted this hook from scratch.
+  }, [partial, text]);
 
   return shown < text.length ? typedPrefix(text, shown) : text;
 }
 
 function Turn({
-  turn, suppressTools, settled, sessionId,
+  turn, settled, sessionId,
 }: {
   turn: ThreadTurn;
-  suppressTools?: boolean;
   settled?: boolean;
   sessionId?: string | null;
 }) {
@@ -538,7 +553,11 @@ function Turn({
     <div className="ask-alaiy-turn ask-alaiy-turn-assistant">
       <div className="ask-alaiy-avatar"><Sparkles size={13} /></div>
       <div className="ask-alaiy-turn-content">
-        {turn.toolCalls.length > 0 && !suppressTools && <ToolTrail turn={turn} />}
+        {/* No suppression while running: a tool call in progress is exactly
+            what "streaming" looks like before any text exists (see
+            AskAlaiyPanel's visibleTurns comment) -- hiding it here is what
+            made tool-using turns look blank on screen while they ran. */}
+        {turn.toolCalls.length > 0 && <ToolTrail turn={turn} />}
         {typed && (
           <div className={typed.length < turn.text.length ? "ask-alaiy-streaming" : undefined}>
             <AnswerBody text={typed} />
@@ -576,13 +595,18 @@ function ToolTrail({ turn }: { turn: ThreadTurn }) {
       {turn.toolCalls.map((call) => {
         const failed = turn.toolErrors.has(call.id);
         const args = Object.entries(call.input || {}).filter(([, v]) => v !== null && v !== "");
+        // The call can land before its own name does (the row is created,
+        // then named), so an empty name isn't "no call" -- it's this one,
+        // mid-arrival. Previously invisible while running (see suppressTools
+        // above), so this fallback never had to matter until now.
+        const label = !call.name
+          ? "Working…"
+          : String(call.name).startsWith("skill:") ? `/${call.name.slice(6)}` : String(call.name).replace(/_/g, " ");
         return (
           <details key={call.id}>
             <summary className={cn("ask-alaiy-tool-summary", failed && "is-failed")}>
               <span className={cn("ask-alaiy-tool-dot", failed && "is-failed")} />
-              <span className="ask-alaiy-tool-name">
-                {String(call.name || "").startsWith("skill:") ? `/${call.name.slice(6)}` : String(call.name || "").replace(/_/g, " ")}
-              </span>
+              <span className="ask-alaiy-tool-name">{label}</span>
               {failed && <span>· refused</span>}
             </summary>
             {args.length > 0 && (

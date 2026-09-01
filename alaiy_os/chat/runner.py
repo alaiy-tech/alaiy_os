@@ -811,9 +811,12 @@ DOWNLOAD_PROMPT = (
 	"— so the file stays sortable.\n"
 	"- The file is attached to your reply automatically, as a chip the user can "
 	"click. You never see where it is stored and you must not invent it: no "
-	"markdown link, no file path, no 'sandbox:/tmp/...', no file name. Writing one "
-	"is worse than writing nothing, because a link that goes nowhere looks like the "
-	"export failed. Just say what the file contains.\n"
+	"markdown link, no file path, no 'sandbox:/tmp/...', no file name, and never a "
+	"URL built from this tool's own arguments (e.g. "
+	"'create_download?columns=...&rows=...'). If you want the user to have the "
+	"file, call the tool — do not describe calling it. Writing one is worse than "
+	"writing nothing, because a link that goes nowhere looks like the export "
+	"failed. Just say what the file contains.\n"
 	"- xlsx by default; csv when they ask for one or the table is very large; pdf "
 	"only when the file is a document to print or forward.\n"
 	"- If what you retrieved is empty, do not make a file and do not go hunting for "
@@ -849,7 +852,9 @@ PRESENTATION_PROMPT = (
 	"invented content, in a chart's points any more than in a table's rows.\n"
 	"- The file is attached to your reply automatically, as a chip the user can "
 	"click. You never see where it is stored and you must not invent it: no "
-	"markdown link, no file path, no file name.\n"
+	"markdown link, no file path, no file name, and never a URL built from this "
+	"tool's own arguments. If you want the user to have the deck, call the "
+	"tool — do not describe calling it.\n"
 	"- Your reply must still have words in it. Say what the deck covers and its "
 	"key takeaway in a sentence or two — never send the tool call as your whole "
 	"reply with nothing else written."
@@ -950,8 +955,27 @@ CHART_PROMPT = (
 )
 
 
+#: A model occasionally free-types the create_download/create_presentation call
+#: as a markdown link instead of issuing it as a real tool_call -- see
+#: DOWNLOAD_PROMPT's and PRESENTATION_PROMPT's "never a URL built from this
+#: tool's own arguments" clause. No legitimate reply ever links to either tool
+#: name: a generated file rides the `attachments` column exclusively, never
+#: prose (see artifacts.py's module docstring), so any match here is by
+#: definition the hallucination the prompt is fighting, not a false positive
+#: to guard further. The prompt clause alone is not trusted to hold -- CHAT.md
+#: already documents one model inventing a plausible file path around a real
+#: filename despite an explicit instruction not to -- so this is the same fix
+#: applied one level up: made structurally impossible for the *text* to carry,
+#: independent of whether the model reads the rule.
+_FAKE_DOWNLOAD_LINK = re.compile(
+	r"\[[^\]\n]{1,200}\]\(\s*(?:create_download|create_presentation)\?[^)\n]*\)"
+)
+_FAKE_DOWNLOAD_NOTE = "*(That file didn't generate — ask me again and I'll create it properly.)*"
+
+
 def _text_of(blocks):
-	return "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
+	text = "\n".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
+	return _FAKE_DOWNLOAD_LINK.sub(_FAKE_DOWNLOAD_NOTE, text)
 
 
 def _system_prompt(specs=None):
