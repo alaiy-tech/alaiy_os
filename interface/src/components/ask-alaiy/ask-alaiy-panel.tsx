@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
-  AtSign, Bot, Calendar, ChevronDown, Edit3, File as FileIcon, Loader2,
+  AtSign, Bot, Calendar, ChevronDown, Download, Edit3, File as FileIcon, Loader2,
   MoreHorizontal, Package, Paperclip, Plus, Search, Send, Slash, Sparkles, Store, Tag,
   Trash2, TriangleAlert, X,
 } from "lucide-react";
@@ -14,6 +14,7 @@ import type {
   ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
 } from "@/lib/frappe/chat";
 import { AnswerBody } from "./answer-body";
+import { AttachmentPreviewPane, useAttachmentPreview } from "./attachment-preview";
 import { FeedbackControl } from "./feedback-control";
 import "./ask-alaiy.css";
 
@@ -105,6 +106,7 @@ export function AskAlaiyPanel({
   chat: ReturnType<typeof useAskAlaiy>;
   userFullName: string;
 }) {
+  const fileOpen = Boolean(useAttachmentPreview()?.file);
   const [text, setText] = useState("");
   const [dayPart, setDayPart] = useState<string | null>(null);
   useEffect(() => setDayPart(dayPartFor(new Date().getHours())), []);
@@ -320,10 +322,20 @@ export function AskAlaiyPanel({
       aria-label="Ask Alaiy"
       aria-hidden={!open}
       className={cn(
-        "fixed inset-y-0 right-0 z-51 flex w-full max-w-100 flex-col border-l border-border bg-card text-sm text-foreground shadow-2xl transition-transform duration-200",
+        "fixed inset-y-0 right-0 z-51 flex w-full border-l border-border bg-card text-sm text-foreground shadow-2xl transition-[transform,max-width] duration-200",
+        // 400px is right for a chat column alone, but not for reading a file.
+        // The drawer grows sideways instead of the file evicting the chat.
+        fileOpen ? "max-w-[min(94vw,64rem)]" : "max-w-100",
         open ? "translate-x-0" : "translate-x-full",
       )}
     >
+      {/* Left of the chat, so the conversation stays pinned to the edge it
+          has always occupied (and that the launcher opens from). */}
+      {fileOpen && <AttachmentPreviewPane className="my-2 ml-2 min-w-0 flex-1" />}
+
+      {/* grow-0 with shrink left on: the chat holds 400px while there is room
+          and gives way only on a viewport too narrow for both. */}
+      <div className="flex min-w-0 shrink basis-100 grow-0 flex-col">
       <div className="flex h-13 flex-none items-center gap-2 border-b border-border px-3">
         <button onClick={() => setPaletteOpen(true)} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-[13.5px] font-semibold hover:bg-accent hover:text-accent-foreground">
           <Sparkles className="size-4 text-primary" />
@@ -492,6 +504,7 @@ export function AskAlaiyPanel({
           onChange={(e) => { chat.uploadFiles(e.target.files ?? []); e.target.value = ""; }} />
 
         <p className="mt-1.5 px-1 text-[11px] text-muted-foreground">Alaiy reads live business data. Check anything it changes.</p>
+      </div>
       </div>
     </div>
   );
@@ -732,7 +745,11 @@ export function AttachmentChip({ attachment, onRemove }: { attachment: PendingAt
   const isArtifact = "kind" in attachment && attachment.kind === "artifact";
   const format = "format" in attachment ? attachment.format : undefined;
 
-  const body = (
+  const preview = useAttachmentPreview();
+  // Only once the upload has a URL: a chip mid-read has nothing to show yet.
+  const canPreview = Boolean(fileUrl && preview);
+
+  const label = (
     <>
       {status === "uploading" ? (
         <Loader2 className="size-3.5 flex-none animate-spin text-muted-foreground" />
@@ -741,33 +758,66 @@ export function AttachmentChip({ attachment, onRemove }: { attachment: PendingAt
       ) : (
         <FileIcon className={cn("size-3.5 flex-none", isError ? "text-destructive" : "text-muted-foreground")} />
       )}
-      <span className="min-w-0 flex-1">
+      <span className="min-w-0 flex-1 text-left">
         <span className="block truncate">{attachment.file_name}</span>
         <span className={cn("block text-[10.5px]", isError ? "text-destructive" : "text-muted-foreground")}>
           {isError ? errorText : status === "uploading" ? "Reading…" : attachmentMeta(attachment.file_size, attachment.chars, format)}
         </span>
       </span>
+    </>
+  );
+
+  return (
+    <div
+      className={cn(
+        "flex max-w-55 items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs",
+        isError ? "border-destructive/30 bg-card text-destructive" : isArtifact ? "border-primary/30 bg-primary/4" : "border-border bg-muted/40",
+        canPreview && "hover:border-primary",
+      )}
+    >
+      {canPreview ? (
+        <button
+          type="button"
+          onClick={() =>
+            preview?.preview({
+              file_name: attachment.file_name,
+              file_url: fileUrl as string,
+              file_size: attachment.file_size,
+              format,
+            })
+          }
+          title={`Preview ${attachment.file_name}`}
+          className="flex min-w-0 flex-1 items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+        >
+          {label}
+        </button>
+      ) : (
+        <span className="flex min-w-0 flex-1 items-center gap-2">{label}</span>
+      )}
+
+      {/* Downloading is the one thing that has to work for every file type,
+          including the ones the panel can't render -- so it is its own
+          control rather than something you reach through the preview. */}
+      {fileUrl && !onRemove && (
+        <a
+          href={fileUrl}
+          download={attachment.file_name}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Download ${attachment.file_name}`}
+          title={`Download ${attachment.file_name}`}
+          className="flex-none rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+        >
+          <Download className="size-3" />
+        </a>
+      )}
+
       {onRemove && (
         <button type="button" onClick={onRemove} aria-label={`Remove ${attachment.file_name}`} className="flex-none rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground">
           <X className="size-3" />
         </button>
       )}
-    </>
+    </div>
   );
-
-  const className = cn(
-    "flex max-w-55 items-center gap-2 rounded-md border px-2.5 py-1.5 text-xs",
-    isError ? "border-destructive/30 bg-card text-destructive" : isArtifact ? "border-primary/30 bg-primary/4" : "border-border bg-muted/40",
-  );
-
-  if (fileUrl && !onRemove) {
-    return (
-      <a href={fileUrl} {...(isArtifact ? { download: attachment.file_name } : { target: "_blank", rel: "noopener noreferrer" })} className={cn(className, "hover:border-primary")}>
-        {body}
-      </a>
-    );
-  }
-  return <div className={className}>{body}</div>;
 }
 
 function SkillPicker({ matches, activeIndex, allLoaded, onPick }: { matches: ChatSkill[]; activeIndex: number; allLoaded: boolean; onPick: (skill: ChatSkill) => void }) {
