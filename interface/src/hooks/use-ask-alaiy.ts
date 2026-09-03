@@ -4,17 +4,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import {
   createChatSession, deleteChatSession, deleteChatAttachment, getChatMessages, listChatSessions,
-  listChatSkills, sendChatMessage, uploadChatAttachment,
+  listChatSkills, sendChatMessage, streamMessagesUrl, uploadChatAttachment,
   type ChatAttachmentMeta, type ChatMention, type ChatMessage, type ChatSessionSummary,
-  type ChatSkill, type ChatToolCall, FrappeError,
+  type ChatSkill, type ChatStatus, type ChatToolCall, FrappeError,
 } from "@/lib/frappe/chat";
 
-const POLL_MS = 1500;
-/** While the assistant is mid-sentence the poll IS the stream (the message
- * row grows and `partial` says it is still being written), so it runs
- * faster -- matched to the server's own flush throttle. */
-const POLL_STREAM_MS = 400;
 const SESSION_KEY = "ask-alaiy-active-session";
+
+/** After this many consecutive failed (re)connects, stop retrying and
+ * surface an error instead -- an endpoint that is actually down (a stale
+ * server process, a proxy misconfiguration) would otherwise have the client
+ * hammer it in a tight fail-instantly loop forever, which looks exactly
+ * like the polling this was meant to replace. */
+const MAX_STREAM_FAILURES = 5;
+const streamBackoffMs = (failures: number) => Math.min(500 * 2 ** failures, 8_000);
 
 export const MAX_ATTACHMENTS = 5;
 
@@ -47,8 +50,8 @@ export interface ThreadTurn {
   attachments: ChatAttachmentMeta[];
   skill: string | null;
   mentions: ChatMention[];
-  /** Still being written: text grows on every poll, tool_calls empty until
-   * it settles. Drives the caret and suppresses anything wrong to show
+  /** Still being written: text grows with every SSE event, tool_calls empty
+   * until it settles. Drives the caret and suppresses anything wrong to show
    * mid-answer. */
   partial: boolean;
 }
@@ -96,9 +99,10 @@ export interface PendingAttachment {
 
 /**
  * Owns one Ask Alaiy conversation: session lifecycle, the message thread,
- * and the poll loop that follows a turn while a background worker answers
- * it. Mirrors the desk's own ask_alaiy.js state machine (see alaiy_os/chat/
- * CHAT.md) so every surface behaves identically against the same API.
+ * and the SSE subscription that follows a turn while a background worker
+ * answers it. Mirrors the desk's own ask_alaiy.js state machine (see
+ * alaiy_os/chat/CHAT.md) so every surface behaves identically against the
+ * same API.
  */
 export function useAskAlaiy() {
   const pathname = usePathname();
@@ -121,7 +125,9 @@ export function useAskAlaiy() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
   const lastSeq = useRef(0);
-  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const eventSource = useRef<EventSource | null>(null);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const streamFailures = useRef(0);
   const activeSession = useRef<string | null>(null);
   const uploadSeq = useRef(0);
   const skillsPromise = useRef<Promise<ChatSkill[]> | null>(null);
@@ -136,14 +142,18 @@ export function useAskAlaiy() {
       .finally(() => setSessionsLoading(false));
   }, []);
 
-  const stopPoll = useCallback(() => {
-    if (pollTimer.current) {
-      clearTimeout(pollTimer.current);
-      pollTimer.current = null;
+  const stopStream = useCallback(() => {
+    if (retryTimer.current) {
+      clearTimeout(retryTimer.current);
+      retryTimer.current = null;
+    }
+    if (eventSource.current) {
+      eventSource.current.close();
+      eventSource.current = null;
     }
   }, []);
 
-  useEffect(() => stopPoll, [stopPoll]);
+  useEffect(() => stopStream, [stopStream]);
 
   const absorbMessage = useCallback((message: ChatMessage) => {
     if (!message.partial) lastSeq.current = message.seq;
@@ -189,38 +199,98 @@ export function useAskAlaiy() {
     });
   }, []);
 
-  const poll = useCallback(
-    async (session: string) => {
-      try {
-        const data = await getChatMessages({ session, after: lastSeq.current, partial: 1 });
+  // The one call that carries follow-ups: the server writes them just before
+  // the session leaves Running, and this is the first read after that. They
+  // ride the terminal payload rather than a message row because the client's
+  // cursor is already past the answer they belong to.
+  const settle = useCallback(
+    (status: ChatStatus, error: string | null | undefined, suggestions: string[] | undefined) => {
+      setRunning(false);
+      setFollowUps(suggestions ?? []);
+      if (status === "Failed") {
+        const lines = (error ?? "").trim().split("\n");
+        setError(lines[lines.length - 1] || "The assistant failed to reply.");
+      }
+      refreshSessions();
+    },
+    [refreshSessions],
+  );
+
+  const startStream = useCallback(
+    (session: string) => {
+      stopStream();
+      const es = new EventSource(streamMessagesUrl(session, lastSeq.current));
+      eventSource.current = es;
+
+      es.onmessage = (e) => {
         if (activeSession.current !== session) return;
+        // A real event arrived, so the connection is genuinely healthy --
+        // whatever run of failures preceded it no longer counts.
+        streamFailures.current = 0;
+        absorbMessage(JSON.parse(e.data) as ChatMessage);
+      };
 
-        data.messages.forEach(absorbMessage);
+      es.addEventListener("done", (e) => {
+        if (activeSession.current !== session) return;
+        stopStream();
+        const data = JSON.parse((e as MessageEvent<string>).data) as {
+          status: ChatStatus | "timeout";
+          error?: string | null;
+          suggestions?: string[];
+        };
 
-        if (data.status === "Running") {
-          const streaming = data.messages.some((m) => m.partial);
-          pollTimer.current = setTimeout(() => poll(session), streaming ? POLL_STREAM_MS : POLL_MS);
+        // The server's own wall-clock cap tripped, not a real end of turn --
+        // just resume from wherever the cursor landed.
+        if (data.status === "timeout") {
+          streamFailures.current = 0;
+          startStream(session);
           return;
         }
 
-        setRunning(false);
-        // The one poll that carries them: the server writes the follow-ups just
-        // before the session leaves Running, and this is the first read after
-        // that. They ride the response rather than a message because our cursor
-        // is already past the answer they belong to.
-        setFollowUps(data.suggestions ?? []);
-        if (data.status === "Failed") {
-          const lines = (data.error ?? "").trim().split("\n");
-          setError(lines[lines.length - 1] || "The assistant failed to reply.");
-        }
-        refreshSessions();
-      } catch (e) {
+        settle(data.status, data.error, data.suggestions);
+      });
+
+      // A dropped connection (a network blip, a laptop waking from sleep, an
+      // endpoint that 403s because the server hasn't loaded it) rather than
+      // a clean `done`. EventSource would otherwise retry the exact same
+      // stream on its own with no backoff; catching up once over plain JSON
+      // first means the UI doesn't sit frozen for that delay, confirms the
+      // turn is still actually running before reopening the stream at all,
+      // and -- paired with the failure cap/backoff above -- keeps a truly
+      // broken endpoint from being hammered forever.
+      es.onerror = () => {
         if (activeSession.current !== session) return;
-        setRunning(false);
-        setError(e instanceof FrappeError ? e.message : "Lost contact with the assistant.");
-      }
+        stopStream();
+        streamFailures.current += 1;
+        const outOfRetries = streamFailures.current > MAX_STREAM_FAILURES;
+
+        getChatMessages({ session, after: lastSeq.current, partial: 1 })
+          .then((data) => {
+            if (activeSession.current !== session) return;
+            data.messages.forEach(absorbMessage);
+            if (data.status !== "Running") {
+              settle(data.status, data.error, data.suggestions);
+              return;
+            }
+            if (outOfRetries) {
+              setRunning(false);
+              setError("Lost contact with the assistant.");
+              refreshSessions();
+              return;
+            }
+            retryTimer.current = setTimeout(
+              () => startStream(session),
+              streamBackoffMs(streamFailures.current),
+            );
+          })
+          .catch((err) => {
+            if (activeSession.current !== session) return;
+            setRunning(false);
+            setError(err instanceof FrappeError ? err.message : "Lost contact with the assistant.");
+          });
+      };
     },
-    [absorbMessage, refreshSessions],
+    [absorbMessage, refreshSessions, settle, stopStream],
   );
 
   const ensureSession = useCallback(async (): Promise<string> => {
@@ -278,13 +348,14 @@ export function useAskAlaiy() {
           mentions: mentions.map((m) => ({ kind: m.kind, value: m.value })),
         });
         lastSeq.current = sent.seq;
-        pollTimer.current = setTimeout(() => poll(session), POLL_MS);
+        streamFailures.current = 0;
+        startStream(session);
       } catch (e) {
         setRunning(false);
         setError(e instanceof FrappeError ? e.message : "Could not send the message.");
       }
     },
-    [pending, running, ensureSession, poll],
+    [pending, running, ensureSession, startStream],
   );
 
   const uploadFiles = useCallback(
@@ -346,7 +417,7 @@ export function useAskAlaiy() {
   const load = useCallback(
     async (name: string) => {
       if (sessionId === name) return;
-      stopPoll();
+      stopStream();
       activeSession.current = name;
       setSessionId(name);
       setTurns([]);
@@ -368,8 +439,8 @@ export function useAskAlaiy() {
 
         if (data.status === "Running") {
           setRunning(true);
-          const streaming = data.messages.some((m) => m.partial);
-          pollTimer.current = setTimeout(() => poll(name), streaming ? POLL_STREAM_MS : POLL_MS);
+          streamFailures.current = 0;
+          startStream(name);
         }
       } catch (e) {
         if (e instanceof FrappeError && e.httpStatus === 404) {
@@ -387,7 +458,7 @@ export function useAskAlaiy() {
         setError(e instanceof FrappeError ? e.message : "Could not open that chat.");
       }
     },
-    [sessionId, absorbMessage, poll, stopPoll, setSessionId],
+    [sessionId, absorbMessage, startStream, stopStream, setSessionId],
   );
 
   const hydrated = useRef(false);
@@ -399,7 +470,7 @@ export function useAskAlaiy() {
   }, [load]);
 
   const newChat = useCallback(() => {
-    stopPoll();
+    stopStream();
     activeSession.current = null;
     setSessionId(null);
     setTurns([]);
@@ -408,7 +479,7 @@ export function useAskAlaiy() {
     setError(null);
     setPending([]);
     setFollowUps([]);
-  }, [stopPoll]);
+  }, [stopStream]);
 
   const remove = useCallback(
     async (name: string) => {

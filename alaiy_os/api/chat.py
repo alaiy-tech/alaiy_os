@@ -6,6 +6,9 @@ POST /api/method/alaiy_os.api.chat.delete_attachment -> {"deleted": "..."}
 POST /api/method/alaiy_os.api.chat.send_message    -> {"seq": n, "status": "Running"}
 GET  /api/method/alaiy_os.api.chat.get_messages    -> messages after a cursor + status
                                                      + the newest answer's follow-ups
+GET  /api/method/alaiy_os.api.chat.stream_messages -> the same feed as get_messages, pushed
+                                                     over SSE instead of polled (see chat/SSE_PLAN.md
+                                                     for why this isn't yet safe in production)
 GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
@@ -32,10 +35,12 @@ Isolation is Frappe's, not ours: both DocTypes grant the `All` role only
 """
 
 import json
+import time
 
 import frappe
 from frappe.utils import cint
 from frappe.utils.file_manager import save_file
+from werkzeug.wrappers import Response
 
 # `mentions` is aliased because `send_message` already takes a parameter of that
 # name, exactly as it does for `attachments` — a bare import would be shadowed
@@ -234,6 +239,132 @@ def get_messages(session, after=0, partial=0):
 		"messages": [_present(row) for row in rows],
 		"suggestions": _suggestions(doc),
 	}
+
+
+#: Hard cap on one stream's wall-clock lifetime, so a client that never
+#: disconnects (a dead tab, a network blip that doesn't fire onerror) can't
+#: pin a worker forever. A live client just reconnects — `Last-Event-ID`
+#: below picks the cursor back up where this left off.
+MAX_STREAM_SECONDS = 180
+
+#: Same cadence as today's poll-while-partial interval and the server's own
+#: STREAM_FLUSH_SECONDS — no reason for the server-side loop to check faster
+#: than the worker can possibly have written something new.
+STREAM_POLL_SECONDS = 0.4
+
+
+@frappe.whitelist()
+def stream_messages(session, after=0):
+	"""SSE alternative to polling `get_messages`.
+
+	**Not yet safe for the production gunicorn setup.** This holds a single
+	worker + one DB connection for the whole stream's lifetime (a turn with
+	tool calls can run tens of seconds) — see `chat/SSE_PLAN.md`'s "Why the
+	production server matters" section for the full accounting and the
+	prerequisites (async worker class, nginx response buffering disabled)
+	before this runs anywhere but `bench serve`'s dev threaded mode, where a
+	held-open connection costs nothing. `chat/SSE_PLAN.md` recommends Frappe's
+	realtime channel instead for exactly this reason; this endpoint exists
+	as the literal-SSE option documented there, at the caller's request.
+
+	Same permission gate as `get_messages` — an SSE response bypasses
+	`frappe.response` entirely (returning a raw `werkzeug.wrappers.Response`
+	short-circuits both `frappe/handler.py` and `frappe/api/__init__.py`), so
+	the ownership check has to happen explicitly, before the generator below
+	ever starts, rather than falling out of the usual whitelisted-method
+	machinery.
+	"""
+	doc = frappe.get_doc("OS Chat Session", session)
+	doc.check_permission("read")
+
+	# EventSource resends the last id it saw as Last-Event-ID on an automatic
+	# reconnect (a dropped connection, a laptop waking from sleep) rather than
+	# re-requesting with the original `after` query param, which never
+	# changes. Preferring it here is what makes reconnect resume instead of
+	# replaying the whole conversation.
+	last_event_id = frappe.get_request_header("Last-Event-ID")
+	cursor = int(last_event_id) if last_event_id else int(after)
+
+	def sse(data: dict, event: str | None = None) -> bytes:
+		"""One SSE frame, as bytes.
+
+		Bytes, not str, and that is load-bearing: `direct_passthrough=True`
+		below hands this generator straight to the WSGI server with no
+		encoding step in between, and WSGI only accepts bytes. Yielding str
+		there sends the headers and then silently drops every frame — a 200
+		with `text/event-stream` and an empty body.
+
+		`frappe.as_json`, not `json.dumps`, for the same reason `get_messages`
+		gets away with returning a row untouched: `_present` hands back
+		`creation` as a `datetime`, which plain `json.dumps` refuses. On the
+		normal endpoint Frappe's own encoder handles that during response
+		building; here nothing does it for us. Using the same encoder also
+		keeps both endpoints' wire format byte-identical, so the client can
+		parse either without caring which one it came from.
+
+		`indent=None` because the default (`indent=1`) pretty-prints across
+		multiple lines, and a newline inside an SSE `data:` field terminates
+		the field — the frame would arrive truncated to its first line.
+		"""
+		head = f"event: {event}\n" if event else ""
+		return f"{head}data: {frappe.as_json(data, indent=None)}\n\n".encode()
+
+	def gen():
+		nonlocal cursor
+		started = time.monotonic()
+
+		while True:
+			if time.monotonic() - started > MAX_STREAM_SECONDS:
+				yield sse({"status": "timeout"}, event="done")
+				return
+
+			# Frappe's request-scoped transaction is REPEATABLE READ (InnoDB's
+			# default): without committing between iterations, every query in
+			# this generator would keep re-reading the snapshot from the
+			# moment the stream opened and never see the worker's writes.
+			# get_messages never needed this — a poll is a fresh request, and
+			# a fresh request is a fresh transaction.
+			frappe.db.commit()
+
+			rows = frappe.get_all(
+				"OS Chat Message",
+				filters={"session": session, "seq": (">", cursor)},
+				fields=[
+					"name", "seq", "role", "text", "blocks", "attachments",
+					"mentions", "skill_used", "is_partial", "creation",
+				],
+				order_by="seq asc",
+			)
+			for row in rows:
+				# `id:` is what the browser echoes back as Last-Event-ID on a
+				# reconnect, and it is sent only for a settled message — the
+				# same cursor rule the client applies to `lastSeq`. Tagging a
+				# partial would let a reconnect mid-answer resume *past* the
+				# message still being written, and its finished text would
+				# never be sent again.
+				if row.is_partial:
+					yield sse(_present(row))
+					continue
+
+				cursor = max(cursor, row.seq)
+				yield b"id: %d\n" % row.seq + sse(_present(row))
+
+			status = frappe.db.get_value("OS Chat Session", session, "status")
+			if status != "Running":
+				done_doc = frappe.get_doc("OS Chat Session", session)
+				yield sse(
+					{
+						"status": status,
+						"error": done_doc.error,
+						"suggestions": _suggestions(done_doc),
+					},
+					event="done",
+				)
+				return
+
+			time.sleep(STREAM_POLL_SECONDS)
+
+	return Response(gen(), mimetype="text/event-stream", direct_passthrough=True)
 
 
 @frappe.whitelist()
