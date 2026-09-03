@@ -285,7 +285,29 @@ def stream_messages(session, after=0):
 	last_event_id = frappe.get_request_header("Last-Event-ID")
 	cursor = int(last_event_id) if last_event_id else int(after)
 
-	frappe.response["type"] = "page"  # keep build_response() from ever touching this
+	def sse(data: dict, event: str | None = None) -> bytes:
+		"""One SSE frame, as bytes.
+
+		Bytes, not str, and that is load-bearing: `direct_passthrough=True`
+		below hands this generator straight to the WSGI server with no
+		encoding step in between, and WSGI only accepts bytes. Yielding str
+		there sends the headers and then silently drops every frame — a 200
+		with `text/event-stream` and an empty body.
+
+		`frappe.as_json`, not `json.dumps`, for the same reason `get_messages`
+		gets away with returning a row untouched: `_present` hands back
+		`creation` as a `datetime`, which plain `json.dumps` refuses. On the
+		normal endpoint Frappe's own encoder handles that during response
+		building; here nothing does it for us. Using the same encoder also
+		keeps both endpoints' wire format byte-identical, so the client can
+		parse either without caring which one it came from.
+
+		`indent=None` because the default (`indent=1`) pretty-prints across
+		multiple lines, and a newline inside an SSE `data:` field terminates
+		the field — the frame would arrive truncated to its first line.
+		"""
+		head = f"event: {event}\n" if event else ""
+		return f"{head}data: {frappe.as_json(data, indent=None)}\n\n".encode()
 
 	def gen():
 		nonlocal cursor
@@ -293,7 +315,7 @@ def stream_messages(session, after=0):
 
 		while True:
 			if time.monotonic() - started > MAX_STREAM_SECONDS:
-				yield f"event: done\ndata: {json.dumps({'status': 'timeout'})}\n\n"
+				yield sse({"status": "timeout"}, event="done")
 				return
 
 			# Frappe's request-scoped transaction is REPEATABLE READ (InnoDB's
@@ -314,16 +336,29 @@ def stream_messages(session, after=0):
 				order_by="seq asc",
 			)
 			for row in rows:
-				if not row.is_partial:
-					cursor = max(cursor, row.seq)
-				yield f"id: {row.seq}\ndata: {json.dumps(_present(row))}\n\n"
+				# `id:` is what the browser echoes back as Last-Event-ID on a
+				# reconnect, and it is sent only for a settled message — the
+				# same cursor rule the client applies to `lastSeq`. Tagging a
+				# partial would let a reconnect mid-answer resume *past* the
+				# message still being written, and its finished text would
+				# never be sent again.
+				if row.is_partial:
+					yield sse(_present(row))
+					continue
+
+				cursor = max(cursor, row.seq)
+				yield b"id: %d\n" % row.seq + sse(_present(row))
 
 			status = frappe.db.get_value("OS Chat Session", session, "status")
 			if status != "Running":
 				done_doc = frappe.get_doc("OS Chat Session", session)
-				yield (
-					"event: done\n"
-					f"data: {json.dumps({'status': status, 'error': done_doc.error, 'suggestions': _suggestions(done_doc)})}\n\n"
+				yield sse(
+					{
+						"status": status,
+						"error": done_doc.error,
+						"suggestions": _suggestions(done_doc),
+					},
+					event="done",
 				)
 				return
 
