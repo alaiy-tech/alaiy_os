@@ -8,6 +8,7 @@
  "field_order": [
   "agent_id",
   "agent_name",
+  "source_app",
   "agent_avatar",
   "is_enabled",
   "description",
@@ -48,6 +49,14 @@
    "in_standard_filter": 1,
    "label": "Agent Name",
    "reqd": 1
+  },
+  {
+   "description": "The app whose catalogue or manifest registered this agent. Stamped by the registering app; empty means the row was written by hand in the Desk. Read-only here \u2014 an app that owns a row overwrites it on every reconcile, so editing this cannot change who owns it, only what this page claims.",
+   "fieldname": "source_app",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "Source App",
+   "read_only": 1
   },
   {
    "description": "Optional \u2014 shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",

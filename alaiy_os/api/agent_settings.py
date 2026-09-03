@@ -36,7 +36,7 @@ def list_agents():
 	for row in frappe.get_all(
 		"OS Agent Registry",
 		fields=["name", "agent_id", "agent_name", "description", "icon",
-				"is_enabled", "run_as_user", "model", "page"],
+				"is_enabled", "run_as_user", "model", "page", "source_app"],
 		order_by="agent_name",
 	):
 		user = row.run_as_user or ADMINISTRATOR
@@ -73,6 +73,12 @@ def list_agents():
 			"icon": row.icon,
 			"model": row.model,
 			"page": row.page,
+			# Which app registered this row, or None for one written by hand in
+			# the Desk. Two things read it: the card, to say where an agent came
+			# from, and an operator about to edit a prompt here — because an app
+			# that owns a row rewrites it on the next reconcile, so a hand-edit
+			# to an owned agent is work that will disappear without warning.
+			"source_app": row.source_app or None,
 			"is_enabled": bool(row.is_enabled),
 			"run_as_user": user,
 			"runs_as_administrator": not row.run_as_user,

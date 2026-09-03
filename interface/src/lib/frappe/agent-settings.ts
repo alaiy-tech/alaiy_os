@@ -31,6 +31,10 @@ export type Agent = {
   icon: string | null; // lucide-ish name, e.g. "trending-up" — may not resolve, fall back
   model: string | null;
   page: string | null; // ignore for now (see Out of scope)
+  /** The app that registered this agent, or null for a row written by hand in the
+   * Desk. An owned row is rewritten by its app on every reconcile, so editing one
+   * here is work that disappears on the next migrate. */
+  source_app: string | null;
   is_enabled: boolean;
   run_as_user: string; // "Administrator" when unset
   runs_as_administrator: boolean; // true = reads the whole site

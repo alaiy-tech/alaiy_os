@@ -61,6 +61,41 @@ function ToolStateChip({ tool }: { readonly tool: AgentTool }) {
   );
 }
 
+/**
+ * Where this agent's definition came from.
+ *
+ * Worth its own badge because it changes what editing this agent means. An app
+ * that owns a row rewrites it from source on every reconcile — `after_migrate`
+ * for a bundle app, an explicit Update for a marketplace one — so a prompt
+ * edited in the Desk on an owned agent is work that vanishes on the next
+ * migrate, silently. A row with no source app is nobody's but the operator's,
+ * and safe to edit.
+ *
+ * The app name is shown rather than prettified: it is the thing you grep for
+ * when you want to find where the definition actually lives.
+ */
+function SourceBadge({ sourceApp }: { readonly sourceApp: string | null }) {
+  if (!sourceApp) {
+    return (
+      <TooltipWrap label="Not registered by any app — written here, and safe to edit. Nothing will overwrite it.">
+        <Badge variant="outline" className="border-dashed font-normal text-muted-foreground">
+          Local
+        </Badge>
+      </TooltipWrap>
+    );
+  }
+
+  return (
+    <TooltipWrap
+      label={`Defined by ${sourceApp}. That app rewrites this agent from its own source, so edits made here are overwritten on the next reconcile.`}
+    >
+      <Badge variant="outline" className="font-mono font-normal">
+        {sourceApp}
+      </Badge>
+    </TooltipWrap>
+  );
+}
+
 function AgentStatusBadge({ agent }: { readonly agent: Agent }) {
   if (agent.is_enabled && !agent.permissions_satisfied) {
     return (
@@ -182,6 +217,8 @@ export function AgentCard({
                 <Badge variant={agent.writes ? "destructive" : "outline"} className="font-normal">
                   {agent.writes ? "Writes data" : "Reads only"}
                 </Badge>
+
+                <SourceBadge sourceApp={agent.source_app} />
 
                 <AgentStatusBadge agent={agent} />
               </div>
