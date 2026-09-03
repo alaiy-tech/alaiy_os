@@ -223,16 +223,22 @@ def _pack_tools():
 	two: the model sees the actual tools, so it picks one on its description
 	rather than on a summary of a pack, and there is no second loop to budget.
 
-	**Read the note on effect before letting a pack register a write tool.** Every
-	tool here is directly callable by the model, and `OS Agent Tool` has no
-	`effect` field yet, so nothing in a row can tell this module that a tool
-	publishes. Both packs on this site register reads only and say so in their
-	manifests; that is a property of those manifests, not a guarantee this code
-	enforces.
+	**Only reads are offered.** Every tool here is directly callable by the model,
+	with the chat's own prompt behind it and none of the owning agent's — so a
+	tool that changes something would be one the chat model runs without the rules
+	its agent exists to apply. `OS Agent Tool.effect` is what a row uses to say so,
+	and a `write` is skipped below; it stays reachable inside its own agent's run,
+	which is where those rules are.
 
-	Two gates, both mirroring `engine/factory.py` so a tool cannot be reachable
-	here and refused there:
+	The default is `read`, so a row that predates the field is offered exactly as
+	it was. That is safe for the connector packs, which register reads only and say
+	so in their manifests — and it is why an agent pack registering a writer has to
+	mark it, rather than relying on this module to guess.
 
+	Three gates, the last two mirroring `engine/factory.py` so a tool cannot be
+	reachable here and refused there:
+
+	  - the tool must only read (see above);
 	  - the connector must be enabled, when the row names one;
 	  - the user must hold what the row declares, so the surface never advertises
 	    a tool whose first call would be a refusal. A row declaring nothing is not
@@ -246,6 +252,10 @@ def _pack_tools():
 	):
 		doc = frappe.get_cached_doc("OS Agent Registry", agent_id)
 		for row in doc.tools:
+			# Unset counts as read: every row written before the field existed was
+			# one, and defaulting the other way would empty the surface on upgrade.
+			if (row.effect or "read") != "read":
+				continue
 			if row.connector and not frappe.db.get_value(
 				"OS Connector Registry", row.connector, "is_enabled"
 			):

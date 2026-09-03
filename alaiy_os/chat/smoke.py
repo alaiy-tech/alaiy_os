@@ -129,6 +129,89 @@ def run(question=None, user=None, keep=False):
 		print("\n(session deleted; pass --kwargs \"{'keep': True}\" to keep it)")
 
 
+def run_skill(slug=None, text=None, user=None, keep=False):
+	"""One `/skill` turn, in-process — the path `run` cannot reach.
+
+	`run` appends a plain user message and calls `_loop`, so it never touches
+	`start_turn` and therefore never dispatches a skill. Everything specific to a
+	skill happens before `_loop`: the slug is resolved, the words alongside it
+	become the argument, the arguments are validated, the agent runs to completion
+	and its JSON is written in as a tool result. That is four places to get wrong
+	and none of them were reachable from a smoke test.
+
+	    bench --site <site> execute alaiy_os.chat.smoke.run_skill \\
+	      --kwargs "{'text': '/listing ABC-123'}"
+
+	Costs one real LLM call for the agent and at least one for the chat model that
+	narrates it. Pass `user` to check the permission story: the agent adopts the
+	session's owner, so a user without the write permission its tools need should
+	see a refusal *in the thread* rather than a failed turn.
+	"""
+	from alaiy_os.chat import skills as chat_skills
+
+	if user:
+		frappe.set_user(user)
+
+	text = text or "/listing"
+	# The slug the client would have matched. Derived from the text so the
+	# one-argument case is typed here exactly as it is in the composer —
+	# `fill_from_text` then strips the command back off to get the argument.
+	slug = slug or text.strip().lstrip("/").split()[0].lower()
+
+	catalogue = {item["slug"]: item for item in chat_skills.catalogue()}
+	print(f"user: {frappe.session.user}")
+	print(f"skills available: {', '.join(sorted(catalogue)) or '(none)'}")
+	if slug not in catalogue:
+		print(
+			f"\n'{slug}' is not a runnable skill here. A skill is an OS Agent Registry "
+			"row with chat_skill ticked and a skill_slug set; if you expected one, "
+			"check it is enabled and that no chat_skill_filter hook is hiding it."
+		)
+		return
+
+	required = ((catalogue[slug].get("input_schema") or {}).get("required")) or []
+	print(f"/{slug} takes: {', '.join(required) or 'no arguments'}")
+
+	session = frappe.get_doc(
+		{"doctype": "OS Chat Session", "model": runner.default_model(), "status": "Idle"}
+	).insert()
+	frappe.db.commit()
+
+	print(f"\n{session.name} — one turn on {session.model}\nQ: {text}\n")
+	try:
+		runner.start_turn(session.name, text, skill=slug)
+	except Exception as e:
+		# The refusals worth seeing: an unknown slug, a missing argument, an
+		# argument that does not satisfy the pack's schema. All of them are raised
+		# on the send precisely so they reach whoever asked, so print and stop.
+		print(f"REFUSED ON SEND: {e}")
+		frappe.db.rollback()
+		_cleanup(session)
+		return
+
+	stored = frappe.db.get_value(
+		"OS Chat Message",
+		{"session": session.name},
+		["skill_used", "skill_args"],
+		order_by="seq desc",
+		as_dict=True,
+	)
+	print(f"dispatching: skill={stored.skill_used} args={stored.skill_args}\n")
+
+	runner.run_turn(session.name)
+
+	# `dump` rather than a transcript of its own: a skill turn is exactly the case
+	# where the tool arguments and the tool *results* are the interesting part —
+	# which spec the channel returned, and what the validator refused.
+	dump(session.name)
+
+	if keep:
+		print(f"\nkept: {session.name}")
+	else:
+		_cleanup(session)
+		print("\n(session deleted; pass --kwargs \"{'keep': True}\" to keep it)")
+
+
 def run_export(fmt="xlsx", rows=25, keep=False):
 	"""The writer path with no LLM: build a table, call the tool, print the file.
 
