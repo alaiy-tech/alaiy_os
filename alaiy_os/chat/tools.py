@@ -248,7 +248,21 @@ def _pack_tools():
 
 	tools = []
 	for agent_id in frappe.get_all(
-		"OS Agent Registry", filters={"is_enabled": 1}, pluck="name", order_by="name asc"
+		"OS Agent Registry",
+		# An agent the chat can RUN does not also lend out its tools. Those are its
+		# internals — the steps its own prompt sequences — and on the flat surface
+		# they are both a duplicate and a trap: the model sees them before
+		# `run_agent` (pack tools lead, see `_surface`), fetches the same data
+		# itself, and either wastes a round trip per tool before delegating anyway
+		# or writes something answer-shaped with none of the agent's rules applied.
+		# Observed, not theoretical — a small model did the former three times over.
+		#
+		# Nothing is lost. A connector's own pack tools stay on the surface for
+		# questions asked on their own, which is what they were curated for; it is
+		# only an agent's private steps that come off.
+		filters={"is_enabled": 1, "chat_skill": 0},
+		pluck="name",
+		order_by="name asc",
 	):
 		doc = frappe.get_cached_doc("OS Agent Registry", agent_id)
 		for row in doc.tools:
@@ -327,6 +341,25 @@ def _core_tools():
 
 	if available:
 		tools.append(WEB_SEARCH_SPEC)
+
+	# `run_agent` is offered only where this site actually has agents to run, and
+	# its description names them — a model can only hand work to an agent it knows
+	# exists. Same discipline as `web_search` above: never advertise a capability
+	# the turn does not have. Built per request rather than imported as a constant,
+	# because the list it describes is a fact about this bench.
+	from alaiy_os.chat.agents import tool_spec as agent_tool_spec
+
+	try:
+		agent_tool = agent_tool_spec()
+	except Exception:
+		# `catalogue()` runs the tenant's `chat_skill_filter` hooks, which fail
+		# closed to "no skills". That is already the safe answer here — no agents
+		# to offer — and must not take the rest of the tool surface down with it.
+		frappe.log_error(title="chat run_agent tool build failed")
+		agent_tool = None
+
+	if agent_tool:
+		tools.append(agent_tool)
 	return tools
 
 
