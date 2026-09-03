@@ -76,7 +76,12 @@ export const PREFERENCE_REGISTRY = {
 
   content_layout: definePreference({
     values: CONTENT_LAYOUT_VALUES,
-    defaultValue: "centered",
+    // `centered` caps every page at max-w-screen-2xl (1536px) and centres it,
+    // which on a 1080p-and-wider screen leaves a dead gutter either side of
+    // the content -- most visible next to a page that has its own rail, like
+    // Ask Alaiy's chat history. Full width by default; `centered` is still
+    // there for anyone who prefers it (Settings → Themes).
+    defaultValue: "full-width",
     persistence: "client-cookie",
     attribute: "data-content-layout",
   }),

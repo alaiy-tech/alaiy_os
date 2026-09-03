@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { AskAlaiyLauncher } from "@/components/ask-alaiy/ask-alaiy-launcher";
 import { AskAlaiyProvider } from "@/components/ask-alaiy/ask-alaiy-provider";
+import { AttachmentPreviewProvider } from "@/components/ask-alaiy/attachment-preview";
 import { Separator } from "@/components/ui/separator";
 import {
   SidebarInset,
@@ -49,6 +50,7 @@ export default async function Layout({
   return (
     <CompanyProvider initialCompany={company}>
     <AskAlaiyProvider>
+    <AttachmentPreviewProvider>
     <SidebarProvider
       defaultOpen={defaultOpen}
       style={
@@ -104,12 +106,13 @@ export default async function Layout({
             the page scroll instead, while still keeping a wide table from
             pushing the sidebar off screen. Same class the SidebarInset above
             already uses. */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-clip p-4 has-data-[content-padding=false]:p-0 md:p-6 md:has-data-[content-padding=false]:p-0">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-clip p-3 has-data-[content-padding=false]:p-0 md:p-4 md:has-data-[content-padding=false]:p-0">
           {children}
         </div>
       </SidebarInset>
     </SidebarProvider>
     <AskAlaiyLauncher userFullName={user.fullName} />
+    </AttachmentPreviewProvider>
     </AskAlaiyProvider>
     </CompanyProvider>
   );

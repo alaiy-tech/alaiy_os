@@ -1,0 +1,21 @@
+{
+ "action": "Create Entry",
+ "action_label": "New Supplier",
+ "creation": "2026-08-31 11:07:18.419791",
+ "description": "Register a supplier for procurement.",
+ "docstatus": 0,
+ "doctype": "Onboarding Step",
+ "idx": 0,
+ "is_complete": 0,
+ "is_single": 0,
+ "is_skipped": 0,
+ "modified": "2026-09-01 11:21:06.600301",
+ "modified_by": "Administrator",
+ "name": "Alaiy OS - Add a Supplier",
+ "owner": "Administrator",
+ "reference_document": "Supplier",
+ "show_form_tour": 0,
+ "show_full_form": 0,
+ "title": "Add a Supplier",
+ "validate_action": 1
+}
