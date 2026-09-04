@@ -41,7 +41,7 @@
       "!out",
       "!src/components/ui",
       "!src/components/calendar",
-      "!obsolete"
+      "!desk-widget"
     ]
   },
   "formatter": {
