@@ -12,19 +12,19 @@ import {
   Sparkles,
 } from "lucide-react";
 
-import { Button } from "@/components/primitive/button";
+import { Button } from "@/components/ui/button";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
-} from "@/components/primitive/collapsible";
+} from "@/components/ui/collapsible";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/primitive/dropdown-menu";
+} from "@/components/ui/dropdown-menu";
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -37,15 +37,15 @@ import {
   SidebarMenuSubButton,
   SidebarMenuSubItem,
   useSidebar,
-} from "@/components/primitive/sidebar";
+} from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import type {
   NavBadge,
   NavGroup,
   NavMainItem,
   NavMainLinkItem,
   NavMainParentItem,
-} from "@/types/navigation";
-import { cn } from "@/utils";
+} from "@/config/sidebar-config";
 
 interface NavMainProps {
   readonly items: readonly NavGroup[];
