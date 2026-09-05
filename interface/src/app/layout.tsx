@@ -2,49 +2,39 @@ import type { ReactNode } from "react";
 
 import type { Metadata } from "next";
 
-import { TooltipProvider } from "@/components/primitive/tooltip";
+import { Toaster } from "../components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { APP_CONFIG } from "@/config/app-config";
-import { fontVars } from "@/config/fonts";
-import { getCompanyInfo, getOrganisationLogoSrc, getServerUser } from "@/lib/frappe/server";
-import { siteMetadataBase } from "@/lib/metadata";
-import { AuthProvider } from "@/runtime/store/auth/auth-provider";
-import { PreferencesStoreProvider } from "@/runtime/store/preferences/preferences-provider";
+import { fontVars } from "@/lib/fonts/registry";
+import { getServerUser } from "@/lib/frappe/server";
+import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
 import { ThemeBootScript } from "@/scripts/theme-boot";
-import { getAllPreferences } from "@/server/server-actions";
+import { AuthProvider } from "@/stores/auth/auth-provider";
+import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
 
-import { Toaster } from "../components/primitive/sonner";
+import "./globals.css";
 
-import "../styles/globals.css";
+export const metadata: Metadata = {
+  title: APP_CONFIG.meta.title,
+  description: APP_CONFIG.meta.description,
+  icons: {
+    icon: "/assets/images/favicon/icon.png",
+  },
+};
 
-/** The favicon is the org's uploaded square logo when set (`OS Theme
- * Settings`, same source `lib/frappe/server.ts`'s `getOrganisationLogoSrc()`
- * resolves for the sidebars), falling back to this app's own default -
- * dynamic per request, so `generateMetadata` rather than a static `metadata`
- * export. Also where `metadataBase` is set once for the whole app - every
- * other page's `generateMetadata` (`lib/metadata.ts`'s `buildPageMetadata`)
- * hands back a relative `route`/OG image path, resolved against this. Every
- * real page overrides `title`/`description` with its own full literal
- * string, so this is only ever seen as a fallback (a route with no
- * `generateMetadata` of its own). */
-export async function generateMetadata(): Promise<Metadata> {
-  const [logoSrc, company] = await Promise.all([
-    getOrganisationLogoSrc(),
-    getCompanyInfo(),
-  ]);
-  return {
-    metadataBase: siteMetadataBase(),
-    title: company?.name ? `${company.name} OS` : APP_CONFIG.meta.title,
-    description: APP_CONFIG.meta.description,
-    icons: {
-      icon: logoSrc.square,
-    },
-  };
-}
-
-export default async function RootLayout({ children }: Readonly<{ children: ReactNode }>) {
-  const [preferences, user] = await Promise.all([getAllPreferences(), getServerUser()]);
-  const { theme_mode, theme_preset, content_layout, navbar_style, sidebar_variant, sidebar_collapsible, font } =
-    preferences;
+export default async function RootLayout({
+  children,
+}: Readonly<{ children: ReactNode }>) {
+  const {
+    theme_mode,
+    theme_preset,
+    content_layout,
+    navbar_style,
+    sidebar_variant,
+    sidebar_collapsible,
+    font,
+  } = PREFERENCE_DEFAULTS;
+  const user = await getServerUser();
   return (
     <html
       lang="en"
@@ -64,7 +54,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body className={`${fontVars} min-h-screen antialiased`}>
         <TooltipProvider>
           <AuthProvider initialUser={user}>
-            <PreferencesStoreProvider initialValues={preferences}>
+            <PreferencesStoreProvider initialValues={PREFERENCE_DEFAULTS}>
               {children}
               <Toaster />
             </PreferencesStoreProvider>
