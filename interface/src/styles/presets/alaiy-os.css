@@ -1,141 +1,133 @@
 /*
-label: Revamped Alaiy
+label: alaiy-os
 value: alaiy-os
 
-Pulled from the Lovable build prompt for the Alaiy OS marketing site - its
-"Design System — Non-Negotiables" section defines six colours by role:
-  --navy:      #003254  primary - headings, nav, button fill, body text, footer
-  --blue:      #91D1F2  highlight - hover states, active links, chips, borders
-  --white:     #FFFFFF  clean section background
-  --paper:     #F7F4EF  paper-feel section background (hero, CTA, narrative)
-  --ink:       #1A1A2E  deep body text specifically on paper backgrounds
-  --navy-dark: #001a2e  button shadow depth colour
+Regenerated from the actual Alaiy OS design system - not the placeholder
+red/yellow/blue palette in the original template. Source: mydesign/Alaiy OS
+Dashboard.dc.html (the approved prototype) + docs/DESIGN_TOKENS.md, and
+cross-checked for exact parity against this app's own live
+frontend/src/index.css (its HSL values converted 1:1 to oklch below, so this
+preset renders pixel-identical to what's already running).
 
-Mapping those roles onto this app's tokens: paper is --background (the
-"narrative" tone this site defaults to), white is --card (the "clean,
-high-density" surface that sits on top of it), navy is --primary, blue is
-both --accent and --ring (it's the one highlight colour in the source spec,
-used for hover/active/focus/borders - so it does that job here too), and
-ink is --foreground. --navy-dark is the darkest anchor, used for dark-mode
---background and for the shadow tint below. --chart-1..5 is the six-colour
-set minus ink (white, paper, blue, navy, navy-dark, light to dark) since
-ink sits almost on top of navy-dark in lightness and the chart didn't need
-both. The light-mode --ring is blue mixed toward navy (not raw #91D1F2)
-because the raw highlight blue only clears ~1.5:1 against paper/white - a
-focus ring needs ~3:1 against the surface it sits on to be visible at all;
-everywhere else (accent, dark-mode ring, sidebar-ring) uses the raw blue,
-since those sit against navy, not paper.
-
-Dark mode isn't in the source doc - it's a light-only marketing site - but
-the spec's own navy-background-white-text sections (the "AI Queries Strip"
-and "Final CTA" sections, and the footer) are effectively what a dark
-theme built from this palette looks like, so that's what dark mode here
-is: navy-dark background, navy cards, blue primary/ring, white text.
-
-Scope note: this file only carries the colour/token layer. The source
-spec's Playfair Display + Poppins typography, the square-corner "arcade
-press" button effect, the paper-grain SVG texture, and the watercolor
-accents are real design decisions in that doc but aren't expressible as
-shadcn CSS variables - they'd need font loading and Button/section
-component changes, which are separate work.
-
-Per the source's numeric radius rule ("border-radius: 5 everywhere"),
---radius is 0.3125rem (~5px) - the square-cornered buttons the same doc
-also calls for are a component-level override, not a --radius value.
-Shadows reuse the shape of this app's existing shadow scale, retinted to
-rgba(0, 26, 46, ...) - navy-dark, called out in the source as the
-button-shadow colour.
+- Semantic roles: primary = navy (#003254), secondary/muted = paper-ish warm
+  neutral, accent = a neutral warm gray (NOT the bright blue - that's
+  reserved for focus rings only, per an explicit "no blue hover" fix already
+  applied in this app), ring = blue (#91D1F2, "focus rings, chart secondary
+  line, highlights" per DESIGN_TOKENS.md), destructive = the danger-fg red
+  (#B4232A) used for delete actions throughout the app.
+- --radius kept at 0.5rem to match the value already live in index.css.
+- --sidebar is the bare name, matching `--color-sidebar: var(--sidebar)` in
+  globals.css. This preset originally shipped it as --sidebar-background, on
+  the assumption that a tailwind.config.ts read that name - this app is
+  Tailwind v4 and has no such file, so nothing read it and the sidebar fell
+  back to the default near-white for as long as the preset existed. A token
+  only exists here if `@theme inline` maps it; check that block before adding
+  or renaming one.
+- --chart-1..5 didn't exist in this app yet (it has its own differently-named
+  chart tokens for one specific chart) - these five are a fresh, coherent set
+  built from colors already used elsewhere in the app: primary navy, the
+  ring blue, and the three status colors (success/warning/danger), so any
+  chart using the standard --chart-1..5 convention stays on-brand.
+- Shadows are kept as literal rgba(), not oklch - the approved design's own
+  box-shadows all use a dark navy-black shadow color, rgb(0,20,36), not pure
+  black. The scale below reuses the exact shadow strings measured out of the
+  prototype file rather than inventing new ones (the original template's
+  hard-edged, zero-blur "neobrutalist" shadows don't match Alaiy OS's soft,
+  blurred shadow style at all, so they're replaced outright, not tweaked).
+- No real dark variant exists in the approved design (it's explicitly
+  light-mode only). The .dark block below mirrors the light values 1:1 so
+  this preset doesn't break if something toggles a `.dark` class - it is not
+  a designed dark theme.
 */
 
 :root[data-theme-preset="alaiy-os"] {
-  --radius: 0.3125rem;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.228 0.038 282.93);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.228 0.038 282.93);
-  --primary: oklch(0.21 0.052 244.04);
-  --primary-foreground: oklch(1 0 0);
-  --secondary: oklch(0.965 0.016 226.97);
-  --secondary-foreground: oklch(0.21 0.052 244.04);
-  --muted: oklch(0.985 0.004 91.45);
-  --muted-foreground: oklch(0.529 0.02 285.69);
-  --accent: oklch(0.829 0.08 231.41);
-  --accent-foreground: oklch(0.21 0.052 244.04);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.888 0.004 197.08);
-  --input: oklch(0.863 0.007 219.57);
-  --ring: oklch(0.605 0.079 236.3);
-  --chart-1: oklch(1 0 0);
-  --chart-2: oklch(0.968 0.007 80.72);
-  --chart-3: oklch(0.829 0.08 231.41);
-  --chart-4: oklch(0.21 0.052 244.04);
-  --chart-5: oklch(0.21 0.052 244.04);
-  /* --sidebar: oklch(0.21 0.052 244.04); */
-  --sidebar: oklch(0.21 0.052 244.04);
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.829 0.08 231.41);
-  --sidebar-primary-foreground: oklch(0.21 0.052 244.04);
-  --sidebar-accent: oklch(0.268 0.069 245.8);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.829 0.08 231.41 / 15%);
-  --sidebar-ring: oklch(0.829 0.08 231.41);
-
-  /* fonts */
-  --font-sans: var(--font-geist);
-  --font-mono: var(--font-geist-mono);
-  --background: oklch(0.968 0.007 80.72);
-  --foreground: oklch(0.228 0.038 282.93);
-    --shadow-2xs: 4px 4px 0px 0px hsl(0 0% 0% / 0.5);
-  --shadow-xs: 4px 4px 0px 0px hsl(0 0% 0% / 0.5);
-  --shadow-sm: 4px 4px 0px 0px hsl(0 0% 0% / 1), 4px 1px 2px -1px hsl(0 0% 0% / 1);
-  --shadow: 4px 4px 0px 0px hsl(0 0% 0% / 1), 4px 1px 2px -1px hsl(0 0% 0% / 1);
-  --shadow-md: 4px 4px 0px 0px hsl(0 0% 0% / 1), 4px 2px 4px -1px hsl(0 0% 0% / 1);
-  --shadow-lg: 4px 4px 0px 0px hsl(0 0% 0% / 1), 4px 4px 6px -1px hsl(0 0% 0% / 1);
-  --shadow-xl: 4px 4px 0px 0px hsl(0 0% 0% / 1), 4px 8px 10px -1px hsl(0 0% 0% / 1);
-  --shadow-2xl: 4px 4px 0px 0px hsl(0 0% 0% / 2.5);
+  --radius: 0.5rem;
+  --background: oklch(1.0000 0.0000 89.8756);
+  --foreground: oklch(0.2284 0.0384 282.9324);
+  --card: oklch(1.0000 0.0000 89.8756);
+  --card-foreground: oklch(0.2284 0.0384 282.9324);
+  --popover: oklch(1.0000 0.0000 89.8756);
+  --popover-foreground: oklch(0.2284 0.0384 282.9324);
+  --primary: oklch(0.3028 0.0765 245.1957);
+  --primary-foreground: oklch(1.0000 0.0000 89.8756);
+  --secondary: oklch(0.9651 0.0074 80.7210);
+  --secondary-foreground: oklch(0.2284 0.0384 282.9324);
+  --muted: oklch(0.9651 0.0074 80.7210);
+  --muted-foreground: oklch(0.5334 0.0248 285.5274);
+  --accent: oklch(0.9345 0.0058 84.5669);
+  --accent-foreground: oklch(0.2284 0.0384 282.9324);
+  --destructive: oklch(0.5004 0.1790 24.2263);
+  --destructive-foreground: oklch(1.0000 0.0000 89.8756);
+  --border: oklch(0.9105 0.0046 78.2968);
+  --input: oklch(0.9105 0.0046 78.2968);
+  --ring: oklch(0.8314 0.0796 230.2093);
+  --chart-1: oklch(0.3028 0.0765 245.1957); /* navy - primary */
+  --chart-2: oklch(0.8314 0.0796 230.2093); /* blue - ring/highlight */
+  --chart-3: oklch(0.5273 0.1371 150.0693); /* success green */
+  --chart-4: oklch(0.7615 0.1233 81.4746);  /* amber - warning/low-stock dot */
+  --chart-5: oklch(0.5021 0.1800 24.6103);  /* danger red */
+  --text-primary: oklch(0.2284 0.0384 282.9324);
+  --sidebar: oklch(0.9651 0.0074 80.7210);
+  --sidebar-foreground: oklch(0.2284 0.0384 282.9324);
+  --sidebar-primary: oklch(0.3028 0.0765 245.1957);
+  --sidebar-primary-foreground: oklch(1.0000 0.0000 89.8756);
+  --sidebar-accent: oklch(0.9345 0.0058 84.5669);
+  --sidebar-accent-foreground: oklch(0.2284 0.0384 282.9324);
+  --sidebar-border: oklch(0.9105 0.0046 78.2968);
+  --sidebar-ring: oklch(0.8314 0.0796 230.2093);
+  --shadow-2xs: 0 1px 2px rgba(0, 20, 36, 0.04);
+  --shadow-xs: 0 2px 12px rgba(0, 20, 36, 0.05);
+  --shadow-sm: 0 2px 12px rgba(0, 20, 36, 0.05), 0 1px 2px -1px rgba(0, 20, 36, 0.04);
+  --shadow: 0 2px 12px rgba(0, 20, 36, 0.05), 0 1px 2px -1px rgba(0, 20, 36, 0.04);
+  --shadow-md: -4px 0 14px rgba(0, 20, 36, 0.07);
+  --shadow-lg: 0 16px 40px rgba(0, 20, 36, 0.14);
+  --shadow-xl: 0 16px 40px rgba(0, 20, 36, 0.16);
+  --shadow-2xl: -24px 0 60px rgba(0, 20, 36, 0.16), 0 30px 80px rgba(0, 20, 36, 0.34);
 }
 
-
 .dark:root[data-theme-preset="alaiy-os"] {
-  --background: oklch(0.21 0.052 244.04);
-  --foreground: oklch(1 0 0);
-  --card: oklch(0.21 0.052 244.04);
-  --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.21 0.052 244.04);
-  --popover-foreground: oklch(1 0 0);
-  --primary: oklch(0.829 0.08 231.41);
-  --primary-foreground: oklch(0.21 0.052 244.04);
-  --secondary: oklch(0.268 0.069 245.8);
-  --secondary-foreground: oklch(1 0 0);
-  --muted: oklch(0.26 0.065 244.98);
-  --muted-foreground: oklch(0.862 0.065 231.53);
-  --accent: oklch(0.268 0.069 245.8);
-  --accent-foreground: oklch(1 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --destructive-foreground: oklch(0.205 0 0);
-  --border: oklch(0.829 0.08 231.41 / 12%);
-  --input: oklch(0.829 0.08 231.41 / 18%);
-  --ring: oklch(0.829 0.08 231.41);
-  --chart-1: oklch(1 0 0);
-  --chart-2: oklch(0.968 0.007 80.72);
-  --chart-3: oklch(0.829 0.08 231.41);
-  --chart-4: oklch(0.21 0.052 244.04);
-  --chart-5: oklch(0.21 0.052 244.04);
-  --sidebar:oklch(0.2488 0.062 246.78)
-  --sidebar-foreground: oklch(1 0 0);
-  --sidebar-primary: oklch(0.829 0.08 231.41);
-  --sidebar-primary-foreground: oklch(0.21 0.052 244.04);
-  --sidebar-accent: oklch(0.268 0.069 245.8);
-  --sidebar-accent-foreground: oklch(1 0 0);
-  --sidebar-border: oklch(0.829 0.08 231.41 / 12%);
-  --sidebar-ring: oklch(0.829 0.08 231.41);
-  --shadow-2xs: 0 1px 2px rgba(0, 26, 46, 0.04);
-  --shadow-xs: 0 2px 12px rgba(0, 26, 46, 0.05);
-  --shadow-sm: 0 2px 12px rgba(0, 26, 46, 0.05), 0 1px 2px -1px rgba(0, 26, 46, 0.04);
-  --shadow: 0 2px 12px rgba(0, 26, 46, 0.05), 0 1px 2px -1px rgba(0, 26, 46, 0.04);
-  --shadow-md: -4px 0 14px rgba(0, 26, 46, 0.07);
-  --shadow-lg: 0 16px 40px rgba(0, 26, 46, 0.14);
-  --shadow-xl: 0 16px 40px rgba(0, 26, 46, 0.16);
-  --shadow-2xl: -24px 0 60px rgba(0, 26, 46, 0.16), 0 30px 80px rgba(0, 26, 46, 0.34);
+  /* Alaiy OS is light-mode only in the approved design - these are the exact
+     same values as :root above, present only so this preset doesn't break if
+     something toggles a `.dark` class. Not a designed dark theme. */
+  --background: oklch(98.673% 0.00638 16.299);
+  --foreground: oklch(0.2284 0.0384 282.9324);
+  --card: oklch(1.0000 0.0000 89.8756);
+  --card-foreground: oklch(0.2284 0.0384 282.9324);
+  --popover: oklch(1.0000 0.0000 89.8756);
+  --popover-foreground: oklch(0.2284 0.0384 282.9324);
+  --primary: oklch(0.3028 0.0765 245.1957);
+  --primary-foreground: oklch(1.0000 0.0000 89.8756);
+  --secondary: oklch(0.9651 0.0074 80.7210);
+  --secondary-foreground: oklch(0.2284 0.0384 282.9324);
+  --muted: oklch(0.9651 0.0074 80.7210);
+  --muted-foreground: oklch(0.5334 0.0248 285.5274);
+  --accent: oklch(0.9345 0.0058 84.5669);
+  --accent-foreground: oklch(0.2284 0.0384 282.9324);
+  --destructive: oklch(0.5004 0.1790 24.2263);
+  --destructive-foreground: oklch(1.0000 0.0000 89.8756);
+  --border: oklch(0.9105 0.0046 78.2968);
+  --input: oklch(0.9105 0.0046 78.2968);
+  --ring: oklch(0.8314 0.0796 230.2093);
+  --chart-1: oklch(0.3028 0.0765 245.1957);
+  --chart-2: oklch(0.8314 0.0796 230.2093);
+  --chart-3: oklch(0.5273 0.1371 150.0693);
+  --chart-4: oklch(0.7615 0.1233 81.4746);
+  --chart-5: oklch(0.5021 0.1800 24.6103);
+  --text-primary: oklch(0.2284 0.0384 282.9324);
+  --sidebar: oklch(95.84% 0.02083 79.039);
+  --sidebar-foreground: oklch(0.2284 0.0384 282.9324);
+  --sidebar-primary: oklch(0.3028 0.0765 245.1957);
+  --sidebar-primary-foreground: oklch(1.0000 0.0000 89.8756);
+  --sidebar-accent: oklch(0.9345 0.0058 84.5669);
+  --sidebar-accent-foreground: oklch(0.2284 0.0384 282.9324);
+  --sidebar-border: oklch(0.9105 0.0046 78.2968);
+  --sidebar-ring: oklch(0.8314 0.0796 230.2093);
+  --shadow-2xs: 0 1px 2px rgba(0, 20, 36, 0.04);
+  --shadow-xs: 0 2px 12px rgba(0, 20, 36, 0.05);
+  --shadow-sm: 0 2px 12px rgba(0, 20, 36, 0.05), 0 1px 2px -1px rgba(0, 20, 36, 0.04);
+  --shadow: 0 2px 12px rgba(0, 20, 36, 0.05), 0 1px 2px -1px rgba(0, 20, 36, 0.04);
+  --shadow-md: -4px 0 14px rgba(0, 20, 36, 0.07);
+  --shadow-lg: 0 16px 40px rgba(0, 20, 36, 0.14);
+  --shadow-xl: 0 16px 40px rgba(0, 20, 36, 0.16);
+  --shadow-2xl: -24px 0 60px rgba(0, 20, 36, 0.16), 0 30px 80px rgba(0, 20, 36, 0.34);
 }
