@@ -12,10 +12,6 @@ declare module "@tanstack/react-table" {
   // (ColumnMeta<TData extends RowData, TValue>) or TS rejects the merge.
   interface ColumnMeta<TData extends RowData, TValue> {
     align?: "right";
-    /** Every real header renders as JSX (for alignment), not a plain
-     * string - `columnFieldsFrom` (data-table.tsx) reads this for the
-     * column picker/filter popover instead of parsing rendered output. */
-    label?: string;
   }
 }
 
@@ -33,13 +29,17 @@ export type DocFieldMeta = {
 export type FilterOperator =
   | "="
   | "!="
+  | "like"
+  | "not like"
   | ">"
   | "<"
   | ">="
   | "<="
   | "in"
   | "not in"
-  | "between";
+  | "between"
+  | "is"
+  | "is not";
 
 export type FilterRow = {
   id: string;
