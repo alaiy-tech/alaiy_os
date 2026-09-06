@@ -1,4 +1,4 @@
-import type { NavContribution } from "@/types/navigation";
+import type { NavContribution } from "./nav-types";
 
 /**
  * Sidebar entries contributed by the Frappe apps installed alongside the base.
