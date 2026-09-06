@@ -3,12 +3,9 @@
 // app's own /api/method proxy. Never import this from a "use client" module.
 import { cookies } from "next/headers";
 
-import { USER_PROFILE_FIELDS } from "@/constants/frappe-user";
-import type { FrappeUser, UserProfileFields } from "@/types/frappe-user";
-import type { CompanyInfo, OrganisationLogoSrc } from "@/types/organisation";
-
 import { getFrappeUrl } from "./config";
-import { toFrappeUser } from "./user";
+import type { ItemGroupNode } from "./item-group";
+import { type FrappeUser, toFrappeUser, USER_PROFILE_FIELDS, type UserProfileFields } from "./user";
 
 export async function frappeFetch(path: string, init: RequestInit = {}): Promise<Response> {
   const cookieStore = await cookies();
@@ -17,11 +14,7 @@ export async function frappeFetch(path: string, init: RequestInit = {}): Promise
   const headers = new Headers(init.headers);
   if (cookieHeader) headers.set("cookie", cookieHeader);
 
-  return fetch(`${getFrappeUrl()}${path}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  return fetch(`${getFrappeUrl()}${path}`, { ...init, headers, cache: "no-store" });
 }
 
 /**
@@ -43,6 +36,8 @@ export async function getServerUser(): Promise<FrappeUser | null> {
 
   return toFrappeUser(userId, profile);
 }
+
+export type CompanyInfo = { name: string; defaultCurrency: string | null };
 
 /** The sidebar shows "{Company} OS" instead of a hardcoded app name, and the
  * default currency prefixes money figures across the OS (KPI cards, table
@@ -75,44 +70,27 @@ export async function getCompanyInfo(): Promise<CompanyInfo | null> {
   const fields = encodeURIComponent(JSON.stringify(["default_currency"]));
   const companyRes = await frappeFetch(`/api/resource/Company/${encodeURIComponent(companyName)}?fields=${fields}`);
   const defaultCurrency = companyRes.ok
-    ? ((
-        (await companyRes.json()) as {
-          data?: { default_currency?: string | null };
-        }
-      ).data?.default_currency ?? null)
+    ? (((await companyRes.json()) as { data?: { default_currency?: string | null } }).data?.default_currency ?? null)
     : null;
 
   return { name: companyName, defaultCurrency };
 }
 
-const DEFAULT_SQUARE_LOGO_SRC = "/assets/images/client-logo-square.png";
-const DEFAULT_HORIZONTAL_LOGO_SRC = "/assets/images/client-logo-hor.png";
-
-/**
- * Whether the org has uploaded a custom square/horizontal logo (`OS Theme
- * Settings`' own `square_logo`/`horizontal_logo` Attach Image fields,
- * uploaded via `/settings/organisation` - see `lib/frappe/organisation.ts`'s
- * `uploadOrganisationLogo`). If so, the fixed-filename copy that doctype's
- * `on_update` hook already wrote to the bench's shared assets folder
- * (`logo-square.png`/`logo-hor.png`) is what should render - reached
- * same-origin via the `/frappe-assets/*` rewrite (`next.config.mjs`), so
- * neither `next/image` remote-pattern config nor CORS ever comes up.
- * Otherwise, this app's own public-folder default. Used for the favicon
- * (root layout `generateMetadata`) and the app/settings sidebars' logo
- * `<Image>`s. Never throws - cosmetic, not worth blocking a page over.
- */
-export async function getOrganisationLogoSrc(): Promise<OrganisationLogoSrc> {
-  const [squareRes, horizontalRes] = await Promise.all([
-    frappeFetch("/api/method/frappe.client.get_single_value?doctype=OS+Theme+Settings&field=square_logo"),
-    frappeFetch("/api/method/frappe.client.get_single_value?doctype=OS+Theme+Settings&field=horizontal_logo"),
-  ]);
-
-  const squareUploaded = squareRes.ok && Boolean(((await squareRes.json()) as { message?: string | null }).message);
-  const horizontalUploaded =
-    horizontalRes.ok && Boolean(((await horizontalRes.json()) as { message?: string | null }).message);
-
-  return {
-    square: squareUploaded ? "/frappe-assets/images/logo-square.png" : DEFAULT_SQUARE_LOGO_SRC,
-    horizontal: horizontalUploaded ? "/frappe-assets/images/logo-hor.png" : DEFAULT_HORIZONTAL_LOGO_SRC,
-  };
+/** The Item Group tree's rootItemId (see os/item-groups) has to be known before
+ * the client-side tree hook mounts, so it's resolved server-side once here
+ * rather than hardcoding ERPNext's conventional "All Item Groups" name. */
+export async function getRootItemGroup(): Promise<ItemGroupNode | null> {
+  const res = await frappeFetch("/api/method/alaiy_os.api.item_group.get_children?is_root=true");
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    console.error(
+      `getRootItemGroup: alaiy_os.api.item_group.get_children returned ${res.status}. ` +
+        "If this is a 404, the alaiy_os app on this Frappe site doesn't have that endpoint yet — " +
+        "deploy the latest alaiy_os app code and restart bench. Response body:",
+      body.slice(0, 500),
+    );
+    return null;
+  }
+  const data = (await res.json()) as { message?: ItemGroupNode[] };
+  return data.message?.[0] ?? null;
 }

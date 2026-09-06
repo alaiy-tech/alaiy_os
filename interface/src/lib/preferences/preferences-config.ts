@@ -1,30 +1,54 @@
 /**
- * Every user/theme/layout preference this app has, and its allowed values -
- * the single registry `PreferenceKey`/`PreferenceValueMap`/`PREFERENCE_DEFAULTS`
- * all derive from. The durable copy of every value lives in the local
- * SQLite `preferences` table (`runtime/store/sqlite-preferences-store.ts`,
- * one shared value per key, not per user/browser) - that's the only source
- * of truth; nothing here is mirrored to a cookie or localStorage.
+ * How each preference should be saved.
+ *
+ * "client-cookie"  → write cookie on the browser only.
+ * "server-cookie"  → write cookie through a Server Action.
+ * "localStorage"   → save only on the client (non-layout stuff).
+ * "none"           → no saving, resets on reload.
+ *
+ * Layout-critical prefs (sidebar_variant / sidebar_collapsible)
+ * must stay consistent during SSR → so they can’t use localStorage.
+ * Others are flexible and can use any persistence.
  */
 
-import { fontKeys } from "@/config/fonts";
+import { fontKeys } from "@/lib/fonts/registry";
+
 import {
   CONTENT_LAYOUT_VALUES,
   NAVBAR_STYLE_VALUES,
   SIDEBAR_COLLAPSIBLE_VALUES,
   SIDEBAR_VARIANT_VALUES,
-} from "@/constants/layout-preferences";
-import { THEME_MODE_VALUES, THEME_PRESET_VALUES } from "@/constants/theme";
+} from "./layout";
+import { THEME_MODE_VALUES, THEME_PRESET_VALUES } from "./theme";
 
-type PreferenceDefinition<Values extends readonly string[], Attribute extends `data-${string}`> = {
+export type PreferencePersistence = "none" | "client-cookie" | "server-cookie" | "localStorage";
+
+type LayoutPersistence = Exclude<PreferencePersistence, "localStorage">;
+
+type PreferenceDefinition<
+  Values extends readonly string[],
+  Persistence extends PreferencePersistence,
+  Attribute extends `data-${string}`,
+> = {
   values: Values;
   defaultValue: Values[number];
+  persistence: Persistence;
   attribute: Attribute;
 };
 
-function definePreference<const Values extends readonly string[], const Attribute extends `data-${string}`>(
-  definition: PreferenceDefinition<Values, Attribute>,
-) {
+function definePreference<
+  const Values extends readonly string[],
+  const Persistence extends PreferencePersistence,
+  const Attribute extends `data-${string}`,
+>(definition: PreferenceDefinition<Values, Persistence, Attribute>) {
+  return definition;
+}
+
+function defineSSRPreference<
+  const Values extends readonly string[],
+  const Persistence extends LayoutPersistence,
+  const Attribute extends `data-${string}`,
+>(definition: PreferenceDefinition<Values, Persistence, Attribute>) {
   return definition;
 }
 
@@ -32,45 +56,54 @@ export const PREFERENCE_REGISTRY = {
   theme_mode: definePreference({
     values: THEME_MODE_VALUES,
     defaultValue: "light",
+    persistence: "client-cookie",
     attribute: "data-theme-mode",
   }),
 
   theme_preset: definePreference({
     values: THEME_PRESET_VALUES,
     defaultValue: "default",
+    persistence: "client-cookie",
     attribute: "data-theme-preset",
   }),
 
   font: definePreference({
     values: fontKeys,
     defaultValue: "geist",
+    persistence: "client-cookie",
     attribute: "data-font",
   }),
 
   content_layout: definePreference({
     values: CONTENT_LAYOUT_VALUES,
-    defaultValue: "centered",
+    // `centered` caps every page at max-w-screen-2xl (1536px) and centres it,
+    // which on a 1080p-and-wider screen leaves a dead gutter either side of
+    // the content -- most visible next to a page that has its own rail, like
+    // Ask Alaiy's chat history. Full width by default; `centered` is still
+    // there for anyone who prefers it (Settings → Themes).
+    defaultValue: "full-width",
+    persistence: "client-cookie",
     attribute: "data-content-layout",
   }),
 
   navbar_style: definePreference({
     values: NAVBAR_STYLE_VALUES,
     defaultValue: "sticky",
+    persistence: "client-cookie",
     attribute: "data-navbar-style",
   }),
 
-  // Read directly (via getPreference) by os/layout.tsx and settings/layout.tsx
-  // to pass as SSR-fallback props into the sidebar - must stay consistent
-  // during SSR, which SQLite already guarantees.
-  sidebar_variant: definePreference({
+  sidebar_variant: defineSSRPreference({
     values: SIDEBAR_VARIANT_VALUES,
     defaultValue: "sidebar",
+    persistence: "client-cookie",
     attribute: "data-sidebar-variant",
   }),
 
-  sidebar_collapsible: definePreference({
+  sidebar_collapsible: defineSSRPreference({
     values: SIDEBAR_COLLAPSIBLE_VALUES,
     defaultValue: "icon",
+    persistence: "client-cookie",
     attribute: "data-sidebar-collapsible",
   }),
 } as const;
@@ -82,6 +115,10 @@ export type PreferenceValueMap = {
 };
 
 export const PREFERENCE_KEYS = Object.freeze(Object.keys(PREFERENCE_REGISTRY) as PreferenceKey[]);
+
+export function getPreferencePersistence(key: PreferenceKey): PreferencePersistence {
+  return PREFERENCE_REGISTRY[key].persistence;
+}
 
 export const PREFERENCE_DEFAULTS = Object.fromEntries(
   PREFERENCE_KEYS.map((key) => [key, PREFERENCE_REGISTRY[key].defaultValue]),
