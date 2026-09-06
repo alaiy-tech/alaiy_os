@@ -1,26 +1,62 @@
-import Script from "next/script";
-
 /**
- * Resolves `theme_mode` to light/dark before hydration, so `.dark`/
- * `colorScheme` are correct on first paint. `RootLayout` already renders
- * every preference's `data-*` attribute from SQLite (the only source of
- * truth) - this script never reads or writes those. It only handles what
- * SSR genuinely can't know: whether "system" currently means light or dark.
+ * Boot script that reads user preference values from cookies or localStorage
+ * based on the configured persistence mode.
  *
- * Uses `next/script`'s `beforeInteractive` strategy (must live in the root
- * layout - which it does), not a raw `<script>` tag: React 19 warns that a
- * plain `<script>` rendered as component output never re-executes on a
- * client-side re-render, which is exactly wrong for the "must run once,
- * synchronously, before first paint" contract this needs. `beforeInteractive`
- * is Next's own supported mechanism for that contract - it inlines the
- * script into the initial HTML response ahead of hydration.
+ * Runs early in <head> to apply the correct data attributes before hydration,
+ * preventing layout or theme flicker and keeping RootLayout fully static.
  */
+import { PREFERENCE_REGISTRY } from "@/lib/preferences/preferences-config";
+
 export function ThemeBootScript() {
+  const registry = JSON.stringify(PREFERENCE_REGISTRY);
+
   const code = `
     (function () {
       try {
         var root = document.documentElement;
-        var mode = root.getAttribute("data-theme-mode");
+        var REGISTRY = ${registry};
+
+        function readCookie(name) {
+          var match = document.cookie.split("; ").find(function(c) {
+            return c.startsWith(name + "=");
+          });
+          return match ? decodeURIComponent(match.split("=")[1]) : null;
+        }
+
+        function readLocal(name) {
+          try {
+            return window.localStorage.getItem(name);
+          } catch (e) {
+            return null;
+          }
+        }
+
+        function readPreference(key, definition) {
+          var mode = definition.persistence;
+          var value = null;
+
+          if (mode === "localStorage") {
+            value = readLocal(key);
+          }
+
+          if (!value && (mode === "client-cookie" || mode === "server-cookie")) {
+            value = readCookie(key);
+          }
+
+          return definition.values.indexOf(value) >= 0 ? value : definition.defaultValue;
+        }
+
+        var preferences = {};
+
+        Object.keys(REGISTRY).forEach(function(key) {
+          var definition = REGISTRY[key];
+          var value = readPreference(key, definition);
+
+          preferences[key] = value;
+          root.setAttribute(definition.attribute, value);
+        });
+
+        var mode = preferences.theme_mode;
         var resolvedMode =
           mode === "system" && window.matchMedia
             ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
@@ -30,15 +66,13 @@ export function ThemeBootScript() {
 
         root.classList.toggle("dark", resolvedMode === "dark");
         root.style.colorScheme = resolvedMode;
+
       } catch (e) {
         console.warn("ThemeBootScript error:", e);
       }
     })();
   `;
 
-  return (
-    <Script id="theme-boot" strategy="beforeInteractive">
-      {code}
-    </Script>
-  );
+  /* biome-ignore lint/security/noDangerouslySetInnerHtml: required for pre-hydration boot script */
+  return <script dangerouslySetInnerHTML={{ __html: code }} />;
 }

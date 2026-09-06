@@ -4,8 +4,8 @@
  * This script scans the /styles/presets directory for CSS files containing theme definitions.
  * It extracts `label:`, `value:`, and primary color definitions (`--primary`) for both light and dark modes.
  * These primary colors are used to visually represent each theme in the UI (e.g., colored dots or theme previews).
- * Default theme colors are fetched from /styles/globals.css.
- * All extracted metadata is injected into a marked section of the /constants/theme.ts file.
+ * Default theme colors are fetched from /app/globals.css.
+ * All extracted metadata is injected into a marked section of the /lib/preferences/theme.ts file.
  *
  * Usage:
  * - During local development, run manually after adding any new theme preset:
@@ -26,7 +26,7 @@ if (!fs.existsSync(presetDir)) {
   process.exit(1);
 }
 
-const outputPath = path.resolve(__dirname, "../constants/theme.ts");
+const outputPath = path.resolve(__dirname, "../lib/preferences/theme.ts");
 
 const files = fs.readdirSync(presetDir).filter((file) => file.endsWith(".css"));
 
@@ -66,7 +66,7 @@ const presets = files.map((file) => {
   return { label, value, primary };
 });
 
-const globalStylesPath = path.resolve(__dirname, "../styles/globals.css");
+const globalStylesPath = path.resolve(__dirname, "../app/globals.css");
 
 let globalContent = "";
 try {
@@ -95,6 +95,8 @@ const generatedBlock = `// --- generated:themePresets:start ---
 export const THEME_PRESET_OPTIONS = ${JSON.stringify(presets, null, 2)} as const;
 
 export const THEME_PRESET_VALUES = THEME_PRESET_OPTIONS.map((p) => p.value);
+
+export type ThemePreset = (typeof THEME_PRESET_OPTIONS)[number]["value"];
 
 // --- generated:themePresets:end ---`;
 
