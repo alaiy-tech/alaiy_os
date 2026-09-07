@@ -103,9 +103,8 @@ def _description(catalogue):
 	"""What the model reads when deciding whether to hand work over."""
 	lines = []
 	for item in catalogue:
-		takes = (item.get("input_schema") or {}).get("required") or []
-		needs = f"Needs: {', '.join(takes)}." if takes else "Takes no arguments."
-		lines.append(f"- `{item['slug']}` — {item.get('description') or item['label']} {needs}")
+		lines.append(f"- `{item['slug']}` — {item.get('description') or item['label']}")
+		lines.extend(_argument_lines(item.get("input_schema") or {}))
 
 	return (
 		"Hand a job to one of this site's specialist agents and return what it "
@@ -142,6 +141,33 @@ def _description(catalogue):
 	)
 
 
+def _argument_lines(schema):
+	"""Each argument an agent takes, with the schema's own description of it.
+
+	Names alone are not enough, and the gap is not theoretical. Told only
+	`Needs: product`, the model filled it with the label it had been using in
+	prose — "Quick Release Bumper Fastener Kit (SKU: 4125037034808)" — and the
+	run died in `channels.resolve`, which looks the identifier up as a primary
+	key and would have matched the bare `4125037034808`. The schema already said
+	what that argument is; it was simply never shown to the one model that has to
+	produce it, so the description was a guess every time.
+
+	Optional arguments are listed too, for the same reason rather than for
+	completeness: a model that cannot see `channel` cannot answer the run that
+	comes back asking which channel to write for.
+	"""
+	properties = schema.get("properties") or {}
+	if not properties:
+		return ["    Takes no arguments."]
+
+	required = set(schema.get("required") or ())
+	return [
+		f"    - `{name}`{'' if name in required else ' (optional)'} — "
+		f"{(spec or {}).get('description') or 'No description.'}"
+		for name, spec in properties.items()
+	]
+
+
 def run(arguments):
 	"""Run one agent and return its output.
 
@@ -176,14 +202,15 @@ def run(arguments):
 	# enqueuing a child job then polling for it would deadlock a single-worker
 	# bench — the same reason `skills.run_skill` calls `run_now`.
 	run_name = executor.run_now(agent, payload=args, trigger_type="Chat")
-	doc = frappe.get_doc("OS Agent Run", run_name)
 
-	if doc.status != "Success":
-		# The traceback stays on the Run; what reaches the model is one line it can
-		# relay and, where the failure is the user's to fix, act on.
-		frappe.throw(f"The {slug} agent failed. Run {run_name} has the details.")
+	# The traceback stays on the Run; what reaches the model is one line it can
+	# relay and, where the failure is the user's to fix, act on. A refusal is
+	# already that line — "no connector is installed" is the whole answer, and
+	# relaying it beats sending someone to a Run record for it.
+	output, is_error = executor.outcome(run_name, label=slug)
+	if is_error:
+		frappe.throw(output)
 
-	output = doc.output or ""
 	if len(output) > MAX_OUTPUT_CHARS:
 		output = output[:MAX_OUTPUT_CHARS] + f"\n… [truncated, {len(output)} chars total]"
 	return output

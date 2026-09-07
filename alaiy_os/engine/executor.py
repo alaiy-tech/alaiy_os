@@ -16,6 +16,35 @@ from alaiy_os.engine.context import agent_run
 from alaiy_os.engine.factory import build_runnable
 
 
+class ToolStop(Exception):
+	"""A tool saying this run cannot continue, and why — in words for a person.
+
+	The default for a failing tool is the opposite of this, and usually right:
+	`_dispatch_tools` hands the traceback back to the model, which re-reads it and
+	corrects itself. A bad argument, a channel id that does not exist, a validator
+	listing what is wrong with a draft — all of those are the model's to fix, and
+	ending the run on them would throw away a correction loop that works.
+
+	Some failures are not the model's to fix. When what is missing is the
+	*environment* — no connector installed for the work, a credential absent — no
+	amount of re-reading changes it, and the model's own instinct is the worst
+	available one: it is holding an output schema that demands a result, so it
+	writes a plausible-looking one. That is how a run with no channel to write for
+	ended up returning a listing whose title was "Product not found", from an agent
+	whose prompt tells it in as many words not to write a listing anyway. A prompt
+	cannot win that argument, because the schema is asking for the opposite.
+
+	So this ends the run instead, at the tool, with `status = "Refused"` and this
+	exception's message on the Run. **There is no output**, and that is the whole
+	point: a refusal cannot be mistaken downstream for work that was done.
+
+	Refused is not Failed. Nothing is broken — the site simply cannot do this — so
+	it does not read as a bug in the list, and `error` holds a sentence someone can
+	act on rather than a traceback. Both are still "not Success", so any caller
+	already branching on that keeps working untouched.
+	"""
+
+
 def execute_agent(agent, payload=None, trigger_type="Manual"):
 	"""Create a Run for `agent` and enqueue it. Returns the Run name."""
 	_assert_runnable(agent)
@@ -103,10 +132,14 @@ def run_queued(run):
 		# Undo any half-done tool side effects, then record the failure.
 		frappe.db.rollback()
 		doc.reload()
+		refused = isinstance(exc, ToolStop)
 		doc.db_set(
 			{
-				"status": "Failed",
-				"error": traceback.format_exc(),
+				"status": "Refused" if refused else "Failed",
+				# A refusal is meant to be read — by the person who asked, through
+				# whichever surface relayed it — so it keeps its sentence instead of a
+				# traceback of the raise that carried it here.
+				"error": str(exc) if refused else traceback.format_exc(),
 				"transcript": json.dumps(_redact_media(messages), indent=1, default=str)
 				if messages
 				else None,
@@ -114,7 +147,11 @@ def run_queued(run):
 			},
 			commit=True,
 		)
-		frappe.log_error(title=f"OS Agent Run {run} failed")
+		if not refused:
+			# A refusal is an expected answer, not a defect. Logging it would put a
+			# site that has simply not installed a connector into the Error Log on
+			# every run, which is how a log stops being read.
+			frappe.log_error(title=f"OS Agent Run {run} failed")
 		return
 
 	doc.db_set(
@@ -129,6 +166,28 @@ def run_queued(run):
 		},
 		commit=True,
 	)
+
+
+def outcome(run, label=None):
+	"""What a caller should relay about a finished Run, as `(text, is_error)`.
+
+	Three endings, and the difference between them is exactly what the person who
+	asked needs to hear, so it is decided here rather than in each surface that
+	runs an agent — `chat/skills.py` for `/listing`, `chat/agents.py` for a job
+	handed over in plain language, and whatever comes next.
+
+	A refusal relays its own words. That is the point of it: "no connector is
+	installed" is the complete answer, and the surface in front of the user can
+	say so instead of sending them to a Run record to find out. A genuine failure
+	still does send them there, because its detail is a traceback and there is
+	nothing in it for them.
+	"""
+	doc = frappe.get_doc("OS Agent Run", run)
+	if doc.status == "Success":
+		return doc.output or "", False
+	if doc.status == "Refused":
+		return doc.error or "", True
+	return f"The {label or doc.agent} agent failed. Run {run} has the details.", True
 
 
 def _run_loop(run_doc):
@@ -201,6 +260,11 @@ def _dispatch_tools(agent, content, usage):
 				)
 			else:
 				results.append(_tool_result(block["id"], json.dumps(value, default=str)))
+		except ToolStop:
+			# The one failure that does not go back to the model. It has said there
+			# is nothing to recover to, and a model handed that still has a schema
+			# telling it to produce something. See ToolStop.
+			raise
 		except Exception:
 			# Tool failures go back to the LLM, not up the stack — it may recover.
 			results.append(_tool_result(block["id"], traceback.format_exc(limit=3), is_error=True))
