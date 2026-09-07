@@ -115,8 +115,7 @@ def attach(doc):
 def generate(doc):
 	"""The follow-ups for the current state of `doc`, or None.
 
-	Split out from `attach` so it can be exercised without writing anything —
-	see `chat/smoke.py`.
+	Split out from `attach` so it can be exercised without writing anything.
 	"""
 	transcript = _transcript(doc.name)
 	if not transcript:
