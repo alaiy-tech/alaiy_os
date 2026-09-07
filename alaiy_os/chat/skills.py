@@ -285,15 +285,11 @@ def run_skill(session, slug, append, args=None):
 	agent = resolve(slug)
 	run = executor.run_now(agent, payload=args, trigger_type="Chat")
 
-	doc = frappe.get_doc("OS Agent Run", run)
-	if doc.status == "Success":
-		content, is_error = doc.output or "", False
-	else:
-		# The traceback stays in the Run; what reaches the model is one line it
-		# can relay. Same rule as a failed tool call — the model responds to the
-		# failure rather than the turn dying on it.
-		content = f"The {slug} agent failed. Run {run} has the details."
-		is_error = True
+	# A traceback stays in the Run; what reaches the model is one line it can
+	# relay. Same rule as a failed tool call — the model responds to the failure
+	# rather than the turn dying on it. A refusal relays its own words, which are
+	# already written for the person who asked (see `executor.outcome`).
+	content, is_error = executor.outcome(run, label=slug)
 
 	if len(content) > MAX_OUTPUT_CHARS:
 		content = content[:MAX_OUTPUT_CHARS] + f"\n… [truncated, {len(content)} chars total]"
