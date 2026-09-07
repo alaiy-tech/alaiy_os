@@ -208,3 +208,63 @@ export const uploadChatAttachment = async (session: string, file: File): Promise
 
 export const deleteChatAttachment = (attachment: string) =>
   call<{ deleted: string }>(`${NS}.delete_attachment`, { attachment });
+
+export interface SheetPreview {
+  kind: "sheet";
+  /** The sheet these rows came from, and every sheet in the workbook. */
+  sheet: string;
+  sheets: string[];
+  rows: string[][];
+  /** Where this window starts, and how many non-blank rows the sheet holds --
+   * so the panel can page through all of them and say so honestly. */
+  offset: number;
+  total_rows: number;
+}
+
+export interface SlideChart {
+  categories: string[];
+  series: { name: string; points: (number | null)[] }[];
+}
+
+export interface Slide {
+  index: number;
+  title: string;
+  bullets: string[];
+  notes: string;
+  /** Header row first. Present only on a table slide. */
+  table: string[][] | null;
+  chart: SlideChart | null;
+}
+
+export interface SlidesPreview {
+  kind: "slides";
+  /** width/height the deck was authored at (16:9 = 1.7777), so the viewer can
+   * shape its stage to match instead of stretching a 4:3 deck into widescreen.
+   * Null if the file didn't say. */
+  ratio: number | null;
+  slides: Slide[];
+  /** One rendered image per slide -- the actual deck as PowerPoint draws it,
+   * produced server-side by LibreOffice. Null when the site can't render
+   * (LibreOffice absent, or the conversion failed), in which case the viewer
+   * falls back to drawing `slides` itself. */
+  images: string[] | null;
+}
+
+export interface DocPreview {
+  kind: "doc";
+  blocks: { type: "heading" | "paragraph" | "list"; text: string; level: number }[];
+}
+
+export type FilePreview = SheetPreview | SlidesPreview | DocPreview;
+
+/** xlsx/pptx/docx only. They're parsed server-side because openpyxl,
+ * python-pptx and python-docx are already installed there and the browser has
+ * no parser for any of them; pdf, images, csv/tsv and text are read straight
+ * off the file URL by the panel itself. */
+export const previewChatFile = (params: { fileUrl: string; sheet?: string; offset?: number; limit?: number }) =>
+  call<FilePreview>(`${NS}.preview_file`, {
+    file_url: params.fileUrl,
+    sheet: params.sheet,
+    offset: params.offset,
+    limit: params.limit,
+  });
