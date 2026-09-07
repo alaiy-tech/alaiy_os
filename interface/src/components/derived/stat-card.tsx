@@ -7,6 +7,7 @@ import {
   CardDescription,
   CardFooter,
   CardHeader,
+  CardTitle,
 } from "@/components/primitive/card";
 import { cn } from "@/utils";
 
@@ -22,38 +23,44 @@ import { cn } from "@/utils";
  * per-feature.
  */
 export function StatCard({
-  label,
+  title,
+  subtitle,
   icon,
   value,
   delta,
   summary,
   className,
 }: {
-  label: string;
-  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  icon?: React.ReactNode;
   value: string;
   delta: React.ReactNode;
-  summary: React.ReactNode;
+  summary?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <Card
-      className={cn("relative h-full overflow-hidden border ring-0", className)}
-    >
-      <CardHeader>
-        <CardDescription className="text-sm mb-1.5 text-foreground">
-          {label}
+    <Card className={cn("py-3 gap-3.5", className)}>
+      <CardHeader className="gap-y-0">
+        <CardTitle className="font-medium text-foreground text-md">
+          {title}
+        </CardTitle>
+        <CardDescription className="text-sm text-muted-foreground">
+          {subtitle}
         </CardDescription>
-        <CardAction className="grid mt-1 scale-125 place-items-center rounded-sm">
-          {icon}
-        </CardAction>
-        <span className="text-3xl pt-1 pb-0.5 text-foreground tabular-nums leading-none tracking-tight">
+        <CardAction>{icon}</CardAction>
+      </CardHeader>
+      <CardContent>
+        <span className="text-[30px] text-accent-foreground tabular-nums leading-none tracking-tight">
           {value}
         </span>
-        <div className="py-0 flex flex-row items-center gap-1 pt-1.5">
-          {delta} {summary}
-        </div>
-      </CardHeader>
+      </CardContent>
+      {summary && (
+        <CardFooter className="bg-card border-0 gap-1.5 uppercase font-medium text-xs text-muted-foreground pt-0.5">
+          <span className="font-semibold">{delta}</span>
+          VS. {summary}
+        </CardFooter>
+      )}
     </Card>
   );
 }

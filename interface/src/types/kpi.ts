@@ -11,7 +11,7 @@ export type OsKpiIconName = keyof typeof KPI_ICONS;
  * `StatCard` - `formatValue` (components/registry/kpi.tsx) auto-typecasts a
  * raw number from a Data Source into a formatted string per this option; a
  * string value already provided by the source passes through unchanged. */
-export type OsKpiFormat = "number" | "currency" | "percent";
+export type OsKpiFormat = "number" | "currency" | "percent" | "unit";
 
 export type OsKpiTrendUnit = "percent" | "points";
 export type OsKpiTrendPolarity = "positive" | "negative";

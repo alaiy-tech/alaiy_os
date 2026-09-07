@@ -16,14 +16,14 @@ import type { PageConfigFile } from "@/types/runtime/page";
  * transform step (which computes each KPI's `trendLabel` from the same
  * codes) can't quietly drift apart within this file - though the codes
  * themselves still have to independently match what the backend's own
- * `PERIOD_DAYS`/`_period_bounds` understands (`dashboard_stats.py`), since
+ * `PERIOD_DAYS`/`_period_bounds` understands ( `dashboard_stats.py`), since
  * component `props` and a page's `data` are never cross-readable at
  * runtime. */
 const DASHBOARD_PERIOD_LABELS: Record<string, string> = {
-  "1D": "vs last day",
-  "1W": "vs last week",
-  "1M": "vs last month",
-  "1Y": "vs last year",
+  "1D": "last day",
+  "1W": "last week",
+  "1M": "last month",
+  "1Y": "last year",
 };
 
 /**
@@ -171,7 +171,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
             // fixed month, regardless of how wide the selected window is -
             // see `resolver.ts`'s `PERIOD_TO_GRANULARITY`.
             granularity: "auto",
-            aggregate: { type: "sum", field: "grand_total", as: "revenue" },
+            aggregate: { type: "sum", field: "grand_total", as: "sales" },
           },
           { type: "sort", field: "key", direction: "asc" },
         ],
@@ -328,14 +328,6 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       format: "currency",
                       className: "rounded-none",
                     },
-                    // `value` stays the transform-pipeline-computed `aov`
-                    // (the deliberate proof that a KPI can come from raw
-                    // doctype rows + `transform`, not a bespoke source) -
-                    // `previousValue` borrows `overview`'s own
-                    // `average_order.previous` for the comparison, since
-                    // `aov`'s own request has no notion of a "previous
-                    // period" and computes the exact same
-                    // sum(grand_total)/count as `overview` does.
                     data: {
                       value: { ref: "aov", path: "aov" },
                       previousValue: {
@@ -374,7 +366,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                     type: "os-kpi",
                     props: {
                       title: "Stock Accuracy",
-                      icon: "PackageCheck",
+                      icon: "Scale",
                       format: "percent",
                       className: "rounded-none rounded-br-lg",
                     },
@@ -396,7 +388,6 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                 id: "chart-kpi-stack",
                 kind: "layout",
                 type: "stack",
-                gap: 0,
                 layout: { span: { xl: 7 } },
                 children: [
                   {
@@ -405,14 +396,13 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                     type: "os-chart",
                     layout: { span: { xl: 12 } },
                     props: {
-                      title: "Sales Overview",
-                      subtitle:
-                        "Revenue over the selected period, computed from Sales Order rows via the generic transform pipeline.",
+                      title: "Sales Order Trends",
+                      icon: "BarChart3",
                       x: "key",
                       className: "rounded-lg flex-1 h-full",
-                      legend: true,
+                      legend: false,
                       series: [
-                        { field: "revenue", label: "Revenue", type: "area" },
+                        { field: "sales", label: "Sales", type: "area" },
                       ],
                       // Demonstrates the chart-wide colour map (`ChartColorMap`
                       // in chart.tsx) - a literal RGB value, not a semantic
@@ -421,7 +411,7 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                       // setting `color` inline on the "revenue" series itself;
                       // this form is what's reusable across multiple charts
                       // that share the same field name.
-                      colors: { revenue: "rgb(37 99 235)" },
+                      colors: { sales: "rgb(00, 32, 54)" },
                       // Revenue reads as currency on the Y-axis and in the
                       // tooltip; the x-axis' own `key` values (day- or
                       // month-shaped, depending on the active period - see
@@ -460,7 +450,6 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                               title: "In Stock",
                               icon: "PackageCheck",
                               format: "number",
-                              trendLabel: "Live snapshot",
                               className: "rounded-none rounded-l-lg",
                             },
                             data: {
@@ -473,9 +462,8 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                             type: "os-kpi",
                             props: {
                               title: "Low Stock",
-                              icon: "Package",
+                              icon: "PackageSearch",
                               format: "number",
-                              trendLabel: "Live snapshot",
                               className: "rounded-none",
                             },
                             data: {
@@ -490,7 +478,6 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
                               title: "Out of Stock",
                               icon: "Package",
                               format: "number",
-                              trendLabel: "Live snapshot",
                               className: "rounded-none rounded-r-lg",
                             },
                             data: {
@@ -511,6 +498,8 @@ export const HEADLESS_DASHBOARD_PAGE: PageConfigFile = {
             kind: "component",
             type: "os-data-table",
             props: {
+              title: "Recent Orders",
+              subtitle: "Overview of your recent sales orders ",
               rowId: "name",
               searchable: true,
               searchPlaceholder: "Search Recent Orders...",

@@ -44,12 +44,10 @@ export function OSPeriodToggle({
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const defaultValue = options[0]?.value;
+  const defaultValue = options[1]?.value;
   const raw = searchParams.get(paramName);
   const period =
-    raw && options.some((option) => option.value === raw)
-      ? raw
-      : defaultValue;
+    raw && options.some((option) => option.value === raw) ? raw : defaultValue;
 
   function setPeriod(next: string) {
     const params = new URLSearchParams(searchParams);

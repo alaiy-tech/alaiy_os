@@ -4,6 +4,8 @@ import { KPI_BORDER_TONES } from "@/config/kpi-classes";
 import { KPI_ICON_NAMES } from "@/config/kpi-icons";
 import { ERPNEXT_BADGE_CATEGORIES } from "@/utils/get-badge-style";
 
+const CHART_ICON_NAMES = KPI_ICON_NAMES;
+
 /**
  * Per-type `propsSchema` values for `runtime/registry/component-registry.ts`'s
  * `baseComponentRegistry` entries - checked by
@@ -58,6 +60,7 @@ const DYNAMIC_BADGE_PROPS_SCHEMA = z
 const OS_KPI_PROPS_SCHEMA = z
   .object({
     title: z.string(),
+    subtitle: z.string(),
     icon: z.enum(KPI_ICON_NAMES),
     value: z.union([z.number(), z.string()]),
     format: z.enum(["number", "currency", "percent"]),
@@ -254,6 +257,7 @@ const OS_CHART_PROPS_SCHEMA = z
   .object({
     title: z.string(),
     subtitle: z.string(),
+    icon: z.enum(CHART_ICON_NAMES),
     x: z.string(),
     series: z.array(CHART_SERIES_SCHEMA),
     // Chart-wide field->colour overrides, checked before each series' own

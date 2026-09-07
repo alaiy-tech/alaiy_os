@@ -878,9 +878,12 @@ export function OsDataTable<TData extends Record<string, unknown>>({
     const params = new URLSearchParams(filterSearchParams);
     for (const key of toRemove) params.delete(key);
     const query = params.toString();
-    filterRouter.replace(query ? `${filterPathname}?${query}` : filterPathname, {
-      scroll: false,
-    });
+    filterRouter.replace(
+      query ? `${filterPathname}?${query}` : filterPathname,
+      {
+        scroll: false,
+      },
+    );
   }, [
     pageParam,
     pageSizeParam,
@@ -932,9 +935,12 @@ export function OsDataTable<TData extends Record<string, unknown>>({
     if (pageParam) params.delete(pageParam);
 
     const query = params.toString();
-    filterRouter.replace(query ? `${filterPathname}?${query}` : filterPathname, {
-      scroll: false,
-    });
+    filterRouter.replace(
+      query ? `${filterPathname}?${query}` : filterPathname,
+      {
+        scroll: false,
+      },
+    );
   }
 
   function handleFilterApply(rows: FilterRow[]) {
@@ -1129,89 +1135,95 @@ export function OsDataTable<TData extends Record<string, unknown>>({
     selectable && Boolean(selectionActions?.length) && selectedCount > 0;
 
   return (
-    <Card >
+    <Card>
       {hasHeader && (
         <CardHeader>
           {title && <CardTitle className="leading-none">{title}</CardTitle>}
           {subtitle && <CardDescription>{subtitle}</CardDescription>}
-          {headerActions && <CardAction>{headerActions}</CardAction>}
+          <CardAction>
+            {" "}
+            {[
+              searchable,
+              filterable,
+              columnVisibility,
+              showSelectionActions,
+            ].some(Boolean) && (
+              <div className="flex flex-wrap items-center gap-2">
+                {searchable && (
+                  <InputGroup className="h-7 w-full md:w-64">
+                    <InputGroupAddon align="inline-start">
+                      <Search className="size-3.5" />
+                    </InputGroupAddon>
+                    <InputGroupInput
+                      placeholder={searchPlaceholder}
+                      value={searchInput}
+                      onChange={(event) => {
+                        setSearchInput(event.target.value);
+                        if (!manualSearch)
+                          setClientPagination((p) => ({ ...p, pageIndex: 0 }));
+                      }}
+                    />
+                  </InputGroup>
+                )}
+
+                {filterFields.length > 0 && (
+                  <ButtonGroup>
+                    <FilterPopover
+                      availableFields={filterFields}
+                      value={effectiveFilterRows}
+                      onApply={handleFilterApply}
+                      manual={manualFilter}
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={effectiveFilterRows.length === 0}
+                      onClick={() => handleFilterApply([])}
+                      aria-label="Clear all filters"
+                    >
+                      <X />
+                    </Button>
+                  </ButtonGroup>
+                )}
+
+                {columnVisibility && (
+                  <ColumnSettingsPopover
+                    open={columnsOpen}
+                    onOpenChange={setColumnsOpen}
+                    trigger={
+                      <Button variant="outline" size="sm">
+                        <Cog /> Columns
+                      </Button>
+                    }
+                    availableFields={columnFields}
+                    value={columnPrefs}
+                    defaultColumnOrder={
+                      defaultColumnOrder ?? manageableColumnIds
+                    }
+                    minVisibleColumns={minVisibleColumns}
+                    compulsoryFields={compulsoryColumns}
+                    onSave={(prefs) => {
+                      if (prefs.columnOrder.length < minVisibleColumns) return;
+                      setColumnPrefs(prefs);
+                    }}
+                  />
+                )}
+                {headerActions}
+                {showSelectionActions && (
+                  <div className="ml-auto">
+                    <SelectionActionsMenu
+                      groups={selectionActions ?? []}
+                      count={selectedCount}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </CardAction>
         </CardHeader>
       )}
 
       <CardContent className="flex flex-col gap-4">
-        {[searchable, filterable, columnVisibility, showSelectionActions].some(
-          Boolean,
-        ) && (
-          <div className="flex flex-wrap items-center gap-2">
-            {searchable && (
-              <InputGroup className="h-7 w-full md:w-64">
-                <InputGroupAddon align="inline-start">
-                  <Search className="size-3.5" />
-                </InputGroupAddon>
-                <InputGroupInput
-                  placeholder={searchPlaceholder}
-                  value={searchInput}
-                  onChange={(event) => {
-                    setSearchInput(event.target.value);
-                    if (!manualSearch)
-                      setClientPagination((p) => ({ ...p, pageIndex: 0 }));
-                  }}
-                />
-              </InputGroup>
-            )}
-
-            {filterFields.length > 0 && (
-              <ButtonGroup>
-                <FilterPopover
-                  availableFields={filterFields}
-                  value={effectiveFilterRows}
-                  onApply={handleFilterApply}
-                  manual={manualFilter}
-                />
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={effectiveFilterRows.length === 0}
-                  onClick={() => handleFilterApply([])}
-                  aria-label="Clear all filters"
-                >
-                  <X />
-                </Button>
-              </ButtonGroup>
-            )}
-
-            {columnVisibility && (
-              <ColumnSettingsPopover
-                open={columnsOpen}
-                onOpenChange={setColumnsOpen}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <Cog /> Columns
-                  </Button>
-                }
-                availableFields={columnFields}
-                value={columnPrefs}
-                defaultColumnOrder={defaultColumnOrder ?? manageableColumnIds}
-                minVisibleColumns={minVisibleColumns}
-                compulsoryFields={compulsoryColumns}
-                onSave={(prefs) => {
-                  if (prefs.columnOrder.length < minVisibleColumns) return;
-                  setColumnPrefs(prefs);
-                }}
-              />
-            )}
-
-            {showSelectionActions && (
-              <div className="ml-auto">
-                <SelectionActionsMenu
-                  groups={selectionActions ?? []}
-                  count={selectedCount}
-                />
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="overflow-hidden rounded-md border">
           <Table>
             <TableHeader>

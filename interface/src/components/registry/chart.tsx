@@ -13,6 +13,7 @@ import {
 
 import {
   Card,
+  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -28,6 +29,10 @@ import {
 } from "@/components/primitive/chart";
 import { cn } from "@/utils";
 import { formatCurrency } from "@/utils/format";
+import { BarChart } from "lucide-react";
+
+import { KPI_ICONS } from "@/config/kpi-icons";
+import type { OsChartIconName } from "@/types/chart";
 
 /** The `chart` capability contract's series shape (brief §21) - one generic
  * composed chart covering exactly the two shapes this app actually has
@@ -41,6 +46,8 @@ export type ChartSeries = {
   type: ChartSeriesType;
   color?: string;
 };
+
+export type { OsChartIconName } from "@/types/chart";
 
 /** Maps a series' own `field` to a chart-wide colour override - lets an
  * author define a field->colour palette once, in `props`, instead of
@@ -88,6 +95,49 @@ function formatChartValue(
   return precision !== undefined
     ? value.toFixed(precision)
     : value.toLocaleString();
+}
+
+/** `1234` -> `"1.2k"`, `1234567` -> `"1.2m"`, `1234567890` -> `"1.2b"` -
+ * below 1000 is left as a plain integer. Deliberately not `Intl`'s own
+ * `notation: "compact"` (which renders as `"1.2K"`, uppercase, and isn't
+ * currency-symbol-aware in the way `formatChartAxisValue` needs below) -
+ * this gives full control over both. */
+function compactNumber(value: number): string {
+  const abs = Math.abs(value);
+  const suffixed = (divisor: number, suffix: string) =>
+    `${(value / divisor).toFixed(1).replace(/\.0$/, "")}${suffix}`;
+  if (abs >= 1_000_000_000) return suffixed(1_000_000_000, "b");
+  if (abs >= 1_000_000) return suffixed(1_000_000, "m");
+  if (abs >= 1_000) return suffixed(1_000, "k");
+  return value.toFixed(0);
+}
+
+function currencySymbol(currency: string): string {
+  return (
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+      currencyDisplay: "narrowSymbol",
+    })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? ""
+  );
+}
+
+/** The Y-axis' own tick labels - deliberately more compact than
+ * `formatChartValue` (which stays exact, for the tooltip): axis ticks have
+ * little horizontal room, so `"32k"` reads far better there than
+ * `"$32,000.00"`, while the tooltip on hover still shows the exact figure. */
+function formatChartAxisValue(
+  value: number,
+  format: ChartValueFormat | undefined,
+  currency: string | undefined,
+): string {
+  if (format === "percent") return `${Math.round(value)}%`;
+  const compact = compactNumber(value);
+  return format === "currency"
+    ? `${currencySymbol(currency ?? "USD")}${compact}`
+    : compact;
 }
 
 /** `"2026"` / `"2026-01"` / `"2026-01-15"` only - `truncateDate`'s own
@@ -152,6 +202,7 @@ export function OsChart({
   colors,
   valueFormat,
   currency,
+  icon,
   precision,
   xAxisFormat,
   rows,
@@ -167,9 +218,8 @@ export function OsChart({
    * inline `color`, which in turn wins over `DEFAULT_COLORS`'s rotation.
    * See `ChartColorMap`'s doc comment. */
   colors?: ChartColorMap;
-  /** How every series' numeric values read on the Y-axis and in the
-   * tooltip - see `ChartValueFormat`'s doc comment. Omitted keeps today's
-   * plain `toLocaleString()`. */
+  /** Icon shown in the chart header, using the same curated Lucide set as KPI cards. */
+  icon?: OsChartIconName;
   valueFormat?: ChartValueFormat;
   /** Only meaningful alongside `valueFormat: "currency"`. */
   currency?: string;
@@ -200,11 +250,13 @@ export function OsChart({
     ]),
   );
 
+  const Icon = (icon && KPI_ICONS[icon]) || KPI_ICONS.BarChart3;
+
   const body =
     !rows || rows.length === 0 ? (
       <div
         className={cn(
-          "grid w-full h-full place-items-center rounded-none text-muted-foreground text-sm",
+          "grid w-full h-full place-items-center rounded-none text-muted-foreground text-sm flex-1",
           className,
         )}
       >
@@ -220,12 +272,15 @@ export function OsChart({
         // it instead of getting cropped/gapped at `aspect-video`'s fixed
         // 16:9 ratio. An explicit `height` still wins - `cn` (tailwind-merge)
         // correctly drops `aspect-video`/`h-full` in favor of the inline style.
-        className={cn("w-full h-full", !height && "aspect-auto h-full")}
+        className={cn(
+          "w-full h-full flex-1",
+          !height && "aspect-auto h-full flex-1",
+        )}
         style={{ height }}
       >
         <ComposedChart
           data={rows}
-          margin={{ top: 4, right: 4, bottom: 0, left: 0 }}
+          margin={{ top: 0, right: 0, bottom: 0, left: 4 }}
         >
           <CartesianGrid vertical={false} />
           <XAxis
@@ -242,7 +297,7 @@ export function OsChart({
             tick={{ fontSize: 11 }}
             width={40}
             tickFormatter={(value) =>
-              formatChartValue(value, valueFormat, currency, precision)
+              formatChartAxisValue(value, valueFormat, currency)
             }
           />
           <ChartTooltip
@@ -297,16 +352,23 @@ export function OsChart({
   if (!title && !subtitle) return body;
 
   return (
-    <Card className={cn(height ? undefined : "h-full", className)}>
-      <CardHeader>
-        {title && (
-          <CardTitle className="font-medium leading-none">{title}</CardTitle>
+    <Card className="h-full py-3">
+      <CardHeader className="gap-y-0">
+        <CardTitle className="font-medium text-foreground text-md">
+          {title}
+        </CardTitle>
+        {subtitle && (
+          <CardDescription className="text-sm text-muted-foreground">
+            {subtitle}
+          </CardDescription>
         )}
-        {subtitle && <CardDescription>{subtitle}</CardDescription>}
+        <CardAction>
+          <span className="scale-200">
+            <Icon className="size-3.5 text-foreground" />
+          </span>
+        </CardAction>
       </CardHeader>
-      <CardContent className={height ? undefined : "min-h-0 flex-1"}>
-        {body}
-      </CardContent>
+      <CardContent className={"min-h-0 flex-1"}>{body}</CardContent>
     </Card>
   );
 }

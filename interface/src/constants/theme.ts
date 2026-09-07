@@ -21,8 +21,8 @@ export const THEME_PRESET_OPTIONS = [
     label: "Alaiy OS",
     value: "alaiy-os",
     primary: {
-      light: "oklch(0.3028 0.0765 245.1957)",
-      dark: "oklch(0.3028 0.0765 245.1957)",
+      light: "oklch(0.304 0.078 245.92)",
+      dark: "oklch(0.693 0.078 240.28)",
     },
   },
   {
@@ -31,6 +31,14 @@ export const THEME_PRESET_OPTIONS = [
     primary: {
       light: "oklch(0.6489 0.237 26.9728)",
       dark: "oklch(0.7044 0.1872 23.1858)",
+    },
+  },
+  {
+    label: "Midnight City",
+    value: "midnight-city",
+    primary: {
+      light: "oklch(0.304 0.078 245.92)",
+      dark: "oklch(0.743 0.071 82.44)",
     },
   },
   {

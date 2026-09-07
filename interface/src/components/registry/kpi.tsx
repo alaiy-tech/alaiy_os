@@ -2,7 +2,6 @@ import type { ReactNode } from "react";
 
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 
-import { Badge } from "@/components/primitive/badge";
 import { KPI_ICONS } from "@/config/kpi-icons";
 import { formatCurrency } from "@/utils/format";
 import { cn } from "@/utils";
@@ -28,10 +27,9 @@ function formatValue(
   currency: string | undefined,
 ): string {
   if (typeof value === "string") return value;
-
   if (format === "currency") {
     return formatCurrency(value, {
-      currency,
+      currency, 
       minimumFractionDigits: precision,
       maximumFractionDigits: precision,
     });
@@ -81,7 +79,6 @@ function TrendBadge({
   trend: number | string | null | undefined;
   trendUnit?: OsKpiTrendUnit;
   trendPolarity?: OsKpiTrendPolarity;
-  children: React.ReactNode;
 }) {
   const normalizedTrend = normalizeNumber(trend);
 
@@ -90,7 +87,7 @@ function TrendBadge({
   if (normalizedTrend === 0 || normalizedTrend === null) {
     return (
       <span className="flex flex-row items-center gap-0.5 text-muted-foreground">
-        <Minus />
+        <Minus size={16} />
         {`0${suffix}`}
       </span>
     );
@@ -103,7 +100,7 @@ function TrendBadge({
   return (
     <span
       className={cn(
-        isGood ? "text-success-foreground" : "text-destructive",
+        isGood ? "text-success-foreground" : "text-caution-foreground",
         "flex flex-row gap-0.5 items-center",
       )}
     >
@@ -113,27 +110,6 @@ function TrendBadge({
       {suffix}
     </span>
   );
-}
-
-/** The summary line at the card's bottom - the delta badge's caption, once
- * the badge itself moved up next to the value. `trendLabel` is the full
- * caption text itself (e.g. "since last month", or a static caption like
- * "Live snapshot" for a metric with no period comparison at all - e.g. the
- * stock KPIs) - not just the comparison point's bare name, so a caller can
- * phrase it however it wants instead of this component imposing its own
- * "vs "/"since" wording. Shown whenever given, independent of whether
- * `trend` resolved to a real number - a caption doesn't have to be about a
- * numeric delta. Falls back to "No comparison available" only when there's
- * neither a `trendLabel` nor a `trend` - genuinely nothing to say, rather
- * than silently rendering blank. */
-function TrendSummary({
-  trend,
-  trendLabel,
-}: {
-  trend: number | string | null | undefined;
-  trendLabel?: string;
-}) {
-  return <span className="text-muted-foreground">{trendLabel}</span>;
 }
 
 /**
@@ -151,6 +127,7 @@ function TrendSummary({
  */
 export function OsKpi({
   title,
+  subtitle,
   icon,
   value,
   format,
@@ -164,6 +141,7 @@ export function OsKpi({
   className,
 }: {
   title: string;
+  subtitle: string;
   icon?: OsKpiIconName;
   value: number | string;
   format?: OsKpiFormat;
@@ -183,18 +161,18 @@ export function OsKpi({
 
   return (
     <StatCard
-      label={title}
-      icon={<Icon className="size-3 text-foreground" />}
+      title={title}
+      subtitle={subtitle}
+      icon={<Icon className="size-3.5 text-foreground" />}
       value={formatValue(value, format, precision, currency)}
       delta={
         <TrendBadge
           trend={effectiveTrend}
           trendUnit={trendUnit}
           trendPolarity={trendPolarity}
-          children={<></>}
         />
       }
-      summary={<TrendSummary trend={effectiveTrend} trendLabel={trendLabel} />}
+      summary={trendLabel}
       className={className}
     />
   );

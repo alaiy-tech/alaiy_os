@@ -4,7 +4,7 @@
  * This script scans the /styles/presets directory for CSS files containing theme definitions.
  * It extracts `label:`, `value:`, and primary color definitions (`--primary`) for both light and dark modes.
  * These primary colors are used to visually represent each theme in the UI (e.g., colored dots or theme previews).
- * Default theme colors are fetched from /app/globals.css.
+ * Default theme colors are fetched from /styles/globals.css.
  * All extracted metadata is injected into a marked section of the /constants/theme.ts file.
  *
  * Usage:
@@ -66,7 +66,7 @@ const presets = files.map((file) => {
   return { label, value, primary };
 });
 
-const globalStylesPath = path.resolve(__dirname, "../app/globals.css");
+const globalStylesPath = path.resolve(__dirname, "../styles/globals.css");
 
 let globalContent = "";
 try {

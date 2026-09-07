@@ -25,6 +25,7 @@
 @import "../styles/presets/alaiy-os.css";
 @import "../styles/presets/soft-pop.css";
 @import "../styles/presets/tangerine.css";
+@import "../styles/presets/midnight-city.css";
 
 @custom-variant dark (&:is(.dark *));
 

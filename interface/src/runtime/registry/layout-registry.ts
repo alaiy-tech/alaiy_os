@@ -26,7 +26,7 @@ export const layoutRegistry: Record<
       gapOverride = 4,
     ) => {
       const gap = typeof nodeOrGap === "number" ? nodeOrGap : gapOverride;
-      return cn("flex flex-col h-[100%]", `gap-${gap ?? 4}`);
+      return cn("flex h-full flex-col", `gap-${gap ?? 4}`);
     },
   },
   /** The header's action row - filters + separator + settings button. */

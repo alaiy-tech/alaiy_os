@@ -96,7 +96,7 @@ function renderChild(
   if (span.length === 0) return renderNode(node, data, registry, key);
 
   return (
-    <div key={key} className={cn(...span)}>
+    <div key={key} className={cn(...span, "h-full")}>
       {renderNode(node, data, registry, "content")}
     </div>
   );

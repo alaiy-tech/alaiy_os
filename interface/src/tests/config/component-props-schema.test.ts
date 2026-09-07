@@ -69,6 +69,17 @@ describe("component-props-schema", () => {
       expect(result.success).toBe(true);
     });
 
+    it("accepts a title, subtitle, and icon on a chart card", () => {
+      const result = schema.safeParse({
+        title: "Sales Order Trends",
+        subtitle: "last month",
+        icon: "BarChart3",
+        x: "period",
+        series: [{ field: "sales", label: "Sales", type: "area" }],
+      });
+      expect(result.success).toBe(true);
+    });
+
     it("rejects a series entry with an unrecognised chart type", () => {
       const result = schema.safeParse({
         x: "period",
@@ -108,7 +119,11 @@ describe("component-props-schema", () => {
           {
             label: "Danger zone",
             items: [
-              { label: "Delete", tone: "destructive", action: { type: "delete" } },
+              {
+                label: "Delete",
+                tone: "destructive",
+                action: { type: "delete" },
+              },
             ],
           },
         ],
@@ -134,7 +149,9 @@ describe("component-props-schema", () => {
         title: "Customers",
         selectable: true,
         selectionActions: [
-          { items: [{ label: "View", action: { type: "navigate", url: "/x" } }] },
+          {
+            items: [{ label: "View", action: { type: "navigate", url: "/x" } }],
+          },
         ],
       });
       expect(result.success).toBe(false);
@@ -151,12 +168,21 @@ describe("component-props-schema", () => {
         actions: [
           {
             items: [
-              { label: "View", action: { type: "navigate", url: "/os/sales/orders/{name}" } },
+              {
+                label: "View",
+                action: { type: "navigate", url: "/os/sales/orders/{name}" },
+              },
               { label: "Edit", action: { type: "edit" } },
             ],
           },
           {
-            items: [{ label: "Delete", tone: "destructive", action: { type: "delete" } }],
+            items: [
+              {
+                label: "Delete",
+                tone: "destructive",
+                action: { type: "delete" },
+              },
+            ],
           },
         ],
       });
@@ -272,7 +298,9 @@ describe("component-props-schema", () => {
     it("rejects an unrecognised textStyle value", () => {
       const result = schema.safeParse({
         selectable: false,
-        columns: [{ field: "name", label: "Order", textStyle: ["strikethrough"] }],
+        columns: [
+          { field: "name", label: "Order", textStyle: ["strikethrough"] },
+        ],
       });
       expect(result.success).toBe(false);
     });

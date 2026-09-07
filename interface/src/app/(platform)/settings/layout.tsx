@@ -4,10 +4,8 @@ import type { Metadata } from "next";
 import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 
-import {
-  getSettingsSearchNav,
-  SettingsSidebar,
-} from "@/components/layout/sidebar/settings-sidebar";
+import { getSettingsSearchNav } from "@/components/layout/sidebar/settings-nav-items";
+import { SettingsSidebar } from "@/components/layout/sidebar/settings-sidebar";
 import { Separator } from "@/components/primitive/separator";
 import {
   SidebarInset,

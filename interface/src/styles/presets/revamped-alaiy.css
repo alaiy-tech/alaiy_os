@@ -1,6 +1,6 @@
 /*
 label: Revamped Alaiy
-value: alaiy-os
+value: revamped-alaiy
 
 Pulled from the Lovable build prompt for the Alaiy OS marketing site - its
 "Design System — Non-Negotiables" section defines six colours by role:
@@ -47,20 +47,20 @@ rgba(0, 26, 46, ...) - navy-dark, called out in the source as the
 button-shadow colour.
 */
 
-:root[data-theme-preset="alaiy-os"] {
+:root[data-theme-preset="revamped-alaiy"] {
   --radius: 0.3125rem;
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.228 0.038 282.93);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.228 0.038 282.93);
-  --primary: oklch(0.21 0.052 244.04);
+  --primary: oklch(0.307 0.078 245.54);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.965 0.016 226.97);
-  --secondary-foreground: oklch(0.21 0.052 244.04);
+  --secondary-foreground: oklch(0.307 0.078 245.54);
   --muted: oklch(0.985 0.004 91.45);
   --muted-foreground: oklch(0.529 0.02 285.69);
   --accent: oklch(0.829 0.08 231.41);
-  --accent-foreground: oklch(0.21 0.052 244.04);
+  --accent-foreground: oklch(0.307 0.078 245.54);
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.888 0.004 197.08);
@@ -69,13 +69,12 @@ button-shadow colour.
   --chart-1: oklch(1 0 0);
   --chart-2: oklch(0.968 0.007 80.72);
   --chart-3: oklch(0.829 0.08 231.41);
-  --chart-4: oklch(0.21 0.052 244.04);
+  --chart-4: oklch(0.307 0.078 245.54);
   --chart-5: oklch(0.21 0.052 244.04);
-  /* --sidebar: oklch(0.21 0.052 244.04); */
-  --sidebar: oklch(0.21 0.052 244.04);
+  --sidebar: oklch(0.307 0.078 245.54);
   --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.829 0.08 231.41);
-  --sidebar-primary-foreground: oklch(0.21 0.052 244.04);
+  --sidebar-primary-foreground: oklch(0.307 0.078 245.54);
   --sidebar-accent: oklch(0.268 0.069 245.8);
   --sidebar-accent-foreground: oklch(1 0 0);
   --sidebar-border: oklch(0.829 0.08 231.41 / 15%);
@@ -96,13 +95,12 @@ button-shadow colour.
   --shadow-2xl: 4px 4px 0px 0px hsl(0 0% 0% / 2.5);
 }
 
-
-.dark:root[data-theme-preset="alaiy-os"] {
+.dark:root[data-theme-preset="revamped-alaiy"] {
   --background: oklch(0.21 0.052 244.04);
   --foreground: oklch(1 0 0);
-  --card: oklch(0.21 0.052 244.04);
+  --card: oklch(0.307 0.078 245.54);
   --card-foreground: oklch(1 0 0);
-  --popover: oklch(0.21 0.052 244.04);
+  --popover: oklch(0.307 0.078 245.54);
   --popover-foreground: oklch(1 0 0);
   --primary: oklch(0.829 0.08 231.41);
   --primary-foreground: oklch(0.21 0.052 244.04);
@@ -120,9 +118,9 @@ button-shadow colour.
   --chart-1: oklch(1 0 0);
   --chart-2: oklch(0.968 0.007 80.72);
   --chart-3: oklch(0.829 0.08 231.41);
-  --chart-4: oklch(0.21 0.052 244.04);
+  --chart-4: oklch(0.307 0.078 245.54);
   --chart-5: oklch(0.21 0.052 244.04);
-  --sidebar:oklch(0.2488 0.062 246.78)
+  --sidebar: oklch(0.307 0.078 245.54);
   --sidebar-foreground: oklch(1 0 0);
   --sidebar-primary: oklch(0.829 0.08 231.41);
   --sidebar-primary-foreground: oklch(0.21 0.052 244.04);
