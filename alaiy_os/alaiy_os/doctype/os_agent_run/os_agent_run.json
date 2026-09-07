@@ -46,7 +46,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "Queued\nRunning\nSuccess\nFailed",
+   "options": "Queued\nRunning\nSuccess\nFailed\nRefused",
    "read_only": 1
   },
   {

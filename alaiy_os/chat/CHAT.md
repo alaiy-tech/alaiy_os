@@ -556,39 +556,6 @@ Most of the limits above are therefore an `inline`-mode concern. On the `tool`
 path the reader's own ceilings apply instead — 50 MB and a `max_pages` argument
 defaulting to 50 — and `MAX_CHARS_PER_FILE` never enters into it.
 
-## Testing a turn without the UI
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run
-bench --site <site> execute alaiy_os.chat.smoke.run --kwargs "{'question': '...', 'user': 'x@y.com'}"
-```
-
-Runs the loop in-process — no worker, no browser, traceback on stdout instead
-of in the Error Log. Costs one real LLM call.
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run_suggest
-```
-
-The follow-up chips against a scripted client: no network, no cost, a fixed
-answer and a fixed suggestion payload. Checks that the extra call happens with no
-tools and with the conversation in it, that the chips are stored, that
-`get_messages` serves them to a caller whose cursor is already past the last
-message — the one failure that would make the feature invisible while everything
-else passed — that a `Running` session offers none, and that `chat_suggestions:
-false` leaves the turn identical and silent. The parser is exercised separately on
-the payloads a real model produces: prose, a fenced array, objects, duplicates.
-
-```bash
-bench --site <site> execute alaiy_os.chat.smoke.run_stream
-```
-
-The streaming path against a scripted client rather than a provider: no network,
-no cost, a fixed answer. Checks that the text was readable *before* the turn
-finished and grew, that the finished row is complete and no longer partial, that
-`chat_streaming: false` produces identical text, and that a client with no
-`stream` method takes the buffered path in silence.
-
 ## site_config keys
 
 | key | default | effect |
