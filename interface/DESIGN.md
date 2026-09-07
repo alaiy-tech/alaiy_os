@@ -86,7 +86,7 @@ attribute:
 | `theme_mode` | `data-theme-mode` | `light` | `light` `dark` `system` |
 | `theme_preset` | `data-theme-preset` | `default` | `default` `alaiy-os` `brutalist` `soft-pop` `tangerine` |
 | `font` | `data-font` | `geist` | 18 keys from `fonts/registry.ts` |
-| `content_layout` | `data-content-layout` | `centered` | `centered` `full-width` |
+| `content_layout` | `data-content-layout` | `full-width` | `centered` `full-width` |
 | `navbar_style` | `data-navbar-style` | `sticky` | `sticky` `scroll` |
 | `sidebar_variant` | `data-sidebar-variant` | `sidebar` | `sidebar` `floating` `inset` |
 | `sidebar_collapsible` | `data-sidebar-collapsible` | `icon` | `icon` `offcanvas` |
@@ -375,12 +375,13 @@ Notes worth knowing before you fight the layout:
 - **Header height** is `h-12` (3rem), also exposed as
   `--dashboard-header-height: --spacing(12)` on the inset for anything that
   needs to offset against it.
-- **Content padding** is `p-4` on mobile, `p-6` from `md:`. A full-bleed page
+- **Content padding** is `p-3` on mobile, `p-4` from `md:`. A full-bleed page
   (a chat, a full-height tree) opts out by putting `data-content-padding="false"`
   on its own root — the parent has `has-data-[content-padding=false]:p-0`. Do
   not add negative margins to escape the padding.
-- **`max-w-screen-2xl`** applies in the default `centered` layout. A page must
-  not assume it has the whole viewport.
+- **`max-w-screen-2xl`** applies in the `centered` layout, which is no longer
+  the default — it left a dead gutter either side on wide screens. A page still
+  must not assume it has the whole viewport: `centered` remains selectable.
 - `min-w-0` and `overflow-x-clip` on the inset are what stop a wide table from
   pushing the sidebar off screen. Keep wide content inside its own
   `overflow-x-auto`, the way `SalesOrderTable` does.

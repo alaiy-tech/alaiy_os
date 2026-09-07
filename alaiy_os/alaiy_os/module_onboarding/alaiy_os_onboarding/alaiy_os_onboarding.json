@@ -1,0 +1,32 @@
+{
+ "allow_roles": [
+  {
+   "role": "OS Manager"
+  }
+ ],
+ "creation": "2026-08-31 11:07:18.507788",
+ "docstatus": 0,
+ "doctype": "Module Onboarding",
+ "idx": 0,
+ "is_complete": 0,
+ "modified": "2026-09-01 11:21:06.695098",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "Alaiy OS Onboarding",
+ "owner": "Administrator",
+ "steps": [
+  {
+   "step": "Alaiy OS - Set up your Company"
+  },
+  {
+   "step": "Alaiy OS - Add your first Product"
+  },
+  {
+   "step": "Alaiy OS - Create a Sales Order"
+  },
+  {
+   "step": "Alaiy OS - Add a Supplier"
+  }
+ ],
+ "title": "Get Started with Alaiy OS"
+}
