@@ -404,15 +404,30 @@ export function useAskAlaiy() {
     });
   }, []);
 
-  const ensureSkillsLoaded = useCallback(async (): Promise<ChatSkill[]> => {
-    if (skills !== null) return skills;
-    if (!skillsPromise.current) {
-      skillsPromise.current = listChatSkills().catch(() => []);
-    }
-    const result = await skillsPromise.current;
-    setSkills(result);
-    return result;
-  }, [skills]);
+  /** The `/` catalogue, cached for the life of the hook.
+   *
+   * `refresh` re-reads it. The cache alone was wrong because the launcher lives
+   * in the `/os` layout, so this hook survives client-side navigation: install
+   * an agent in the Agent Marketplace, come back to the chat, and `/` still
+   * offered the list loaded before the install — a hard reload was the only way
+   * to see a newly enabled skill. Enabling and disabling an agent takes effect
+   * server-side on the next request, so the picker was the one place lagging.
+   *
+   * The caller passes `refresh` when the picker opens and serves the cached
+   * value meanwhile, so the list renders instantly and corrects itself a moment
+   * later rather than blocking on a round trip per keystroke. */
+  const ensureSkillsLoaded = useCallback(
+    async (refresh = false): Promise<ChatSkill[]> => {
+      if (!refresh && skills !== null) return skills;
+      if (refresh || !skillsPromise.current) {
+        skillsPromise.current = listChatSkills().catch(() => []);
+      }
+      const result = await skillsPromise.current;
+      setSkills(result);
+      return result;
+    },
+    [skills],
+  );
 
   const load = useCallback(
     async (name: string) => {
