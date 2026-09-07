@@ -223,16 +223,22 @@ def _pack_tools():
 	two: the model sees the actual tools, so it picks one on its description
 	rather than on a summary of a pack, and there is no second loop to budget.
 
-	**Read the note on effect before letting a pack register a write tool.** Every
-	tool here is directly callable by the model, and `OS Agent Tool` has no
-	`effect` field yet, so nothing in a row can tell this module that a tool
-	publishes. Both packs on this site register reads only and say so in their
-	manifests; that is a property of those manifests, not a guarantee this code
-	enforces.
+	**Only reads are offered.** Every tool here is directly callable by the model,
+	with the chat's own prompt behind it and none of the owning agent's — so a
+	tool that changes something would be one the chat model runs without the rules
+	its agent exists to apply. `OS Agent Tool.effect` is what a row uses to say so,
+	and a `write` is skipped below; it stays reachable inside its own agent's run,
+	which is where those rules are.
 
-	Two gates, both mirroring `engine/factory.py` so a tool cannot be reachable
-	here and refused there:
+	The default is `read`, so a row that predates the field is offered exactly as
+	it was. That is safe for the connector packs, which register reads only and say
+	so in their manifests — and it is why an agent pack registering a writer has to
+	mark it, rather than relying on this module to guess.
 
+	Three gates, the last two mirroring `engine/factory.py` so a tool cannot be
+	reachable here and refused there:
+
+	  - the tool must only read (see above);
 	  - the connector must be enabled, when the row names one;
 	  - the user must hold what the row declares, so the surface never advertises
 	    a tool whose first call would be a refusal. A row declaring nothing is not
@@ -242,10 +248,28 @@ def _pack_tools():
 
 	tools = []
 	for agent_id in frappe.get_all(
-		"OS Agent Registry", filters={"is_enabled": 1}, pluck="name", order_by="name asc"
+		"OS Agent Registry",
+		# An agent the chat can RUN does not also lend out its tools. Those are its
+		# internals — the steps its own prompt sequences — and on the flat surface
+		# they are both a duplicate and a trap: the model sees them before
+		# `run_agent` (pack tools lead, see `_surface`), fetches the same data
+		# itself, and either wastes a round trip per tool before delegating anyway
+		# or writes something answer-shaped with none of the agent's rules applied.
+		# Observed, not theoretical — a small model did the former three times over.
+		#
+		# Nothing is lost. A connector's own pack tools stay on the surface for
+		# questions asked on their own, which is what they were curated for; it is
+		# only an agent's private steps that come off.
+		filters={"is_enabled": 1, "chat_skill": 0},
+		pluck="name",
+		order_by="name asc",
 	):
 		doc = frappe.get_cached_doc("OS Agent Registry", agent_id)
 		for row in doc.tools:
+			# Unset counts as read: every row written before the field existed was
+			# one, and defaulting the other way would empty the surface on upgrade.
+			if (row.effect or "read") != "read":
+				continue
 			if row.connector and not frappe.db.get_value(
 				"OS Connector Registry", row.connector, "is_enabled"
 			):
@@ -317,6 +341,25 @@ def _core_tools():
 
 	if available:
 		tools.append(WEB_SEARCH_SPEC)
+
+	# `run_agent` is offered only where this site actually has agents to run, and
+	# its description names them — a model can only hand work to an agent it knows
+	# exists. Same discipline as `web_search` above: never advertise a capability
+	# the turn does not have. Built per request rather than imported as a constant,
+	# because the list it describes is a fact about this bench.
+	from alaiy_os.chat.agents import tool_spec as agent_tool_spec
+
+	try:
+		agent_tool = agent_tool_spec()
+	except Exception:
+		# `catalogue()` runs the tenant's `chat_skill_filter` hooks, which fail
+		# closed to "no skills". That is already the safe answer here — no agents
+		# to offer — and must not take the rest of the tool surface down with it.
+		frappe.log_error(title="chat run_agent tool build failed")
+		agent_tool = None
+
+	if agent_tool:
+		tools.append(agent_tool)
 	return tools
 
 

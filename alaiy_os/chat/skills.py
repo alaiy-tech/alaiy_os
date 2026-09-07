@@ -26,10 +26,25 @@ history.
 
 ## Arguments
 
-There are none. A skill runs its agent with no payload, on that agent's own
-default window, and refinement happens conversationally in the next message.
-`agent_meta` can grow an input schema later without changing this file's
-contract — the dispatch would fill a payload where today it passes None.
+Most skills take none: the agent runs on its own defaults and refinement happens
+conversationally in the next message. A pack that needs an argument declares an
+`input_schema` in the same `agent_meta` manifest, and it reaches the agent as the
+run's `input` — so a skill that takes arguments and one that does not are the
+same dispatch with a payload or a None.
+
+The path from a typed line to a validated payload is three narrow steps, in this
+order, all on the *send* rather than the worker:
+
+    fill_from_text   `/listing ABC-123` -> {"product": "ABC-123"}, but only for a
+                     schema with exactly one required string property
+    validate_args    against the declared schema, throwing with a usable message
+    _skill_text      the words the user sees in their own bubble, when the client
+                     sent arguments but no text of its own
+
+A skill declaring no schema still takes none, and passing some is an error rather
+than something to silently drop — a caller sending arguments believes they matter,
+and a pack that ignored them would answer on its defaults while looking like it
+had listened.
 
 ## Permissions
 
@@ -141,10 +156,17 @@ def _schema_for(slug):
 def fill_from_text(slug, args, text):
 	"""Use the words typed alongside the command as the skill's one argument.
 
-	`/amazon is SKU ABC listed?` should work: the client sends the slug it matched
-	and the rest as ordinary text, and that text *is* the request. Without this a
-	picker has to grow a form per skill before any skill with a required argument
+	`/listing ABC-123` should work: the client sends the slug it matched and the
+	line the user typed, and the rest of that line *is* the argument. Without this
+	a picker has to grow a form per skill before any skill with a required argument
 	can be used at all.
+
+	**The command itself is stripped here, not by the client.** Both clients send
+	the whole line, because the user's own chat bubble has to read back as what
+	they typed — so `text` arrives as `/listing ABC-123` and the argument is what
+	follows the slug. Doing it server-side also means a client that *did* strip it
+	is equally correct: there is then no leading slug to remove and the line is
+	already the argument.
 
 	Deliberately narrow. It fills only when the schema has exactly ONE required
 	property and that property is a string, because that is the only case where
@@ -155,7 +177,12 @@ def fill_from_text(slug, args, text):
 	if args not in (None, "", {}):
 		return args
 	text = (text or "").strip()
+	if text.lower().startswith(f"/{slug}"):
+		text = text[len(slug) + 1 :].strip()
 	if not text:
+		# `/listing` on its own. Leave args unfilled so `validate_args` can say
+		# which argument is missing, rather than filling it with an empty string
+		# and letting the agent run on nothing.
 		return args
 
 	schema = _schema_for(slug) or {}
