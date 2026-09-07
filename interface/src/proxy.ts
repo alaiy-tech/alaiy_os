@@ -1,41 +1,42 @@
-import { type NextRequest, NextResponse } from "next/server";
-
-// Frappe sets a `sid` cookie of literal value "Guest" for unauthenticated
-// sessions, so presence alone doesn't mean logged-in — the value must be
-// checked too.
-function hasFrappeSession(req: NextRequest): boolean {
-  const sid = req.cookies.get("sid")?.value;
-  return Boolean(sid) && sid !== "Guest";
-}
+import { NextResponse, type NextRequest } from "next/server";
+import { SESSION_COOKIE, decrypt, effectiveStep } from "@/lib/auth/session";
 
 /**
- * Runs before requests complete.
- * Gates the /os dashboard behind a Frappe session, and keeps already-logged-in
- * users out of the login page. This is a redirect-before-render convenience —
- * it doesn't validate the session cookie against Frappe (a stale/invalidated
- * sid still passes this check; the /os layout does the authoritative check
- * via getServerUser(), reading the x-pathname header set below to build the
- * same `next` redirect if that check fails).
+ * Optimistic route protection (Next.js 16 renamed `middleware` to `proxy`).
+ *
+ * This only reads the signed cookie to decide where to send someone — it is a
+ * redirect optimisation, not the authorisation boundary. Every page and Server
+ * Action re-verifies through the DAL in src/lib/auth/dal.ts.
  */
-export function proxy(req: NextRequest) {
-  const { pathname, search } = req.nextUrl;
-  const loggedIn = hasFrappeSession(req);
 
-  if (!loggedIn && pathname.startsWith("/os")) {
-    const loginUrl = new URL("/auth/login", req.url);
-    loginUrl.searchParams.set("next", pathname + search);
-    return NextResponse.redirect(loginUrl);
+function isPublic(pathname: string): boolean {
+  // Route Handlers authenticate themselves and answer with their own status
+  // codes. Redirecting them here would hand a polling fetch() an HTML page
+  // instead of the 401 it can act on.
+  return pathname === "/" || pathname === "/start" || pathname.startsWith("/api/");
+}
+
+export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const session = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
+
+  if (!session && !isPublic(pathname)) {
+    const signIn = new URL("/start", request.url);
+    // Come back here once they are through auth.
+    if (pathname !== "/") signIn.searchParams.set("next", pathname);
+    return NextResponse.redirect(signIn);
   }
 
-  if (loggedIn && pathname.startsWith("/auth/login")) {
-    return NextResponse.redirect(new URL("/os", req.url));
+  if (session && (pathname === "/" || pathname === "/start")) {
+    const step = effectiveStep(session.onboardingStep);
+    const destination = step === "done" ? "/home" : `/onboarding/${step}`;
+    return NextResponse.redirect(new URL(destination, request.url));
   }
 
-  const requestHeaders = new Headers(req.headers);
-  requestHeaders.set("x-pathname", pathname + search);
-  return NextResponse.next({ request: { headers: requestHeaders } });
+  return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/os/:path*", "/auth/login"],
+  // Skip Next internals and static assets.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|mp4)$).*)"],
 };

@@ -1,0 +1,72 @@
+import { requireOnboardedSession } from "@/lib/auth/dal";
+import { loadHomeTiles } from "@/lib/backend/dashboard";
+import { openingMessage } from "@/lib/ask/greeting";
+import { suggestionsFor } from "@/lib/ask/suggestions";
+import { ChatWorkspace } from "@/components/ask/chat-workspace";
+import { listChatSessions } from "@/lib/backend/chat";
+import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
+import type { ChatSessionSummary } from "@/lib/backend/types";
+
+export const metadata = { title: "Ask Alaiy" };
+
+/**
+ * Home is Ask Alaiy: the conversation, and the seller's past chats beside it.
+ *
+ * Which chat is open comes from `?chat=`, so a conversation has a URL — it
+ * survives a reload, and can be reopened from the rail tomorrow. With no
+ * parameter it opens the most recent one, which is also what the docked panel
+ * on the data tabs does: that is how a question asked on Orders is still there
+ * when the seller comes back to Home, without either surface having to tell
+ * the other anything.
+ *
+ * No session is created here. One appears when a question is asked, or every
+ * visit to this page would leave an empty chat in the rail.
+ */
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ chat?: string }>;
+}) {
+  const session = await requireOnboardedSession();
+  const { chat } = await searchParams;
+  const firstName = session.name?.split(" ")[0];
+
+  // Three reads, none of them fatal. The greeting has a fallback, the rail can
+  // be empty, and the import check only decides a placeholder — a failure in
+  // any of them should not cost the seller the composer.
+  const [{ tiles }, currentImport, sessions] = await Promise.all([
+    loadHomeTiles(session.backendToken),
+    loadCurrentImport(session.workspaceId, session.backendToken),
+    listChatSessions(session.backendToken).catch(() => [] as ChatSessionSummary[]),
+  ]);
+
+  const greeting = tiles
+    ? openingMessage(tiles, firstName)
+    : [
+        firstName ? `Hi ${firstName}.` : "Hi.",
+        "I can't reach your numbers this second. The tabs on the left still work.",
+      ];
+
+  // A `chat` that is not theirs is not honoured: the poll would 403 on it and
+  // the screen would sit empty. Falling back to their newest is both safe and
+  // what someone following a stale link wants.
+  const known = sessions.some((row) => row.name === chat);
+  const active = (known ? chat : sessions[0]?.name) ?? null;
+
+  return (
+    // Keyed on the chat the URL asked for. ChatWorkspace holds which
+    // conversation is open in state, and a client component does not
+    // re-initialise state when a prop changes — so without this, navigating
+    // to ?chat=X updates the URL and the rail's highlight and leaves the
+    // previous transcript on screen. The server is the authority on
+    // navigation; remounting is how it stays that way.
+    <ChatWorkspace
+      key={active ?? "new"}
+      sessions={sessions}
+      initialActive={active}
+      greeting={greeting}
+      suggestions={suggestionsFor("/home")}
+      importing={isImporting(currentImport)}
+    />
+  );
+}

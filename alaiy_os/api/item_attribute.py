@@ -20,7 +20,7 @@ BLOCKING_ITEMS_SHOWN = 3
 @frappe.whitelist()
 def get_attributes():
 	"""Every Item Attribute with its values and a count of the items using it,
-	for the /os/item-attributes page (see interface/src/app/(main)/os/item-attributes).
+	for the /os/item-attributes page (see alaiy_os_commerce/interface/src/app/(main)/os/item-attributes).
 
 	One call rather than the obvious per-attribute fan-out: usage is an
 	aggregate over `Item Variant Attribute`, so counting it from the browser

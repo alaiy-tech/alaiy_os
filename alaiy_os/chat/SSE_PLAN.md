@@ -8,8 +8,8 @@ Both UI surfaces poll. Nobody streams over HTTP today.
   `_poll()` call `alaiy_os.api.chat.get_messages` on a `setTimeout` loop —
   1000ms normally, 400ms (`POLL_INTERVAL_STREAM_MS`) while a message is
   `partial`.
-- **Custom UI** (`interface/src/hooks/use-ask-alaiy.ts`, and the Desk-embedded
-  copy at `interface/desk-widget/src/askAlaiy/useAskAlaiy.ts`): identical
+- **Custom UI** (`alaiy_os_commerce/interface/src/hooks/use-ask-alaiy.ts`, and the Desk-embedded
+  copy at `desk-widget/src/askAlaiy/useAskAlaiy.ts`): identical
   shape, `poll()` / `setTimeout`, 1500ms / 400ms (`POLL_MS` / `POLL_STREAM_MS`).
 - **Backend** (`alaiy_os/api/chat.py`): `send_message` enqueues a background
   job (`chat/runner.py::run_turn`) and returns immediately. `get_messages` is
@@ -211,13 +211,13 @@ frappe.realtime.on("os_chat_turn_aborted", (data) => {
 
 **Next.js custom UI** (`use-ask-alaiy.ts`) doesn't have `frappe.realtime`
 loaded — it needs `socket.io-client` pointed at the bench's socketio port
-(same one already used for any other realtime feature in `interface/`, or
+(same one already used for any other realtime feature in `alaiy_os_commerce/interface/`, or
 newly wired if there isn't one yet), joining the user's room the same way
 Desk's `frappe.realtime` does under the hood. Swap the `poll()` /
 `pollTimer` logic for socket listeners the same shape as above, calling the
 existing `absorbMessage`.
 
-**Desk widget** (`interface/desk-widget/src/askAlaiy/useAskAlaiy.ts`) is
+**Desk widget** (`desk-widget/src/askAlaiy/useAskAlaiy.ts`) is
 already injected into an authenticated Desk page, so it can use the same
 `frappe.realtime.on(...)` approach as the Desk page itself rather than a raw
 socket.io client.
@@ -254,7 +254,7 @@ a non-Frappe consumer of the same endpoint) — in which case treat the
    API signature changes.
 2. Swap Desk's `_schedule_poll`/`_poll` for `frappe.realtime.on(...)`
    listeners. Keep `_absorb`/`_draw`/`_reveal` untouched.
-3. Wire a socket.io client into the Next.js `interface/` app (or confirm one
+3. Wire a socket.io client into the Next.js `alaiy_os_commerce/interface/` app (or confirm one
    already exists) and swap `use-ask-alaiy.ts`'s poll loop for listeners.
 4. Swap the desk-widget's `useAskAlaiy.ts` the same way as (2), using
    `frappe.realtime` since it's Desk-embedded.
@@ -272,7 +272,7 @@ a non-Frappe consumer of the same endpoint) — in which case treat the
 
 ## Open questions worth resolving before implementation
 
-- Does `interface/` already have any socket.io wiring for other realtime
+- Does `alaiy_os_commerce/interface/` already have any socket.io wiring for other realtime
   features (notifications, presence, etc.)? If yes, reuse that client
   rather than adding a second one.
 - Multi-tab behavior: does the same user open the same session in two tabs?

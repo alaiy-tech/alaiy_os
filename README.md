@@ -58,12 +58,45 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    the same fix (`public/js/item.js`, wired through the `doctype_js` hook)
    still present alongside it — both currently run on the Item form.
 
-   None of that reaches `interface/`, which loads no desk JS. There the
+   None of that reaches `alaiy_os_commerce/interface/`, which loads no desk JS. There the
    policy is set inline on each Item `<img>` from
    `ITEM_IMAGE_REFERRER_POLICY` (`src/constants/products.ts`), which is
    better than the observer rather than a workaround for its absence: the
    attribute is present on the first fetch, so no image ever leaks a
    `Referer` or needs a reload to recover from a 403.
+
+## `interface/` — the frontend this app ships
+
+The Next.js app in `interface/` is **Alaiy OS Self-Serve**: a seller signs up,
+connects Shopify or Amazon, imports 90 days of data and starts operating. It is
+the frontend a deployment gets by default, and it talks to this app's REST
+surface server-side only — the browser never reaches Frappe directly. See
+[interface/README.md](interface/README.md) for its architecture and
+[interface/DESIGN.md](interface/DESIGN.md) for the design system.
+
+It is a **base** in devbench's composition: `interface/interface.config.json`
+declares `"base": true`, so `devbench compose` builds a client's workspace out
+of this tree. Two more things it declares there:
+
+- `"acceptsContributions": false` — this app is not the `@alaiy-os/*` platform
+  those screens are written against, so a connector's `interface/` overlay is
+  skipped by name rather than dropped into a tree that cannot compile it. The
+  platform lives in
+  [alaiy_os_commerce](https://github.com/alaiy-tech/alaiy_os_commerce)`/interface`,
+  which claims the base itself on any bench that installs it and takes over
+  completely there.
+- `"env"` — the variables this app's server-side code reads
+  (`ALAIY_BACKEND_URL`, `APP_URL`, `SESSION_SECRET` and the two service
+  credentials), which devbench answers when it writes `.env.local` and again
+  when it writes the production supervisor program. Anything else in
+  `interface/.env.example` — Google SSO's two keys, for instance — has to be
+  added to that map *and* to `devbench/.env`, because `.env.local` is generated
+  and a hand-edit there does not survive the next compose.
+
+Not to be confused with `desk-widget/`, which is a Frappe **Desk** asset of this
+app: a React IIFE built into `alaiy_os/public/dist/` and loaded on every Desk
+page by `app_include_js`. It has nothing to do with the Next.js app, and moved
+to the repo root when the platform frontend left.
 
 ## Access control
 
@@ -214,6 +247,13 @@ alaiy_os/
 ├── public/js/referrer_policy.js      # document-wide no-referrer stamping for CDN images
 ├── public/js/item.js                 # Item-form-only version of the same fix (doctype_js hook)
 └── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
+```
+
+Two directories sit at the repo root, outside the app package:
+
+```
+interface/                            # the self-serve Next.js frontend (above)
+desk-widget/                          # Ask Alaiy's Desk widget -> alaiy_os/public/dist/
 ```
 
 `scripts/install_fac.sh` sits at the repo root, outside the app package, because

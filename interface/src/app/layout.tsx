@@ -1,66 +1,53 @@
-import type { ReactNode } from "react";
-
 import type { Metadata } from "next";
-
-import { Toaster } from "../components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { APP_CONFIG } from "@/config/app-config";
-import { fontVars } from "@/lib/fonts/registry";
-import { getServerUser } from "@/lib/frappe/server";
-import { PREFERENCE_DEFAULTS } from "@/lib/preferences/preferences-config";
-import { ThemeBootScript } from "@/scripts/theme-boot";
-import { AuthProvider } from "@/stores/auth/auth-provider";
-import { PreferencesStoreProvider } from "@/stores/preferences/preferences-provider";
-
+import { Geist, Playfair_Display, Poppins } from "next/font/google";
 import "./globals.css";
 
+/**
+ * Three faces, each with one job.
+ *
+ * Playfair Display is the voice: headings, the greeting, a figure being shown
+ * off. Poppins is everything read at length — body copy, labels, nav, buttons.
+ * Geist carries what a seller reads a thousand rows of, where Poppins' width
+ * and its proportional numerals work against scanning a column of money. See
+ * `--font-display`, `--font-sans` and `--font-data` in globals.css.
+ */
+const playfair = Playfair_Display({
+  variable: "--font-playfair",
+  subsets: ["latin"],
+  // 700 is the heading weight; 400 italic is the pull-quote in the system, and
+  // is what a question in Alaiy's own voice is set in.
+  weight: ["400", "700"],
+  style: ["normal", "italic"],
+  display: "swap",
+});
+const poppins = Poppins({
+  variable: "--font-poppins",
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
+});
+const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
+
 export const metadata: Metadata = {
-  title: APP_CONFIG.meta.title,
-  description: APP_CONFIG.meta.description,
-  icons: {
-    icon: "/assets/images/favicon/icon.png",
+  title: {
+    // The product is "Alaiy". Never "Alaiy OS" — that is the backend's name,
+    // and a seller has no reason to ever meet it.
+    default: "Alaiy",
+    template: "%s",
   },
+  description:
+    "Connect your Shopify and Amazon data to AI. Access it, ask about it, act on it.",
 };
 
-export default async function RootLayout({
-  children,
-}: Readonly<{ children: ReactNode }>) {
-  const {
-    theme_mode,
-    theme_preset,
-    content_layout,
-    navbar_style,
-    sidebar_variant,
-    sidebar_collapsible,
-    font,
-  } = PREFERENCE_DEFAULTS;
-  const user = await getServerUser();
+export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
-      data-theme-mode={theme_mode}
-      data-theme-preset={theme_preset}
-      data-content-layout={content_layout}
-      data-navbar-style={navbar_style}
-      data-sidebar-variant={sidebar_variant}
-      data-sidebar-collapsible={sidebar_collapsible}
-      data-font={font}
-      suppressHydrationWarning
+      className={`${playfair.variable} ${poppins.variable} ${geistSans.variable} h-full antialiased`}
     >
-      <head>
-        {/* Applies theme and layout preferences on load to avoid flicker and unnecessary server rerenders. */}
-        <ThemeBootScript />
-      </head>
-      <body className={`${fontVars} min-h-screen antialiased`}>
-        <TooltipProvider>
-          <AuthProvider initialUser={user}>
-            <PreferencesStoreProvider initialValues={PREFERENCE_DEFAULTS}>
-              {children}
-              <Toaster />
-            </PreferencesStoreProvider>
-          </AuthProvider>
-        </TooltipProvider>
-      </body>
+      {/* The grain is painted by `body::before` rather than by an element
+          here — one fixed layer over everything, including what floats. */}
+      <body className="min-h-full bg-canvas font-sans text-ink">{children}</body>
     </html>
   );
 }

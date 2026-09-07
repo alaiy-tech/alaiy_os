@@ -1,4 +1,4 @@
-"""REST surface for Ask Alaiy feedback -- see interface/docs/feedback-system.md.
+"""REST surface for Ask Alaiy feedback -- see alaiy_os_commerce/interface/docs/feedback-system.md.
 
 POST /api/method/alaiy_os.api.feedback.submit_feedback -> {"name": "..."}
 
