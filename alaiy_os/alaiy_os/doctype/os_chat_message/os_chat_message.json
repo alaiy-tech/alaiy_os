@@ -16,6 +16,10 @@
   "screen",
   "text",
   "blocks",
+  "duration_ms",
+  "input_tokens",
+  "output_tokens",
+  "model",
   "attachments",
   "mentions",
   "suggestions"
@@ -110,6 +114,33 @@
    "fieldtype": "Code",
    "label": "Suggestions (JSON)",
    "options": "JSON"
+  },
+  {
+   "description": "Wall clock for the one LLM call that produced this message, in milliseconds. Measured around the call in runner._loop, because nothing else can: the completion path writes with update_modified=False, so `modified` never moves off `creation` and the row carried no timing at all \u2014 323 of 323 rows had a zero delta when this was measured. Null on a message no LLM produced, such as a tool result.",
+   "fieldname": "duration_ms",
+   "fieldtype": "Int",
+   "label": "Duration (ms)",
+   "read_only": 1
+  },
+  {
+   "description": "Prompt tokens for this one call. The session accumulates a total; this is the split, which is what makes a single expensive turn findable.",
+   "fieldname": "input_tokens",
+   "fieldtype": "Int",
+   "label": "Input Tokens",
+   "read_only": 1
+  },
+  {
+   "fieldname": "output_tokens",
+   "fieldtype": "Int",
+   "label": "Output Tokens",
+   "read_only": 1
+  },
+  {
+   "description": "The model that produced this message, as resolved for the call.",
+   "fieldname": "model",
+   "fieldtype": "Data",
+   "label": "Model",
+   "read_only": 1
   }
  ],
  "links": [],

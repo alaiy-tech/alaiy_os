@@ -364,10 +364,25 @@ def _loop(doc):
 		# whether the message is readable while it is being written; both return
 		# the same dict, so everything below is blind to which one ran.
 		step = _streaming_step if streaming else _buffered_step
-		response = step(doc, model, system, messages, specs, pending)
+		# Timed here, around the call, because there is nowhere else it can be
+		# measured from. The completion path writes with update_modified=False,
+		# so a message's `modified` never moves off its `creation` — every row
+		# on a real bench had a zero delta — and an assistant row's `creation`
+		# is when streaming *started*, which makes the gap to the next row the
+		# only derivable interval and leaves the final answer of a turn with
+		# none at all. So the runner records it, where the clock is honest.
+		started = time.monotonic()
+		response, seq = step(doc, model, system, messages, specs, pending)
+		elapsed_ms = int((time.monotonic() - started) * 1000)
 
 		blocks = response["content"]
-		_record_usage(doc, response.get("usage") or {})
+		usage = response.get("usage") or {}
+		_record_usage(doc, usage)
+		# The session keeps the running total; the message keeps its own share.
+		# Both, not one: a total answers "what did this conversation cost" and a
+		# split answers "which turn was expensive", and only the second is
+		# actionable.
+		_record_step(doc.name, seq, model, usage, elapsed_ms)
 		pending = None
 		frappe.db.commit()
 
@@ -394,11 +409,15 @@ def _loop(doc):
 
 
 def _buffered_step(doc, model, system, messages, specs, pending):
-	"""One LLM call, written once it is complete. The original behaviour."""
+	"""One LLM call, written once it is complete. The original behaviour.
+
+	Returns the response and the `seq` of the message it wrote, so the caller
+	can record what that call cost against the row it produced.
+	"""
 	response = llm.complete(model, system, messages, tools=specs or None)
 	blocks = response["content"]
-	_append(doc.name, "assistant", blocks, text=_text_of(blocks), attachments=pending)
-	return response
+	seq = _append(doc.name, "assistant", blocks, text=_text_of(blocks), attachments=pending)
+	return response, seq
 
 
 def _streaming_step(doc, model, system, messages, specs, pending):
@@ -467,7 +486,40 @@ def _streaming_step(doc, model, system, messages, specs, pending):
 		},
 		update_modified=False,
 	)
-	return response
+	return response, seq
+
+
+def _record_step(session, seq, model, usage, duration_ms):
+	"""What one LLM call cost, on the message it produced.
+
+	**This is the one write on this path that bumps `modified`**, and that is
+	deliberate. Every other one suppresses it because a streamed reply rewrites
+	one row many times and the row is not a new version of itself. But this
+	write lands *after* the message is already complete and readable, so a
+	reader that saw it a moment earlier saw it without these numbers. Anything
+	consuming `modified` as a high-water mark — `alaiy_os_ai_client`'s sweep
+	does — would otherwise have posted the row unmeasured and advanced past it,
+	and a watermark only ever looks forward.
+
+	Never raises. A turn that answered must not fail because a metric could not
+	be written: this is a number for a dashboard, not part of the answer.
+	"""
+	name = frappe.db.get_value("OS Chat Message", {"session": session, "seq": seq}, "name")
+	if not name:
+		return
+	try:
+		frappe.db.set_value(
+			"OS Chat Message",
+			name,
+			{
+				"duration_ms": duration_ms,
+				"input_tokens": usage.get("input_tokens") or 0,
+				"output_tokens": usage.get("output_tokens") or 0,
+				"model": model,
+			},
+		)
+	except Exception:
+		frappe.log_error(title=f"OS Chat Message {name} usage not recorded")
 
 
 def _settle_partials(session):
