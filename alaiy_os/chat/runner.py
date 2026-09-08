@@ -205,6 +205,33 @@ def start_turn(
 	return seq
 
 
+#: Fired when a turn is over — answered, refused or failed. Subscribers get the
+#: session name and nothing else, because the turn's own writes are already
+#: committed and a subscriber's job is to react to them, not to be handed them.
+#:
+#: This exists because a chat turn leaves no document event to listen for. Every
+#: write on the completion path is `db_set` or `frappe.db.set_value`, for good
+#: reasons — a streamed reply rewrites one row many times and routing that
+#: through `Document.save()` would be waste — but it means `on_update` never
+#: fires for a finished reply. Anything downstream that needs to know a turn
+#: happened had no choice but to poll.
+TURN_FINISHED_HOOK = "chat_turn_finished"
+
+
+def _turn_finished(session):
+	"""Tell subscribers the turn is over. Never raises.
+
+	Same contract as `chat_suggest.attach` a few lines up: this runs after the
+	answer is committed, so a subscriber that throws must not turn a turn that
+	answered into a turn that failed.
+	"""
+	for entry in frappe.get_hooks(TURN_FINISHED_HOOK) or []:
+		try:
+			frappe.get_attr(entry)(session)
+		except Exception:
+			frappe.log_error(title=f"chat_turn_finished hook failed: {entry}")
+
+
 def run_turn(session):
 	"""Worker entry point: drive one turn to completion."""
 	doc = frappe.get_doc("OS Chat Session", session)
@@ -221,6 +248,19 @@ def run_turn(session):
 	# `long` queue share a worker process, so a previous turn that died between
 	# writing a file and the drain would otherwise hand its meta to this one.
 	chat_artifacts.reset(doc.name)
+
+	# `finally`, and not a call at each exit: the turn has two endings and a third
+	# would be easy to add without noticing this. "The turn is over" is true on
+	# every path out of here.
+	try:
+		_drive(doc)
+	finally:
+		_turn_finished(doc.name)
+
+
+def _drive(doc):
+	"""One turn, from the pending skill to the status flip."""
+	session = doc.name
 
 	try:
 		skill, skill_args = _pending_skill(doc.name)
