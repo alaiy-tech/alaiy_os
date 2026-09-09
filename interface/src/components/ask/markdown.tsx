@@ -168,8 +168,14 @@ function Table({ head, body }: { head: string[]; body: string[][] }) {
  * One pass over an alternating split, so the two cannot interleave wrongly and
  * an unclosed marker stays visible as itself rather than swallowing the rest
  * of the answer.
+ *
+ * Exported because the changelog page renders the same two markers and there
+ * should be one answer to what a code chip looks like in this product. The
+ * block layer above is not shared: it renders every heading as a small caps
+ * label, which is right for an answer in a panel and wrong for a page whose
+ * headings are its structure.
  */
-function inline(text: string): ReactNode[] {
+export function inline(text: string): ReactNode[] {
   const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
   return parts.map((part, n) => {
     if (part.startsWith("**") && part.endsWith("**") && part.length > 4) {

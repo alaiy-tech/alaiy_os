@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireOnboardedSession } from "@/lib/auth/dal";
 import { loadHomeTiles } from "@/lib/backend/dashboard";
 import { openingMessage } from "@/lib/ask/greeting";
@@ -6,6 +7,9 @@ import { ChatWorkspace } from "@/components/ask/chat-workspace";
 import { listChatSessions } from "@/lib/backend/chat";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import type { ChatSessionSummary } from "@/lib/backend/types";
+import { Alert } from "@/components/ui";
+import { urgency } from "@/lib/support/cases";
+import { buildMockCases } from "@/lib/support/mock-data";
 
 export const metadata = { title: "Ask Alaiy" };
 
@@ -53,20 +57,28 @@ export default async function HomePage({
   const known = sessions.some((row) => row.name === chat);
   const active = (known ? chat : sessions[0]?.name) ?? null;
 
+  // The Support tab's own alert, per the issue: a case idle for over a week
+  // or closing in on Amazon's auto-close should surface here too, not only on
+  // Support itself. Mock data, like the tab it points at — see the API
+  // constraint note on buildMockCases — so this reads the same seed list
+  // rather than anything a seller has added, which lives only in that tab's
+  // own client state.
+  const urgentSupportCases = buildMockCases().filter(
+    (supportCase) => supportCase.status !== "resolved" && urgency(supportCase),
+  );
+
   return (
-    // Keyed on the chat the URL asked for. ChatWorkspace holds which
-    // conversation is open in state, and a client component does not
-    // re-initialise state when a prop changes — so without this, navigating
-    // to ?chat=X updates the URL and the rail's highlight and leaves the
-    // previous transcript on screen. The server is the authority on
-    // navigation; remounting is how it stays that way.
-    <ChatWorkspace
-      key={active ?? "new"}
-      sessions={sessions}
-      initialActive={active}
-      greeting={greeting}
-      suggestions={suggestionsFor("/home")}
-      importing={isImporting(currentImport)}
-    />
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="min-h-0 flex-1">
+        <ChatWorkspace
+          key={active ?? "new"}
+          sessions={sessions}
+          initialActive={active}
+          greeting={greeting}
+          suggestions={suggestionsFor("/home")}
+          importing={isImporting(currentImport)}
+        />
+      </div>
+    </div>
   );
 }

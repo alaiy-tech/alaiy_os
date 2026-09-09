@@ -24,7 +24,7 @@ import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
 
 const CHANNEL_BLURB: Record<ChannelId, string> = {
   shopify: "Orders, products and inventory. Real-time once webhooks are live.",
-  amazon: "Orders and inventory over SP-API. Polled hourly.",
+  amazon: "Orders and inventory over SP-API.",
 };
 
 export function ChannelCard({
@@ -68,7 +68,7 @@ export function ChannelCard({
         </div>
 
         {!connected ? (
-          <ButtonLink href="/onboarding/connect" size="sm" className="shrink-0">
+          <ButtonLink href="/start" size="sm" className="shrink-0">
             Connect
           </ButtonLink>
         ) : null}

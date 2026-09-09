@@ -69,10 +69,24 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
 
 The Next.js app in `interface/` is **Alaiy OS Self-Serve**: a seller signs up,
 connects Shopify or Amazon, imports 90 days of data and starts operating. It is
-the frontend a deployment gets by default, and it talks to this app's REST
-surface server-side only — the browser never reaches Frappe directly. See
+the frontend a deployment gets by default, and every backend call it makes is
+made server-side only — the browser never reaches Frappe directly. See
 [interface/README.md](interface/README.md) for its architecture and
 [interface/DESIGN.md](interface/DESIGN.md) for the design system.
+
+The REST surface it calls is **not** all in this app. Ask Alaiy
+(`alaiy_os.api.chat`) answers from here; the seller-facing data — sign-in OTP,
+workspace, dashboard, orders, listings, inventory, imports, connections,
+account health — answers from
+[alaiy_os_self_serve_apis](https://github.com/alaiy-tech/alaiy_os_self_serve_apis),
+a separate app the self-serve bench installs alongside this one (see
+`devbench/clients/api.py`). Those endpoints stay there deliberately: that app
+depends on the Amazon SP-API and Shopify connectors, and both of those already
+require `alaiy_os`, so folding it in would make `required_apps` a cycle.
+
+The consequence worth knowing: **installing `alaiy_os` on its own gives you
+this frontend with no data behind it.** Every screen except Ask Alaiy needs
+`alaiy_os_self_serve_apis` on the bench as well.
 
 It is a **base** in devbench's composition: `interface/interface.config.json`
 declares `"base": true`, so `devbench compose` builds a client's workspace out

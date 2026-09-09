@@ -329,6 +329,8 @@ hatch, and nothing else.
 | [components/ui/index.tsx](src/components/ui/index.tsx) | `Button`, `ButtonLink`, `pressClass`, `Input`, `Select`, `Field`, `Card`, `Alert`, `Pill`, `Eyebrow`, `Logo`, `Spinner` |
 | [components/data/](src/components/data/) | the table, toolbar, pagination and summary primitives |
 | [components/ask/chat.tsx](src/components/ask/chat.tsx) | the conversation, and `Mark` — Alaiy's plate, shared with the panel header |
+| [app/(app)/dashboard/](src/app/(app)/dashboard/) | the KPI tile, and the alert card — a soft ground with the bright value as a 3px rule down its leading edge |
+| [app/(app)/account-health/](src/app/(app)/account-health/) | the metric tile, and the only chart in the product — small multiples in inline SVG, navy line against a dashed alert-hue threshold |
 
 ## Adding to this
 

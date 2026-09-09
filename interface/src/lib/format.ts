@@ -132,3 +132,48 @@ export function formatDateTime(value?: string | null): string {
   if (!time) return date;
   return `${date} ${time.slice(0, 5)}`;
 }
+
+/**
+ * The weekday a backend date falls on — "Sunday", "Monday".
+ *
+ * The Home GMV tile compares today against the same weekday last week, and
+ * "vs. last Tuesday" is a far clearer label than a date.
+ *
+ * Built from the Y-M-D digits through `Date.UTC` rather than by parsing the
+ * string: `new Date("2026-09-07")` is read as UTC midnight, so anything west
+ * of Greenwich renders the day before, and the server and the browser would
+ * disagree about which. Feeding UTC in and reading UTC out is the one way
+ * through `Date` that cannot shift.
+ */
+const WEEKDAYS = [
+  "Sunday",
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+];
+
+export function weekdayName(value?: string | null): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value ?? "");
+  if (!match) return undefined;
+  const [, year, month, day] = match;
+  const at = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+  // An impossible date — "2026-02-31" — rolls over rather than throwing, so
+  // the day is checked back rather than trusted.
+  if (at.getUTCDate() !== Number(day)) return undefined;
+  return WEEKDAYS[at.getUTCDay()];
+}
+
+/**
+ * The time of day alone, to the minute: "09:42".
+ *
+ * For "as of", where the date is today and saying so twice is noise. String
+ * slicing, like every other date helper here — see `formatDate`.
+ */
+export function formatClock(value?: string | null): string {
+  if (!value) return NO_VALUE;
+  const [, time] = value.replace("T", " ").split(" ");
+  return time ? time.slice(0, 5) : NO_VALUE;
+}

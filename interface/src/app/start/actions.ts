@@ -68,6 +68,9 @@ export async function authAction(
     };
   }
 
-  // `redirect` throws to unwind, so it has to sit outside the try block.
-  redirect(`/onboarding/${step}`);
+  // The onboarding steps render on /start itself, so verifying does not leave
+  // this screen — the server re-renders it with the session now in hand and the
+  // right panel carries on into the step. `redirect` throws to unwind, so it
+  // has to sit outside the try block.
+  redirect(step === "done" ? "/home" : "/start");
 }

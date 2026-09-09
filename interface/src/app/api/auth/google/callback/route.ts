@@ -28,7 +28,10 @@ export async function GET(request: NextRequest) {
       profileFromSso: true,
     });
 
-    const destination = claims.next || `/onboarding/${step}`;
+    // Onboarding lives on /start, so an unfinished seller goes back there
+    // rather than to a route of its own.
+    const destination =
+      claims.next || (step === "done" ? "/home" : "/start");
     return NextResponse.redirect(new URL(destination, request.url));
   } catch (error) {
     console.error("Google sign-in failed", error);

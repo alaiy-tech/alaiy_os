@@ -37,7 +37,9 @@ export async function requireOnboardedSession(): Promise<SessionPayload> {
   const session = await requireSession();
   const step = effectiveStep(session.onboardingStep);
   if (step !== "done") {
-    redirect(`/onboarding/${step}`);
+    // /start is the whole of getting started now: it works out which step is
+    // still owed and renders it beside the masthead.
+    redirect("/start");
   }
   return session;
 }

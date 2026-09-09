@@ -16,7 +16,14 @@ function SubmitButton({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
+export function SignInForm({
+  googleEnabled,
+  /** A failed Google round-trip, already turned into copy by the page. */
+  error,
+}: {
+  googleEnabled: boolean;
+  error?: string;
+}) {
   const [state, formAction] = useActionState(authAction, initialOtpState);
   const codeRef = useRef<HTMLInputElement>(null);
 
@@ -27,6 +34,10 @@ export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
 
   return (
     <div className="space-y-5">
+      {/* Dropped once the seller does something: their own attempt is the more
+          recent news, and its error replaces this one. */}
+      {error && !state.error ? <Alert>{error}</Alert> : null}
+
       {googleEnabled ? (
         <>
           {/* The same press as every other call to action. An anchor, because
@@ -48,21 +59,16 @@ export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
         {state.stage === "email" ? (
           <>
             <input type="hidden" name="intent" value="send" />
-            <Field label="Work email">
-              <Input
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                autoFocus
-                defaultValue={state.email}
-                placeholder="you@yourstore.com"
-              />
-            </Field>
-            <SubmitButton>Send code</SubmitButton>
-            <p className="text-center text-xs text-muted">
-              No passwords. We email a fresh 6-digit code every time you sign in.
-            </p>
+            <Input
+              name="email"
+              type="email"
+              autoComplete="email"
+              required
+              autoFocus
+              defaultValue={state.email}
+              placeholder="you@yourstore.com"
+            />
+            <SubmitButton>Send OTP</SubmitButton>
           </>
         ) : (
           <>
@@ -101,7 +107,7 @@ export function SignInForm({ googleEnabled }: { googleEnabled: boolean }) {
             value="resend"
             className="text-primary-600 underline-offset-2 hover:underline"
           >
-            Resend code
+            Resend OTP
           </button>
           <span aria-hidden className="text-line">|</span>
           <button

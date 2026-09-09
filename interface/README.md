@@ -3,16 +3,9 @@
 Self-serve tier for Alaiy OS. A Shopify or Amazon seller signs up, connects their
 accounts, imports 90 days of data, and starts operating — no hand-holding.
 
-This is the frontend `alaiy_os` ships, and the one a deployment gets unless an
-app installed later claims the base for itself (see the repo
-[README](../README.md#interface--the-frontend-this-app-ships)). `devbench
-compose <client>` builds a workspace out of this tree and writes `.env.local`
-from the `env` map in `interface.config.json`; `npm run dev` here runs it
-standalone against whatever `.env.local` you write by hand.
-
 Spec: [issue #1](https://github.com/alaiy-tech/alaiy_os_self_serve/issues/1).
 This repo implements **P0 — Auth + Onboarding** and the **P1 core tabs**:
-Home, Orders, Inventory and Channels.
+Home, Dashboard, Orders, Listings, Inventory, Account Health and Channels.
 
 The design system — paper ground, navy panels, one accent, one button shape —
 is documented in [DESIGN.md](DESIGN.md), with the tokens themselves in
@@ -132,6 +125,151 @@ What is deliberately *not* flagged: carrier delays, "no scan in 48 hours", and
 shipment, so each would be a guess wearing a coloured dot. The detail panel
 says so where a seller would look for it.
 
+### The Dashboard is the glance; Home is the question
+
+The Dashboard replaces the ritual the product exists to kill — Seller Central,
+the Shopify admin, a spreadsheet, email and a tracker, all opened before
+anything useful has happened. Four figures, up to three things Alaiy noticed,
+the last ten orders, and when each channel was last pulled.
+
+It is its own route rather than a band under Ask Alaiy. The spec folds all of
+this into Home, and Home is the Ask surface — built that way, the figures sat
+below the fold on the one screen whose whole job is to be read at a glance.
+Scanning four numbers and reading a transcript are different postures, so they
+are two rows in the rail. The docked Ask panel comes along on the Dashboard as
+it does on every data tab, so a question about a number stays one click from
+the number. Nothing on the Dashboard is a place to work: every alert and every
+order row leads to the tab where the thing can actually be done.
+
+**The four tiles do not share a window, and each one says which it is.** GMV
+and orders are today so far; the return rate is a rolling week, because one day
+of returns is not a rate; unsettled is empty, because settlements are not
+synced. A row of tiles that looked alike but meant different periods would be
+the most misleading thing that could go on this screen.
+
+**"Today vs. the same day last week" is compared at the same time of day.** The
+naive reading — today's rows against the whole of that day's — reports a
+collapse every morning, because a partial day always loses to a full one. Both
+windows end at the same clock time seven days apart.
+
+**The alert bar is inference, and it is honest about its sources.** Six
+detectors in `selfserve/home_alerts.py`, each a pattern actually visible in the
+synced data: a channel erroring, a channel overdue a pull, orders needing
+attention, a return-rate spike, this week's sellers at zero stock, and sales
+behind the same weekday. The spec also sketched alerts about carrier scans,
+Amazon disbursement holds and review patterns — none is derivable, so none is
+there. Alerts are ranked by severity rather than time, capped at three, and
+carry a `tab` rather than a URL: which surface fixes a stuck order is the
+backend's business, what that surface's path is belongs to `lib/dashboard/alerts.ts`.
+
+A dismissal is a row in `Alaiy Alert Dismissal`. It survives navigation — an
+alert does not clear because the seller visited the tab it points at, since
+they may well have gone there for something else — and two things bring it
+back: the condition clearing and later returning, and the condition getting
+materially worse.
+
+Recent orders and last-synced are read through `list_orders` and
+`list_connections` rather than duplicated into the Home payload, so there is
+one definition of "flagged" and one of "last synced" in the product.
+
+### Account Health is Amazon-only, and says so
+
+Amazon can deactivate a seller account when a performance metric crosses a
+published threshold. Seller Central shows the number; it does not say how much
+room is left, which orders are spending it, or where the Late Shipment Rate
+lands if the orders sitting unshipped go out late. That arithmetic is the tab.
+
+Shopify has no account-suspension mechanism, so there is no Shopify equivalent
+to show. That is labelled in the header as a design decision rather than left
+as an apparent gap.
+
+All four metrics the spec fixes are **queryable, not calculated** — that was
+the open question on the issue. `GET_V2_SELLER_PERFORMANCE_REPORT` carries all
+of them, and the SP-API connector already parses it in the three encodings
+Amazon has shipped it as. Three more metrics come back in the same report and
+are shown below the four rather than dropped.
+
+**Health rows are workspace-scoped in this app, deliberately.** The connector
+stores its own metrics in `Account Health Metric`, keyed
+`{marketplace}::{metric_key}` — no seller in the key, over a global marketplace
+table. On a bench where every seller shares a site that means two sellers on
+amazon.in overwrite each other and a read returns the wrong seller's account
+health. So this app owns `Alaiy Account Health Metric` and `Alaiy Seller
+Feedback`, both with a required indexed `workspace`, and no endpoint accepts a
+workspace argument — there is no parameter through which to name another
+seller's. The connector's two tables are never read.
+
+Rows are a daily series rather than a snapshot: Amazon's report has no history,
+so a value not stored on the day it was read is gone. That makes the 60-day
+trend accumulate from the first sync, and the chart says how many days it
+actually has instead of drawing a 60-day axis over five points. It is drawn as
+small multiples — one panel per metric with its own scale and its own threshold
+line — because Order Defect Rate lives near 1% and Valid Tracking Rate near
+97%, and one shared y-axis flattens the metric most likely to suspend an
+account into the baseline.
+
+The late-shipment projection the spec asks for in V1 is there and **labelled an
+estimate**: Amazon publishes the rate but neither the window nor the shipment
+count behind it, so the denominator is our own synced order count and the panel
+shows it. Which orders are at risk comes from Amazon's own `LatestShipDate`,
+now persisted — it was already in the `getOrders` payload and being discarded.
+
+Two things the spec asks for have no source and are stated where a seller would
+look for them: policy warnings need the Performance Notifications API, and
+A-to-Z claims and chargebacks arrive as counts rather than per order, so the
+orders behind ODR are the ones with negative feedback.
+
+### Product groups: one product, two channels
+
+The Canvas Tote Bag is one thing to photograph, describe and reorder. That it
+is `CT-TOTE-BLK-001` on Shopify and `B09XKQL3M2` on Amazon is an accident of
+where it is listed — and it is why an Amazon suppression can sit for a week
+with nothing in Shopify mentioning it. A **product group** is that product,
+and it is the shared idea behind two tabs, which is why its shapes and its
+seed data live in `lib/product-groups/` rather than in either one.
+
+**Listings** (`/listings`) is one row per product with both channels' status
+side by side, and a detail view that puts the two listings in two columns —
+same fields, same order, same scale, because the comparison *is* the feature.
+Amazon's suppression codes are translated to plain English with the raw code
+kept in the tooltip. Read-only: V1 links out to the live listing and to the
+seller's own admin, and the header says so, because a tab that looked editable
+and silently was not would be worse than one that is honest. The unlinked panel
+is the queue that keeps the rest honest — every unmatched product is somewhere
+a suppression could hide — and it distinguishes a barcode match (certain) from
+an AI suggestion above the spec's 85% threshold (offered for confirmation) from
+one below it (no suggestion at all, because a guess invites a confirming click
+and a wrong link merges two products' inventory).
+
+**Inventory** now has two grains, and the toggle is in the URL. *By product* is
+the new one: the warehouse's number, Shopify's and Amazon FBA's shown
+separately rather than summed, plus the days-of-cover arithmetic none of the
+three sources does for you, and the open POs sorted by the cover of what they
+restock. *By channel listing* is the original per-channel table and it is kept,
+not replaced — the per-channel price and stock figure are facts a merged row
+would have to average away.
+
+Two things that table refuses to do: **no cover is not zero cover** (a SKU with
+stock and no sales has no rate to divide by, and painting it critical would
+send someone to reorder the one product they should not), and **the three
+numbers are never reconciled** — where Shopify disagrees with the warehouse the
+row says so and by how much, because that gap is the oversell risk.
+
+**Both now read live data.** `lib/backend/listings.ts` and `loadStock` in
+`lib/backend/inventory.ts` call `api.listings.*` and `api.inventory.stock`; the
+seed data they replaced is gone. The `sample` flag stays in the shape and the
+banner still renders off it — the backend answers `false`, so the banner
+removed itself with nobody having to remember a switch, which is the whole
+point of having put it there. It is kept for the next stubbed endpoint.
+
+Listings is read-plus-decide rather than read-only. Edits still happen on the
+channel, but three decisions are made here, because no sync can make them:
+confirming that two listings are the same product, marking a product
+single-channel on purpose, and undoing a join. A barcode match links itself; a
+title match only ever *offers*, and a person confirms — a wrong join merges two
+products' stock into one row and nothing downstream can detect it, so the cost
+of asking is a click.
+
 ### Ask Alaiy is deliberately inert
 
 The prompt is disabled and says so, on Home and in the docked panel, because
@@ -161,7 +299,16 @@ in `src/lib/backend/*.ts` — change them there if the names differ. Shapes are 
 | `alaiy.imports.start` | Queue the 90-day backfill. Returns a job. |
 | `alaiy.imports.status` / `alaiy.imports.latest` | Progress for the import screen. |
 | `api.imports.resync` | Re-pull one channel/kind. The Channels tab's "Sync now". |
-| `api.dashboard.tiles` | The figures behind Ask Alaiy's opening line. |
+| `api.listings.groups` | Product groups with both channels' listings, plus the unlinked queue. |
+| `api.listings.link` | Link an unmatched product to a group, or mark it channel-exclusive. |
+| `api.inventory.stock` | Inventory by product group: every source's stock, days of cover, open POs. |
+| `api.account_health.overview` | The Account Health banner, tiles, late-shipment outlook and gaps. |
+| `api.account_health.trend` | Stored daily readings for the 60-day chart. |
+| `api.account_health.contributing` | The orders behind one metric, where they can be attributed. |
+| `api.account_health.refresh` | Queue a fresh performance-report pull. |
+| `api.dashboard.home` | The Home dashboard: four tiles at their own windows, plus the alert bar. |
+| `api.dashboard.dismiss_alert` | Hide one Home alert until it changes, or clears and returns. |
+| `api.dashboard.tiles` | One window and the one before it. The figures behind Ask Alaiy's opening line. |
 | `api.orders.list_orders` | The Orders tab: one row per order, flagged and ranked. |
 | `api.orders.order_detail` | One order and its lines, for the detail panel. |
 | `api.orders.list_order_items` / `api.orders.summary` | The line grain, and a window-wide split by channel. Still whitelisted; nothing in the app calls them now. |
@@ -183,8 +330,20 @@ the product is legible, not links, because a link to a route that does not
 exist reads as broken rather than as unfinished.
 
 P2 is the NL query layer that makes Ask Alaiy answer, plus pinning, WhatsApp
-and Slack. P3 is alerts, Stripe metering and upgrade gates. The Home dashboard
-tiles were built and then removed: Home is the question box, and the tiles'
-figures now feed Ask Alaiy's opening line instead. `api.dashboard.tiles` and
-the `DashboardTiles` type are still there for whatever brings a dashboard
-back.
+and Slack. P3 is Stripe metering and upgrade gates.
+
+The unsettled tile is the one figure on Home with no source: there is no
+settlement DocType and no handler for one in `selfserve.sync.HANDLERS`, so it
+reports itself unavailable rather than showing a zero that would read as "you
+have been paid everything". `SETTLEMENTS_AVAILABLE` in `api/dashboard.py` is
+the single place that changes when Finance lands.
+
+Policy warnings on Account Health are waiting on the Performance
+Notifications API, and per-order attribution for A-to-Z claims and chargebacks
+on something richer than Financial Events' counts.
+
+Two Home alerts are waiting on the same gap. "No carrier scan in 48 hours" and
+"cancelled after dispatch" need a shipment with a tracking number and a
+dispatch timestamp, and the order DocType holds neither; a disbursement-hold
+alert needs settlements. All three belong in `selfserve/home_alerts.py` beside
+the six that are there, the day their data is synced.

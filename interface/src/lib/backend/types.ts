@@ -46,6 +46,16 @@ export type ConnectorStatus = {
   account_label?: string;
   marketplace?: string;
   last_synced_at?: string;
+  /**
+   * Overdue a pull, by the backend's own clock.
+   *
+   * Decided there rather than here on purpose: Frappe sends a naive
+   * "YYYY-MM-DD HH:MM:SS" in the *site's* timezone, so subtracting it from a
+   * clock in any other timezone is out by the offset — and the browser has no
+   * way to know which offset. It is also the same threshold the Home alert
+   * about a stale channel uses, so the dot and the alert cannot disagree.
+   */
+  stale?: boolean;
   error?: string;
 };
 
@@ -126,6 +136,215 @@ export type DashboardTiles = {
   orders: TileMetric;
   return_rate: ReturnRateMetric;
   unsettled: UnsettledMetric;
+};
+
+/* --- Home dashboard ---------------------------------------------------- */
+
+/**
+ * One thing Alaiy noticed, and the tab where the seller can act on it.
+ *
+ * Shapes `selfserve/home_alerts.py`. The backend sends a `tab` and a `query`
+ * rather than a URL: which surface fixes a stuck order is a fact about the
+ * product and belongs there, while what that surface's path is and what its
+ * filter parameters are called belongs here — see `lib/dashboard/alerts.ts`.
+ */
+export type HomeAlert = {
+  /** The detector's name. Stable, and what a dismissal is keyed on. */
+  key: string;
+  /** Higher is louder. The bar is ranked on this, never on time. */
+  severity: number;
+  tone: "alert" | "warn" | "info";
+  title: string;
+  detail: string;
+  /** "orders" | "inventory" | "channels" today. Unknown values lose the link
+   *  rather than pointing a seller at a route that does not exist. */
+  tab: string;
+  query: Record<string, string>;
+  /**
+   * What the alert said when it was rendered. Sent back on dismiss, so a click
+   * cannot silence a worse version of the same alert that arrived in between.
+   */
+  fingerprint: string;
+};
+
+/** One window the tiles were measured over. Strings, for display only. */
+export type DashboardSpan = { from: string; to: string };
+
+/**
+ * The four windows behind the Home tiles.
+ *
+ * `today` and `compare` end at the *same clock time* seven days apart — a
+ * partial day always loses to a full one, so comparing today-so-far against
+ * the whole of last Tuesday would report a collapse every morning. See the
+ * docstring on `api/dashboard.py`.
+ */
+export type HomeWindows = {
+  today: DashboardSpan;
+  compare: DashboardSpan;
+  rolling: DashboardSpan & { days: number };
+  rolling_compare: DashboardSpan;
+};
+
+/**
+ * Everything the Home dashboard reads, in one call.
+ *
+ * The four tiles deliberately do not share a window: "is anything on fire this
+ * morning" is a question about today, and "is my return rate drifting" is not
+ * answerable from one day of orders. The alerts ride along because they are
+ * computed from these same figures — a tile and the alert about it cannot
+ * quote different numbers.
+ */
+export type HomeDashboard = {
+  /** When the backend computed this, so the screen can say how fresh it is. */
+  as_of: string;
+  /** The currency carrying the most revenue this week, or null. */
+  currency: string | null;
+  mixed_currencies: boolean;
+  /** Distinguishes "nothing sold today" from "nothing imported yet". */
+  has_any_orders: boolean;
+  windows: HomeWindows;
+  /** Today so far, against the same stretch of the same weekday last week. */
+  gmv: TileMetric;
+  orders: TileMetric;
+  /** Rolling 7 days, against the 7 before. */
+  return_rate: ReturnRateMetric;
+  unsettled: UnsettledMetric;
+  /** At most three, loudest first. */
+  alerts: HomeAlert[];
+};
+
+/* --- Account Health (Amazon only) -------------------------------------- */
+
+/**
+ * One Amazon performance metric, as this seller's newest reading of it.
+ *
+ * Shapes `selfserve/account_health.py`. `metric_value` is null when Amazon's
+ * report did not carry the metric — which is not zero, and on Order Defect
+ * Rate a zero would be the best possible score.
+ */
+export type HealthMetric = {
+  /** Amazon's own key: "orderDefectRate", "lateShipmentRate", … */
+  metric_key: string;
+  metric_label: string;
+  /** "customer_service" or "shipping" — how Amazon groups them. */
+  section: string;
+  /** Percent, or null when unreported. */
+  metric_value: number | null;
+  /** Amazon's published policy limit. */
+  metric_target: number | null;
+  /** 1 for a metric where a higher number is better, e.g. Valid Tracking Rate. */
+  higher_is_better: number;
+  health_status: "unknown" | "ok" | "warn" | "critical";
+  /**
+   * Room left before a breach, in percentage points, and **signed the same way
+   * on every metric**: positive is room to spare, negative is already over. The
+   * backend does that normalisation so the tab does not have to explain that
+   * +0.3 is good on ODR and bad on Valid Tracking Rate.
+   */
+  headroom: number | null;
+  /** One of the four the spec puts on tiles, rather than the other three. */
+  primary: boolean;
+  /** The day this value was read. */
+  as_of_date: string;
+  synced_at: string | null;
+  /** A-to-Z claims and chargebacks in the last 30 days. Only on the ODR row —
+   *  they are what ODR is made of. Counts only; see the defect_attribution gap. */
+  defect_guarantees: number | null;
+  defect_chargebacks: number | null;
+  marketplace_id: string | null;
+};
+
+/** An Amazon order that has not shipped and is at or past its promised date. */
+export type LateRiskOrder = {
+  external_order_id: string;
+  order_number: string | null;
+  order_date: string | null;
+  /** Amazon's own LatestShipDate — an order is late when Amazon says so. */
+  promised_ship_by: string | null;
+  order_status: string | null;
+  currency: string | null;
+  order_total: number | null;
+  units: number;
+  products: string[];
+};
+
+/**
+ * Where Late Shipment Rate lands if the unshipped orders go out late.
+ *
+ * `estimated` is always true and the tab must say so. Amazon reports the rate
+ * but neither the trailing window it used nor the number of shipments in it,
+ * so `denominator` is *our* synced order count over `window_days` — which
+ * makes the projected change sound and the absolute figure an approximation.
+ * `projected` is null when there is nothing honest to say (nothing at risk, or
+ * too few orders for a projection to mean anything).
+ */
+export type LateShipmentOutlook = {
+  current: number;
+  target: number;
+  projected: number | null;
+  breaches: boolean;
+  at_risk_count: number;
+  at_risk: LateRiskOrder[];
+  denominator: number;
+  window_days: number;
+  estimated: boolean;
+};
+
+/** Something the spec asks for that the data cannot support, and why. */
+export type HealthGap = { key: string; title: string; detail: string };
+
+export type HealthStatus = "healthy" | "at_risk" | "action_required" | "unknown";
+
+export type AccountHealth = {
+  /** False when no Amazon account is attached — the tab is Amazon-only. */
+  connected: boolean;
+  /** Proximity to the thresholds, not merely whether one has been crossed. */
+  status: HealthStatus;
+  metrics: HealthMetric[];
+  late_shipment: LateShipmentOutlook | null;
+  gaps: HealthGap[];
+  synced_at: string | null;
+  /** Connected but nothing pulled yet: a first sync pending, not a healthy
+   *  account. The banner has to tell those two apart. */
+  never_synced: boolean;
+};
+
+/** One stored reading, for the trend chart. */
+export type HealthTrendPoint = {
+  metric_key: string;
+  as_of_date: string;
+  metric_value: number;
+  metric_target: number | null;
+};
+
+export type HealthTrend = {
+  days: number;
+  rows: HealthTrendPoint[];
+  /**
+   * How many distinct days actually have readings. Amazon's report has no
+   * backfill, so this is well short of `days` for a while after the first sync
+   * — and a chart drawing a 60-day axis over five points would overstate it.
+   */
+  available_days: number;
+  /** metric_key -> the threshold line to draw. */
+  targets: Record<string, number>;
+};
+
+/** The orders behind one metric. */
+export type ContributingOrders = {
+  metric_key: string;
+  /**
+   * False when this metric cannot name its orders at all — which is a
+   * different answer from an empty list. An empty list under a bad metric
+   * reads as "no orders are responsible for this".
+   */
+  supported: boolean;
+  basis?: "negative_feedback" | "unshipped_past_promise";
+  rows: (LateRiskOrder & {
+    rating?: number | null;
+    comment?: string | null;
+    feedback_date?: string | null;
+  })[];
 };
 
 /* --- Orders and Inventory tabs ----------------------------------------- */

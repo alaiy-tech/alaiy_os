@@ -168,6 +168,8 @@ export type ListingQuery = {
   min?: string;
   max?: string;
   order?: string;
+  /** Inventory only: which grain the tab is showing. */
+  view?: string;
 };
 
 /**

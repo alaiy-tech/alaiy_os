@@ -7,6 +7,7 @@ import type {
   InventorySummaryRow,
   Paged,
 } from "@/lib/backend/types";
+import type { StockPage } from "@/lib/inventory/types";
 
 /**
  * The Inventory tab's reads.
@@ -20,6 +21,7 @@ import type {
 
 const LIST = "/api/method/alaiy_os_self_serve_apis.api.inventory.list_products";
 const SUMMARY = "/api/method/alaiy_os_self_serve_apis.api.inventory.summary";
+const STOCK = "/api/method/alaiy_os_self_serve_apis.api.inventory.stock";
 
 /** Matches api/inventory.py's SORTABLE. Anything else the backend ignores. */
 export const PRODUCT_SORT_FIELDS = [
@@ -88,5 +90,61 @@ export async function inventorySummary(
     return (await backend.get<InventorySummaryRow[] | null>(SUMMARY, { userToken })) ?? [];
   } catch {
     return [];
+  }
+}
+
+/**
+ * The spec's toggle: how many days of sales the rate is averaged over.
+ *
+ * 14 is the default and lives on the workspace; these are the values the tab
+ * offers. A slow-moving product needs 30 to have a meaningful rate at all,
+ * and a fast-moving one is better described by 7.
+ */
+export const VELOCITY_WINDOWS = [7, 14, 30] as const;
+
+export type VelocityWindow = (typeof VELOCITY_WINDOWS)[number];
+
+/**
+ * An empty stock page, for the failure path.
+ *
+ * The thresholds are the backend's own defaults, repeated here only so the
+ * legend has numbers to render when the call failed. A workspace that has
+ * changed them will see its own the moment the read succeeds.
+ */
+const EMPTY_STOCK: StockPage = {
+  sample: false,
+  rows: [],
+  purchase_orders: [],
+  has_wms: false,
+  thresholds: { critical: 7, low: 14, watch: 30 },
+};
+
+export type StockResult = { page: StockPage; error?: string };
+
+/**
+ * Inventory at product-group grain: what you have, where, and when it runs out.
+ *
+ * A different question from `listProducts`, not a different rendering of it.
+ * That one answers "what does each channel say"; this one merges the channels
+ * into the physical product and adds the days-of-cover arithmetic no source
+ * does for you. Both grains stay on the tab because neither answer is
+ * derivable from the other.
+ *
+ * `velocityDays` is a way of looking at the same data rather than a change to
+ * the workspace's reorder policy, so it is a query parameter and nothing is
+ * persisted.
+ */
+export async function loadStock(
+  velocityDays?: number,
+  userToken?: string,
+): Promise<StockResult> {
+  try {
+    const page = await backend.get<StockPage | null>(STOCK, {
+      query: { velocity_days: velocityDays },
+      userToken,
+    });
+    return { page: page ?? EMPTY_STOCK };
+  } catch (error) {
+    return { page: EMPTY_STOCK, error: userFacingError(error, OUR_FAULT) };
   }
 }

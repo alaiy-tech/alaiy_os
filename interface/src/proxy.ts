@@ -13,7 +13,17 @@ function isPublic(pathname: string): boolean {
   // Route Handlers authenticate themselves and answer with their own status
   // codes. Redirecting them here would hand a polling fetch() an HTML page
   // instead of the 401 it can act on.
-  return pathname === "/" || pathname === "/start" || pathname.startsWith("/api/");
+  //
+  // /changelog is public because it is about the product, not about a seller's
+  // data. It is also the one public page a signed-in seller is left on rather
+  // than redirected away from — sending someone reading release notes to /home
+  // would be a bug, not a convenience.
+  return (
+    pathname === "/" ||
+    pathname === "/start" ||
+    pathname === "/changelog" ||
+    pathname.startsWith("/api/")
+  );
 }
 
 export async function proxy(request: NextRequest) {
@@ -28,9 +38,16 @@ export async function proxy(request: NextRequest) {
   }
 
   if (session && (pathname === "/" || pathname === "/start")) {
+    // A seller part-way through onboarding belongs on /start — that is where
+    // the steps are — so only a finished one is sent to the app. Bouncing them
+    // off /start the way this used to would now bounce them out of onboarding.
     const step = effectiveStep(session.onboardingStep);
-    const destination = step === "done" ? "/home" : `/onboarding/${step}`;
-    return NextResponse.redirect(new URL(destination, request.url));
+    if (step === "done") {
+      return NextResponse.redirect(new URL("/home", request.url));
+    }
+    if (pathname === "/") {
+      return NextResponse.redirect(new URL("/start", request.url));
+    }
   }
 
   return NextResponse.next();
