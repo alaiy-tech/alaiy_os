@@ -16,6 +16,9 @@ import type {
 import { AnswerBody } from "./answer-body";
 import { AttachmentPreviewPane, useAttachmentPreview } from "./attachment-preview";
 import { FeedbackControl } from "./feedback-control";
+// The `/` catalogue lives here so the dedicated /os/ask-alaiy page has the same
+// picker this drawer does — it had none at all before.
+import { exactSkillSlug, SkillPicker, skillQueryOf } from "./skill-picker";
 import "./ask-alaiy.css";
 
 type MentionRow = MentionOption & { kind: string };
@@ -33,17 +36,6 @@ const SUGGESTIONS = [
 
 export const ATTACHMENT_ACCEPT =
   ".pdf,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.yaml,.yml,.py,.js,.ts,.sql,.log,.xml,.html,.htm,.css,.ini,.cfg,.toml";
-
-function skillQueryOf(value: string): string | null {
-  const match = /^\/([a-z0-9-]*)$/.exec(value.trimStart());
-  return match ? match[1] : null;
-}
-
-function exactSkillSlug(value: string, skills: ChatSkill[] | null): string | undefined {
-  const match = /^\/([a-z0-9-]+)$/.exec(value.trim());
-  if (!match || !skills) return undefined;
-  return skills.some((s) => s.slug === match[1]) ? match[1] : undefined;
-}
 
 const MENTION_RE = /(?:^|[\s(\[{,;:"'“‘])@([^\s@]{0,40}(?:[ ][^\s@]{0,40}){0,2})?$/;
 const MENTION_DEBOUNCE_MS = 120;
@@ -122,16 +114,40 @@ export function AskAlaiyPanel({
   const [skillDismissedFor, setSkillDismissedFor] = useState<string | null>(null);
   const skillsOpen = skillQuery !== null && text !== skillDismissedFor;
 
+  // True only on the keystroke that OPENS the picker, so the catalogue is
+  // re-read once per open rather than once per character. Without the re-read
+  // an agent installed from the Agent Marketplace never appeared here: this
+  // hook lives in the /os layout, so its cache survives navigating between the
+  // two pages. See ensureSkillsLoaded in use-ask-alaiy.ts.
+  const skillPickerWasClosed = useRef(true);
+
   useEffect(() => {
     if (skillQuery === null) {
+      skillPickerWasClosed.current = true;
       setSkillMatches([]);
       return;
     }
+    const justOpened = skillPickerWasClosed.current;
+    skillPickerWasClosed.current = false;
+
+    const q = skillQuery.toLowerCase();
+    const matching = (all: ChatSkill[]) =>
+      all.filter((s) => s.slug.includes(q) || (s.label || "").toLowerCase().includes(q));
+
+    // Paint from what we already have before awaiting anything. Matches were
+    // cleared when the picker last closed, so without this the re-read on open
+    // shows "No matching skill." for the length of a round trip — which reads
+    // as "this site has no skills" at exactly the moment someone is looking for
+    // the one they just installed.
+    if (chat.skills) {
+      setSkillMatches(matching(chat.skills));
+      setSkillIndex(0);
+    }
+
     let cancelled = false;
-    void chat.ensureSkillsLoaded().then((all) => {
+    void chat.ensureSkillsLoaded(justOpened).then((all) => {
       if (cancelled || skillQueryOf(text) === null) return;
-      const q = skillQuery.toLowerCase();
-      setSkillMatches(all.filter((s) => s.slug.includes(q) || (s.label || "").toLowerCase().includes(q)));
+      setSkillMatches(matching(all));
       setSkillIndex(0);
     });
     return () => { cancelled = true; };
@@ -246,9 +262,41 @@ export function AskAlaiyPanel({
     if (open) setTimeout(() => inputRef.current?.focus(), 150);
   }, [open]);
 
+  // Whether the reader is at (or very near) the bottom right now -- read
+  // before every autoscroll decision below, not just tracked on its own,
+  // since a reader who scrolled up mid-answer to reread earlier context must
+  // not be yanked back down on the next streamed chunk. `true` until proven
+  // otherwise, so a fresh open starts pinned to the bottom.
+  const stickToBottom = useRef(true);
+
+  // Opening the panel, or switching to a different conversation, should
+  // always start pinned to that conversation's latest message.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: stickToBottom is a ref, not a reactive value
+  useEffect(() => {
+    stickToBottom.current = true;
+  }, [open, chat.sessionId]);
+
   useEffect(() => {
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    const onScroll = () => {
+      stickToBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // Re-fires on every streamed chunk (chat.turns is a new array each time),
+  // which used to force scrollTop to the very bottom unconditionally on every
+  // one of them -- if a reader had scrolled up to reread something while the
+  // answer streamed in, this repeatedly yanked their view back down, which is
+  // what showed up as "the chat keeps scrolling" during generation. Gated on
+  // stickToBottom now: it only follows the stream while the reader is already
+  // at the bottom (or just sent the message that's being answered -- submit()
+  // below resets the flag first).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && stickToBottom.current) el.scrollTop = el.scrollHeight;
   }, [chat.turns, chat.running]);
 
   useEffect(() => {
@@ -263,6 +311,9 @@ export function AskAlaiyPanel({
   const submit = (value?: string) => {
     const toSend = (value ?? text).trim();
     if ((!toSend && !chat.attachments.some((a) => a.status === "ready")) || chat.running) return;
+    // Sending a message always means the reader wants to see the reply that
+    // follows, even if they'd scrolled up to reread something first.
+    stickToBottom.current = true;
     const skill = value === undefined ? exactSkillSlug(toSend, chat.skills) : undefined;
     const mentions = value === undefined ? collectMentions(toSend) : [];
     setText("");
@@ -273,6 +324,7 @@ export function AskAlaiyPanel({
   };
 
   const runSkill = (skill: ChatSkill) => {
+    stickToBottom.current = true;
     setText("");
     setSkillDismissedFor(null);
     setMentionTokens([]);
@@ -820,25 +872,6 @@ export function AttachmentChip({ attachment, onRemove }: { attachment: PendingAt
   );
 }
 
-function SkillPicker({ matches, activeIndex, allLoaded, onPick }: { matches: ChatSkill[]; activeIndex: number; allLoaded: boolean; onPick: (skill: ChatSkill) => void }) {
-  return (
-    <div role="listbox" aria-label="Skills" className="absolute inset-x-3 bottom-full z-10 mb-2 max-h-64 overflow-y-auto rounded-lg border border-border bg-popover text-popover-foreground shadow-md">
-      {matches.length === 0 ? (
-        <p className="px-3.5 py-2.5 text-[12.5px] text-muted-foreground">{allLoaded ? "No matching skill." : "This site has no skills set up."}</p>
-      ) : (
-        matches.map((skill, i) => (
-          <button key={skill.slug} type="button" role="option" aria-selected={i === activeIndex}
-            onMouseDown={(e) => { e.preventDefault(); onPick(skill); }}
-            className={cn("block w-full border-b border-border px-3.5 py-2 text-left last:border-b-0", i === activeIndex ? "bg-accent" : "hover:bg-accent")}>
-            <span className="text-[13px] font-semibold">/{skill.slug}</span>
-            {skill.label && <span className="ml-2 text-[13px] text-muted-foreground">{skill.label}</span>}
-            {skill.description && <span className="mt-0.5 block truncate text-[11.5px] text-muted-foreground">{skill.description}</span>}
-          </button>
-        ))
-      )}
-    </div>
-  );
-}
 
 function MentionPicker({ groups, term, activeIndex, onPick }: { groups: MentionGroup[]; term: string; activeIndex: number; onPick: (option: MentionRow) => void }) {
   const total = groups.reduce((n, g) => n + g.options.length, 0);

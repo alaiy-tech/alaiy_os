@@ -37,15 +37,19 @@ plus two image capabilities, for tools that produce imagery rather than text:
 
     translate_image(image_url) -> {"translated_url": str}
 
-and one that reads the public web:
+one that reads the public web:
 
     web_search(query) -> {"answer": str, "citations": [{"title", "url"}]}
+
+and one that turns recorded speech into text:
+
+    transcribe_audio(audio_bytes, mime_type) -> {"text": str}
 
 Not every client can serve all of them. A client that cannot must raise
 `Unsupported` rather than return something empty, so the caller can tell a
 deployment that never does this from a provider that happened to fail.
-`image_support()` and `web_search_support()` report the same thing without
-making a call, for a caller that wants to check up front.
+`image_support()`, `web_search_support()` and `transcribe_support()` report the
+same thing without making a call, for a caller that wants to check up front.
 
 `web_search` is a capability of the *endpoint*, not of the model: it is the
 gateway that runs the search and folds the results in. Anthropic direct does not
@@ -75,6 +79,13 @@ MAX_TOKENS = 4096
 OPENROUTER_IMAGES_URL = "https://openrouter.ai/api/v1/images"
 DEFAULT_IMAGE_MODEL = "openai/gpt-image-1"
 IMAGE_TIMEOUT = 180
+
+# Whisper's own REST endpoint. Not OpenRouter's — it has no transcription API,
+# only chat completions — so this is the one call in this file that reaches a
+# provider neither `ai_api_key` nor `openrouter_api_key` was meant to authorize.
+OPENAI_TRANSCRIBE_URL = "https://api.openai.com/v1/audio/transcriptions"
+DEFAULT_TRANSCRIBE_MODEL = "whisper-1"
+TRANSCRIBE_TIMEOUT = 60
 
 # Web search is billed per query on top of tokens, and the search itself is most
 # of what the answer is worth — so the cheapest model that supports grounding is
@@ -121,6 +132,8 @@ class ByokClient:
 		# is not readable. See the module docstring.
 		self._image_key = frappe.conf.get("openrouter_api_key")
 		self._image_model = frappe.conf.get("image_generate_model") or DEFAULT_IMAGE_MODEL
+		self._transcribe_key = frappe.conf.get("openai_api_key")
+		self._transcribe_model = frappe.conf.get("transcribe_model") or DEFAULT_TRANSCRIBE_MODEL
 
 	def image_support(self):
 		"""What this client can do, without making a call."""
@@ -309,6 +322,61 @@ class ByokClient:
 			"This site cannot translate images. Install alaiy_os_ai_client, which "
 			"serves image translation through the managed billing service."
 		)
+
+	def transcribe_support(self):
+		"""Whether this site can transcribe voice input, without making a call."""
+		return bool(self._transcribe_key)
+
+	def transcribe_audio(self, audio_bytes, mime_type):
+		"""One recorded clip, transcribed -> {"text": str}.
+
+		site_config keys:
+		    openai_api_key   — an OpenAI key with Whisper access
+		    transcribe_model — optional; defaults to whisper-1
+
+		A separate key from both `ai_api_key` and `openrouter_api_key`, for the
+		same reason the image key is separate from the chat one: this reaches
+		Whisper's own REST endpoint, which neither of those was provisioned for.
+
+		Thread-safe: reads only state captured in __init__.
+		"""
+		import requests
+
+		if not self._transcribe_key:
+			raise Unsupported(
+				"This site cannot transcribe voice input. Set openai_api_key in "
+				"site_config.json, or install alaiy_os_ai_client to use the managed "
+				"transcription service."
+			)
+
+		resp = requests.post(
+			OPENAI_TRANSCRIBE_URL,
+			headers={"Authorization": f"Bearer {self._transcribe_key}"},
+			files={"file": (f"audio.{extension_for(mime_type)}", audio_bytes, mime_type)},
+			data={"model": self._transcribe_model},
+			timeout=TRANSCRIBE_TIMEOUT,
+		)
+		if resp.status_code != 200:
+			raise RuntimeError(f"Transcription failed ({resp.status_code}): {resp.text[:500]}")
+
+		return {"text": (resp.json().get("text") or "").strip()}
+
+
+def extension_for(mime_type):
+	"""A plausible filename extension for an upload's declared MIME type.
+
+	Whisper's endpoint infers the codec from the filename it's given, not from
+	the multipart Content-Type header, so a browser's actual recording format
+	has to travel as a name here — an unrecognised type still needs *a* name,
+	so this never returns nothing.
+	"""
+	return {
+		"audio/webm": "webm",
+		"audio/ogg": "ogg",
+		"audio/mp4": "m4a",
+		"audio/mpeg": "mp3",
+		"audio/wav": "wav",
+	}.get((mime_type or "").split(";")[0].strip().lower(), "webm")
 
 
 def get_ai_client():

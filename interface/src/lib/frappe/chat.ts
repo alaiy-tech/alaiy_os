@@ -209,6 +209,26 @@ export const uploadChatAttachment = async (session: string, file: File): Promise
 export const deleteChatAttachment = (attachment: string) =>
   call<{ deleted: string }>(`${NS}.delete_attachment`, { attachment });
 
+/** Multipart, like uploadChatAttachment -- the browser's recorded clip goes
+ * up as a file, and the composer gets text back. Nothing here is saved to a
+ * session; see transcribe_voice's own docstring for why. */
+export const transcribeVoiceClip = async (blob: Blob, mimeType: string): Promise<string> => {
+  const form = new FormData();
+  form.append("file", blob, `voice.${mimeType.includes("ogg") ? "ogg" : mimeType.includes("mp4") ? "m4a" : "webm"}`);
+
+  const res = await fetch(`/api/method/${NS}.transcribe_voice`, {
+    method: "POST",
+    body: form,
+  });
+  const body = (await res.json().catch(() => ({}))) as {
+    message?: { text?: string };
+    exception?: string;
+    _server_messages?: string;
+  };
+  if (!res.ok) throw new FrappeError(frappeErrorMessage(body, "Could not transcribe that recording."), res.status);
+  return body.message?.text ?? "";
+};
+
 export interface SheetPreview {
   kind: "sheet";
   /** The sheet these rows came from, and every sheet in the workbook. */
