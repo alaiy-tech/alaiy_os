@@ -25,6 +25,7 @@ chain outlives any sane request timeout).
 """
 
 import json
+import math
 import re
 import time
 import traceback
@@ -538,6 +539,25 @@ def _settle_partials(session):
 		frappe.db.commit()
 
 
+def _sanitize_json_floats(value):
+	"""Replace NaN/Infinity/-Infinity with None, recursively.
+
+	`json.dumps`'s default `allow_nan=True` emits those as bare, spec-invalid
+	tokens rather than raising — pandas tools in particular return them for
+	every missing cell (`df.to_dict()` leaves `float('nan')` as-is). The result
+	still looks like JSON, so it flows all the way into the next model call,
+	where a stricter reader downstream (observed: the LiteLLM proxy) can drop it
+	silently, coming back as an empty assistant reply with nothing in any log.
+	"""
+	if isinstance(value, float):
+		return value if math.isfinite(value) else None
+	if isinstance(value, dict):
+		return {k: _sanitize_json_floats(v) for k, v in value.items()}
+	if isinstance(value, list):
+		return [_sanitize_json_floats(v) for v in value]
+	return value
+
+
 def _run_tools(blocks):
 	"""Execute every tool_use block, returning the matching tool_result blocks."""
 	results = []
@@ -546,7 +566,7 @@ def _run_tools(blocks):
 			continue
 		try:
 			value = chat_tools.call_tool(block["name"], block.get("input") or {})
-			content = _truncate(json.dumps(value, default=str))
+			content = _truncate(json.dumps(_sanitize_json_floats(value), default=str))
 			results.append(_tool_result(block["id"], content))
 		except Exception as exc:
 			# Tool failures go back to the model, not up the stack: a rejected
