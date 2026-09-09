@@ -178,4 +178,19 @@ def render_slides(file_doc, session):
 		finally:
 			document.close()
 
+	# Commit explicitly, because this is a write on a read path.
+	#
+	# `preview_file` is a GET, and `frappe/app.py::sync_database` rolls back
+	# anything a safe method did. The PNGs would survive on disk (the
+	# filesystem is not transactional) while their `File` rows vanished,
+	# leaving URLs that resolve to nothing — a 403 from
+	# `download_private_file`, which has no row to check permission against —
+	# and `_cached` finding nothing, so every open re-rendered and wrote
+	# another orphan.
+	#
+	# This only bit clients that call the endpoint over GET: alaiy_os's own UI
+	# POSTs, so it committed by accident, while the Solist portals' frappeCall
+	# is a GET and never did.
+	frappe.db.commit()
+
 	return urls

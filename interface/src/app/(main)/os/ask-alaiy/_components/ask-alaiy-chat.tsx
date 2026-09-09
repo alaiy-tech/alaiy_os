@@ -13,6 +13,7 @@ import "@/components/ask-alaiy/ask-alaiy.css";
 import { useAskAlaiyContext } from "@/components/ask-alaiy/ask-alaiy-provider";
 import { FeedbackControl } from "@/components/ask-alaiy/feedback-control";
 import { ATTACHMENT_ACCEPT, AttachmentChip, ToolTrail, useTypedText } from "@/components/ask-alaiy/ask-alaiy-panel";
+import { exactSkillSlug, SkillPicker, useSkillPicker } from "@/components/ask-alaiy/skill-picker";
 import { groupAssistantTurns, MAX_ATTACHMENTS, type ThreadTurn } from "@/hooks/use-ask-alaiy";
 
 const PROMPT_IDEAS = [
@@ -156,6 +157,8 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   const [input, setInput] = useState("");
   const [model, setModel] = useState(MODELS[0]);
   const endRef = useRef<HTMLDivElement>(null);
+  /** The newest question, which is what the view scrolls to. */
+  const questionRef = useRef<HTMLDivElement>(null);
   const typewriterText = useTypewriter(PROMPT_IDEAS);
   const [hour, setHour] = useState<number | null>(null);
   useEffect(() => setHour(new Date().getHours()), []);
@@ -211,14 +214,20 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
     return () => observer.disconnect();
   }, [hasMessages]);
 
-  // This page scrolls as a whole (see the overflow-x-clip note in
-  // os/layout.tsx) rather than inside a bounded flex box, so "scroll to
-  // bottom" means scrolling this sentinel into view, not an internal
-  // container.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on new turns/thinking state to scroll to bottom
+  // A new question goes to the top of the view, not the bottom, and the
+  // spacer after the thread leaves the rest of the screen empty for the answer
+  // to fill -- so reading an answer never means chasing text upward from the
+  // composer. This page scrolls as a whole (see the overflow-x-clip note in
+  // os/layout.tsx), so scrollIntoView on the question is the whole mechanism.
+  //
+  // Keyed on the newest *question* only: re-running while the assistant
+  // streams would yank the view back on every token.
+  const lastUserKey = [...visibleTurns].reverse().find((t) => t.role === "user")?.key;
+  const lastTurnIsUser = lastVisible?.role === "user";
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [visibleTurns.length, chat.running]);
+    if (!lastUserKey) return;
+    questionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [lastUserKey]);
 
   const hasReadyAttachment = chat.attachments.some((a) => a.status === "ready");
   const canSend = !!input.trim() || hasReadyAttachment;
@@ -226,9 +235,25 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   function sendMessage(text: string) {
     const trimmed = text.trim();
     if ((!trimmed && !hasReadyAttachment) || chat.running) return;
+    // A line that is exactly one real slug runs that agent rather than being
+    // sent as prose — so `/stock-watch` + Enter works without ever opening the
+    // picker. Anything else sends as normal and `skill` stays undefined.
+    const skill = exactSkillSlug(trimmed, chat.skills);
     setInput("");
-    void chat.send(trimmed);
+    void chat.send(trimmed, { skill });
   }
+
+  const skillPicker = useSkillPicker({
+    text: input,
+    skills: chat.skills,
+    ensureSkillsLoaded: chat.ensureSkillsLoaded,
+    // Emptying the input takes the composer out of skill mode, which is what
+    // clears any Escape dismissal — see the hook.
+    onRun: (skill) => {
+      setInput("");
+      void chat.send(`/${skill.slug}`, { skill: skill.slug });
+    },
+  });
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -236,6 +261,9 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // The picker gets first refusal on arrows, Escape, Enter and Tab — so Enter
+    // runs the highlighted skill instead of sending "/" as a message.
+    if (skillPicker.handleKeyDown(event)) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendMessage(input);
@@ -245,13 +273,23 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   const placeholder = hasMessages ? "Message Ask Alaiy..." : typewriterText || "Ask Alaiy anything...";
 
   const composer = (
-    <form onSubmit={handleSubmit} className="w-full">
+    // `relative` so SkillPicker's `bottom-full` anchors to the composer rather
+    // than to whatever ancestor happens to be positioned.
+    <form onSubmit={handleSubmit} className="relative w-full">
       {chat.attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5" aria-live="polite">
           {chat.attachments.map((a) => (
             <AttachmentChip key={a.localId} attachment={a} onRemove={() => chat.removeAttachment(a.localId)} />
           ))}
         </div>
+      )}
+      {skillPicker.open && (
+        <SkillPicker
+          matches={skillPicker.matches}
+          activeIndex={skillPicker.index}
+          allLoaded={skillPicker.allLoaded}
+          onPick={skillPicker.pick}
+        />
       )}
       <InputGroup className="h-auto flex-col rounded-2xl bg-background p-1.5 shadow-sm">
         <InputGroupTextarea
@@ -387,8 +425,15 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
         {visibleTurns.map((turn, i) => {
           const isLast = i === visibleTurns.length - 1;
           return (
-            <ChatBubble
+            <div
               key={turn.key}
+              // The newest question is the scroll anchor, so it needs a handle.
+              // A plain wrapper only: the room for the answer comes from the
+              // spacer after the thread, not from here -- a min-height on the
+              // question itself would push the answer a screenful below it.
+              ref={turn.key === lastUserKey ? questionRef : undefined}
+            >
+            <ChatBubble
               turn={turn}
               showToolStatus={toolStatusShowing && isLast}
               // Not turn.partial -- same reasoning as toolStatusShowing: a
@@ -397,6 +442,7 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
               settled={!(chat.running && isLast)}
               sessionId={chat.sessionId}
             />
+            </div>
           );
         })}
 
@@ -438,6 +484,11 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
             {chat.error}
           </div>
         )}
+        {/* The room the newest question scrolls up into. Only while a turn is
+            in flight: once the answer has landed the thread settles back and
+            the page stops being scrollable past its own content. */}
+        {(chat.running || lastTurnIsUser) && <div className="min-h-[55vh]" aria-hidden />}
+
         <div ref={endRef} />
       </div>
 
