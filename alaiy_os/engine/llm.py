@@ -105,3 +105,30 @@ def translate_image(image_url):
 	itself rather than receiving bytes.
 	"""
 	return _client().translate_image(image_url)
+
+
+def transcribe_support():
+	"""Whether this site can transcribe voice input at all.
+
+	Asked before the mic button is wired up live, the same discipline
+	`image_support()` exists for — a deployment without a transcription
+	provider simply has no working mic rather than one that always fails.
+	`getattr` because a third-party client predating this capability is a
+	client that does not have it, not a broken one.
+	"""
+	client = _client()
+	probe = getattr(client, "transcribe_support", None)
+	return bool(probe()) if probe else False
+
+
+def transcribe_audio(audio_bytes, mime_type):
+	"""One recorded clip, transcribed -> {"text": str}.
+
+	Same seam as `generate_image`: a chat endpoint should not hold a provider
+	key or know Whisper's wire format. Raises `Unsupported` if this
+	deployment's client cannot serve it.
+	"""
+	client = _client()
+	if not hasattr(client, "transcribe_audio"):
+		raise Unsupported("This deployment's ai_client cannot transcribe audio.")
+	return client.transcribe_audio(audio_bytes, mime_type)

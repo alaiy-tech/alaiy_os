@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { ArrowUp, Loader2, Mic, Paperclip, Sparkles, TriangleAlert } from "lucide-react";
+import { ArrowUp, Loader2, Mic, Paperclip, Sparkles, Square, TriangleAlert, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupTextarea } from "@/components/ui/input-group";
@@ -13,7 +13,9 @@ import "@/components/ask-alaiy/ask-alaiy.css";
 import { useAskAlaiyContext } from "@/components/ask-alaiy/ask-alaiy-provider";
 import { FeedbackControl } from "@/components/ask-alaiy/feedback-control";
 import { ATTACHMENT_ACCEPT, AttachmentChip, ToolTrail, useTypedText } from "@/components/ask-alaiy/ask-alaiy-panel";
+import { exactSkillSlug, SkillPicker, useSkillPicker } from "@/components/ask-alaiy/skill-picker";
 import { groupAssistantTurns, MAX_ATTACHMENTS, type ThreadTurn } from "@/hooks/use-ask-alaiy";
+import { useVoiceInput } from "@/hooks/use-voice-input";
 
 const PROMPT_IDEAS = [
   "Summarize this month's sales performance...",
@@ -151,11 +153,108 @@ function ChatBubble({
   );
 }
 
+// Relative heights for the equalizer bars in VoiceRecordingPanel, symmetric
+// around the middle -- a single scalar `level` drives all of them, so the
+// spread here is what keeps them from just moving in lockstep as one blob.
+const VOICE_BAR_PHASES = [0.35, 0.65, 1, 1, 0.65, 0.35];
+
+/**
+ * Replaces the composer's textarea while a voice clip is being recorded or
+ * transcribed -- not just an icon change, so recording reads as its own
+ * distinct mode rather than a state buried in a button.
+ *
+ * The bars are driven by `voice.level`, sampled live off the input stream
+ * (see use-voice-input's AnalyserNode) -- they move with the user's actual
+ * voice, not on a canned animation loop, which is what makes this read as a
+ * real level meter instead of decoration.
+ */
+function VoiceRecordingPanel({ voice }: { voice: ReturnType<typeof useVoiceInput> }) {
+  if (voice.transcribing) {
+    return (
+      <div className="flex min-h-11 items-center gap-2 px-2.5 py-2 text-muted-foreground text-sm">
+        <Loader2 className="size-4 animate-spin" />
+        Transcribing…
+      </div>
+    );
+  }
+
+  const minutes = Math.floor(voice.seconds / 60);
+  const secs = voice.seconds % 60;
+
+  return (
+    <div className="flex min-h-11 items-center gap-3 px-2.5 py-2">
+      <span className="relative flex size-2.5 shrink-0" aria-hidden>
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-destructive/60" />
+        <span className="relative inline-flex size-2.5 rounded-full bg-destructive" />
+      </span>
+      <div className="flex flex-1 items-center gap-0.5" aria-hidden>
+        {VOICE_BAR_PHASES.map((phase, i) => (
+          <span
+            key={i}
+            className="w-0.5 rounded-full bg-destructive/70 transition-[height] duration-100 ease-out"
+            style={{ height: `${4 + Math.max(0, voice.level) * phase * 20}px` }}
+          />
+        ))}
+      </div>
+      <span className="tabular-nums text-muted-foreground text-xs">
+        {minutes}:{String(secs).padStart(2, "0")}
+      </span>
+      <button
+        type="button"
+        onClick={voice.cancel}
+        aria-label="Discard recording"
+        className="flex size-6 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+      >
+        <X className="size-3.5" />
+      </button>
+      <Button
+        type="button"
+        size="icon-sm"
+        variant="destructive"
+        className="shrink-0 rounded-full"
+        onClick={voice.toggle}
+        aria-label="Stop recording and transcribe"
+      >
+        <Square className="size-3 fill-current" />
+      </Button>
+    </div>
+  );
+}
+
 export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   const chat = useAskAlaiyContext();
   const [input, setInput] = useState("");
   const [model, setModel] = useState(MODELS[0]);
+  // Appends onto whatever's already typed rather than replacing it, so
+  // speaking mid-sentence (or after typing part of a question) doesn't
+  // clobber it.
+  const voice = useVoiceInput((text) =>
+    setInput((prev) => (prev && !prev.endsWith(" ") ? `${prev} ${text}` : `${prev}${text}`)),
+  );
+  // Shown on click rather than via `disabled` -- a disabled button can't be
+  // clicked at all, which read as exactly the "the mic button isn't a real
+  // button" complaint this exists to fix. getUserMedia + MediaRecorder cover
+  // every real browser (Firefox included -- see use-voice-input's own
+  // docstring for why this isn't the SpeechRecognition API), so this is
+  // mostly a safety net for a locked-down embed with no mic permission at
+  // all; clickable always, so there is still something to click either way.
+  const [voiceUnsupportedNotice, setVoiceUnsupportedNotice] = useState(false);
+  function toggleVoice() {
+    if (!voice.supported) {
+      setVoiceUnsupportedNotice(true);
+      window.setTimeout(() => setVoiceUnsupportedNotice(false), 5000);
+      return;
+    }
+    voice.toggle();
+  }
+  // voice.error covers a *supported* browser that still failed once it tried
+  // to actually listen -- mic permission blocked, no microphone device, or
+  // the speech service unreachable. Without this, that failure was only ever
+  // visible as the button quietly reverting to its idle icon: exactly the
+  // "I click it and nothing happens" this whole feature was reported for.
   const endRef = useRef<HTMLDivElement>(null);
+  /** The newest question, which is what the view scrolls to. */
+  const questionRef = useRef<HTMLDivElement>(null);
   const typewriterText = useTypewriter(PROMPT_IDEAS);
   const [hour, setHour] = useState<number | null>(null);
   useEffect(() => setHour(new Date().getHours()), []);
@@ -211,14 +310,20 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
     return () => observer.disconnect();
   }, [hasMessages]);
 
-  // This page scrolls as a whole (see the overflow-x-clip note in
-  // os/layout.tsx) rather than inside a bounded flex box, so "scroll to
-  // bottom" means scrolling this sentinel into view, not an internal
-  // container.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on new turns/thinking state to scroll to bottom
+  // A new question goes to the top of the view, not the bottom, and the
+  // spacer after the thread leaves the rest of the screen empty for the answer
+  // to fill -- so reading an answer never means chasing text upward from the
+  // composer. This page scrolls as a whole (see the overflow-x-clip note in
+  // os/layout.tsx), so scrollIntoView on the question is the whole mechanism.
+  //
+  // Keyed on the newest *question* only: re-running while the assistant
+  // streams would yank the view back on every token.
+  const lastUserKey = [...visibleTurns].reverse().find((t) => t.role === "user")?.key;
+  const lastTurnIsUser = lastVisible?.role === "user";
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [visibleTurns.length, chat.running]);
+    if (!lastUserKey) return;
+    questionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [lastUserKey]);
 
   const hasReadyAttachment = chat.attachments.some((a) => a.status === "ready");
   const canSend = !!input.trim() || hasReadyAttachment;
@@ -226,9 +331,25 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   function sendMessage(text: string) {
     const trimmed = text.trim();
     if ((!trimmed && !hasReadyAttachment) || chat.running) return;
+    // A line that is exactly one real slug runs that agent rather than being
+    // sent as prose — so `/stock-watch` + Enter works without ever opening the
+    // picker. Anything else sends as normal and `skill` stays undefined.
+    const skill = exactSkillSlug(trimmed, chat.skills);
     setInput("");
-    void chat.send(trimmed);
+    void chat.send(trimmed, { skill });
   }
+
+  const skillPicker = useSkillPicker({
+    text: input,
+    skills: chat.skills,
+    ensureSkillsLoaded: chat.ensureSkillsLoaded,
+    // Emptying the input takes the composer out of skill mode, which is what
+    // clears any Escape dismissal — see the hook.
+    onRun: (skill) => {
+      setInput("");
+      void chat.send(`/${skill.slug}`, { skill: skill.slug });
+    },
+  });
 
   function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -236,6 +357,9 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   }
 
   function handleKeyDown(event: React.KeyboardEvent<HTMLTextAreaElement>) {
+    // The picker gets first refusal on arrows, Escape, Enter and Tab — so Enter
+    // runs the highlighted skill instead of sending "/" as a message.
+    if (skillPicker.handleKeyDown(event)) return;
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendMessage(input);
@@ -245,7 +369,9 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
   const placeholder = hasMessages ? "Message Ask Alaiy..." : typewriterText || "Ask Alaiy anything...";
 
   const composer = (
-    <form onSubmit={handleSubmit} className="w-full">
+    // `relative` so SkillPicker's `bottom-full` anchors to the composer rather
+    // than to whatever ancestor happens to be positioned.
+    <form onSubmit={handleSubmit} className="relative w-full">
       {chat.attachments.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5" aria-live="polite">
           {chat.attachments.map((a) => (
@@ -253,22 +379,34 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
           ))}
         </div>
       )}
-      <InputGroup className="h-auto flex-col rounded-2xl bg-background p-1.5 shadow-sm">
-        <InputGroupTextarea
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={handleKeyDown}
-          onPaste={(event) => {
-            const files = event.clipboardData.files;
-            if (files.length) {
-              event.preventDefault();
-              chat.uploadFiles(files);
-            }
-          }}
-          placeholder={placeholder}
-          className="min-h-11 px-2.5 py-2"
-          rows={1}
+      {skillPicker.open && (
+        <SkillPicker
+          matches={skillPicker.matches}
+          activeIndex={skillPicker.index}
+          allLoaded={skillPicker.allLoaded}
+          onPick={skillPicker.pick}
         />
+      )}
+      <InputGroup className="h-auto flex-col rounded-2xl bg-background p-1.5 shadow-sm">
+        {voice.state !== "idle" ? (
+          <VoiceRecordingPanel voice={voice} />
+        ) : (
+          <InputGroupTextarea
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={handleKeyDown}
+            onPaste={(event) => {
+              const files = event.clipboardData.files;
+              if (files.length) {
+                event.preventDefault();
+                chat.uploadFiles(files);
+              }
+            }}
+            placeholder={placeholder}
+            className="min-h-11 px-2.5 py-2"
+            rows={1}
+          />
+        )}
         <InputGroupAddon align="block-end" className="justify-between px-1 pb-1">
           <div className="flex items-center gap-1">
             <InputGroupButton
@@ -277,12 +415,12 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
               size="icon-sm"
               aria-label="Attach file"
               onClick={pickFiles}
-              disabled={chat.running || chat.attachments.length >= MAX_ATTACHMENTS}
+              disabled={chat.running || voice.state !== "idle" || chat.attachments.length >= MAX_ATTACHMENTS}
               title={chat.attachments.length >= MAX_ATTACHMENTS ? `Up to ${MAX_ATTACHMENTS} files per message.` : undefined}
             >
               <Paperclip />
             </InputGroupButton>
-            <Select value={model} onValueChange={setModel}>
+            <Select value={model} onValueChange={setModel} disabled={voice.state !== "idle"}>
               <SelectTrigger size="sm" className="h-7 border-none bg-transparent px-2 shadow-none hover:bg-muted">
                 <SelectValue />
               </SelectTrigger>
@@ -296,18 +434,33 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
             </Select>
           </div>
           <div className="flex items-center gap-1.5">
-            <InputGroupButton type="button" variant="ghost" size="icon-sm" aria-label="Voice input">
-              <Mic />
-            </InputGroupButton>
-            <Button
-              type="submit"
-              size="icon-sm"
-              className="rounded-full"
-              disabled={chat.running || !canSend}
-              aria-label="Send message"
-            >
-              {chat.running ? <Loader2 className="animate-spin" /> : <ArrowUp />}
-            </Button>
+            {voice.state === "idle" && (
+              <>
+                {/* variant="outline", not the row's usual ghost: voice input is
+                    a new, unfamiliar control here, and ghost has no visible
+                    border or background at rest -- until hovered it read as a
+                    decorative icon rather than a real button. */}
+                <InputGroupButton
+                  type="button"
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Voice input"
+                  onClick={toggleVoice}
+                  title={voice.supported ? undefined : "Voice input isn't available in this browser."}
+                >
+                  <Mic />
+                </InputGroupButton>
+                <Button
+                  type="submit"
+                  size="icon-sm"
+                  className="rounded-full"
+                  disabled={chat.running || !canSend}
+                  aria-label="Send message"
+                >
+                  {chat.running ? <Loader2 className="animate-spin" /> : <ArrowUp />}
+                </Button>
+              </>
+            )}
           </div>
         </InputGroupAddon>
       </InputGroup>
@@ -322,6 +475,18 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
           event.target.value = "";
         }}
       />
+      {voiceUnsupportedNotice && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-destructive text-xs">
+          <TriangleAlert className="size-3.5 shrink-0" />
+          Voice input isn't available in this browser.
+        </p>
+      )}
+      {voice.error && (
+        <p className="mt-1.5 flex items-center gap-1.5 text-destructive text-xs">
+          <TriangleAlert className="size-3.5 shrink-0" />
+          {voice.error}
+        </p>
+      )}
     </form>
   );
 
@@ -387,8 +552,15 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
         {visibleTurns.map((turn, i) => {
           const isLast = i === visibleTurns.length - 1;
           return (
-            <ChatBubble
+            <div
               key={turn.key}
+              // The newest question is the scroll anchor, so it needs a handle.
+              // A plain wrapper only: the room for the answer comes from the
+              // spacer after the thread, not from here -- a min-height on the
+              // question itself would push the answer a screenful below it.
+              ref={turn.key === lastUserKey ? questionRef : undefined}
+            >
+            <ChatBubble
               turn={turn}
               showToolStatus={toolStatusShowing && isLast}
               // Not turn.partial -- same reasoning as toolStatusShowing: a
@@ -397,6 +569,7 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
               settled={!(chat.running && isLast)}
               sessionId={chat.sessionId}
             />
+            </div>
           );
         })}
 
@@ -438,6 +611,11 @@ export function AskAlaiyChat({ userName }: { readonly userName: string }) {
             {chat.error}
           </div>
         )}
+        {/* The room the newest question scrolls up into. Only while a turn is
+            in flight: once the answer has landed the thread settles back and
+            the page stops being scrollable past its own content. */}
+        {(chat.running || lastTurnIsUser) && <div className="min-h-[55vh]" aria-hidden />}
+
         <div ref={endRef} />
       </div>
 
