@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireOnboardedSession } from "@/lib/auth/dal";
-import { loadGroup, loadListings } from "@/lib/backend/listings";
-import { firstValue, hrefToString, parseChannel } from "@/lib/listing";
+import { PAGE_SIZE, loadGroup, loadListings, loadUnlinked } from "@/lib/backend/listings";
+import { firstValue, hrefToString, parseChannel, parseOffset } from "@/lib/listing";
 import { formatDateTime } from "@/lib/format";
 import {
   EmptyRow,
@@ -15,6 +15,7 @@ import {
   Toolbar,
 } from "@/components/data/toolbar";
 import { Alert, Eyebrow } from "@/components/ui";
+import { Pagination } from "@/components/data/pagination";
 import { SampleBanner } from "@/components/data/sample-banner";
 import {
   HEALTH_FILTER_OPTIONS,
@@ -49,6 +50,12 @@ const PATH = "/listings";
  * Which group is open lives in `?group=`, and the filters in the URL beside
  * it, for the same reason as every other listing tab: a filtered view with one
  * product expanded is a link someone can send to whoever is fixing it.
+ *
+ * **Two tables, two offsets.** `start` pages the comparison; `ustart` pages the
+ * unlinked queue below it, and they are separate reads so that moving one does
+ * not re-fetch the other. The queue is the expensive one — a suggestion is
+ * computed per row at read time — which is why it is paged rather than left to
+ * render a whole catalogue's worth of unmatched products.
  */
 export default async function ListingsPage({
   searchParams,
@@ -62,28 +69,43 @@ export default async function ListingsPage({
   const channel = parseChannel(params.channel);
   const category = firstValue(params.category);
   const openGroup = firstValue(params.group);
+  const start = parseOffset(params.start);
+  const unlinkedStart = parseOffset(params.ustart);
 
-  // The filters go to the backend rather than being applied here: the category
-  // list and the filtered set are computed from the same read, so they cannot
-  // disagree about what exists.
+  // The filters, the ordering and the offset all go to the backend rather than
+  // being applied here: a filter applied after the page was chosen would hand
+  // back "the rows of page one that happen to be suppressed" and call it the
+  // suppressed products. The category list comes from the same read, so it
+  // cannot disagree with the filtered set about what exists.
   //
-  // The open group is fetched separately rather than found in the list, because
+  // Three reads, in parallel, each failing on its own. The queue is a separate
+  // call from the table because paging one should not re-run the other — and
+  // the open group is fetched separately rather than found in the list, because
   // `?group=` is a shareable link and can name a product the recipient's
-  // filters exclude — a link that opened an empty panel would be baffling.
-  const [{ page, error }, opened] = await Promise.all([
-    loadListings({ health, channel, category }, session.backendToken),
-    openGroup
-      ? loadGroup(openGroup, session.backendToken)
-      : Promise.resolve(null),
-  ]);
+  // filters exclude, or one on another page entirely.
+  const [{ page, error }, { page: waiting, error: waitingError }, opened] =
+    await Promise.all([
+      loadListings({ health, channel, category, start }, session.backendToken),
+      loadUnlinked({ channel, start: unlinkedStart }, session.backendToken),
+      openGroup
+        ? loadGroup(openGroup, session.backendToken)
+        : Promise.resolve(null),
+    ]);
 
   const groups = page.groups;
   const group = opened?.group ?? null;
 
+  // Both offsets ride in the query, so a link that changes one keeps the other.
+  // Page one is the absence of the parameter rather than `start=0`, which is
+  // what `hrefWith` dropping empty values gives for free. The filter bar is a
+  // GET form and carries neither, so applying a filter lands on page one of
+  // both — which is the only sensible place for it to land.
   const query = {
     health: health ?? "",
     channel: channel ?? "",
     category: category ?? "",
+    start: start ? String(start) : "",
+    ustart: unlinkedStart ? String(unlinkedStart) : "",
   };
   const hrefWith = (over: Record<string, string | undefined>) =>
     hrefToString({
@@ -164,9 +186,14 @@ export default async function ListingsPage({
         <tbody>
           {groups.length === 0 ? (
             <EmptyRow colSpan={7}>
-              {filtered
-                ? "No products match those filters."
-                : "No products yet. They appear here once your channels sync."}
+              {/* An empty page with a non-zero total is a hand-typed offset
+                  past the end. Saying "no products match" there would be a
+                  lie about the filters rather than about the offset. */}
+              {page.total > 0
+                ? "Nothing on this page. Go back to the first one."
+                : filtered
+                  ? "No products match those filters."
+                  : "No products yet. They appear here once your channels sync."}
             </EmptyRow>
           ) : (
             groups.map((row) => (
@@ -181,6 +208,14 @@ export default async function ListingsPage({
         </tbody>
       </TableFrame>
 
+      <Pagination
+        total={page.total}
+        start={page.start}
+        limit={page.limit || PAGE_SIZE}
+        hrefFor={(offset) => hrefWith({ start: offset ? String(offset) : undefined })}
+        unit="products"
+      />
+
       {/* A group named in the URL that could not be read says so, rather than
           silently rendering nothing — the link was to something specific. */}
       {opened?.error ? <Alert>{opened.error}</Alert> : null}
@@ -189,7 +224,13 @@ export default async function ListingsPage({
         <GroupDetail group={group} closeHref={hrefWith({ group: undefined })} />
       ) : null}
 
-      <Unlinked products={page.unlinked} />
+      <Unlinked
+        page={waiting}
+        error={waitingError}
+        hrefFor={(offset) =>
+          hrefWith({ ustart: offset ? String(offset) : undefined })
+        }
+      />
     </div>
   );
 }

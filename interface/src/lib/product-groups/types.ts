@@ -1,4 +1,4 @@
-import type { ChannelId } from "@/lib/backend/types";
+import type { ChannelId, Paged } from "@/lib/backend/types";
 
 /**
  * Product groups: one physical product, however many channels sell it.
@@ -122,6 +122,13 @@ export type UnlinkedProduct = {
   };
 };
 
+/**
+ * One page of product groups.
+ *
+ * `groups` rather than the `rows` every other paged shape uses, because the
+ * endpoint answers `groups` and a rename here would only move the mismatch.
+ * The three paging fields are the same three as everywhere else.
+ */
 export type ListingsPage = {
   /**
    * True while these figures are fabricated. The banner that says so renders
@@ -132,10 +139,23 @@ export type ListingsPage = {
    */
   sample: boolean;
   groups: ProductGroup[];
-  unlinked: UnlinkedProduct[];
+  /** Groups matching the filters across every page, not just this one. */
+  total: number;
+  start: number;
+  limit: number;
   /** Every category present, for the filter. */
   categories: string[];
 };
+
+/**
+ * One page of the unlinked queue — its own read, its own offset.
+ *
+ * Separate from `ListingsPage` because it is the expensive half of the tab: it
+ * is the read that computes a suggestion for every row, so paging it is what
+ * keeps that cost proportional to what is on screen rather than to the whole
+ * catalogue. Paging the groups table does not recompute any of it.
+ */
+export type UnlinkedPage = Paged<UnlinkedProduct>;
 
 /**
  * One product group with everything the side-by-side view needs.
