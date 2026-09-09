@@ -7,7 +7,18 @@ import { channelName } from "@/lib/channels";
 import { formatNumber } from "@/lib/format";
 import type { ImportJob, ImportStep } from "@/lib/backend/types";
 
-const POLL_INTERVAL_MS = 3000;
+/**
+ * How often the browser asks the backend how the import is getting on.
+ *
+ * The floor, not the cadence: an import that has not changed since the last
+ * answer is asked again progressively less often, up to the ceiling. An import
+ * runs for minutes and is watched by every seller onboarding at once, so a
+ * fixed three-second poll is a lot of identical answers for the backend to
+ * compute — and asking faster does not make a queued sync start.
+ */
+const POLL_INTERVAL_MS = 5000;
+const POLL_MAX_INTERVAL_MS = 15000;
+const POLL_BACKOFF_FACTOR = 1.5;
 
 /** How long the finished state stays up before it gets out of the way. */
 const DONE_LINGER_MS = 6000;
@@ -58,12 +69,25 @@ export function ImportStatus({ initialJob }: { initialJob: ImportJob | null }) {
   // event to react to.
   const expanded = expandedByChoice ?? failed;
 
+  // The job's id rather than the job: every poll replaces `job` with a freshly
+  // parsed object, so depending on it re-ran this effect on each response —
+  // which tore down the interval before it could elapse and fired the immediate
+  // poll below again. The cadence was one request per round trip, not one per
+  // three seconds, from every seller importing at once.
+  const jobId = job?.id ?? null;
+
   useEffect(() => {
-    if (!job || !running) return;
+    if (!running) return;
 
     let cancelled = false;
-    const query = job.id ? `?job=${encodeURIComponent(job.id)}` : "";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let delay = POLL_INTERVAL_MS;
+    let previous = "";
+    const query = jobId ? `?job=${encodeURIComponent(jobId)}` : "";
 
+    // Chained rather than an interval, because the delay changes between polls
+    // and because it cannot overlap: one slow answer does not queue up the next
+    // request behind it.
     async function poll() {
       try {
         const response = await fetch(`/api/import/status${query}`, {
@@ -74,19 +98,34 @@ export function ImportStatus({ initialJob }: { initialJob: ImportJob | null }) {
         if (cancelled || !next) return;
         setUnreachable(false);
         setJob(next);
+
+        // An import that is visibly moving is worth watching closely. One that
+        // has not changed since the last answer is not, and the seller is told
+        // they can go and look around — so the poll eases off and comes back to
+        // the floor the moment something moves.
+        const snapshot = JSON.stringify([next.status, next.progress, next.steps]);
+        delay =
+          snapshot === previous
+            ? Math.min(delay * POLL_BACKOFF_FACTOR, POLL_MAX_INTERVAL_MS)
+            : POLL_INTERVAL_MS;
+        previous = snapshot;
       } catch {
-        // A blip should not look like a failed import.
+        // A blip should not look like a failed import. It should also not be
+        // retried at full speed: if the backend is the thing struggling, this
+        // is the last poller that should be adding to it.
         if (!cancelled) setUnreachable(true);
+        delay = Math.min(delay * POLL_BACKOFF_FACTOR, POLL_MAX_INTERVAL_MS);
+      } finally {
+        if (!cancelled) timer = setTimeout(poll, delay);
       }
     }
 
     poll();
-    const timer = setInterval(poll, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(timer);
+      if (timer) clearTimeout(timer);
     };
-  }, [job?.id, running, job]);
+  }, [jobId, running]);
 
   // The moment it finishes, everything the server rendered while the import was
   // running is stale: Ask Alaiy is still disabled, and Orders and Inventory
