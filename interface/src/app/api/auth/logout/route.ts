@@ -1,7 +1,7 @@
-import { NextResponse, type NextRequest } from "next/server";
 import { deleteSession } from "@/lib/auth/session";
+import { redirectTo } from "@/lib/redirect";
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   await deleteSession();
-  return NextResponse.redirect(new URL("/start", request.url), { status: 303 });
+  return redirectTo("/start", { status: 303 });
 }

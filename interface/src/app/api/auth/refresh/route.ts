@@ -1,7 +1,8 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { getSession } from "@/lib/auth/dal";
 import { updateSession, type OnboardingStep } from "@/lib/auth/session";
 import { getWorkspace } from "@/lib/backend/workspace";
+import { redirectTo } from "@/lib/redirect";
 
 /**
  * Re-syncs the session cookie from the workspace, then continues.
@@ -20,7 +21,7 @@ import { getWorkspace } from "@/lib/backend/workspace";
 export async function GET(request: NextRequest) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.redirect(new URL("/start", request.url), { status: 303 });
+    return redirectTo("/start", { status: 303 });
   }
 
   let step: OnboardingStep = session.onboardingStep;
@@ -38,9 +39,7 @@ export async function GET(request: NextRequest) {
 
   await updateSession({ onboardingStep: step, tier });
 
-  return NextResponse.redirect(new URL(safeNext(request), request.url), {
-    status: 303,
-  });
+  return redirectTo(safeNext(request), { status: 303 });
 }
 
 /**
