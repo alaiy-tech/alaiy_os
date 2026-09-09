@@ -19,10 +19,10 @@ import type { ConnectorStatus } from "@/lib/backend/types";
  *
  * The two live channels do not connect the same way, and the rows admit it.
  * Amazon is OAuth, so its button leaves for Seller Central. Shopify in V1 is a
- * private-app token the seller pastes, which cannot be a single click, so its
- * button opens the two fields underneath. Both post to Server Actions, so
- * credentials go browser -> our server -> the connector and never cross an
- * origin.
+ * custom app the seller makes in their own admin, so what it needs is that
+ * app's Client ID and Secret — which cannot be a single click, so its button
+ * opens the fields underneath. Both post to Server Actions, so credentials go
+ * browser -> our server -> the connector and never cross an origin.
  */
 
 /**
@@ -135,6 +135,17 @@ function ConnectorRow({
   );
 }
 
+/**
+ * Shopify's credentials: the store, and the custom app's API key pair.
+ *
+ * The Client ID and Secret rather than the Admin API access token the first
+ * version asked for. A token from Shopify's client_credentials grant lasts
+ * about a day, so a pasted one connected a store that stopped working by the
+ * next morning with nobody having touched it; the id and secret mint a fresh
+ * token whenever one is needed, including for a sync that runs at 3am. It is
+ * also one trip into the Shopify admin instead of two — the same screen that
+ * shows the token shows both of these.
+ */
 function ShopifyForm() {
   const [state, formAction] = useActionState<FormState, FormData>(
     connectShopifyAction,
@@ -152,14 +163,25 @@ function ShopifyForm() {
         />
       </Field>
 
-      <Field
-        label="Admin API access token"
-        hint="Shopify admin → Settings → Apps → Develop apps → your app → Admin API access token."
-      >
+      {/* Both come off one screen, so it is named once, above the pair,
+          rather than repeated in two hints that say the same route. */}
+      <p className="text-[12px] text-muted">
+        Shopify admin → Settings → Apps and sales channels → Develop apps →
+        your app → API credentials.
+      </p>
+
+      <Field label="Client ID">
         <Input
-          name="access_token"
+          name="client_id"
+          autoComplete="off"
+          required
+        />
+      </Field>
+
+      <Field label="Client Secret">
+        <Input
+          name="client_secret"
           type="password"
-          placeholder="shpat_..."
           autoComplete="off"
           required
         />

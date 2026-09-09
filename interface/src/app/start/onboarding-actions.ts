@@ -79,9 +79,13 @@ export async function startImportAction(
 /**
  * Attach a Shopify store.
  *
- * The token is posted straight through to the connector, which verifies it
- * against the shop before storing it encrypted. It never touches a cookie and
- * is never read back.
+ * The custom app's Client ID and Secret are posted straight through to the
+ * connector, which proves them against the shop before storing them
+ * encrypted. Neither touches a cookie and neither is ever read back.
+ *
+ * A Server Action rather than a fetch from the browser, and that is the point
+ * for these two: the secret goes browser -> our server -> the connector, so it
+ * never crosses an origin and never sits in client-side JavaScript.
  */
 export async function connectShopifyAction(
   _prev: FormState,
@@ -90,13 +94,21 @@ export async function connectShopifyAction(
   const session = await requireSession();
 
   const shop = String(formData.get("shop") ?? "").trim();
-  const token = String(formData.get("access_token") ?? "").trim();
+  const clientId = String(formData.get("client_id") ?? "").trim();
+  const clientSecret = String(formData.get("client_secret") ?? "").trim();
 
   if (!shop) return { error: "Enter your Shopify store domain." };
-  if (!token) return { error: "Paste the Admin API access token." };
+  if (!clientId) return { error: "Enter the custom app's Client ID." };
+  if (!clientSecret) return { error: "Enter the custom app's Client Secret." };
 
   try {
-    await connectShopify(session.workspaceId, shop, token, session.backendToken);
+    await connectShopify(
+      session.workspaceId,
+      shop,
+      clientId,
+      clientSecret,
+      session.backendToken,
+    );
   } catch (error) {
     return { error: userFacingError(error, OUR_FAULT) };
   }
