@@ -40,6 +40,7 @@ from alaiy_os.chat import suggest as chat_suggest
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.chat import websearch as chat_websearch
 from alaiy_os.engine import llm
+from alaiy_os.engine.context import chat_turn
 
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_MAX_TURNS = 12
@@ -252,10 +253,16 @@ def run_turn(session):
 	# `finally`, and not a call at each exit: the turn has two endings and a third
 	# would be easy to add without noticing this. "The turn is over" is true on
 	# every path out of here.
-	try:
-		_drive(doc)
-	finally:
-		_turn_finished(doc.name)
+	#
+	# `chat_turn` wraps the whole drive, not just the LLM calls inside it: a
+	# managed client reads this per completion (see engine/context.py), and a
+	# tool that makes its own nested completion — or invokes an agent — should
+	# still be attributed to this turn and this user.
+	with chat_turn(session_id=doc.name, actor=doc.owner):
+		try:
+			_drive(doc)
+		finally:
+			_turn_finished(doc.name)
 
 
 def _drive(doc):
