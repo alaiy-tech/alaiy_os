@@ -40,7 +40,7 @@ from alaiy_os.chat import suggest as chat_suggest
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.chat import websearch as chat_websearch
 from alaiy_os.engine import llm
-from alaiy_os.engine.context import chat_turn
+from alaiy_os.engine.context import chat_turn, set_turn_seq
 
 DEFAULT_MODEL = "gemini-3.1-flash-lite"
 DEFAULT_MAX_TURNS = 12
@@ -345,6 +345,21 @@ def _pending_skill(session):
 	return last.skill_used, args
 
 
+def _next_seq(session):
+	"""The `seq` the next `_append` call for this session will get.
+
+	Predicted, not read back afterwards: `set_turn_seq` needs it BEFORE the
+	LLM call it will tag, and `_append` only assigns the real one once the
+	call has returned. Exact, not a guess — a session's messages are only
+	ever written by that session's own turn, one at a time (the same
+	single-writer guarantee `start_turn`'s enqueue dedup already leans on),
+	so nothing else can claim this number between the prediction and the
+	write. See `engine/context.py`'s `set_turn_seq` for what reads it.
+	"""
+	last = frappe.db.get_value("OS Chat Message", {"session": session}, "seq", order_by="seq desc")
+	return (last or 0) + 1
+
+
 # ── The loop ─────────────────────────────────────────────────────────────────
 def _loop(doc):
 	specs = chat_tools.tool_specs()
@@ -378,6 +393,11 @@ def _loop(doc):
 		# is when streaming *started*, which makes the gap to the next row the
 		# only derivable interval and leaves the final answer of a turn with
 		# none at all. So the runner records it, where the clock is honest.
+		# Tags the LLM call about to run with the message it will produce,
+		# before that message even exists — see _next_seq and
+		# engine/context.py's set_turn_seq. Lets billing attribute cost per
+		# MESSAGE, not just per conversation.
+		set_turn_seq(_next_seq(doc.name))
 		started = time.monotonic()
 		response, seq = step(doc, model, system, messages, specs, pending)
 		elapsed_ms = int((time.monotonic() - started) * 1000)
