@@ -1,5 +1,5 @@
 import { requireOnboardedSession } from "@/lib/auth/dal";
-import { listConnectors } from "@/lib/backend/connectors";
+import { amazonAppStatus, listConnectors } from "@/lib/backend/connectors";
 import { getLatestImport } from "@/lib/backend/imports";
 import { CHANNELS } from "@/lib/channels";
 import { formatDate } from "@/lib/format";
@@ -14,22 +14,32 @@ export const metadata = { title: "Channels — Alaiy" };
  *
  * Both channels are always rendered, connected or not, so the tab answers
  * "what could I be syncing?" rather than only "what am I syncing?". A channel
- * that has never been connected shows a Connect link back into the onboarding
- * step that owns the credential forms — there is one place that knows how to
- * take a Shopify token or start Amazon's consent flow, and duplicating it here
- * would mean two copies of that to keep right.
+ * that has never been connected can be connected from its own card, using the
+ * same components the onboarding step uses (`components/connect/`) — so there
+ * is still one credential form on the codebase, just not one screen that owns
+ * it. It used to be a Connect link to /start, which redirects anyone who has
+ * finished onboarding: the button existed and went to Home.
  */
 export default async function ChannelsPage() {
   const session = await requireOnboardedSession();
 
-  // Two independent reads, neither fatal. The import line is context for the
-  // sync buttons; losing it should not cost the seller the controls.
-  const [connectors, latestImport] = await Promise.all([
+  // Three independent reads, and only the first is fatal to this page. The
+  // import line is context for the sync buttons; losing it should not cost the
+  // seller the controls.
+  const [connectors, latestImport, amazon] = await Promise.all([
     listConnectors(session.workspaceId, session.backendToken).catch(
       () => null as ConnectorStatus[] | null,
     ),
     getLatestImport(session.workspaceId, session.backendToken).catch(
       () => null as ImportJob | null,
+    ),
+    // Settled, not caught-to-false, for the reason the connect step spells
+    // out: collapsing a failed check into "not ready" renders as "Amazon
+    // isn't configured on this environment", which sends whoever reads it to
+    // check a site_config that was correct all along.
+    amazonAppStatus(session.backendToken).then(
+      (value) => ({ ok: true as const, value }),
+      () => ({ ok: false as const }),
     ),
   ]);
 
@@ -63,6 +73,8 @@ export default async function ChannelsPage() {
                 channel={channel.id}
                 name={channel.name}
                 status={statusFor(channel.id)}
+                amazonReady={amazon.ok ? amazon.value.ready : false}
+                amazonUnavailable={!amazon.ok}
               />
             ))}
           </div>

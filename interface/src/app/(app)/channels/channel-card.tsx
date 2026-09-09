@@ -7,7 +7,9 @@ import {
   syncChannelAction,
   type ChannelActionState,
 } from "./actions";
-import { Alert, ButtonLink, Pill, Spinner, pressClass } from "@/components/ui";
+import { AmazonAction } from "@/components/connect/amazon-action";
+import { ShopifyForm } from "@/components/connect/shopify-form";
+import { Alert, Pill, Spinner, pressClass } from "@/components/ui";
 import { formatDate } from "@/lib/format";
 import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
 
@@ -31,11 +33,18 @@ export function ChannelCard({
   channel,
   name,
   status,
+  amazonReady,
+  amazonUnavailable,
 }: {
   channel: ChannelId;
   name: string;
   status?: ConnectorStatus;
+  /** Whether the bench has SP-API app credentials. Amazon's row only. */
+  amazonReady: boolean;
+  /** That check itself failed, so we do not know either way. */
+  amazonUnavailable: boolean;
 }) {
+  const [connecting, setConnecting] = useState(false);
   const connected = Boolean(status?.connected);
 
   return (
@@ -67,12 +76,38 @@ export function ChannelCard({
           ) : null}
         </div>
 
+        {/* Connecting happens here, not on /start. That link is what sent a
+            seller clicking Connect to Home: /start redirects anyone who has
+            finished onboarding, so the credential form was unreachable to
+            everyone except someone still mid-signup. Amazon is one click out
+            to Seller Central, so its row carries the action itself; Shopify
+            needs three fields, so its button opens them below. */}
         {!connected ? (
-          <ButtonLink href="/start" size="sm" className="shrink-0">
-            Connect
-          </ButtonLink>
+          channel === "amazon" ? (
+            <AmazonAction ready={amazonReady} unavailable={amazonUnavailable} />
+          ) : (
+            <button
+              type="button"
+              onClick={() => setConnecting((open) => !open)}
+              aria-expanded={connecting}
+              className={`${pressClass(
+                connecting ? { ground: "quiet", size: "sm" } : { size: "sm" },
+              )} shrink-0`}
+            >
+              {connecting ? "Cancel" : "Connect"}
+            </button>
+          )
         ) : null}
       </div>
+
+      {/* Collapsed until asked for, so an unconnected channel still costs one
+          card. It closes on its own once connected: the action refreshes this
+          page, `connected` flips, and the whole branch stops rendering. */}
+      {!connected && channel === "shopify" && connecting ? (
+        <div className="border-t border-line px-5 py-4">
+          <ShopifyForm />
+        </div>
+      ) : null}
 
       {/* The channel's own last error, straight from the connection record. It
           survives a reload, unlike an action's error, so it belongs to the card
