@@ -5,6 +5,7 @@ import type {
   ListingHealth,
   ListingsPage,
   ProductGroupDetail,
+  UnlinkedPage,
 } from "@/lib/product-groups/types";
 import type { ChannelId } from "@/lib/backend/types";
 
@@ -26,16 +27,29 @@ import type { ChannelId } from "@/lib/backend/types";
 const BASE = "/api/method/alaiy_os_self_serve_apis.api.listings";
 
 const OVERVIEW = `${BASE}.overview`;
+const UNLINKED = `${BASE}.unlinked`;
 const GROUP = `${BASE}.group`;
 const LINK = `${BASE}.link`;
 const MARK_EXCLUSIVE = `${BASE}.mark_exclusive`;
 const UNLINK = `${BASE}.unlink`;
 const REBUILD = `${BASE}.rebuild`;
 
+/** Matches api/listings.py's PAGE_SIZE. The backend caps anything larger. */
+export const PAGE_SIZE = 50;
+
 export type ListingsQuery = {
   health?: ListingHealth;
   channel?: ChannelId;
   category?: string;
+  start?: number;
+  limit?: number;
+};
+
+/** The unlinked queue's own query. Only the channel filter applies to it. */
+export type UnlinkedQuery = {
+  channel?: ChannelId;
+  start?: number;
+  limit?: number;
 };
 
 /**
@@ -48,19 +62,49 @@ export type ListingsQuery = {
 const EMPTY: ListingsPage = {
   sample: false,
   groups: [],
-  unlinked: [],
+  total: 0,
+  start: 0,
+  limit: PAGE_SIZE,
   categories: [],
 };
+
+const EMPTY_UNLINKED: UnlinkedPage = {
+  rows: [],
+  total: 0,
+  start: 0,
+  limit: PAGE_SIZE,
+};
+
+/**
+ * Fills in the paging fields if the backend did not send them.
+ *
+ * For one deploy only: a backend without the paged endpoints answers the old
+ * shape, and `total: undefined` reaches the pager as NaN rather than as an
+ * error. These two apps deploy together, so this is insurance against the order
+ * they are merged in, not a contract.
+ */
+function paged<T extends { total?: number; start?: number; limit?: number }>(page: T): T {
+  return {
+    ...page,
+    total: page.total ?? 0,
+    start: page.start ?? 0,
+    limit: page.limit || PAGE_SIZE,
+  };
+}
 
 export type ListingsResult = { page: ListingsPage; error?: string };
 
 /**
- * Every product group, plus the products no group has claimed.
+ * One page of product groups, worst health first.
  *
- * Filtering happens on the backend rather than here. The seller's catalogue is
- * one page with no paging on this tab — a deliberate simplification, since the
- * table is a comparison rather than a ledger — but the filter still belongs
- * with the data so the category list and the filtered set cannot disagree.
+ * Filtering, ordering and paging all happen on the backend rather than here.
+ * This tab used to read the whole catalogue in one go — defensible for a
+ * comparison table, and fine until a seller had a real catalogue, at which
+ * point the read cost a full product scan plus a suggestion computed for every
+ * unlinked product against every other one. The filter belongs with the data
+ * regardless, so the category list and the filtered set cannot disagree.
+ *
+ * The unlinked queue is a separate read; see `loadUnlinked`.
  *
  * Returns its failure rather than throwing, like every other reader here: a
  * listings outage should cost the seller this table, not the shell around it.
@@ -75,12 +119,47 @@ export async function loadListings(
         health: query.health,
         channel: query.channel,
         category: query.category,
+        start: query.start ?? 0,
+        limit: query.limit ?? PAGE_SIZE,
       },
       userToken,
     });
-    return { page: page ?? EMPTY };
+    return { page: page ? paged(page) : EMPTY };
   } catch (error) {
     return { page: EMPTY, error: userFacingError(error, OUR_FAULT) };
+  }
+}
+
+export type UnlinkedResult = { page: UnlinkedPage; error?: string };
+
+/**
+ * One page of the products no group has claimed, each with its suggestion.
+ *
+ * Its own call rather than a field on the overview, because it is the half of
+ * this tab that costs something: every row carries a match computed at read
+ * time, so the price is the number of rows scored times the size of the
+ * catalogue. Asking for fifty keeps that proportional to the screen, and
+ * paging the groups table above no longer recomputes any of it.
+ *
+ * Fails on its own too. The queue going down should not cost the seller the
+ * comparison table, which is the part they came for.
+ */
+export async function loadUnlinked(
+  query: UnlinkedQuery = {},
+  userToken?: string,
+): Promise<UnlinkedResult> {
+  try {
+    const page = await backend.get<UnlinkedPage | null>(UNLINKED, {
+      query: {
+        channel: query.channel,
+        start: query.start ?? 0,
+        limit: query.limit ?? PAGE_SIZE,
+      },
+      userToken,
+    });
+    return { page: page ? paged(page) : EMPTY_UNLINKED };
+  } catch (error) {
+    return { page: EMPTY_UNLINKED, error: userFacingError(error, OUR_FAULT) };
   }
 }
 
