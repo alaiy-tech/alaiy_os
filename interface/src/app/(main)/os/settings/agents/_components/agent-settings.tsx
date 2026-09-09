@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertAction, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -49,20 +50,17 @@ function AgentCardSkeleton() {
 
 function Header({ count, needingAttention }: { readonly count: number | null; readonly needingAttention: number }) {
   return (
-    <div className="flex flex-col gap-1">
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-        <h1 className="font-semibold text-3xl tracking-tight">Agents</h1>
-        {count !== null && (
+    <PageHeader
+      title="Agents"
+      subtitle="Agents read your data as a service user. This page shows what each one needs, whether its user has it, and lets you turn it on."
+      action={
+        count !== null && (
           <span className="text-muted-foreground text-sm">
             {count} registered{needingAttention > 0 ? ` · ${needingAttention} needs attention` : ""}
           </span>
-        )}
-      </div>
-      <p className="text-muted-foreground text-sm">
-        Agents read your data as a service user. This page shows what each one needs, whether its user has it, and lets
-        you turn it on.
-      </p>
-    </div>
+        )
+      }
+    />
   );
 }
 
@@ -112,10 +110,14 @@ export function AgentSettings() {
     try {
       await setAgentEnabled(agent.agent_id, next);
       toast.success(`${agent.agent_name} is ${next ? "on" : "off"}.`);
-      await load();
     } catch (error) {
+      // A 417 here means the permission check that gated this call (or the
+      // fact that it wasn't gated at all, for a plain disable) is now stale
+      // -- a role revoked while the page was open, say. Refetch either way:
+      // readiness is computed server-side and never guessed client-side.
       toast.error(errorMessage(error, `Could not ${next ? "enable" : "disable"} the agent.`));
     } finally {
+      await load();
       setPendingAgentId(null);
     }
   }

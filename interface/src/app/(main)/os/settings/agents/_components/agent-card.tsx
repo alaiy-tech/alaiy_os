@@ -39,9 +39,11 @@ function resolveAgentIcon(icon: string | null): LucideIcon {
 function ToolStateChip({ tool }: { readonly tool: AgentTool }) {
   if (!tool.declared) {
     return (
-      <Badge variant="outline" className="shrink-0 border-dashed font-normal text-muted-foreground">
-        Not declared
-      </Badge>
+      <TooltipWrap label="This tool doesn't declare what it reads, so we can't check it.">
+        <Badge variant="outline" className="shrink-0 border-dashed font-normal text-muted-foreground">
+          Not declared
+        </Badge>
+      </TooltipWrap>
     );
   }
 
