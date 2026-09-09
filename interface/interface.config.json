@@ -1,0 +1,12 @@
+{
+  "app": "alaiy_os",
+  "base": true,
+  "acceptsContributions": false,
+  "env": {
+    "ALAIY_BACKEND_URL": "backendUrl",
+    "APP_URL": "appUrl",
+    "SESSION_SECRET": "secret:SESSION_SECRET",
+    "ALAIY_BACKEND_API_KEY": "secret:ALAIY_BACKEND_API_KEY",
+    "ALAIY_BACKEND_API_SECRET": "secret:ALAIY_BACKEND_API_SECRET"
+  }
+}

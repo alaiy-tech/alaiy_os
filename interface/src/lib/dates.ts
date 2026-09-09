@@ -1,30 +1,50 @@
-/** Today as `YYYY-MM-DD` in the viewer's own timezone. */
-export function todayIso(): string {
-  return toDateParam(new Date());
-}
+/**
+ * Arithmetic on the naive "YYYY-MM-DD" dates the app keeps everywhere (see
+ * the note on `formatDate` in `lib/format.ts`) — parsed as local calendar
+ * dates rather than through `Date`'s own UTC parsing, which would shift a
+ * date by a day depending on the reader's timezone.
+ *
+ * Shared by the Support and Ratings tabs, both of which score how long
+ * something has been sitting from a plain date string.
+ */
 
-/** `YYYY-MM-DD`, the format Frappe Date fields arrive in and the one the list
- * queries expect back. Built from local parts rather than toISOString(), which
- * converts to UTC first and can hand back the previous day. */
-export function toDateParam(date: Date): string {
+export function isoDate(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
 }
 
-/** Whether a document's due date has passed while it is still open.
+function parseLocalDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, (month ?? 1) - 1, day ?? 1);
+}
+
+/**
+ * Whole calendar days from `today` until a future YYYY-MM-DD date.
  *
- * Compared as strings: both sides are zero-padded `YYYY-MM-DD`, so
- * lexicographic order is date order, and no timezone is involved — parsing a
- * bare Frappe date into a Date would place it at UTC midnight and shift the
- * comparison by a day for anyone west of Greenwich.
+ * Negative once the date has passed, and deliberately not clamped the way
+ * `daysBetween` is: the Inventory tab asks "does this PO land before I run
+ * out", and both a late arrival and an overdue one are real answers.
  *
- * `settledStatuses` is the list of statuses that close the document out; the
- * per-doctype wrappers (isDeliveryPastDue, isReceiptPastDue) each pass their
- * own, and each of those mirrors a SETTLED_STATUSES on the Python side so the
- * highlighted cells are exactly the rows the past-due KPI counts. */
-export function isPastDue(dueDate: unknown, status: unknown, settledStatuses: readonly string[]): boolean {
-  if (typeof dueDate !== "string" || !dueDate) return false;
-  if (typeof status === "string" && settledStatuses.includes(status)) return false;
-  return dueDate < todayIso();
+ * Compared at local midnight on both sides. Diffing a date against a *time*
+ * loses a day whenever the clock is past midnight — which is always — so a PO
+ * six days out read as five and the tab under-reported how late it was.
+ */
+export function daysUntil(date: string, today: Date): number {
+  const target = parseLocalDate(date);
+  const a = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+  const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return Math.round((a - b) / 86_400_000);
+}
+
+/** Whole days between two YYYY-MM-DD dates, ignoring time of day. */
+export function daysBetween(from: string, today: Date): number {
+  const start = parseLocalDate(from);
+  const a = new Date(start.getFullYear(), start.getMonth(), start.getDate()).getTime();
+  const b = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+  return Math.max(0, Math.round((b - a) / 86_400_000));
+}
+
+export function withinDays(date: string, today: Date, days: number): boolean {
+  return daysBetween(date, today) <= days;
 }

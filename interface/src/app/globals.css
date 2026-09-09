@@ -1,337 +1,428 @@
-/* Scan our own source and nothing else.
- *
- * Tailwind's automatic source detection crawls the project directory and skips
- * whatever git ignores — which makes the generated CSS depend on where the app
- * happens to be checked out. It holds here (this tree sits in a repo whose
- * .gitignore covers node_modules and .next) and breaks anywhere it doesn't: in a
- * composed workspace under devbench/builds, git ignores that whole directory, so
- * no nested .gitignore applies, and Tailwind reads .next/dev/cache/turbopack/*.sst
- * — Turbopack's *binary* cache, which holds serialized copies of these files. It
- * extracts mangled candidates from them and emits CSS like
- * `.gap-\[-��Q\(var\(��A\)\)\]`, which then fails to parse:
- * "Parsing CSS source code failed / Unexpected token Id".
- *
- * Naming the sources pins the output to this app's actual code wherever it is
- * built. It also stops node_modules being scanned when git isn't there to
- * exclude it, which was adding ~170KB of other people's utilities to the bundle.
- */
-@import "tailwindcss" source(none);
-@source "../**/*.{ts,tsx}";
-@import "tw-animate-css";
-@import "shadcn/tailwind.css";
+@import "tailwindcss";
 
-/* Theme preset styles: these override CSS variables based on the selected data-theme-preset */
-@import "../styles/presets/brutalist.css";
-@import "../styles/presets/alaiy-os.css";
-@import "../styles/presets/soft-pop.css";
-@import "../styles/presets/tangerine.css";
+/* ---------------------------------------------------------------------------
+   Alaiy — the design system.
 
-@custom-variant dark (&:is(.dark *));
+   Four values carry the whole product. Everything below is derived from them
+   and nothing else is invented:
 
-@theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
-  --radius-3xl: calc(var(--radius) + 12px);
-  --radius-4xl: calc(var(--radius) + 16px);
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-card-foreground: var(--card-foreground);
-  --color-popover: var(--popover);
-  --color-popover-foreground: var(--popover-foreground);
-  --color-primary: var(--primary);
-  --color-primary-foreground: var(--primary-foreground);
-  --color-secondary: var(--secondary);
-  --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-info: var(--info);
-  --color-info-foreground: var(--info-foreground);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --color-caution: var(--caution);
-  --color-caution-foreground: var(--caution-foreground);
-  --color-destructive-foreground: var(--destructive-foreground);
-  --color-border: var(--border);
-  --color-input: var(--input);
-  --color-ring: var(--ring);
-  --color-chart-1: var(--chart-1);
-  --color-chart-2: var(--chart-2);
-  --color-chart-3: var(--chart-3);
-  --color-chart-4: var(--chart-4);
-  --color-chart-5: var(--chart-5);
-  --color-sidebar: var(--sidebar);
-  --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-primary: var(--sidebar-primary);
-  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-  --color-sidebar-accent: var(--sidebar-accent);
-  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-  --color-sidebar-border: var(--sidebar-border);
-  --color-sidebar-ring: var(--sidebar-ring);
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+     paper   #F7F4EF   the ground the entire product sits on
+     navy    #003254   every panel, and every word of text
+     blue    #91D1F2   the one accent
+     border  #DFD9CD   the line between a card and the ground
+
+   THE GROUND IS PAPER, NOT WHITE
+   Paper is not one option in a rotation — it is the surface, and navy is used
+   with intent (the rail, a CTA panel, a footer) rather than alternated with
+   it. White survives in exactly one role: a card sitting *on* paper, which is
+   how the system's own swatches are drawn. So `bg-white` in a component means
+   "this is a card", and the page underneath it is always paper.
+
+   HEX, NOT OKLCH
+   Several of these blues sit on the sRGB gamut edge, and an out-of-gamut oklch
+   is mapped differently by the build than by a browser. Writing the resolved
+   value is exact, and it keeps the value and the comment the same thing.
+
+   CONTRAST
+   Navy on paper is 12.1:1 and blue on navy is 8.0:1, so the brand pairs are
+   not the problem — the derived ones are, and each was measured. `muted` is
+   6.6:1 on paper. Every status colour has a bright value for fills and dots
+   and a darker *-ink for text: the inks are 6.2-6.6:1 on their own soft
+   grounds and ~6.9:1 on paper. The bright values are 1.9-4.1:1 and are never
+   text; each dot is paired with a spelled-out label, so it is redundant
+   reinforcement rather than the only way to read a state.
+
+   WHY THERE IS A STATUS PALETTE AT ALL
+   The system says two colours and one accent, which is right for a page that
+   is read once. This product has to say "that sync failed" and "those figures
+   are stale" in a table a seller scans daily, and blue cannot carry both a
+   link and a failure. So the status set is kept deliberately narrow — three
+   hues, each with one bright step and one ink — retuned warm so it sits on
+   paper rather than on the white it was mixed for. See DESIGN.md.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  /* Navy. 600 is the brand; 400-500 are the readable mid-tones. */
+  --color-primary-50: #eef4f8;
+  --color-primary-100: #d8e6ef;
+  --color-primary-200: #aecadb;
+  --color-primary-300: #7ba5bd;
+  --color-primary-400: #3f7898;
+  --color-primary-500: #124e70;
+  --color-primary-600: #003254;
+  --color-primary-700: #002741;
+  --color-primary-800: #001c30;
+  --color-primary-900: #00121f;
+
+  /* The one accent. 300 is the brand blue — a plate a seller reads navy text
+     on (8.0:1), never a text colour itself. 600-700 are the steps that can
+     carry 12px type on paper; 500 exists for a dot or a bar, where it is a
+     fill rather than a word. */
+  --color-highlight-100: #eaf6fc;
+  --color-highlight-200: #c8e8f8;
+  --color-highlight-300: #91d1f2;
+  --color-highlight-400: #6dbfe8;
+  --color-highlight-500: #2e9fd3;
+  --color-highlight-600: #0080ba;
+  --color-highlight-700: #00648f;
+
+  /* Healthy / needs-attention / broken. Bright for fills, bars and dots... */
+  --color-ok: #1f9d5f;
+  --color-ok-soft: #dcf2e0;
+  --color-warn: #e08a1e;
+  --color-warn-soft: #fbeecf;
+  --color-alert: #d9401a;
+  --color-alert-soft: #fbe3d9;
+
+  /* ...and these for any text, on the soft grounds above or on paper. */
+  --color-ok-ink: #0a6136;
+  --color-warn-ink: #7d4708;
+  --color-alert-ink: #a02310;
+
+  --color-ink: #003254;
+  --color-muted: #455a63;
+  /* The quietest legible text: a hint under a field, a date under a chat
+     title, a placeholder. A measured colour rather than `text-muted/70`,
+     because an alpha is a guess — the ones this replaces measured 2.3:1 to
+     4.1:1 on paper, all of them under the 4.5:1 a 12px line needs. This is
+     4.7:1 on paper and 5.2:1 on white, and still clearly a step down from
+     `muted`. Anything quieter than this is not text; it is decoration, and
+     should be `aria-hidden` rather than dimmer. */
+  --color-muted-soft: #5c7078;
+  --color-line: #dfd9cd;
+  --color-paper: #f7f4ef;
+  /* `canvas` is the ground, and the ground is paper. Named separately so a
+     component can say which of the two it means. */
+  --color-canvas: #f7f4ef;
+  /* A deeper paper, for a ground that has to sit *inside* paper — a filter
+     bar, a disabled step. Warm, because a blue tint here fights the ground. */
+  --color-surface: #efe9dd;
+
+  /* ONE SHAPE, ONE RADIUS.
+     The system draws a single 5px corner and squares everything else, so every
+     radius step resolves to it. That is deliberate: it means `rounded-xl` and
+     `rounded-2xl` left in a component cannot reintroduce a second shape
+     language, and a full round is reserved for things that are genuinely round
+     — a dot, a spinner, an avatar. */
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 5px;
+  --radius-lg: 5px;
+  --radius-xl: 5px;
+  --radius-2xl: 5px;
+  --radius-3xl: 5px;
+
+  /* HARD SHADOWS ONLY.
+     The system has exactly one shadow: an offset, unblurred block of colour —
+     the thing that makes a button read as a key to press. A blurred shadow
+     under a card would be a different system, so a card gets a 1px line and
+     nothing else, and only a surface genuinely floating over the page (a
+     toast, a dialog) gets the block. */
+  --shadow-press: 4px 4px 0 var(--color-primary-600);
+  --shadow-press-lift: 6px 6px 0 var(--color-highlight-300);
+  --shadow-press-dark: 4px 4px 0 rgb(255 255 255 / 0.25);
+  /* The exception to "cards get a line, not a shadow": a surface genuinely
+     floating over the page, which needs to say so. Navy at low alpha rather
+     than solid, because it falls across whatever the page is showing. */
+  --shadow-float: 10px 10px 0 rgb(0 50 84 / 0.14);
+
+  /* Playfair Display for anything that is read once — headings, the greeting,
+     a figure being shown off. Poppins for everything read at length: body
+     copy, labels, buttons, nav. Geist carries table rows, SKUs and money: at
+     12-13px Poppins is wider and looser, and it sets numerals proportionally,
+     so a column of figures shifts under its own alignment. `font-data` is
+     that opt-in, and it is the only reason a third face exists. */
+  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  --font-data: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+
+  /* THE DISPLAY SCALE.
+     Five steps, named for the job rather than the size, because the size is
+     the thing most likely to be nudged and the job is not. Every heading in
+     the product is one of these — an `h1` with an arbitrary pixel value is how
+     a scale becomes a list of numbers nobody can review.
+
+     `quote` is the odd one: it is Alaiy speaking in its own voice — the
+     greeting on the first screen, and the italic pull-quote the system draws.
+     It is display-face body copy, so unlike the headings it gets a line height
+     you can read a sentence at. */
+  --text-display-xl: 52px;
+  --text-display-xl--line-height: 1.04;
+  --text-display-lg: 36px;
+  --text-display-lg--line-height: 1.08;
+  --text-display-md: 26px;
+  --text-display-md--line-height: 1.12;
+  --text-display-sm: 18px;
+  --text-display-sm--line-height: 1.2;
+  --text-display-xs: 16px;
+  --text-display-xs--line-height: 1.25;
+  --text-quote: 20px;
+  --text-quote--line-height: 1.4;
+
+  /* How wide Ask Alaiy is when it is docked to the right of a data tab.
+     A token because two things have to agree on it: the panel itself, and
+     anything that slides in beside it — the Orders detail panel lies across
+     the table and stops at Ask's edge, so that Ask stays readable while an
+     order is being inspected. Written once here, widened below at xl. */
+  --spacing-ask-panel: 360px;
 }
 
-/* Default theme styles (used when no data-theme-preset is set or when 'default' is selected).
-These serve as the fallback; there is no separate default.css file. */
+@media (width >= 80rem) {
+  :root {
+    --spacing-ask-panel: 400px;
+  }
+}
+
+/* The product is a paper-background app. Opt out of the UA dark scheme so
+   form controls and scrollbars stay light regardless of OS setting. */
 :root {
-  --radius: 0.625rem;
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-
-  /* Status tones. A tone is a tinted fill plus a readable text colour, not one
-   * colour: the fill is the -500 step at low alpha, the text a darker step in
-   * light mode and a lighter one in dark. Values are lifted verbatim from the
-   * Tailwind palette steps the status maps already hardcoded (green/amber/
-   * blue/orange 500 for the fill, 700 for light text, 300 for dark), so
-   * introducing them changed nothing on screen. A preset can now override
-   * them, which is the whole point - none does yet. */
-  --info: oklch(62.3% 0.214 259.815);
-  --info-foreground: oklch(48.8% 0.243 264.376);
-  --success: oklch(72.3% 0.219 149.579);
-  --success-foreground: oklch(52.7% 0.154 150.069);
-  --warning: oklch(76.9% 0.188 70.08);
-  --warning-foreground: oklch(55.5% 0.163 48.998);
-  --caution: oklch(70.5% 0.213 47.604);
-  --caution-foreground: oklch(55.3% 0.195 38.402);
-  --destructive-foreground: oklch(0.985 0 0);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-
-  /* fonts */
-  --font-sans: var(--font-geist);
-  --font-mono: var(--font-geist-mono);
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  color-scheme: light;
 }
 
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-
-  /* Only the text step changes in dark mode; the fills stay on the same -500
-   * hue and are tinted harder at the call site (/15 rather than /10). */
-  --info-foreground: oklch(80.9% 0.105 251.813);
-  --success-foreground: oklch(87.1% 0.15 154.449);
-  --warning-foreground: oklch(87.9% 0.169 91.605);
-  --caution-foreground: oklch(83.7% 0.128 66.29);
-  --destructive-foreground: oklch(0.205 0 0);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  position: relative;
 }
 
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-  }
+/* ---------------------------------------------------------------------------
+   The grain.
 
-  body {
-    @apply bg-background text-foreground;
-    font-family: var(--font-sans), system-ui, sans-serif;
-  }
-  html {
-    @apply font-sans;
-  }
+   Not decoration — it is what stops a flat fill from reading as plain beige,
+   and it is why paper looks like paper and navy looks like ink on it. One
+   fixed layer over the whole viewport at 5%, blended rather than drawn, so it
+   sits on every surface including the ones that float above the page.
+
+   Fixed and `pointer-events: none`, so it neither scrolls (no repaint cost per
+   frame) nor intercepts a click. Above the app's own z-indexes on purpose: a
+   dialog that lost the grain would look like a different product.
+   --------------------------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-@layer utilities {
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xs {
-    box-shadow: var(--shadow-2xs);
+/* Headings are the display face by default, so a component cannot forget.
+   `text-wrap: balance` because these are short, deliberate lines. */
+:where(h1, h2, h3, h4) {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+/* One consistent focus ring, in the bright blue. */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--color-highlight-600);
+  outline-offset: 2px;
+}
+
+/* The one exception, and the reason it is an exception.
+   Ask Alaiy's field sits *inside* a bordered box rather than being the
+   bordered thing itself, so the ring above draws a rectangle a few pixels in
+   from the box — it reads as a mistake rather than as focus. The box takes the
+   focus state instead (see the composer in components/ask/chat.tsx: a brighter
+   border on `focus-within`), which is a visible indicator on the control the
+   seller is actually looking at.
+
+   Unlayered on purpose. `@import "tailwindcss"` puts utilities in a cascade
+   layer and unlayered rules beat layered ones whatever their specificity, so a
+   `focus:outline-none` class on the field cannot turn the rule above off —
+   which is exactly why this had to be dealt with here. */
+.field-in-a-box:focus-visible {
+  outline: none;
+}
+
+/* Geist has tabular figures; this makes them the default wherever the data
+   face is used, so money and counts line up down a column. */
+.font-data {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* -------------------------------------------------------------------------
+     The arcade press — the one button shape.
+
+     There is no filled "primary" any more. Every call to action is this
+     outlined shape with a hard, unblurred shadow: it lifts towards the reader
+     on hover and its shadow turns accent blue, then on click the shadow
+     collapses to nothing as the button travels into where the shadow was. The
+     travel and the shadow have to add up to the same distance or the press
+     looks like a slide.
+
+     In `@layer components`, so a utility class on a call site still wins — a
+     button that needs to be full width or a different height says so with
+     Tailwind and does not have to fight this.
+     ------------------------------------------------------------------------- */
+  .press {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius-sm);
+    border-width: 2px;
+    border-style: solid;
+    background: transparent;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    cursor: pointer;
+    transition:
+      transform 100ms ease,
+      box-shadow 100ms ease,
+      opacity 100ms ease;
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-xs {
-    box-shadow: var(--shadow-xs);
+  .press-light {
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-600);
+    box-shadow: var(--shadow-press);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-sm {
-    box-shadow: var(--shadow-sm);
+  .press-dark {
+    color: #fff;
+    border-color: rgb(255 255 255 / 0.6);
+    box-shadow: var(--shadow-press-dark);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow {
-    box-shadow: var(--shadow);
+  /* The one press that is not brand-coloured: the destructive confirm.
+     It keeps the geometry exactly — it has to read as a key — and takes the
+     alert ink for its border and its block, so the colour is the only thing
+     saying this one does something that cannot be taken back. Its lift stays
+     in its own hue rather than turning blue, because blue here would read as
+     "and now it is safe". */
+  .press-alert {
+    color: var(--color-alert-ink);
+    border-color: var(--color-alert-ink);
+    box-shadow: 4px 4px 0 var(--color-alert-ink);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-md {
-    box-shadow: var(--shadow-md);
+  /* Hover and press are identical on every ground — the shape is the shape. */
+  .press-light:hover:not(:disabled),
+  .press-dark:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: var(--shadow-press-lift);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-lg {
-    box-shadow: var(--shadow-lg);
+  .press-alert:hover:not(:disabled) {
+    transform: translate(-2px, -2px);
+    box-shadow: 6px 6px 0 var(--color-alert);
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-xl {
-    box-shadow: var(--shadow-xl);
+  .press-light:active:not(:disabled),
+  .press-dark:active:not(:disabled),
+  .press-alert:active:not(:disabled) {
+    transform: translate(4px, 4px);
+    box-shadow: 0 0 0 transparent;
   }
 
-  [data-theme-preset]:not([data-theme-preset="default"]) .shadow-2xl {
-    box-shadow: var(--shadow-2xl);
+  /* Disabled sits flat where it was pressed: no shadow to promise a press
+     that will not happen, and no travel on hover. */
+  .press:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+    box-shadow: none;
+    transform: none;
   }
 
-  html[data-font="inter"] body {
-    --font-sans: var(--font-inter);
-  }
-  html[data-font="notoSans"] body {
-    --font-sans: var(--font-noto-sans);
-  }
-  html[data-font="nunitoSans"] body {
-    --font-sans: var(--font-nunito-sans);
-  }
-  html[data-font="figtree"] body {
-    --font-sans: var(--font-figtree);
-  }
-  html[data-font="roboto"] body {
-    --font-sans: var(--font-roboto);
-  }
-  html[data-font="geist"] body {
-    --font-sans: var(--font-geist);
-  }
-  html[data-font="raleway"] body {
-    --font-sans: var(--font-raleway);
-  }
-  html[data-font="dmSans"] body {
-    --font-sans: var(--font-dm-sans);
-  }
-  html[data-font="publicSans"] body {
-    --font-sans: var(--font-public-sans);
-  }
-  html[data-font="outfit"] body {
-    --font-sans: var(--font-outfit);
-  }
-  html[data-font="geistMono"] body {
-    --font-sans: var(--font-geist-mono);
-  }
-  html[data-font="geistPixelSquare"] body {
-    --font-sans: var(--font-geist-pixel-square);
-  }
-  html[data-font="jetBrainsMono"] body {
-    --font-sans: var(--font-jetbrains-mono);
-  }
-  html[data-font="notoSerif"] body {
-    --font-sans: var(--font-noto-serif);
-  }
-  html[data-font="robotoSlab"] body {
-    --font-sans: var(--font-roboto-slab);
-  }
-  html[data-font="merriweather"] body {
-    --font-sans: var(--font-merriweather);
-  }
-  html[data-font="lora"] body {
-    --font-sans: var(--font-lora);
-  }
-  html[data-font="playfairDisplay"] body {
-    --font-sans: var(--font-playfair-display);
+  /* -------------------------------------------------------------------------
+     The eyebrow — a section's name, above its heading.
+
+     Letterspaced small caps in navy, with the blue squiggle. Used for anything
+     that labels rather than says: a column group, a filter's name, the
+     "Recent" over a list.
+
+     Navy at 68%, not the 55% the system draws. 55% measures 3.35:1 on paper,
+     which is fine for a 40px marketing eyebrow the eye skims past and not fine
+     for a 12px one that is the only thing naming a section — a seller who
+     cannot read "RECENT" cannot tell what the list under it is. 68% is
+     4.79:1 and is still visibly quieter than the heading it sits above.
+     ------------------------------------------------------------------------- */
+  .eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: color-mix(in oklab, var(--color-primary-600) 68%, transparent);
   }
 }
 
-html {
-  overscroll-behavior: none;
+/* ---------------------------------------------------------------------------
+   Motion, for Ask Alaiy.
+
+   Two things only, because a conversation is the one screen in the product
+   where movement carries meaning: a message arriving, and the assistant being
+   mid-thought. Both are announced by the transcript itself, so both stop under
+   `prefers-reduced-motion` rather than being softened.
+
+   `rise` runs on insertion, which is exactly once per message — a partial
+   answer is the same element re-rendered longer, so it does not re-fire and
+   the text does not judder as it is written.
+   --------------------------------------------------------------------------- */
+
+@keyframes alaiy-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-.disable-transitions * {
-  transition: none !important;
+.animate-rise {
+  animation: alaiy-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-[data-print-root] {
-  display: none;
+/* The thinking dots. Scale rather than travel, so the row's height is fixed
+   and the composer below it does not shift. */
+@keyframes alaiy-pulse-dot {
+  0%,
+  70%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.72);
+  }
+  35% {
+    opacity: 1;
+    transform: none;
+  }
 }
 
-@media print {
-  @page {
-    size: Letter;
-    margin: 0;
+.animate-dot {
+  animation: alaiy-pulse-dot 1.25s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise,
+  .animate-dot {
+    animation: none;
   }
 
-  html,
-  body {
-    width: 8.5in !important;
-    height: 11in !important;
-    margin: 0 !important;
-    overflow: hidden !important;
+  /* The press keeps its shadow change — that is the affordance — but stops
+     travelling. */
+  .press {
+    transition: box-shadow 100ms ease;
   }
 
-  body > *:not([data-print-root]) {
-    display: none !important;
-  }
-
-  [data-print-root] {
-    display: block !important;
-    width: 8.5in !important;
-    height: 11in !important;
-    margin: 0 !important;
-    overflow: hidden !important;
-    background: white !important;
-  }
-
-  [data-print-root] [data-print-paper] {
-    width: 8.5in !important;
-    height: 11in !important;
-    margin: 0 !important;
-    box-shadow: none !important;
-  }
-
-  [data-print-root] [data-print-paper],
-  [data-print-root] [data-print-paper] * {
-    print-color-adjust: exact;
-    -webkit-print-color-adjust: exact;
+  .press-light:hover:not(:disabled),
+  .press-dark:hover:not(:disabled),
+  .press-alert:hover:not(:disabled),
+  .press-light:active:not(:disabled),
+  .press-dark:active:not(:disabled),
+  .press-alert:active:not(:disabled) {
+    transform: none;
   }
 }

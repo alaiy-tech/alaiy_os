@@ -4,7 +4,7 @@ import frappe
 @frappe.whitelist()
 def get_children(parent=None, is_root=False):
 	"""One level of the Item Group tree at a time, for the /os/item-groups
-	page's async-loaded tree (see interface/src/app/(main)/os/item-groups).
+	page's async-loaded tree (see alaiy_os_commerce/interface/src/app/(main)/os/item-groups).
 
 	Not reusing frappe.desk.treeview.get_children: that endpoint's response
 	shape is desk-internal and not documented as stable, so this wraps

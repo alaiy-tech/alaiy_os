@@ -70,7 +70,7 @@
    "label": "Feedback"
   },
   {
-   "description": "Snapshot of what produced the reply -- {text, tools: [{tool, input, failed}, ...]} -- built client-side from the already-grouped turn at submission time. This is the record of record: it survives even if the linked session/message is later pruned. See interface/docs/feedback-system.md.",
+   "description": "Snapshot of what produced the reply -- {text, tools: [{tool, input, failed}, ...]} -- built client-side from the already-grouped turn at submission time. This is the record of record: it survives even if the linked session/message is later pruned. See alaiy_os_commerce/interface/docs/feedback-system.md.",
    "fieldname": "agent_trail",
    "fieldtype": "Code",
    "label": "Agent Trail (JSON)",
