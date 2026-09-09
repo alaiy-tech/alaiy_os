@@ -75,10 +75,11 @@ export async function ConnectStep({
       <header className="space-y-1.5">
         {/* <Eyebrow>{session.skipProfile ? "Last step" : "Step two"}</Eyebrow> */}
         <h2 className="text-display-md">Connect your accounts</h2>
-        {/* Deliberately does not say "add the rest later from Channels". The
-            Channels tab's Connect link points back here, and this screen
-            redirects anyone who has finished onboarding — so that would be a
-            promise the app does not currently keep. */}
+        {/* The Channels tab now carries the same connect controls this step
+            does (`components/connect/`), so "add the rest later from Channels"
+            would finally be true. Saying it is a copy decision, not a
+            technical one — the caveat that used to sit here, that the tab's
+            Connect only linked back to this screen, no longer applies. */}
         <p className="text-sm text-muted">
           Connect the ones you sell on. 
         </p>

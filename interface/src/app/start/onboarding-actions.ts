@@ -6,7 +6,6 @@ import { updateSession } from "@/lib/auth/session";
 import { OUR_FAULT, userFacingError } from "@/lib/backend/errors";
 import { saveProfile } from "@/lib/backend/workspace";
 import { startImport } from "@/lib/backend/imports";
-import { amazonConnectUrl, connectShopify } from "@/lib/backend/connectors";
 import { revalidatePath } from "next/cache";
 import type { ChannelId } from "@/lib/backend/types";
 
@@ -74,69 +73,4 @@ export async function startImportAction(
   }
 
   redirect("/home");
-}
-
-/**
- * Attach a Shopify store.
- *
- * The custom app's Client ID and Secret are posted straight through to the
- * connector, which proves them against the shop before storing them
- * encrypted. Neither touches a cookie and neither is ever read back.
- *
- * A Server Action rather than a fetch from the browser, and that is the point
- * for these two: the secret goes browser -> our server -> the connector, so it
- * never crosses an origin and never sits in client-side JavaScript.
- */
-export async function connectShopifyAction(
-  _prev: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const session = await requireSession();
-
-  const shop = String(formData.get("shop") ?? "").trim();
-  const clientId = String(formData.get("client_id") ?? "").trim();
-  const clientSecret = String(formData.get("client_secret") ?? "").trim();
-
-  if (!shop) return { error: "Enter your Shopify store domain." };
-  if (!clientId) return { error: "Enter the custom app's Client ID." };
-  if (!clientSecret) return { error: "Enter the custom app's Client Secret." };
-
-  try {
-    await connectShopify(
-      session.workspaceId,
-      shop,
-      clientId,
-      clientSecret,
-      session.backendToken,
-    );
-  } catch (error) {
-    return { error: userFacingError(error, OUR_FAULT) };
-  }
-
-  revalidatePath("/start");
-  return {};
-}
-
-/**
- * Start Amazon authorisation.
- *
- * The connector builds the consent URL because the SP-API app credentials live
- * on the bench, and Seller Central redirects back to the connector too. This
- * app only sends the seller out.
- */
-export async function connectAmazonAction(
-  _prev: FormState,
-  formData: FormData,
-): Promise<FormState> {
-  const session = await requireSession();
-  const region = String(formData.get("region") ?? "NA") as "NA" | "EU" | "FE";
-
-  let url: string;
-  try {
-    ({ url } = await amazonConnectUrl(session.workspaceId, region, session.backendToken));
-  } catch (error) {
-    return { error: userFacingError(error, OUR_FAULT) };
-  }
-
-  redirect(url);
 }

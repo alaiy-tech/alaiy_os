@@ -1,11 +1,10 @@
 "use client";
 
-import { useActionState, useState } from "react";
-import { useFormStatus } from "react-dom";
-import { connectAmazonAction, connectShopifyAction, type FormState } from "./onboarding-actions";
+import { useState } from "react";
 import { VideoHelper } from "@/components/onboarding/video-helper";
-import { Alert, Field, Input, Pill, Select, Spinner, pressClass } from "@/components/ui";
-import { AMAZON_REGIONS } from "@/lib/auth/amazon-regions";
+import { AmazonAction } from "@/components/connect/amazon-action";
+import { ShopifyForm } from "@/components/connect/shopify-form";
+import { Pill, pressClass } from "@/components/ui";
 import type { ChannelDefinition } from "@/lib/channels";
 import type { ConnectorStatus } from "@/lib/backend/types";
 
@@ -132,151 +131,6 @@ function ConnectorRow({
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * Shopify's credentials: the store, and the custom app's API key pair.
- *
- * The Client ID and Secret rather than the Admin API access token the first
- * version asked for. A token from Shopify's client_credentials grant lasts
- * about a day, so a pasted one connected a store that stopped working by the
- * next morning with nobody having touched it; the id and secret mint a fresh
- * token whenever one is needed, including for a sync that runs at 3am. It is
- * also one trip into the Shopify admin instead of two — the same screen that
- * shows the token shows both of these.
- */
-function ShopifyForm() {
-  const [state, formAction] = useActionState<FormState, FormData>(
-    connectShopifyAction,
-    {},
-  );
-
-  return (
-    <form action={formAction} className="space-y-4">
-      <Field label="Store domain">
-        <Input
-          name="shop"
-          placeholder="your-store.myshopify.com"
-          autoComplete="off"
-          required
-        />
-      </Field>
-
-      {/* Both come off one screen, so it is named once, above the pair,
-          rather than repeated in two hints that say the same route. */}
-      <p className="text-[12px] text-muted">
-        Shopify admin → Settings → Apps and sales channels → Develop apps →
-        your app → API credentials.
-      </p>
-
-      <Field label="Client ID">
-        <Input
-          name="client_id"
-          autoComplete="off"
-          required
-        />
-      </Field>
-
-      <Field label="Client Secret">
-        <Input
-          name="client_secret"
-          type="password"
-          autoComplete="off"
-          required
-        />
-      </Field>
-
-      {state.error ? <Alert>{state.error}</Alert> : null}
-
-      <RowSubmit className={`${ACTION} w-full sm:w-auto`}>Connect Shopify</RowSubmit>
-    </form>
-  );
-}
-
-/**
- * Amazon's action: region, then straight out to Seller Central.
- *
- * The region cannot be dropped to make this a lone button. Consent starts on a
- * region-specific Seller Central domain, so a European seller sent to the North
- * American one simply cannot sign in — and we have nothing to guess from before
- * they are authorised. Inline beside the button keeps it one click.
- */
-function AmazonAction({
-  ready,
-  unavailable,
-}: {
-  ready: boolean;
-  unavailable: boolean;
-}) {
-  const [state, formAction] = useActionState<FormState, FormData>(
-    connectAmazonAction,
-    {},
-  );
-
-  // Said before the not-configured case, because "we could not check" must
-  // never be reported as "it is not set up" — that points at the wrong thing.
-  if (unavailable) {
-    return (
-      <p className="text-[12px] text-warn-ink">
-        Couldn&apos;t check availability — that&apos;s on our side.
-      </p>
-    );
-  }
-
-  if (!ready) {
-    return (
-      <p className="text-[12px] text-muted">
-        Not configured on this environment yet.
-      </p>
-    );
-  }
-
-  return (
-    <form action={formAction} className="min-w-0 space-y-2">
-      {/* One line, always: no wrap, and the select is the part that gives way.
-          `w-auto!` because `Select` ships `w-full` and Tailwind emits it after
-          `w-auto`, so an unforced override loses and the button drops below.
-          Auto lets the native select size to "India (Amazon EU region)", and
-          `min-w-0` lets it shrink from there when the row runs out of room. */}
-      <div className="flex items-center gap-2">
-        <label className="sr-only" htmlFor="amazon-region">
-          Your Amazon region
-        </label>
-        <Select
-          id="amazon-region"
-          name="region"
-          defaultValue="NA"
-          className="h-9 w-auto! min-w-0 text-[13px]"
-          options={AMAZON_REGIONS.map((region) => ({
-            value: region.spapi,
-            label: region.label,
-          }))}
-        />
-
-        <RowSubmit className={ACTION}>Connect</RowSubmit>
-      </div>
-
-      {state.error ? (
-        <p className="text-[12px] text-alert-ink">{state.error}</p>
-      ) : null}
-    </form>
-  );
-}
-
-function RowSubmit({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className: string;
-}) {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className={className}>
-      {pending ? <Spinner /> : null}
-      {children}
-    </button>
   );
 }
 
