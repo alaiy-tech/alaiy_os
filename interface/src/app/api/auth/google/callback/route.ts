@@ -1,8 +1,9 @@
-import { NextResponse, type NextRequest } from "next/server";
+import { type NextRequest } from "next/server";
 import { exchangeGoogleCode } from "@/lib/auth/google";
 import { consumeOAuthState } from "@/lib/auth/oauth-state";
 import { establishSession } from "@/lib/auth/establish";
 import { signInWithGoogle } from "@/lib/backend/auth";
+import { redirectTo } from "@/lib/redirect";
 
 /**
  * Google redirects here. Everything past this point — the token exchange, the
@@ -10,8 +11,7 @@ import { signInWithGoogle } from "@/lib/backend/auth";
  */
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
-  const failure = (reason: string) =>
-    NextResponse.redirect(new URL(`/start?error=${reason}`, request.url));
+  const failure = (reason: string) => redirectTo(`/start?error=${reason}`);
 
   if (params.get("error")) return failure("google_denied");
 
@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     // rather than to a route of its own.
     const destination =
       claims.next || (step === "done" ? "/home" : "/start");
-    return NextResponse.redirect(new URL(destination, request.url));
+    return redirectTo(destination);
   } catch (error) {
     console.error("Google sign-in failed", error);
     return failure("google_failed");
