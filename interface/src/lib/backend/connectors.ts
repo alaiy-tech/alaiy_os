@@ -28,22 +28,30 @@ export async function listConnectors(
 }
 
 /**
- * Attach a Shopify store with an Admin API access token.
+ * Attach a Shopify store with a custom app's Client ID and Client Secret.
  *
  * Shopify OAuth is a later stage; until then the seller creates a custom app
- * in their Shopify admin and pastes its token. The connector verifies it
- * against the shop before saving, so a bad token fails here rather than at
- * first sync.
+ * in their Shopify admin and hands over its two API credentials. Not the
+ * Admin API access token, which this used to send: tokens minted from those
+ * credentials last about a day, so the pair that mints them is what keeps a
+ * store connected. The backend proves them against the shop before saving, so
+ * a wrong secret fails here rather than at first sync.
  */
 export async function connectShopify(
   workspaceId: string,
   shop: string,
-  accessToken: string,
+  clientId: string,
+  clientSecret: string,
   userToken?: string,
 ): Promise<ConnectorStatus> {
   return backend.post(
     `${API}.connect_shopify`,
-    { workspace: workspaceId, shop, access_token: accessToken },
+    {
+      workspace: workspaceId,
+      shop,
+      client_id: clientId,
+      client_secret: clientSecret,
+    },
     { userToken },
   );
 }

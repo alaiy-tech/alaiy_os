@@ -15,12 +15,12 @@ export type ChannelDefinition = {
 };
 
 export const CHANNELS: ChannelDefinition[] = [
-  // {
-  //   id: "shopify",
-  //   name: "Shopify",
-  //   blurb: "Orders, products, inventory and payouts. Real-time via webhooks.",
-  //   helpVideoUrl: "https://cdn.alaiy.com/help/connect-shopify.mp4",
-  // },
+  {
+    id: "shopify",
+    name: "Shopify",
+    blurb: "Orders, products, inventory and payouts. Real-time via webhooks.",
+    helpVideoUrl: "https://cdn.alaiy.com/help/connect-shopify.mp4",
+  },
   {
     id: "amazon",
     name: "Amazon",
