@@ -3,6 +3,7 @@
 POST /api/method/alaiy_os.api.chat.create_session  -> {"session": "CHAT-..."}
 POST /api/method/alaiy_os.api.chat.upload_attachment -> a staged file's chip (multipart)
 POST /api/method/alaiy_os.api.chat.delete_attachment -> {"deleted": "..."}
+POST /api/method/alaiy_os.api.chat.transcribe_voice  -> {"text": "..."} (multipart)
 POST /api/method/alaiy_os.api.chat.send_message    -> {"seq": n, "status": "Running"}
 GET  /api/method/alaiy_os.api.chat.get_messages    -> messages after a cursor + status
                                                      + the newest answer's follow-ups
@@ -52,6 +53,11 @@ from werkzeug.wrappers import Response
 from alaiy_os.chat import attachments
 from alaiy_os.chat import mentions as chat_mentions
 from alaiy_os.chat import runner, skills, tools
+from alaiy_os.engine import llm
+
+# Whisper's own cap. Checked here so an over-long recording fails with a
+# message that says why, rather than a provider 413 with no context.
+MAX_VOICE_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 @frappe.whitelist()
@@ -175,6 +181,43 @@ def upload_attachment(session):
 		"file_size": len(content),
 		"chars": len(text),
 	}
+
+
+@frappe.whitelist()
+def transcribe_voice():
+	"""Transcribe one recorded voice clip -> {"text": str}.
+
+	Multipart, like upload_attachment — the browser posts a MediaRecorder blob
+	as `file` — but nothing is saved here: a voice clip is dictation for the
+	composer, not a document the conversation should be able to refer back to
+	later, so it never becomes a File or an OS Chat Attachment. No session or
+	permission check either, for the same reason: this doesn't touch a chat,
+	it only turns audio into text on its way into one.
+	"""
+	uploaded = frappe.request.files.get("file")
+	if not uploaded:
+		frappe.throw(frappe._("No audio uploaded."))
+
+	content = uploaded.stream.read()
+	if not content:
+		frappe.throw(frappe._("The recording was empty."))
+	if len(content) > MAX_VOICE_UPLOAD_BYTES:
+		frappe.throw(
+			frappe._("That recording is too long ({0} MB). Keep it under {1} MB.").format(
+				round(len(content) / 1024 / 1024, 1), MAX_VOICE_UPLOAD_BYTES // 1024 // 1024
+			)
+		)
+
+	try:
+		result = llm.transcribe_audio(content, uploaded.mimetype or "audio/webm")
+	except Exception as exc:
+		# Unsupported (no provider configured) and a provider failure both carry
+		# a clean, already-human-readable message as their str() — see
+		# engine/ai_client.py — so there is nothing to translate here, only to
+		# make sure it reaches the caller instead of becoming a raw traceback.
+		frappe.throw(str(exc) or frappe._("Could not transcribe that recording."))
+
+	return {"text": result.get("text") or ""}
 
 
 #: One request's worth of spreadsheet. Not a cap on what is *viewable* — the
