@@ -4,9 +4,17 @@ import { useActionState } from "react";
 import { startImportAction, type FormState } from "./onboarding-actions";
 import { SubmitButton } from "@/components/onboarding/submit-button";
 import { Alert } from "@/components/ui";
-import { IMPORT_WINDOW_DAYS_LABEL } from "@/lib/channels";
+import { IMPORT_RECENT_WINDOW_LABEL } from "@/lib/channels";
 
-/** The gate between connecting accounts and kicking off the 90-day backfill. */
+/**
+ * The gate between connecting accounts and kicking off the import.
+ *
+ * The button promises the store rather than a window, because that is what the
+ * import delivers — the recent orders land while the seller is still looking
+ * at this flow, and their older history keeps arriving afterwards. Saying so
+ * in the note below is the difference between a store that is still filling in
+ * and one that looks like it imported the wrong amount.
+ */
 export function ImportLauncher({
   connectedChannels,
 }: {
@@ -27,16 +35,14 @@ export function ImportLauncher({
       {state.error ? <Alert>{state.error}</Alert> : null}
 
       <SubmitButton className="w-full" disabled={!ready}>
-        {ready
-          ? `Import my last ${IMPORT_WINDOW_DAYS_LABEL}`
-          : "Connect a channel first"}
+        {ready ? "Import my store" : "Connect a channel first"}
       </SubmitButton>
 
-      {!ready ? (
-        <p className="text-center text-xs text-muted">
-          Connect at least one channel above to continue.
-        </p>
-      ) : null}
+      <p className="text-center text-xs text-muted">
+        {ready
+          ? `Your listings and the last ${IMPORT_RECENT_WINDOW_LABEL} of orders land first. Older orders keep importing in the background.`
+          : "Connect at least one channel above to continue."}
+      </p>
     </form>
   );
 }

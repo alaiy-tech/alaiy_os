@@ -47,7 +47,7 @@ export async function saveProfileAction(
 }
 
 /**
- * The last step — queue the 90-day backfill and hand the seller the app.
+ * The last step — queue the import and hand the seller the app.
  *
  * There is no progress screen to wait on any more: they go to Ask Alaiy and
  * watch the import from the status box that follows them around. The backend

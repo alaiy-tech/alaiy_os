@@ -3,7 +3,7 @@ import { requireOnboardedSession } from "@/lib/auth/dal";
 import { loadHomeDashboard } from "@/lib/backend/home";
 import { listOrders } from "@/lib/backend/orders";
 import { listConnectors } from "@/lib/backend/connectors";
-import { DEFAULT_WINDOW, windowStart } from "@/lib/listing";
+import { DASHBOARD_WINDOW, windowStart } from "@/lib/listing";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { ImportingBanner } from "@/components/data/importing-banner";
 import { Alert, Eyebrow } from "@/components/ui";
@@ -60,7 +60,7 @@ export default async function DashboardPage() {
         limit: RECENT_ORDERS,
         orderBy: "order_date",
         order: "desc",
-        fromDate: windowStart(DEFAULT_WINDOW),
+        fromDate: windowStart(DASHBOARD_WINDOW),
       },
       session.backendToken,
     ),
