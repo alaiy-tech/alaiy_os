@@ -22,6 +22,11 @@ import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
  * a single page-level state could not express. The two forms share one state
  * hook per card, so triggering a sync clears the previous notice rather than
  * stacking messages up.
+ *
+ * A card only reaches this component when its channel is live or when it is
+ * connected (see the page). The `live` prop is what separates those: a card
+ * for a switched-off channel exists to be wound down, so it keeps its status
+ * and its Disconnect and loses everything that would deepen the connection.
  */
 
 const CHANNEL_BLURB: Record<ChannelId, string> = {
@@ -32,12 +37,15 @@ const CHANNEL_BLURB: Record<ChannelId, string> = {
 export function ChannelCard({
   channel,
   name,
+  live,
   status,
   amazonReady,
   amazonUnavailable,
 }: {
   channel: ChannelId;
   name: string;
+  /** Still connectable. Off means wind-down only — no connect, no sync. */
+  live: boolean;
   status?: ConnectorStatus;
   /** Whether the bench has SP-API app credentials. Amazon's row only. */
   amazonReady: boolean;
@@ -56,7 +64,11 @@ export function ChannelCard({
             <StatusPill status={status} />
           </div>
 
-          <p className="text-[13px] text-muted">{CHANNEL_BLURB[channel]}</p>
+          <p className="text-[13px] text-muted">
+            {live
+              ? CHANNEL_BLURB[channel]
+              : `${name} is switched off. Everything already imported stays; disconnect to stop syncing it.`}
+          </p>
 
           {connected ? (
             <dl className="flex flex-wrap gap-x-5 gap-y-1 pt-1.5 text-[12px]">
@@ -82,7 +94,7 @@ export function ChannelCard({
             everyone except someone still mid-signup. Amazon is one click out
             to Seller Central, so its row carries the action itself; Shopify
             needs three fields, so its button opens them below. */}
-        {!connected ? (
+        {!connected && live ? (
           channel === "amazon" ? (
             <AmazonAction ready={amazonReady} unavailable={amazonUnavailable} />
           ) : (
@@ -103,7 +115,7 @@ export function ChannelCard({
       {/* Collapsed until asked for, so an unconnected channel still costs one
           card. It closes on its own once connected: the action refreshes this
           page, `connected` flips, and the whole branch stops rendering. */}
-      {!connected && channel === "shopify" && connecting ? (
+      {!connected && live && channel === "shopify" && connecting ? (
         <div className="border-t border-line px-5 py-4">
           <ShopifyForm />
         </div>
@@ -118,7 +130,9 @@ export function ChannelCard({
         </div>
       ) : null}
 
-      {connected ? <ConnectedControls channel={channel} name={name} /> : null}
+      {connected ? (
+        <ConnectedControls channel={channel} name={name} live={live} />
+      ) : null}
     </div>
   );
 }
@@ -126,9 +140,11 @@ export function ChannelCard({
 function ConnectedControls({
   channel,
   name,
+  live,
 }: {
   channel: ChannelId;
   name: string;
+  live: boolean;
 }) {
   const [state, formAction] = useActionState<ChannelActionState, FormData>(
     async (previous, formData) =>
@@ -143,27 +159,36 @@ function ConnectedControls({
       {state.error ? <Alert>{state.error}</Alert> : null}
       {state.notice ? <Alert tone="info">{state.notice}</Alert> : null}
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
+      <div
+        className={`flex flex-wrap items-end gap-3 ${
+          live ? "justify-between" : "justify-end"
+        }`}
+      >
         {/* One form, two submit buttons: `formAction` is the same action and
-            the button's own name/value says which kind to pull. */}
-        <form action={formAction} className="space-y-1.5">
-          <input type="hidden" name="channel" value={channel} />
-          <input type="hidden" name="intent" value="sync" />
-          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-            Sync now
-          </p>
-          <div className="flex gap-2">
-            <SyncButton kind="products">Products</SyncButton>
-            <SyncButton kind="orders">Orders</SyncButton>
-          </div>
-        </form>
+            the button's own name/value says which kind to pull. Gone when the
+            channel is off — the action refuses it anyway, and a button whose
+            only outcome is an error is worse than no button. */}
+        {live ? (
+          <form action={formAction} className="space-y-1.5">
+            <input type="hidden" name="channel" value={channel} />
+            <input type="hidden" name="intent" value="sync" />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+              Sync now
+            </p>
+            <div className="flex gap-2">
+              <SyncButton kind="products">Products</SyncButton>
+              <SyncButton kind="orders">Orders</SyncButton>
+            </div>
+          </form>
+        ) : null}
 
         <DisconnectForm channel={channel} name={name} formAction={formAction} />
       </div>
 
       <p className="text-[12px] text-muted">
-        A sync runs on our side and can take a few minutes. Nothing is written
-        back to {name} — Alaiy only reads.
+        {live
+          ? `A sync runs on our side and can take a few minutes. Nothing is written back to ${name} — Alaiy only reads.`
+          : `No new syncs will be started for ${name}. Nothing was ever written back to it — Alaiy only reads.`}
       </p>
     </div>
   );

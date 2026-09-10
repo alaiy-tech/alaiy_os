@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChannelBadge, EmptyRow, TableFrame, Td, Th } from "@/components/data/table";
 import { FilterField, FilterSelect } from "@/components/data/toolbar";
 import { pressClass } from "@/components/ui";
+import { channelOptions } from "@/lib/channels";
 import type { ChannelId } from "@/lib/backend/types";
 import { formatMoney, formatNumber } from "@/lib/format";
 import type { ChannelPnlRow, FeeBasis } from "@/lib/profitability/types";
@@ -67,11 +68,7 @@ export function PnlTable({
           <FilterSelect
             value={channel}
             onChange={(event) => setChannel(event.target.value as ChannelId | "")}
-            options={[
-              { value: "", label: "All channels" },
-              { value: "amazon", label: "Amazon" },
-              { value: "shopify", label: "Shopify" },
-            ]}
+            options={[{ value: "", label: "All channels" }, ...channelOptions()]}
           />
         </FilterField>
         {isFiltered ? (

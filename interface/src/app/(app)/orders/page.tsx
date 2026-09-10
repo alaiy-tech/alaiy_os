@@ -38,6 +38,7 @@ import {
   Th,
 } from "@/components/data/table";
 import { ChannelTabs } from "@/components/data/channel-tabs";
+import { LIVE_CHANNELS } from "@/lib/channels";
 import { Pagination } from "@/components/data/pagination";
 import { Figure, TotalsBar } from "@/components/data/summary";
 import {
@@ -204,8 +205,11 @@ export default async function OrdersPage({
         active={channel ?? ""}
         tabs={[
           { value: "", label: "All", href: channelHref(query, undefined) },
-          { value: "shopify", label: "Shopify", href: channelHref(query, "shopify") },
-          { value: "amazon", label: "Amazon", href: channelHref(query, "amazon") },
+          ...LIVE_CHANNELS.map((c) => ({
+            value: c.id,
+            label: c.name,
+            href: channelHref(query, c.id),
+          })),
         ]}
       />
 

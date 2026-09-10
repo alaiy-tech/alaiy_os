@@ -7,7 +7,7 @@ import { OUR_FAULT, userFacingError } from "@/lib/backend/errors";
 import { saveProfile } from "@/lib/backend/workspace";
 import { startImport } from "@/lib/backend/imports";
 import { revalidatePath } from "next/cache";
-import type { ChannelId } from "@/lib/backend/types";
+import { isLiveChannel } from "@/lib/channels";
 
 export type FormState = { error?: string };
 
@@ -59,7 +59,10 @@ export async function startImportAction(
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
-  const channels = formData.getAll("channels").map(String) as ChannelId[];
+  // Filtered rather than cast: these arrive as form fields, so they are
+  // whatever the caller posted, and a switched-off channel must not be
+  // backfilled just because a stale form still named it.
+  const channels = formData.getAll("channels").map(String).filter(isLiveChannel);
 
   if (channels.length === 0) {
     return { error: "Connect at least one channel before importing." };

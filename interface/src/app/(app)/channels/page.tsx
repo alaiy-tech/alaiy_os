@@ -12,8 +12,8 @@ export const metadata = { title: "Channels — Alaiy" };
 /**
  * The Channels tab: what each channel is attached to, and control over it.
  *
- * Both channels are always rendered, connected or not, so the tab answers
- * "what could I be syncing?" rather than only "what am I syncing?". A channel
+ * Every live channel is rendered, connected or not, so the tab answers "what
+ * could I be syncing?" rather than only "what am I syncing?". A channel
  * that has never been connected can be connected from its own card, using the
  * same components the onboarding step uses (`components/connect/`) — so there
  * is still one credential form on the codebase, just not one screen that owns
@@ -46,6 +46,14 @@ export default async function ChannelsPage() {
   const statusFor = (channel: string) =>
     connectors?.find((connector) => connector.channel === channel);
 
+  // Live channels, plus any switched-off channel this workspace is still
+  // attached to. A store connected while its channel was live would otherwise
+  // vanish from the tab and keep syncing with nothing to stop it — so it keeps
+  // a card, minus the controls that would deepen the connection.
+  const visible = CHANNELS.filter(
+    (channel) => channel.live || statusFor(channel.id)?.connected,
+  );
+
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
@@ -67,11 +75,12 @@ export default async function ChannelsPage() {
           {latestImport ? <ImportLine job={latestImport} /> : null}
 
           <div className="space-y-3">
-            {CHANNELS.map((channel) => (
+            {visible.map((channel) => (
               <ChannelCard
                 key={channel.id}
                 channel={channel.id}
                 name={channel.name}
+                live={channel.live}
                 status={statusFor(channel.id)}
                 amazonReady={amazon.ok ? amazon.value.ready : false}
                 amazonUnavailable={!amazon.ok}

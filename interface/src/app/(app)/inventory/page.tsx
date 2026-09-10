@@ -9,7 +9,7 @@ import {
   loadStock,
   type ProductSortField,
 } from "@/lib/backend/inventory";
-import { channelName } from "@/lib/channels";
+import { channelName, channelOptions } from "@/lib/channels";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import {
   firstValue,
@@ -248,11 +248,7 @@ export default async function InventoryPage({
             <FilterSelect
               name="channel"
               defaultValue={channel ?? ""}
-              options={[
-                { value: "", label: "All channels" },
-                { value: "shopify", label: "Shopify" },
-                { value: "amazon", label: "Amazon" },
-              ]}
+              options={[{ value: "", label: "All channels" }, ...channelOptions()]}
             />
           </FilterField>
         </Toolbar>

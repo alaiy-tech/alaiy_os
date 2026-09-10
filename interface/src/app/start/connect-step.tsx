@@ -2,7 +2,7 @@ import { Stepper } from "@/components/onboarding/stepper";
 import { Alert, Eyebrow } from "@/components/ui";
 import { amazonAppStatus, listConnectors } from "@/lib/backend/connectors";
 import { BackendError } from "@/lib/backend/client";
-import { CHANNELS, UPCOMING_CHANNELS } from "@/lib/channels";
+import { LIVE_CHANNELS, UPCOMING_CHANNELS, isLiveChannel } from "@/lib/channels";
 import type { SessionPayload } from "@/lib/auth/session";
 import type { ConnectorStatus } from "@/lib/backend/types";
 import { ConnectorRows, UpcomingRows } from "./connector-rows";
@@ -66,7 +66,13 @@ export async function ConnectStep({
         : "We couldn't load your connections.";
   }
 
-  const connectedIds = connectors.filter((c) => c.connected).map((c) => c.channel);
+  // Live channels only, to match what the import action will accept: a
+  // connection to a switched-off channel must not arm the Import button and
+  // then be filtered out server-side, which reads as "connect a channel first"
+  // to someone looking at one that says Connected.
+  const connectedIds = connectors
+    .filter((c) => c.connected && isLiveChannel(c.channel))
+    .map((c) => c.channel);
 
   return (
     <div className="space-y-6">
@@ -90,7 +96,7 @@ export async function ConnectStep({
 
       <div className="space-y-6">
         <ConnectorRows
-          channels={CHANNELS}
+          channels={LIVE_CHANNELS}
           statuses={connectors}
           amazonReady={amazonReady}
           amazonUnavailable={amazonUnavailable}
