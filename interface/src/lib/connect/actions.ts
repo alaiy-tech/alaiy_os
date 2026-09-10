@@ -5,6 +5,7 @@ import { refresh } from "next/cache";
 import { requireSession } from "@/lib/auth/dal";
 import { OUR_FAULT, userFacingError } from "@/lib/backend/errors";
 import { amazonConnectUrl, connectShopify } from "@/lib/backend/connectors";
+import { isLiveChannel } from "@/lib/channels";
 
 /**
  * Attaching a channel, from wherever the seller is standing.
@@ -32,12 +33,20 @@ export type FormState = { error?: string };
  * A Server Action rather than a fetch from the browser, and that is the point
  * for these two: the secret goes browser -> our server -> the connector, so it
  * never crosses an origin and never sits in client-side JavaScript.
+ *
+ * The live check is here rather than only on the screens that render the form:
+ * a Server Action is reachable by a direct POST, so hiding the form is not the
+ * same as switching the channel off.
  */
 export async function connectShopifyAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
+
+  if (!isLiveChannel("shopify")) {
+    return { error: "Shopify connections are switched off." };
+  }
 
   const shop = String(formData.get("shop") ?? "").trim();
   const clientId = String(formData.get("client_id") ?? "").trim();

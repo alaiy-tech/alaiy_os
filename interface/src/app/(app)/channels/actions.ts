@@ -5,7 +5,7 @@ import { requireOnboardedSession } from "@/lib/auth/dal";
 import { disconnectChannel } from "@/lib/backend/connectors";
 import { resyncChannel, type SyncKind } from "@/lib/backend/imports";
 import { OUR_FAULT, userFacingError } from "@/lib/backend/errors";
-import { channelName } from "@/lib/channels";
+import { channelName, isChannel, isLiveChannel } from "@/lib/channels";
 import type { ChannelId } from "@/lib/backend/types";
 
 /**
@@ -16,16 +16,20 @@ import type { ChannelId } from "@/lib/backend/types";
  * the check has to live here. Both also validate their arguments against a
  * fixed set — the channel and the sync kind arrive as form fields, which means
  * they arrive as whatever the caller typed.
+ *
+ * The two treat a switched-off channel differently, and deliberately.
+ * Disconnecting one has to keep working, or a store attached while its channel
+ * was live could never be detached; starting a fresh sync on one must not.
  */
 
 export type ChannelActionState = { error?: string; notice?: string };
 
-const CHANNELS: ChannelId[] = ["shopify", "amazon"];
 const KINDS: SyncKind[] = ["products", "orders"];
 
+/** Any channel this app knows, live or not. */
 function readChannel(formData: FormData): ChannelId | undefined {
   const raw = String(formData.get("channel") ?? "");
-  return CHANNELS.find((channel) => channel === raw);
+  return isChannel(raw) ? raw : undefined;
 }
 
 /**
@@ -45,6 +49,9 @@ export async function syncChannelAction(
   const rawKind = String(formData.get("kind") ?? "");
   const kind = KINDS.find((k) => k === rawKind);
   if (!channel || !kind) return { error: "Unknown channel or sync type." };
+  if (!isLiveChannel(channel)) {
+    return { error: `${channelName(channel)} syncing is switched off.` };
+  }
 
   try {
     await resyncChannel(session.workspaceId, channel, kind, session.backendToken);

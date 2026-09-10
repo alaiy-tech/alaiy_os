@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireOnboardedSession } from "@/lib/auth/dal";
 import { PAGE_SIZE, loadListing, loadListings } from "@/lib/backend/listings";
 import { firstValue, hrefToString, parseChannel, parseOffset } from "@/lib/listing";
+import { channelOptions } from "@/lib/channels";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import {
   ChannelBadge,
@@ -140,11 +141,7 @@ export default async function ListingsPage({
           <FilterSelect
             name="channel"
             defaultValue={channel ?? ""}
-            options={[
-              { value: "", label: "All channels" },
-              { value: "shopify", label: "Shopify" },
-              { value: "amazon", label: "Amazon" },
-            ]}
+            options={[{ value: "", label: "All channels" }, ...channelOptions()]}
           />
         </FilterField>
         <FilterField label="Category">

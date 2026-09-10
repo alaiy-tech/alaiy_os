@@ -1,3 +1,4 @@
+import { isChannel, isLiveChannel } from "@/lib/channels";
 import type { ChannelId, FulfilmentFilter, OrderFlagKey } from "@/lib/backend/types";
 
 /**
@@ -22,12 +23,17 @@ export function firstValue(value: string | string[] | undefined): string | undef
   return trimmed ? trimmed : undefined;
 }
 
-const CHANNELS: ChannelId[] = ["shopify", "amazon"];
-
-/** undefined means "all channels", which is the default view. */
+/**
+ * undefined means "all channels", which is the default view.
+ *
+ * Live channels only: this backs a filter, and a filter for a channel the app
+ * no longer offers is a link with nowhere to be clicked from. A stale
+ * bookmark for a switched-off channel falls back to all, which still shows
+ * that channel's rows — filtering it out was never the point.
+ */
 export function parseChannel(value: string | string[] | undefined): ChannelId | undefined {
   const raw = firstValue(value);
-  return CHANNELS.find((channel) => channel === raw);
+  return raw !== undefined && isLiveChannel(raw) ? raw : undefined;
 }
 
 export function parseDirection(value: string | string[] | undefined): "asc" | "desc" {
@@ -144,7 +150,10 @@ export function parseSelectedOrder(
   if (!raw) return undefined;
   const separator = raw.indexOf(":");
   if (separator < 1) return undefined;
-  const channel = CHANNELS.find((id) => id === raw.slice(0, separator));
+  // Any known channel, live or not: this identifies an order that already
+  // exists, and switching a channel off does not unimport its orders.
+  const prefix = raw.slice(0, separator);
+  const channel = isChannel(prefix) ? prefix : undefined;
   const externalOrderId = raw.slice(separator + 1);
   if (!channel || !externalOrderId) return undefined;
   return { channel, externalOrderId };
