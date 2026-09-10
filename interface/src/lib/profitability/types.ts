@@ -1,18 +1,30 @@
 import type { ChannelId } from "@/lib/backend/types";
 
 /**
- * The Profitability tab's own shapes.
+ * The Profitability tab's shapes, as `api/profitability.py` returns them.
  *
- * Every fee and cost field here already exists via a real SP-API or Shopify
- * endpoint (Fees API, Financial Events API, Competitive Pricing API, Shopify
- * orders) — nothing is blocked the way Support's or Ratings' data is. The
- * one field V1 genuinely cannot fill in is COGS, which the issue is explicit
- * about: the column exists, is visible, and says "Coming soon" rather than
- * being hidden — see the issue's key decision against an averaged COGS
- * field. `grossMarginPct` below is therefore *before* COGS by construction,
- * and `netMarginPct` is the one that needs it and is null until it exists.
+ * Snake case, like every other backend-shaped type in this app — these cross
+ * the wire as-is rather than through a renaming layer that would have to be
+ * kept in step with the Python.
+ *
+ * Two fields carry the whole honesty of this tab and neither is decoration:
+ * `fee_basis` says whether the fees are Amazon's own accounting or its quote,
+ * and `fees_available` says whether there are any. See the module docstring on
+ * `selfserve/profitability.py` — the failure this guards against is presenting
+ * an estimate as an actual, which a seller cannot detect for themselves and
+ * will price against.
  */
 
+/**
+ * Where a fee figure came from.
+ *
+ * `actual` means settled fees covered every unit sold in the window — Amazon's
+ * own ledger, nothing estimated. `estimated` means anything else, including a
+ * row that is mostly settled with a quoted tail: Amazon settles two to four
+ * weeks after a sale, so a recent window is normally part-estimated, and
+ * labelling that blend "actual" because most of it is would be the exact
+ * failure above.
+ */
 export type FeeBasis = "actual" | "estimated";
 
 /**
@@ -21,6 +33,11 @@ export type FeeBasis = "actual" | "estimated";
  * is two of these, because the fee structure, the price, and the margin
  * genuinely differ per channel, and nothing rolls them back together: the
  * product group that used to do it is gone app-wide.
+ *
+ * The backend still sends `product_group`, because `Alaiy Product Group` is
+ * still a real thing there. It is deliberately not in this type: a field
+ * nothing reads is an invitation to group by it again, and the pairing behind
+ * it — a barcode match or a title score — is exactly what was removed.
  */
 export type ChannelPnlRow = {
   sku: string;
@@ -28,34 +45,97 @@ export type ChannelPnlRow = {
   channel: ChannelId;
   revenue: number;
   units: number;
-  amazonReferralFee: number;
-  /** Amazon's fulfilment fee. 0 off Amazon — this mock assumes every Amazon
-   *  row is FBA-fulfilled, which is also why `shippingCost` is 0 for them:
-   *  Amazon's own fee already covers pick, pack and ship. */
-  amazonFbaFee: number;
-  shopifyTransactionFee: number;
-  /** Financial Events (settled) vs. Fee Preview (recent, unsettled) — see
-   *  the issue's key decision. The UI must not present an estimate as if it
-   *  were an actual. */
-  feeBasis: FeeBasis;
-  shippingCost: number;
-  /** From a connected WMS, or Jordan's own manual per-SKU estimate — the V1
-   *  fallback the issue calls out, which must read as an estimate. */
-  shippingCostBasis: FeeBasis;
-  /** Null off Amazon — Shopify has no Buy Box. */
-  buyBoxWinPct: number | null;
-  buyBoxWinPctSevenDaysAgo: number | null;
-  currentPrice: number | null;
-  buyBoxPrice: number | null;
+  orders: number;
+  currency: string | null;
+  external_url: string | null;
+
+  amazon_referral_fee: number;
+  amazon_fba_fee: number;
+  /** Storage, long-term storage, disposal — Amazon's charges that are neither
+   *  commission nor fulfilment. Counted, because a margin that omitted them
+   *  would be wrong by exactly that much. */
+  amazon_other_fee: number;
+  shopify_transaction_fee: number;
+  fee_basis: FeeBasis;
   /**
-   * What recommending a price would project to recover — the kind of
-   * forecast a real elasticity model would produce from sales velocity at
-   * different price points. There is no such model here, so this is filled
-   * in by hand on the one row with a recommendation worth showing, exactly
-   * like Ratings' hand-authored positive-attribution figures; the
-   * *recommended price itself* is never hand-authored — see
-   * `recommendedPrice` in presentation.ts.
+   * False when the channel has told us nothing about this SKU's fees — Amazon
+   * declined to quote it and has settled nothing, or the Shopify store takes
+   * payment through a gateway Shopify never sees.
+   *
+   * Not the same as zero, and the table must not render it as one: a ₹0 fee
+   * makes the SKU with unknown costs look like the best margin on the page.
    */
-  projectedBuyBoxRecoveryPct?: number;
-  projectedMonthlyRevenueImpact?: number;
+  fees_available: boolean;
+  /** Why, when `fees_available` is false. Shown rather than left as a dash
+   *  nobody can act on. */
+  fee_note: string | null;
+  /** How much of the row is Amazon's accounting and how much is its quote.
+   *  What `fee_basis` is derived from, kept so the UI can say "18 of 24 units
+   *  settled" instead of just "estimated". */
+  settled_units: number;
+  estimated_units: number;
+
+  /**
+   * Revenue less fees, over revenue. Before COGS and before shipping, neither
+   * of which has a source — see the tab's own note.
+   *
+   * Null when the fees are unknown. A margin computed from a fee we do not
+   * have is a guess with a decimal point on it, and the one number on this tab
+   * nobody should be allowed to read off a guess.
+   */
+  gross_margin_pct: number | null;
+
+  /** Null off Amazon — Shopify has no Buy Box. Also null on an Amazon SKU
+   *  whose Sales & Traffic report we have not read, which is a role gap
+   *  rather than a zero win rate. */
+  buy_box_win_pct: number | null;
+  /** The freshest reading a week or more old, for the "down from" comparison.
+   *  Amazon keeps no Buy Box history, so this exists only because it was
+   *  stored on the day it was taken. */
+  buy_box_win_pct_prior: number | null;
+  /** The date that prior reading is actually from. A sync can miss a day, so
+   *  the comparison says when rather than implying a week to the hour. */
+  buy_box_prior_date: string | null;
+  buy_box_price: number | null;
+  buy_box_is_ours: boolean | null;
+  buy_box_as_of: string | null;
+  current_price: number | null;
+};
+
+/**
+ * What this seller's numbers are made of, decided on the backend.
+ *
+ * An empty table means "no Amazon account", "no sales in this window" or "the
+ * Finance role was never granted", and those need three different sentences.
+ * None of them is derivable from an absence of rows in the browser, so the
+ * backend says which it is.
+ */
+export type PnlCoverage = {
+  amazon_connected: boolean;
+  shopify_connected: boolean;
+  amazon_skus: number;
+  shopify_skus: number;
+  /** At least one SKU has a settled figure, so the Finance and Accounting role
+   *  is granted and the seller is simply inside the settlement lag. */
+  has_settled_fees: boolean;
+  has_fee_data: boolean;
+  has_buy_box: boolean;
+  shopify_fees_available: boolean;
+  synced_at: string | null;
+  /** Both false, and expected to stay so. The columns remain on the tab and
+   *  say "coming soon" rather than disappearing: COGS needs lot-level cost per
+   *  PO line and a per-SKU shipping cost needs a WMS, and an averaged stand-in
+   *  for either would be a number nobody could act on. */
+  cogs_available: boolean;
+  shipping_cost_available: boolean;
+};
+
+export type PnlPage = {
+  days: number;
+  rows: ChannelPnlRow[];
+  coverage: PnlCoverage;
+  /** Taken from the rows themselves, not assumed. A seller reading ₹ against
+   *  figures Amazon settled in $ has every number on the page wrong by the
+   *  exchange rate. */
+  currency: string | null;
 };

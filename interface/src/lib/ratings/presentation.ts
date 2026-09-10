@@ -1,161 +1,82 @@
-import { daysBetween, withinDays } from "@/lib/dates";
-import type {
-  OpsNoteCategory,
-  PatternAlert,
-  ProductRatingRow,
-  Review,
-} from "./types";
+import type { ReviewTopic, TopicSentiment } from "./types";
 
 /**
- * How a review pattern reads: the fixed keyword watchlist patterns are
- * detected against, the ops note taxonomy, and the rating-change delta —
- * client-safe, like `lib/orders/flags.ts` and `lib/support/cases.ts`.
+ * How a rating change and a topic read — client-safe, so the tab can filter
+ * and regroup without another round trip.
+ *
+ * **What used to be here and is gone:** a keyword watchlist that scanned review
+ * text for "zipper", "stitching", "strap" and clustered the matches into a
+ * batch-defect alert. It matched against text SP-API does not return and never
+ * will, so nothing could ever have fed it. Amazon's own topic aggregate does
+ * the same job with less confidence and actual data behind it — see `concerns`
+ * on the backend.
  */
 
-/** Amazon's own cutoff below which Buy Box eligibility is at risk. */
+/** Amazon's own cutoff below which Buy Box eligibility is at risk. Also
+ *  returned on the seller rating; this is the fallback for rendering the line
+ *  before that has loaded. */
 export const RATING_THRESHOLD = 4.0;
 
-export const OPS_CATEGORY_OPTIONS: { value: OpsNoteCategory; label: string }[] = [
-  { value: "packaging", label: "Packaging change" },
-  { value: "supplier", label: "Supplier switch" },
-  { value: "logistics", label: "3PL / logistics change" },
-  { value: "other", label: "Other" },
-];
-
-const OPS_CATEGORY_LABEL = new Map(OPS_CATEGORY_OPTIONS.map((o) => [o.value, o.label]));
-
-export function opsCategoryLabel(category: OpsNoteCategory): string {
-  return OPS_CATEGORY_LABEL.get(category) ?? category;
-}
-
-/**
- * A small watchlist rather than free-text mining — sentiment scoring and
- * general theme extraction are explicitly out of scope for V1. Grouped by
- * canonical tag, so "the zipper broke" and "zip came off" both read as the
- * same part failing — which is what turns unrelated-looking complaints into
- * one batch-defect signal instead of three near-misses that never cluster.
- *
- * `defect` marks the tags a physical fault, worth clustering into an alert.
- * The rest — delivery, packaging, value — are still worth a table column
- * ("what is this review actually about?"), but are exactly the fulfilment
- * complaints the issue's third example says must *not* read as a defect.
- */
-const THEME_GROUPS: { tag: string; patterns: string[]; defect: boolean }[] = [
-  { tag: "zipper", patterns: ["zipper", "zip broke", "zip came"], defect: true },
-  { tag: "stitching", patterns: ["stitching", "seam"], defect: true },
-  { tag: "strap", patterns: ["strap"], defect: true },
-  { tag: "handle", patterns: ["handle"], defect: true },
-  { tag: "buckle", patterns: ["buckle"], defect: true },
-  { tag: "delivery", patterns: ["shipping", "delivery", "arrived", "delayed", "took "], defect: false },
-  { tag: "packaging", patterns: ["box", "packaging", "packed"], defect: false },
-  { tag: "quality", patterns: ["quality", "material", "well made", "sturdy"], defect: false },
-  { tag: "value", patterns: ["price", "worth the", "great value"], defect: false },
-];
-
-const DEFECT_TAGS = new Set(THEME_GROUPS.filter((g) => g.defect).map((g) => g.tag));
-
-export function themeTagFor(snippet: string): string | undefined {
-  const lower = snippet.toLowerCase();
-  return THEME_GROUPS.find((group) => group.patterns.some((pattern) => lower.includes(pattern)))?.tag;
-}
+/** Below this much movement a rating change is as likely to be Amazon's
+ *  rounding as a real shift. Matches RATING_DELTA_FLOOR on the backend. */
+export const RATING_DELTA_FLOOR = 0.1;
 
 export type RatingDelta = { label: string; direction: "up" | "down" | "flat" };
 
 export function ratingDelta(from: number, to: number): RatingDelta {
   const change = to - from;
-  if (Math.abs(change) < 0.05) return { label: "no change", direction: "flat" };
+  if (Math.abs(change) < RATING_DELTA_FLOOR) return { label: "no change", direction: "flat" };
   const sign = change > 0 ? "+" : "−";
-  return { label: `${sign}${Math.abs(change).toFixed(1)}`, direction: change > 0 ? "up" : "down" };
+  return {
+    label: `${sign}${Math.abs(change).toFixed(1)}`,
+    direction: change > 0 ? "up" : "down",
+  };
 }
 
+export const SENTIMENT_TONE: Record<TopicSentiment, string> = {
+  positive: "border-ok/30 bg-ok-soft text-ok-ink",
+  neutral: "border-line bg-surface text-muted",
+  negative: "border-alert/30 bg-alert-soft text-alert-ink",
+};
+
 /**
- * The AI pattern summary banner's own logic: low-star product reviews (never
- * seller feedback — Amazon's does not name a product, and is not what a
- * batch-defect signal is about), grouped by product and keyword, inside a
- * rolling window. Three or more is the line the issue's own example draws.
+ * Amazon's mention share as a phrase, or nothing.
+ *
+ * Deliberately vague where the data is vague. Amazon gives a proportion of
+ * mentions and no total, so "raised often" is as precise as this can honestly
+ * get — turning 0.31 into "about 12 reviews" would invent the denominator.
  */
-export function detectDefectPatterns(
-  reviews: Review[],
-  today = new Date(),
-  windowDays = 14,
-  minCount = 3,
-): PatternAlert[] {
-  const groups = new Map<
-    string,
-    { channel: Review["channel"]; product: NonNullable<Review["product"]>; keyword: string; count: number }
-  >();
-
-  for (const review of reviews) {
-    if (review.kind !== "product_review" || !review.product) continue;
-    if (review.rating > 2) continue;
-    if (!withinDays(review.date, today, windowDays)) continue;
-    if (!review.themeTag || !DEFECT_TAGS.has(review.themeTag)) continue;
-
-    const key = `${review.channel}:${review.product.sku}:${review.themeTag}`;
-    const existing = groups.get(key);
-    if (existing) {
-      existing.count += 1;
-    } else {
-      groups.set(key, {
-        channel: review.channel,
-        product: review.product,
-        keyword: review.themeTag,
-        count: 1,
-      });
-    }
-  }
-
-  return [...groups.entries()]
-    .filter(([, group]) => group.count >= minCount)
-    .map(([key, group]) => ({
-      id: key,
-      channel: group.channel,
-      product: group.product,
-      keyword: group.keyword,
-      count: group.count,
-      windowDays,
-      severity: group.count >= minCount + 1 ? "alert" : "warn",
-    }));
+export function mentionPhrase(share: number | null): string | null {
+  if (share === null) return null;
+  // Amazon has shipped this as both a fraction and a percentage. Reading a
+  // value above 1 as a fraction would call a 31% share "rarely raised".
+  const fraction = share > 1 ? share / 100 : share;
+  if (fraction >= 0.3) return "raised often";
+  if (fraction >= 0.1) return "raised regularly";
+  return "raised occasionally";
 }
 
-/**
- * Average rating per (product, channel) over the last 30 days, against the
- * 31–90-day-old reviews as the baseline — the same "current vs previous
- * window" shape as the Home tiles, so the breakdown table can show a trend
- * rather than a bare average. `avgRating` falls back to the older window
- * when there is nothing recent, so a product that has gone quiet still shows
- * a number rather than nothing.
- */
-export function productBreakdown(reviews: Review[], today = new Date()): ProductRatingRow[] {
-  const groups = new Map<
-    string,
-    { product: NonNullable<Review["product"]>; channel: Review["channel"]; recent: number[]; prior: number[] }
-  >();
-
-  for (const review of reviews) {
-    if (review.kind !== "product_review" || !review.product) continue;
-    const key = `${review.channel}:${review.product.sku}`;
-    const existing = groups.get(key) ?? {
-      product: review.product,
-      channel: review.channel,
-      recent: [] as number[],
-      prior: [] as number[],
+/** Topics grouped by product, each product's own list already in Amazon's
+ *  rank order — the per-product breakdown the tab draws under the banner. */
+export function topicsByProduct(topics: ReviewTopic[]): {
+  sku: string;
+  title: string;
+  topics: ReviewTopic[];
+}[] {
+  const groups = new Map<string, { sku: string; title: string; topics: ReviewTopic[] }>();
+  for (const topic of topics) {
+    const existing = groups.get(topic.sku) ?? {
+      sku: topic.sku,
+      title: topic.title,
+      topics: [],
     };
-    const age = daysBetween(review.date, today);
-    if (age <= 30) existing.recent.push(review.rating);
-    else if (age <= 90) existing.prior.push(review.rating);
-    groups.set(key, existing);
+    existing.topics.push(topic);
+    groups.set(topic.sku, existing);
   }
-
-  const average = (values: number[]) => values.reduce((sum, v) => sum + v, 0) / values.length;
-
-  return [...groups.values()]
-    .map((group) => ({
-      product: group.product,
-      channel: group.channel,
-      avgRating: average(group.recent.length ? group.recent : group.prior),
-      reviewCount: group.recent.length + group.prior.length,
-      previousAvgRating: group.prior.length ? average(group.prior) : null,
-    }))
-    .sort((a, b) => a.avgRating - b.avgRating);
+  // Products with something negative said about them first — that is what
+  // someone opened this tab to find.
+  return [...groups.values()].sort((a, b) => {
+    const negatives = (g: (typeof a)["topics"]) => g.filter((t) => t.sentiment === "negative").length;
+    return negatives(b.topics) - negatives(a.topics);
+  });
 }
