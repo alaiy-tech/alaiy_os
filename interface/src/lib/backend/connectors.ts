@@ -15,6 +15,7 @@ import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
  */
 
 const API = "/api/method/alaiy_os_self_serve_apis.api.connections";
+const SHOPIFY_API = "/api/method/alaiy_os.api.connections";
 
 export async function listConnectors(
   workspaceId: string,
@@ -28,30 +29,22 @@ export async function listConnectors(
 }
 
 /**
- * Attach a Shopify store with a custom app's Client ID and Client Secret.
+ * Start Shopify OAuth — returns the authorisation URL to redirect the seller to.
  *
- * Shopify OAuth is a later stage; until then the seller creates a custom app
- * in their Shopify admin and hands over its two API credentials. Not the
- * Admin API access token, which this used to send: tokens minted from those
- * credentials last about a day, so the pair that mints them is what keeps a
- * store connected. The backend proves them against the shop before saving, so
- * a wrong secret fails here rather than at first sync.
+ * The seller enters their store domain, we ask the connector to build the
+ * OAuth URL (storing a nonce → workspace mapping in Redis), and redirect the
+ * browser out. Shopify sends the merchant back to the connector's callback,
+ * which exchanges the code for a permanent token and redirects here with
+ * ?connected=shopify.
  */
-export async function connectShopify(
+export async function shopifyConnectUrl(
   workspaceId: string,
   shop: string,
-  clientId: string,
-  clientSecret: string,
   userToken?: string,
-): Promise<ConnectorStatus> {
+): Promise<{ url: string }> {
   return backend.post(
-    `${API}.connect_shopify`,
-    {
-      workspace: workspaceId,
-      shop,
-      client_id: clientId,
-      client_secret: clientSecret,
-    },
+    `${SHOPIFY_API}.shopify_connect_url`,
+    { workspace: workspaceId, shop },
     { userToken },
   );
 }

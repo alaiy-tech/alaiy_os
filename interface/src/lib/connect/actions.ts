@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { refresh } from "next/cache";
 import { requireSession } from "@/lib/auth/dal";
 import { OUR_FAULT, userFacingError } from "@/lib/backend/errors";
-import { amazonConnectUrl, connectShopify } from "@/lib/backend/connectors";
+import { amazonConnectUrl, shopifyConnectUrl } from "@/lib/backend/connectors";
 
 /**
  * Attaching a channel, from wherever the seller is standing.
@@ -23,44 +23,28 @@ import { amazonConnectUrl, connectShopify } from "@/lib/backend/connectors";
 export type FormState = { error?: string };
 
 /**
- * Attach a Shopify store.
+ * Start Shopify OAuth.
  *
- * The custom app's Client ID and Secret are posted straight through to the
- * connector, which proves them against the shop before storing them
- * encrypted. Neither touches a cookie and neither is ever read back.
- *
- * A Server Action rather than a fetch from the browser, and that is the point
- * for these two: the secret goes browser -> our server -> the connector, so it
- * never crosses an origin and never sits in client-side JavaScript.
+ * The seller enters their store domain and is redirected to Shopify's install
+ * screen. Shopify sends them back to the connector's callback, which exchanges
+ * the code for a permanent access token and redirects here with ?connected=shopify.
  */
-export async function connectShopifyAction(
+export async function startShopifyOAuthAction(
   _prev: FormState,
   formData: FormData,
 ): Promise<FormState> {
   const session = await requireSession();
-
   const shop = String(formData.get("shop") ?? "").trim();
-  const clientId = String(formData.get("client_id") ?? "").trim();
-  const clientSecret = String(formData.get("client_secret") ?? "").trim();
-
   if (!shop) return { error: "Enter your Shopify store domain." };
-  if (!clientId) return { error: "Enter the custom app's Client ID." };
-  if (!clientSecret) return { error: "Enter the custom app's Client Secret." };
 
+  let url: string;
   try {
-    await connectShopify(
-      session.workspaceId,
-      shop,
-      clientId,
-      clientSecret,
-      session.backendToken,
-    );
+    ({ url } = await shopifyConnectUrl(session.workspaceId, shop, session.backendToken));
   } catch (error) {
     return { error: userFacingError(error, OUR_FAULT) };
   }
 
-  refresh();
-  return {};
+  redirect(url);
 }
 
 /**

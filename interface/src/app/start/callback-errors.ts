@@ -14,6 +14,9 @@ export const CALLBACK_ERROR_COPY: Record<string, string> = {
   google_failed: "Google wouldn't complete the sign-in. Try again.",
   amazon_denied: "Amazon authorisation was cancelled.",
   amazon_failed: "Amazon wouldn't complete the connection. Try again.",
+  invalid_request: "The Shopify authorisation was invalid. Start again.",
+  shopify_timeout: "Shopify took too long to respond. Try again.",
+  shopify_failed: "Shopify wouldn't complete the connection. Try again.",
 };
 
 export function callbackError(reason?: string): string | undefined {
