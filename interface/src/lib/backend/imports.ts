@@ -3,7 +3,12 @@ import { cache } from "react";
 import { backend } from "@/lib/backend/client";
 import type { ChannelId, ImportJob } from "@/lib/backend/types";
 
-/** Spec: initial import covers the last 90 days on every tier. */
+/**
+ * How much order history the import *waits* for, on every tier — not how much
+ * it fetches. The backend queues a second pass behind this one that walks the
+ * seller's whole reachable history, so this number sizes the progress screen,
+ * not the data. Kept in step with `backfill.RECENT_WINDOW_DAYS`.
+ */
 export const IMPORT_WINDOW_DAYS = 90;
 
 /**

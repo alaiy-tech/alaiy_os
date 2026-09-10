@@ -59,9 +59,10 @@ export function parseSortField<Field extends string>(
 }
 
 /**
- * How far back a listing looks. "all" is offered because the 90-day backfill
- * is the floor, not the ceiling — a seller who has been syncing for months has
- * older orders than any fixed window would show.
+ * How far back a listing looks. Every option is real data now: the import
+ * pulls the seller's whole reachable order history, not a 90-day slice of it,
+ * so a narrower window here is a filter the seller chose rather than the only
+ * thing we happen to hold.
  */
 export const WINDOW_OPTIONS = [
   { value: "7", label: "Last 7 days" },
@@ -70,8 +71,24 @@ export const WINDOW_OPTIONS = [
   { value: "all", label: "All time" },
 ];
 
-/** Matches the backfill, so the tab is never empty right after onboarding. */
-export const DEFAULT_WINDOW = "90";
+/**
+ * Everything, because that is what a seller opening their store expects to
+ * see. It was 90 days when 90 days was all the import fetched; keeping it
+ * there would now hide data we hold behind a filter nobody set.
+ *
+ * Right after onboarding this shows the recent window and then grows as the
+ * history backfill lands — which is the honest picture, and cheaper than a
+ * default that pretends the older orders are absent.
+ */
+export const DEFAULT_WINDOW = "all";
+
+/**
+ * What the dashboard's figures cover, which is deliberately not DEFAULT_WINDOW.
+ * Its snippets are "recently", and `list_orders` computes full aggregates over
+ * whatever range it is handed — unbounded, that is every order the seller has
+ * ever had, recomputed on every page load.
+ */
+export const DASHBOARD_WINDOW = "90";
 
 export function parseWindow(value: string | string[] | undefined): string {
   const raw = firstValue(value);

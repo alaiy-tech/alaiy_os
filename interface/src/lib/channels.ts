@@ -90,5 +90,10 @@ export function channelName(id: ChannelId): string {
   return CHANNELS.find((c) => c.id === id)?.name ?? id;
 }
 
-/** Client-safe label for the backfill window. See IMPORT_WINDOW_DAYS. */
-export const IMPORT_WINDOW_DAYS_LABEL = "90 days";
+/**
+ * Client-safe label for the part of the import a seller waits for, not for
+ * how much history they get — they get all of it. Onboarding completes on the
+ * recent window and the rest keeps landing behind them, so this labels the
+ * wait. See IMPORT_WINDOW_DAYS.
+ */
+export const IMPORT_RECENT_WINDOW_LABEL = "90 days";
