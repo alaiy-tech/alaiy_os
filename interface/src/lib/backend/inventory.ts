@@ -122,13 +122,13 @@ const EMPTY_STOCK: StockPage = {
 export type StockResult = { page: StockPage; error?: string };
 
 /**
- * Inventory at product-group grain: what you have, where, and when it runs out.
+ * Inventory per listing: what you have, where, and when it runs out.
  *
  * A different question from `listProducts`, not a different rendering of it.
- * That one answers "what does each channel say"; this one merges the channels
- * into the physical product and adds the days-of-cover arithmetic no source
- * does for you. Both grains stay on the tab because neither answer is
- * derivable from the other.
+ * That one answers "what does each channel say"; this one gathers every stock
+ * pool visible for the same SKU — warehouse, Shopify, FBA — and adds the
+ * days-of-cover arithmetic no source does for you. Both stay on the tab because
+ * neither answer is derivable from the other.
  *
  * `velocityDays` is a way of looking at the same data rather than a change to
  * the workspace's reorder policy, so it is a query parameter and nothing is

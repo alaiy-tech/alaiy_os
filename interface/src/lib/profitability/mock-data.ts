@@ -10,7 +10,7 @@ import type { ChannelPnlRow } from "./types";
  * the table computes are this data's own arithmetic, not a hardcoded string
  * chosen to match the issue's prose. Two deliberate stories:
  *
- *   - Leather Wallet Slim is the highest-revenue product group here, and
+ *   - Leather Wallet Slim is the highest-revenue product here, and
  *     — once its fees are counted — only the 4th-highest margin of six.
  *     "Highest revenue" and "best margin" are different questions, which is
  *     the whole reason this tab exists.
@@ -28,7 +28,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "LWS-BRN-01-AMZ",
       title: "Leather Wallet Slim",
-      productGroup: "Leather Wallet Slim",
       channel: "amazon",
       revenue: 201190,
       units: 310,
@@ -46,7 +45,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "LWS-BRN-01-SHP",
       title: "Leather Wallet Slim",
-      productGroup: "Leather Wallet Slim",
       channel: "shopify",
       revenue: 31455,
       units: 45,
@@ -64,7 +62,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "CTB-BLK-01-AMZ",
       title: "Canvas Tote Bag (Black)",
-      productGroup: "Canvas Tote Bag (Black)",
       channel: "amazon",
       revenue: 98820,
       units: 180,
@@ -86,7 +83,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "CTB-BLK-01-SHP",
       title: "Canvas Tote Bag (Black)",
-      productGroup: "Canvas Tote Bag (Black)",
       channel: "shopify",
       revenue: 22762,
       units: 38,
@@ -104,7 +100,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "SCR-MLT-01-AMZ",
       title: "Cotton Scrunchie Pack",
-      productGroup: "Cotton Scrunchie Pack",
       channel: "amazon",
       // A ₹79 item eating a ₹78 flat FBA fee plus 15% referral — the flat
       // fee alone is nearly the entire price.
@@ -124,7 +119,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "LTN-NAT-01-SHP",
       title: "Linen Tote Natural",
-      productGroup: "Linen Tote Natural",
       channel: "shopify",
       // The other way to go negative: a bulky tote whose estimated shipping
       // cost is now above what it sells for.
@@ -144,7 +138,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "CPS-NAT-01-AMZ",
       title: "Canvas Pouch Small",
-      productGroup: "Canvas Pouch Small",
       channel: "amazon",
       revenue: 28900,
       units: 340,
@@ -162,7 +155,6 @@ export function buildMockPnlRows(): ChannelPnlRow[] {
     {
       sku: "SCB-TAN-01-SHP",
       title: "Suede Crossbody Bag",
-      productGroup: "Suede Crossbody Bag",
       channel: "shopify",
       revenue: 53940,
       units: 60,

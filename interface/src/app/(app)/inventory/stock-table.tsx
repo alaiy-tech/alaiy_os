@@ -9,7 +9,7 @@ import {
 import type { StockPage, StockRow } from "@/lib/inventory/types";
 
 /**
- * Inventory at product-group grain: what you have, where, and when it runs out.
+ * Inventory per listing: what you have, where, and when it runs out.
  *
  * A seller does not have one inventory number, they have three — the
  * warehouse's, Shopify's, and what Amazon holds in FBA — and none of the three
@@ -54,7 +54,7 @@ export function StockTable({ page }: { page: StockPage }) {
               No products yet. Stock appears here once your channels sync.
             </EmptyRow>
           ) : (
-            page.rows.map((row) => <Row key={row.group_id} row={row} hasWms={page.has_wms} />)
+            page.rows.map((row) => <Row key={row.row_id} row={row} hasWms={page.has_wms} />)
           )}
         </tbody>
       </TableFrame>

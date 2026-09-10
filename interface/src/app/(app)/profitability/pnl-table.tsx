@@ -6,54 +6,46 @@ import { FilterField, FilterSelect } from "@/components/data/toolbar";
 import { pressClass } from "@/components/ui";
 import type { ChannelId } from "@/lib/backend/types";
 import { formatMoney, formatNumber } from "@/lib/format";
-import { grossMarginPct, rollupByProductGroup, totalFees, type GroupRollup } from "@/lib/profitability/presentation";
+import { grossMarginPct, totalFees } from "@/lib/profitability/presentation";
 import type { ChannelPnlRow } from "@/lib/profitability/types";
 
 const COLUMN_COUNT = 11;
 
 /**
- * The P&L table: one row per Product Group, expandable to the channel rows
- * underneath.
+ * The P&L table: one row per (channel, SKU).
  *
- * Filtering by channel filters the *raw* rows before anything is rolled up
- * — "Amazon only" shows each group's Amazon numbers alone, not the combined
- * total with Amazon's share highlighted, which is what "see the full impact
- * of Amazon's fee structure per SKU" in the issue actually asks for.
+ * These rows used to collapse under a Product Group, expandable to the channel
+ * rows beneath. The grouping is gone app-wide — the thing that decided two
+ * channels' listings were one product was a barcode match or a title score, and
+ * a rolled-up margin built on a wrong pairing is a wrong number with no way to
+ * see that it is wrong. Per channel is also the grain the numbers are true at:
+ * the fee structure, the price and the margin genuinely differ per channel, so
+ * the combined figure was never the one to act on.
+ *
+ * Filtering by channel filters the rows directly — "Amazon only" shows the
+ * Amazon numbers alone, which is what "see the full impact of Amazon's fee
+ * structure per SKU" in the issue actually asks for.
  */
 export function PnlTable({ rows }: { rows: ChannelPnlRow[] }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [channel, setChannel] = useState<ChannelId | "">("");
-  const [group, setGroup] = useState("");
+  const [sku, setSku] = useState("");
 
-  const productGroups = [...new Set(rows.map((r) => r.productGroup))];
+  const skus = [...new Set(rows.map((r) => r.sku))].sort();
 
-  const filteredRows = rows.filter((r) => !channel || r.channel === channel);
-  const rollups = rollupByProductGroup(filteredRows).filter(
-    (g) => !group || g.productGroup === group,
+  const filtered = rows.filter(
+    (r) => (!channel || r.channel === channel) && (!sku || r.sku === sku),
   );
 
-  const isFiltered = Boolean(channel || group);
-
-  function toggle(productGroup: string) {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(productGroup)) next.delete(productGroup);
-      else next.add(productGroup);
-      return next;
-    });
-  }
+  const isFiltered = Boolean(channel || sku);
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2 rounded-sm border border-line bg-surface p-3">
-        <FilterField label="Product group">
+        <FilterField label="SKU">
           <FilterSelect
-            value={group}
-            onChange={(event) => setGroup(event.target.value)}
-            options={[
-              { value: "", label: "All product groups" },
-              ...productGroups.map((g) => ({ value: g, label: g })),
-            ]}
+            value={sku}
+            onChange={(event) => setSku(event.target.value)}
+            options={[{ value: "", label: "All SKUs" }, ...skus.map((s) => ({ value: s, label: s }))]}
           />
         </FilterField>
         <FilterField label="Channel">
@@ -72,7 +64,7 @@ export function PnlTable({ rows }: { rows: ChannelPnlRow[] }) {
             type="button"
             onClick={() => {
               setChannel("");
-              setGroup("");
+              setSku("");
             }}
             className={pressClass({ ground: "quiet", size: "sm" })}
           >
@@ -98,17 +90,10 @@ export function PnlTable({ rows }: { rows: ChannelPnlRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rollups.length === 0 ? (
-            <EmptyRow colSpan={COLUMN_COUNT}>No product groups match those filters.</EmptyRow>
+          {filtered.length === 0 ? (
+            <EmptyRow colSpan={COLUMN_COUNT}>No listings match those filters.</EmptyRow>
           ) : (
-            rollups.map((rollup) => (
-              <GroupRows
-                key={rollup.productGroup}
-                rollup={rollup}
-                expanded={expanded.has(rollup.productGroup)}
-                onToggle={() => toggle(rollup.productGroup)}
-              />
-            ))
+            filtered.map((row) => <PnlRow key={`${row.channel}:${row.sku}`} row={row} />)
           )}
         </tbody>
       </TableFrame>
@@ -116,101 +101,37 @@ export function PnlTable({ rows }: { rows: ChannelPnlRow[] }) {
   );
 }
 
-function GroupRows({
-  rollup,
-  expanded,
-  onToggle,
-}: {
-  rollup: GroupRollup;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const canExpand = rollup.channels.length > 1;
-
+function PnlRow({ row }: { row: ChannelPnlRow }) {
   return (
-    <>
-      <tr className={canExpand ? "cursor-pointer hover:bg-primary-600/[0.04]" : ""} onClick={canExpand ? onToggle : undefined}>
-        <Td className="font-medium">
-          <span className="flex items-center gap-1.5">
-            {canExpand ? (
-              <span
-                aria-hidden
-                className={`text-[10px] text-muted transition-transform ${expanded ? "rotate-90" : ""}`}
-              >
-                ▶
-              </span>
-            ) : (
-              <span className="w-2.5" aria-hidden />
-            )}
-            {rollup.productGroup}
-          </span>
-        </Td>
-        <Td>
-          {rollup.channels.length === 1 ? (
-            <ChannelBadge channel={rollup.channels[0]} />
-          ) : (
-            <span className="flex gap-1">
-              {rollup.channels.map((c) => (
-                <ChannelBadge key={c} channel={c} />
-              ))}
-            </span>
-          )}
-        </Td>
-        <Td align="right">{formatMoney(rollup.revenue, "INR")}</Td>
-        <Td align="right">{formatNumber(rollup.units)}</Td>
-        <Td align="right">{moneyOrDash(rollup.amazonFees)}</Td>
-        <Td align="right">{moneyOrDash(rollup.shopifyFees)}</Td>
-        <Td align="right">
-          {formatMoney(rollup.shippingCost, "INR")}
-          {rollup.shippingCostBasis !== "actual" ? (
-            <EstimatedMark mixed={rollup.shippingCostBasis === "mixed"} />
-          ) : null}
-        </Td>
-        <Td align="right">
-          <ComingSoon />
-        </Td>
-        <Td align="right">
-          <MarginValue pct={rollup.grossMarginPct} />
-        </Td>
-        <Td align="right">
-          <ComingSoon />
-        </Td>
-        <Td align="right">
-          <BuyBoxCell pct={rollup.buyBoxWinPct} />
-        </Td>
-      </tr>
-
-      {expanded
-        ? rollup.rows.map((row) => (
-            <tr key={row.sku} className="bg-surface/60">
-              <Td className="pl-8 text-muted">{row.title}</Td>
-              <Td>
-                <ChannelBadge channel={row.channel} />
-              </Td>
-              <Td align="right">{formatMoney(row.revenue, "INR")}</Td>
-              <Td align="right">{formatNumber(row.units)}</Td>
-              <Td align="right">{moneyOrDash(row.amazonReferralFee + row.amazonFbaFee)}</Td>
-              <Td align="right">{moneyOrDash(row.shopifyTransactionFee)}</Td>
-              <Td align="right">
-                {formatMoney(row.shippingCost, "INR")}
-                {row.shippingCostBasis === "estimated" ? <EstimatedMark /> : null}
-              </Td>
-              <Td align="right">
-                <ComingSoon />
-              </Td>
-              <Td align="right">
-                <MarginValue pct={grossMarginPct(row, totalFees(row))} />
-              </Td>
-              <Td align="right">
-                <ComingSoon />
-              </Td>
-              <Td align="right">
-                <BuyBoxCell pct={row.buyBoxWinPct} />
-              </Td>
-            </tr>
-          ))
-        : null}
-    </>
+    <tr className="transition-colors hover:bg-primary-600/[0.04]">
+      <Td className="font-medium">
+        {row.title}
+        <span className="block font-data text-[11.5px] text-muted-soft">{row.sku}</span>
+      </Td>
+      <Td>
+        <ChannelBadge channel={row.channel} />
+      </Td>
+      <Td align="right">{formatMoney(row.revenue, "INR")}</Td>
+      <Td align="right">{formatNumber(row.units)}</Td>
+      <Td align="right">{moneyOrDash(row.amazonReferralFee + row.amazonFbaFee)}</Td>
+      <Td align="right">{moneyOrDash(row.shopifyTransactionFee)}</Td>
+      <Td align="right">
+        {formatMoney(row.shippingCost, "INR")}
+        {row.shippingCostBasis === "estimated" ? <EstimatedMark /> : null}
+      </Td>
+      <Td align="right">
+        <ComingSoon />
+      </Td>
+      <Td align="right">
+        <MarginValue pct={grossMarginPct(row, totalFees(row))} />
+      </Td>
+      <Td align="right">
+        <ComingSoon />
+      </Td>
+      <Td align="right">
+        <BuyBoxCell pct={row.buyBoxWinPct} />
+      </Td>
+    </tr>
   );
 }
 
@@ -239,15 +160,11 @@ function ComingSoon() {
   );
 }
 
-function EstimatedMark({ mixed = false }: { mixed?: boolean }) {
+function EstimatedMark() {
   return (
     <span
       className="ml-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-warn-ink"
-      title={
-        mixed
-          ? "One channel's shipping cost is a manual estimate, the other an actual."
-          : "No WMS connected — this is Jordan's own manual per-SKU estimate, not an actual."
-      }
+      title="No WMS connected — this is Jordan's own manual per-SKU estimate, not an actual."
     >
       est.
     </span>

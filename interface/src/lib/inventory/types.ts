@@ -1,11 +1,19 @@
+import type { ChannelId } from "@/lib/backend/types";
+
 /**
- * Inventory at product-group grain: what you have, where, and when it runs out.
+ * Inventory per listing: what you have, where, and when it runs out.
  *
- * Distinct from `lib/backend/types.ts`'s `ChannelProduct`, which is the real,
- * per-channel shape the existing Inventory table reads. That one is a fact
- * each channel reports; this one merges the channels into the physical product
- * and adds the days-of-cover arithmetic no source does for you. Both grains
- * live on the Inventory tab, and the toggle between them is in the URL.
+ * Distinct from `lib/backend/types.ts`'s `ChannelProduct`, which is the raw
+ * per-channel shape the existing Inventory table reads. That one is a fact each
+ * channel reports; this one gathers every stock pool visible for the same SKU —
+ * warehouse, Shopify, FBA — and adds the days-of-cover arithmetic no source
+ * does for you. Both grains live on the Inventory tab, and the toggle between
+ * them is in the URL.
+ *
+ * One row per (channel, SKU), like the Listings tab. These rows used to merge a
+ * product's channels together under a product group; that grouping is gone, so
+ * a SKU sold on both channels is two rows rather than one row whose totals
+ * depended on the two having been paired correctly.
  */
 
 /** Where a stock figure came from. The spec wants this visible per row. */
@@ -15,8 +23,12 @@ export type StockSource = "wms" | "erp" | "shopify" | "amazon";
 export type CoverBand = "healthy" | "watch" | "low" | "critical" | "unknown";
 
 export type StockRow = {
-  group_id: string;
+  /** The channel product's own id — this row's identity, not a group's. */
+  row_id: string;
+  channel: ChannelId;
   name: string;
+  /** The SKU, and the bridge to ERPNext: warehouse stock and PO lines match
+   *  on `item_code == brand_sku`. */
   brand_sku: string;
   /** Null when this workspace has no warehouse source configured. */
   warehouse_qty: number | null;
