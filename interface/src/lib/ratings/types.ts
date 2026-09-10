@@ -1,95 +1,168 @@
 import type { ChannelId } from "@/lib/backend/types";
 
 /**
- * The Ratings tab's own shapes.
+ * The Ratings tab's shapes, as `api/ratings.py` returns them.
  *
- * Like Support, there is no backend module behind these — see the issue's
- * open question: Amazon's SP-API has no endpoint for product review *text*,
- * only seller feedback. Shopify's review text comes from whichever review
- * app a seller runs (Judge.me, Yotpo, …), which is not integrated yet
- * either. `mock-data.ts` stands in for both until a data source is chosen.
+ * Shaped by two absences, and every type here is narrower than it would
+ * otherwise be because of one of them:
+ *
+ *   - **Amazon exposes no product-review text**, at any SP-API version. So
+ *     there is no `Review` type with a body: what has text is buyer
+ *     *feedback*, which is about the seller, and what is about a product is an
+ *     *aggregate* — a topic and a sentiment, nothing quotable.
+ *   - **Shopify has no reviews at all.** Not a gap in this integration; the
+ *     Admin API has no review resource. Shopify reviews belong to whichever
+ *     app a store installed (Judge.me, Yotpo, Loox), none integrated. The
+ *     backend reports that as `ChannelSupport` rather than the frontend
+ *     hardcoding a sentence, so the day one lands the notice disappears by
+ *     itself.
  */
 
-export type ProductRef = { sku: string; title: string };
-
-/**
- * Amazon keeps these genuinely separate — seller feedback affects the seller
- * rating and Account Health, product reviews affect listing quality — and
- * the issue is explicit that the UI must not blur them. `seller_feedback`
- * has no `product`, because it is not about one.
- */
-export type ReviewKind = "product_review" | "seller_feedback";
-
-export type Review = {
-  id: string;
+/** Which channels this tab can answer for, and why not, decided on the
+ *  backend. */
+export type ChannelSupport = {
   channel: ChannelId;
-  kind: ReviewKind;
-  /** Absent for Amazon seller feedback, which is not about a product. */
-  product?: ProductRef;
-  /** 1–5. */
-  rating: number;
-  date: string;
-  snippet: string;
-  /** The AI theme tag — a keyword cluster, not a sentiment score (out of
-   *  scope per the issue). Absent when nothing in the watchlist matched. */
-  themeTag?: string;
-  externalUrl?: string;
+  supported: boolean;
+  reason: string | null;
 };
 
-export type SellerRatingPoint = { date: string; value: number };
+/** What the tab cannot tell you, stated where you would look for it — the
+ *  same shape Account Health reports its gaps in. */
+export type RatingsGap = {
+  key: string;
+  title: string;
+  detail: string;
+};
 
+/**
+ * The seller rating, computed from stored buyer feedback.
+ *
+ * Amazon publishes no endpoint for its own figure, so this is the mean of the
+ * feedback rows this app holds — at most fifty over ninety days. It will not
+ * match Seller Central exactly, and `sample_size`, `window_days` and `basis`
+ * are here so the tile can show its working instead of asserting a number
+ * Seller Central will contradict.
+ */
 export type SellerRating = {
-  current: number;
-  /** Roughly the last 30 days, sampled every few days rather than daily. */
+  current: number | null;
   history: SellerRatingPoint[];
   /** Amazon's own Buy Box eligibility cutoff. */
   threshold: number;
+  sample_size: number;
+  window_days: number;
+  basis: "feedback_average";
 };
 
-/** A detected keyword cluster — "3 reviews this week mention 'zipper'". */
-export type PatternAlert = {
+export type SellerRatingPoint = {
+  date: string;
+  value: number;
+  /** How many pieces of feedback this point is the mean of. Genuinely small —
+   *  shown rather than hidden, so a jagged line reads as thin data instead of
+   *  a volatile business. */
+  sample_size: number;
+};
+
+/**
+ * One piece of buyer feedback: the only quotable text on this tab.
+ *
+ * It is about the *transaction* — did it ship, was it as described — and
+ * carries an order id. `products` is what that order contained, which is
+ * context and not attribution: an order of three products does not make the
+ * complaint about any one of them, so this is never a product the row is filed
+ * under.
+ */
+export type SellerFeedback = {
   id: string;
   channel: ChannelId;
-  product: ProductRef;
-  keyword: string;
-  count: number;
-  windowDays: number;
-  severity: "alert" | "warn";
+  kind: "seller_feedback";
+  /** 1–5. Amazon counts 1 and 2 as negative, which is what feeds Order Defect
+   *  Rate. */
+  rating: number;
+  date: string | null;
+  comment: string | null;
+  order_id: string;
+  order_number: string | null;
+  products: string[];
 };
 
+export type TopicSentiment = "positive" | "neutral" | "negative";
+
+/**
+ * One topic buyers raise about one product — Amazon's aggregate.
+ *
+ * `mention_share` is Amazon's own proportion and is never multiplied into a
+ * count of reviews: that would read as a number of things someone could go and
+ * look at, and there is nothing to look at.
+ */
+export type ReviewTopic = {
+  sku: string;
+  asin: string | null;
+  title: string;
+  channel: ChannelId;
+  topic: string;
+  sentiment: TopicSentiment;
+  /** Amazon's own ranking within its response — the only ordering it vouches
+   *  for. */
+  rank: number | null;
+  mention_share: number | null;
+  /** Amazon rebuilds these about weekly, so this reading is up to seven days
+   *  old and the tab says so rather than implying this morning. */
+  as_of_date: string | null;
+};
+
+/**
+ * A product's average review rating and how it moved.
+ *
+ * `review_count` is always null. Amazon's trend carries an average and no
+ * denominator, and deriving one — from mention shares, from order counts —
+ * would put a number on screen that nothing produced.
+ */
 export type ProductRatingRow = {
-  product: ProductRef;
+  sku: string;
+  asin: string | null;
+  title: string;
   channel: ChannelId;
-  avgRating: number;
-  reviewCount: number;
-  /** Null when there is not enough history before the current window to
-   *  compare against — a product with three reviews has no trend yet. */
-  previousAvgRating: number | null;
+  avg_rating: number;
+  /** Null when there is only one stored reading — a product whose history we
+   *  do not have yet has no trend, which is not the same as no change. */
+  previous_avg_rating: number | null;
+  period_start: string | null;
+  period_end: string | null;
+  points: number;
+  review_count: null;
 };
 
-/** A noted improvement, optionally traced to a logged ops event. */
-export type PositiveAttribution = {
-  id: string;
-  product: ProductRef;
+/**
+ * A product whose rating climbed between two readings.
+ *
+ * An observation and not a claim about cause. Linking "the rating improved
+ * after the packaging change" needs a logged business event, which this app
+ * does not store — and inferring a cause from two numbers would be the tab
+ * inventing the most flattering explanation available.
+ */
+export type RatingImprovement = {
+  sku: string;
+  title: string;
   channel: ChannelId;
   from: number;
   to: number;
-  windowDays: number;
-  opsNoteId?: string;
+  delta: number;
+  period_start: string | null;
+  period_end: string | null;
 };
 
-export type OpsNoteCategory = "packaging" | "supplier" | "logistics" | "other";
-
-/**
- * The one manual-entry mechanism this tab needs. Per the issue: "AI linking
- * 'rating improved after packaging change' requires Jordan to have logged a
- * business event" — reviews themselves are read-only, synced data, but there
- * is nothing to sync a packaging change or a supplier switch from.
- */
-export type OpsNote = {
-  id: string;
-  date: string;
-  category: OpsNoteCategory;
-  note: string;
-  product?: ProductRef;
+export type RatingsPage = {
+  connected: boolean;
+  channels: ChannelSupport[];
+  gaps: RatingsGap[];
+  seller_rating: SellerRating | null;
+  feedback: SellerFeedback[];
+  topics: ReviewTopic[];
+  /** The negative slice of `topics`, worst-ranked first — what replaced a
+   *  banner that needed review text to write. */
+  concerns: ReviewTopic[];
+  products: ProductRatingRow[];
+  improvements: RatingImprovement[];
+  synced_at: string | null;
+  never_synced: boolean;
 };
