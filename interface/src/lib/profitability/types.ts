@@ -28,21 +28,20 @@ import type { ChannelId } from "@/lib/backend/types";
 export type FeeBasis = "actual" | "estimated";
 
 /**
- * One product, on one channel — the grain a P&L row is computed at.
+ * One product, on one channel — the grain a P&L row is computed at, and now
+ * also the grain the table renders. A product sold on both Amazon and Shopify
+ * is two of these, because the fee structure, the price, and the margin
+ * genuinely differ per channel, and nothing rolls them back together: the
+ * product group that used to do it is gone app-wide.
  *
- * A product sold on both Amazon and Shopify is two of these, because the fee
- * structure, the price and therefore the margin genuinely differ per channel.
- * The table's product-group row is these rolled up, not a third copy of the
- * numbers.
+ * The backend still sends `product_group`, because `Alaiy Product Group` is
+ * still a real thing there. It is deliberately not in this type: a field
+ * nothing reads is an invitation to group by it again, and the pairing behind
+ * it — a barcode match or a title score — is exactly what was removed.
  */
 export type ChannelPnlRow = {
   sku: string;
   title: string;
-  /** The row groups under — several SKUs (a size or colour) can share one.
-   *  Falls back to the SKU's own title when the product grouping has not
-   *  paired it with anything, so an ungrouped product rolls up under itself
-   *  rather than into one bucket with every other ungrouped product. */
-  product_group: string;
   channel: ChannelId;
   revenue: number;
   units: number;

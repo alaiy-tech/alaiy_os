@@ -6,21 +6,24 @@ import { FilterField, FilterSelect } from "@/components/data/toolbar";
 import { pressClass } from "@/components/ui";
 import type { ChannelId } from "@/lib/backend/types";
 import { formatMoney, formatNumber } from "@/lib/format";
-import {
-  rollupByProductGroup,
-  type GroupRollup,
-} from "@/lib/profitability/presentation";
 import type { ChannelPnlRow, FeeBasis } from "@/lib/profitability/types";
 
 const COLUMN_COUNT = 11;
 
 /**
- * The P&L table: one row per product group, expandable to its channel rows.
+ * The P&L table: one row per (channel, SKU).
  *
- * Filtering by channel filters the *raw* rows before anything is rolled up —
- * "Amazon only" shows each group's Amazon numbers alone, not the combined
- * total with Amazon's share highlighted, which is what seeing the full impact
- * of Amazon's fee structure per SKU actually asks for.
+ * These rows used to collapse under a Product Group, expandable to the channel
+ * rows beneath. The grouping is gone app-wide — the thing that decided two
+ * channels' listings were one product was a barcode match or a title score, and
+ * a rolled-up margin built on a wrong pairing is a wrong number with no way to
+ * see that it is wrong. Per channel is also the grain the numbers are true at:
+ * the fee structure, the price and the margin genuinely differ per channel, so
+ * the combined figure was never the one to act on.
+ *
+ * Filtering by channel filters the rows directly — "Amazon only" shows the
+ * Amazon numbers alone, which is what "see the full impact of Amazon's fee
+ * structure per SKU" in the issue actually asks for.
  *
  * Three columns say "coming soon" rather than showing a number, and that is
  * deliberate in each case: shipping cost needs a WMS, COGS needs lot-level
@@ -34,40 +37,29 @@ export function PnlTable({
   rows: ChannelPnlRow[];
   currency: string;
 }) {
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [channel, setChannel] = useState<ChannelId | "">("");
-  const [group, setGroup] = useState("");
+  const [sku, setSku] = useState("");
 
-  const productGroups = [...new Set(rows.map((r) => r.product_group))].sort();
+  const skus = [...new Set(rows.map((r) => r.sku))].sort();
 
-  const filteredRows = rows.filter((r) => !channel || r.channel === channel);
-  const rollups = rollupByProductGroup(filteredRows)
-    .filter((g) => !group || g.product_group === group)
+  const filtered = rows
+    .filter((r) => (!channel || r.channel === channel) && (!sku || r.sku === sku))
     // Biggest first, so the products worth arguing about are on screen. The
     // point of the tab is that this order is *not* the margin order.
     .sort((a, b) => b.revenue - a.revenue);
 
-  const isFiltered = Boolean(channel || group);
-
-  function toggle(productGroup: string) {
-    setExpanded((current) => {
-      const next = new Set(current);
-      if (next.has(productGroup)) next.delete(productGroup);
-      else next.add(productGroup);
-      return next;
-    });
-  }
+  const isFiltered = Boolean(channel || sku);
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-end gap-2 rounded-sm border border-line bg-surface p-3">
-        <FilterField label="Product group">
+        <FilterField label="SKU">
           <FilterSelect
-            value={group}
-            onChange={(event) => setGroup(event.target.value)}
+            value={sku}
+            onChange={(event) => setSku(event.target.value)}
             options={[
-              { value: "", label: "All product groups" },
-              ...productGroups.map((g) => ({ value: g, label: g })),
+              { value: "", label: "All SKUs" },
+              ...skus.map((s) => ({ value: s, label: s })),
             ]}
           />
         </FilterField>
@@ -87,7 +79,7 @@ export function PnlTable({
             type="button"
             onClick={() => {
               setChannel("");
-              setGroup("");
+              setSku("");
             }}
             className={pressClass({ ground: "quiet", size: "sm" })}
           >
@@ -113,21 +105,13 @@ export function PnlTable({
           </tr>
         </thead>
         <tbody>
-          {rollups.length === 0 ? (
+          {filtered.length === 0 ? (
             <EmptyRow colSpan={COLUMN_COUNT}>
-              {isFiltered
-                ? "No product groups match those filters."
-                : "No sales in this period."}
+              {isFiltered ? "No listings match those filters." : "No sales in this period."}
             </EmptyRow>
           ) : (
-            rollups.map((rollup) => (
-              <GroupRows
-                key={rollup.product_group}
-                rollup={rollup}
-                currency={currency}
-                expanded={expanded.has(rollup.product_group)}
-                onToggle={() => toggle(rollup.product_group)}
-              />
+            filtered.map((row) => (
+              <PnlRow key={`${row.channel}:${row.sku}`} row={row} currency={currency} />
             ))
           )}
         </tbody>
@@ -136,138 +120,56 @@ export function PnlTable({
   );
 }
 
-function GroupRows({
-  rollup,
-  currency,
-  expanded,
-  onToggle,
-}: {
-  rollup: GroupRollup;
-  currency: string;
-  expanded: boolean;
-  onToggle: () => void;
-}) {
-  const canExpand = rollup.rows.length > 1;
-
+function PnlRow({ row, currency }: { row: ChannelPnlRow; currency: string }) {
   return (
-    <>
-      <tr
-        className={canExpand ? "cursor-pointer hover:bg-primary-600/[0.04]" : ""}
-        onClick={canExpand ? onToggle : undefined}
-      >
-        <Td className="font-medium">
-          <span className="flex items-center gap-1.5">
-            {canExpand ? (
-              <span
-                aria-hidden
-                className={`text-[10px] text-muted transition-transform ${expanded ? "rotate-90" : ""}`}
-              >
-                ▶
-              </span>
-            ) : (
-              <span className="w-2.5" aria-hidden />
-            )}
-            {rollup.product_group}
-          </span>
-        </Td>
-        <Td>
-          <span className="flex gap-1">
-            {rollup.channels.map((c) => (
-              <ChannelBadge key={c} channel={c} />
-            ))}
-          </span>
-        </Td>
-        <Td align="right">{formatMoney(rollup.revenue, currency)}</Td>
-        <Td align="right">{formatNumber(rollup.units)}</Td>
-        <Td align="right">
-          <FeeCell
-            value={rollup.amazonFees}
-            available={rollup.fees_available}
-            basis={rollup.fee_basis}
-            currency={currency}
-            applies={rollup.channels.includes("amazon")}
-          />
-        </Td>
-        <Td align="right">
-          <FeeCell
-            value={rollup.shopifyFees}
-            available={rollup.fees_available}
-            basis={rollup.fee_basis}
-            currency={currency}
-            applies={rollup.channels.includes("shopify")}
-          />
-        </Td>
-        <Td align="right">
-          <ComingSoon reason="shipping" />
-        </Td>
-        <Td align="right">
-          <ComingSoon reason="cogs" />
-        </Td>
-        <Td align="right">
-          <MarginValue pct={rollup.gross_margin_pct} />
-        </Td>
-        <Td align="right">
-          <ComingSoon reason="net" />
-        </Td>
-        <Td align="right">
-          <BuyBoxCell pct={rollup.buy_box_win_pct} />
-        </Td>
-      </tr>
-
-      {expanded
-        ? rollup.rows.map((row) => (
-            <tr key={`${row.channel}:${row.sku}`} className="bg-surface/60">
-              <Td className="pl-8 text-muted">
-                <span className="block truncate" title={row.sku}>
-                  {row.title}
-                </span>
-              </Td>
-              <Td>
-                <ChannelBadge channel={row.channel} />
-              </Td>
-              <Td align="right">{formatMoney(row.revenue, currency)}</Td>
-              <Td align="right">{formatNumber(row.units)}</Td>
-              <Td align="right">
-                <FeeCell
-                  value={row.amazon_referral_fee + row.amazon_fba_fee + row.amazon_other_fee}
-                  available={row.fees_available}
-                  basis={row.fee_basis}
-                  currency={currency}
-                  applies={row.channel === "amazon"}
-                  note={row.fee_note}
-                  settledUnits={row.settled_units}
-                  units={row.units}
-                />
-              </Td>
-              <Td align="right">
-                <FeeCell
-                  value={row.shopify_transaction_fee}
-                  available={row.fees_available}
-                  basis={row.fee_basis}
-                  currency={currency}
-                  applies={row.channel === "shopify"}
-                  note={row.fee_note}
-                />
-              </Td>
-              <Td align="right">
-                <ComingSoon reason="shipping" />
-              </Td>
-              <Td align="right">
-                <ComingSoon reason="cogs" />
-              </Td>
-              <Td align="right">
-                <MarginValue pct={row.gross_margin_pct} />
-              </Td>
-              <Td align="right">
-                <ComingSoon reason="net" />
-              </Td>
-              <Td align="right">
-                <BuyBoxCell pct={row.buy_box_win_pct} />
-              </Td>
-            </tr>
-          ))
-        : null}
-    </>
+    <tr className="transition-colors hover:bg-primary-600/[0.04]">
+      <Td className="font-medium">
+        {row.title}
+        <span className="block font-data text-[11.5px] text-muted-soft">{row.sku}</span>
+      </Td>
+      <Td>
+        <ChannelBadge channel={row.channel} />
+      </Td>
+      <Td align="right">{formatMoney(row.revenue, currency)}</Td>
+      <Td align="right">{formatNumber(row.units)}</Td>
+      <Td align="right">
+        <FeeCell
+          value={row.amazon_referral_fee + row.amazon_fba_fee + row.amazon_other_fee}
+          available={row.fees_available}
+          basis={row.fee_basis}
+          currency={currency}
+          applies={row.channel === "amazon"}
+          note={row.fee_note}
+          settledUnits={row.settled_units}
+          units={row.units}
+        />
+      </Td>
+      <Td align="right">
+        <FeeCell
+          value={row.shopify_transaction_fee}
+          available={row.fees_available}
+          basis={row.fee_basis}
+          currency={currency}
+          applies={row.channel === "shopify"}
+          note={row.fee_note}
+        />
+      </Td>
+      <Td align="right">
+        <ComingSoon reason="shipping" />
+      </Td>
+      <Td align="right">
+        <ComingSoon reason="cogs" />
+      </Td>
+      <Td align="right">
+        <MarginValue pct={row.gross_margin_pct} />
+      </Td>
+      <Td align="right">
+        <ComingSoon reason="net" />
+      </Td>
+      <Td align="right">
+        <BuyBoxCell pct={row.buy_box_win_pct} />
+      </Td>
+    </tr>
   );
 }
 
@@ -292,7 +194,7 @@ function FeeCell({
 }: {
   value: number;
   available: boolean;
-  basis: FeeBasis | "mixed";
+  basis: FeeBasis;
   currency: string;
   applies: boolean;
   note?: string | null;
@@ -316,7 +218,7 @@ function FeeCell({
     <span>
       {formatMoney(value, currency)}
       {basis !== "actual" ? (
-        <EstimatedMark basis={basis} settledUnits={settledUnits} units={units} />
+        <EstimatedMark settledUnits={settledUnits} units={units} />
       ) : null}
     </span>
   );
@@ -371,11 +273,9 @@ function ComingSoon({ reason }: { reason: keyof typeof COMING_SOON | string }) {
  * is not.
  */
 function EstimatedMark({
-  basis,
   settledUnits,
   units,
 }: {
-  basis: FeeBasis | "mixed";
   settledUnits?: number;
   units?: number;
 }) {
@@ -387,11 +287,7 @@ function EstimatedMark({
   return (
     <span
       className="ml-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-warn-ink"
-      title={
-        basis === "mixed"
-          ? "This group mixes settled fees with quoted ones. Amazon settles two to four weeks after a sale."
-          : `Amazon's quote for what it would charge, not what it has taken — it settles two to four weeks after a sale.${coverage}`
-      }
+      title={`Amazon's quote for what it would charge, not what it has taken — it settles two to four weeks after a sale.${coverage}`}
     >
       est.
     </span>

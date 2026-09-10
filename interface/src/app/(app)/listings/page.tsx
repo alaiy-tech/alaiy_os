@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireOnboardedSession } from "@/lib/auth/dal";
-import { PAGE_SIZE, loadGroup, loadListings, loadUnlinked } from "@/lib/backend/listings";
+import { PAGE_SIZE, loadListing, loadListings } from "@/lib/backend/listings";
 import { firstValue, hrefToString, parseChannel, parseOffset } from "@/lib/listing";
-import { formatDateTime } from "@/lib/format";
+import { formatDateTime, formatMoney } from "@/lib/format";
 import {
+  ChannelBadge,
   EmptyRow,
   TableFrame,
   Td,
@@ -17,45 +18,38 @@ import {
 import { Alert, Eyebrow } from "@/components/ui";
 import { Pagination } from "@/components/data/pagination";
 import { SampleBanner } from "@/components/data/sample-banner";
-import {
-  HEALTH_FILTER_OPTIONS,
-  byChannel,
-  healthPresentation,
-  linkPresentation,
-} from "@/lib/listings/presentation";
-import { GroupDetail } from "@/app/(app)/listings/group-detail";
-import { Unlinked } from "@/app/(app)/listings/unlinked";
-import type { ChannelListing, ListingHealth, ProductGroup } from "@/lib/product-groups/types";
+import { HEALTH_FILTER_OPTIONS, healthPresentation } from "@/lib/listings/presentation";
+import { ListingDetailPanel } from "@/app/(app)/listings/listing-detail";
+import type { Listing, ListingHealth } from "@/lib/listings/types";
 
 export const metadata = { title: "Listings — Alaiy" };
 
 const PATH = "/listings";
+const COLUMN_COUNT = 7;
 
 /**
- * The Listings tab: one physical product, however many channels sell it.
+ * The Listings tab: one row per listing, which is one row per (channel, SKU).
  *
- * The Canvas Tote Bag is one thing to photograph and one thing to describe.
- * That it is `CT-TOTE-BLK-001` on Shopify and `B09XKQL3M2` on Amazon is an
- * accident of where it is listed — and it is the reason an Amazon suppression
- * can sit there for a week without anything in Shopify mentioning it. Every
- * other table in this app has a channel column; this one has a channel
- * *column pair*, because the question here is what the two sides say about the
- * same product.
+ * This tab used to show one row per *physical product*, with a column pair for
+ * what Shopify and Amazon each said about it. That grouping is gone. The
+ * pairing behind it was a barcode match or a title score, and a row built on a
+ * wrong pairing was wrong everywhere at once and in a way nothing downstream
+ * could detect. A listing is the thing the channel actually has, and the
+ * channel is where it gets fixed.
  *
  * **Read-only, and the screen says so.** Edits happen on the channel, and the
  * detail view links out to both the live listing and the seller's own admin.
  * Writing listing changes back is explicitly V2 — a tab that looked editable
  * and silently was not would be worse than one that is honest about it.
  *
- * Which group is open lives in `?group=`, and the filters in the URL beside
+ * Which listing is open lives in `?listing=`, and the filters in the URL beside
  * it, for the same reason as every other listing tab: a filtered view with one
- * product expanded is a link someone can send to whoever is fixing it.
+ * row expanded is a link someone can send to whoever is fixing it.
  *
- * **Two tables, two offsets.** `start` pages the comparison; `ustart` pages the
- * unlinked queue below it, and they are separate reads so that moving one does
- * not re-fetch the other. The queue is the expensive one — a suggestion is
- * computed per row at read time — which is why it is paged rather than left to
- * render a whole catalogue's worth of unmatched products.
+ * **One table, one offset.** There were two — `start` for the comparison and
+ * `ustart` for the unlinked queue below it, read separately because the queue
+ * computed a suggestion per row. The queue was a consequence of the grouping,
+ * so it goes with it, and `ustart` no longer means anything.
  */
 export default async function ListingsPage({
   searchParams,
@@ -68,44 +62,38 @@ export default async function ListingsPage({
   const health = parseHealth(params.health);
   const channel = parseChannel(params.channel);
   const category = firstValue(params.category);
-  const openGroup = firstValue(params.group);
+  const openListing = firstValue(params.listing);
   const start = parseOffset(params.start);
-  const unlinkedStart = parseOffset(params.ustart);
 
   // The filters, the ordering and the offset all go to the backend rather than
   // being applied here: a filter applied after the page was chosen would hand
   // back "the rows of page one that happen to be suppressed" and call it the
-  // suppressed products. The category list comes from the same read, so it
+  // suppressed listings. The category list comes from the same read, so it
   // cannot disagree with the filtered set about what exists.
   //
-  // Three reads, in parallel, each failing on its own. The queue is a separate
-  // call from the table because paging one should not re-run the other — and
-  // the open group is fetched separately rather than found in the list, because
-  // `?group=` is a shareable link and can name a product the recipient's
+  // The open listing is fetched separately rather than found in the page,
+  // because `?listing=` is a shareable link and can name a row the recipient's
   // filters exclude, or one on another page entirely.
-  const [{ page, error }, { page: waiting, error: waitingError }, opened] =
-    await Promise.all([
-      loadListings({ health, channel, category, start }, session.backendToken),
-      loadUnlinked({ channel, start: unlinkedStart }, session.backendToken),
-      openGroup
-        ? loadGroup(openGroup, session.backendToken)
-        : Promise.resolve(null),
-    ]);
+  const [{ page, error }, opened] = await Promise.all([
+    loadListings({ health, channel, category, start }, session.backendToken),
+    openListing
+      ? loadListing(openListing, session.backendToken)
+      : Promise.resolve(null),
+  ]);
 
-  const groups = page.groups;
-  const group = opened?.group ?? null;
+  const listings = page.listings;
+  const detail = opened?.listing ?? null;
 
-  // Both offsets ride in the query, so a link that changes one keeps the other.
+  // The offset rides in the query, so a link that changes a filter keeps it.
   // Page one is the absence of the parameter rather than `start=0`, which is
   // what `hrefWith` dropping empty values gives for free. The filter bar is a
-  // GET form and carries neither, so applying a filter lands on page one of
-  // both — which is the only sensible place for it to land.
+  // GET form and carries neither, so applying a filter lands on page one —
+  // which is the only sensible place for it to land.
   const query = {
     health: health ?? "",
     channel: channel ?? "",
     category: category ?? "",
     start: start ? String(start) : "",
-    ustart: unlinkedStart ? String(unlinkedStart) : "",
   };
   const hrefWith = (over: Record<string, string | undefined>) =>
     hrefToString({
@@ -123,8 +111,8 @@ export default async function ListingsPage({
         <Eyebrow>Your data</Eyebrow>
         <h1 className="text-display-md">Listings</h1>
         <p className="text-[13px] text-muted">
-          One row per product, both channels side by side. Edits happen on the
-          channel — every listing here links out to it.
+          One row per listing, on every channel you sell through. Edits happen
+          on the channel — every listing here links out to it.
         </p>
       </div>
 
@@ -148,12 +136,12 @@ export default async function ListingsPage({
             options={HEALTH_FILTER_OPTIONS}
           />
         </FilterField>
-        <FilterField label="Sold on">
+        <FilterField label="Channel">
           <FilterSelect
             name="channel"
             defaultValue={channel ?? ""}
             options={[
-              { value: "", label: "Either channel" },
+              { value: "", label: "All channels" },
               { value: "shopify", label: "Shopify" },
               { value: "amazon", label: "Amazon" },
             ]}
@@ -174,34 +162,34 @@ export default async function ListingsPage({
       <TableFrame minWidth="56rem">
         <thead>
           <tr>
-            <Th>Product</Th>
-            <Th>Brand SKU</Th>
-            <Th>Shopify</Th>
-            <Th>Amazon</Th>
+            <Th>Listing</Th>
+            <Th>Channel</Th>
+            <Th>SKU</Th>
+            <Th>Status</Th>
+            <Th align="right">Price</Th>
             <Th>Health</Th>
-            <Th>Linked by</Th>
             <Th>Synced</Th>
           </tr>
         </thead>
         <tbody>
-          {groups.length === 0 ? (
-            <EmptyRow colSpan={7}>
+          {listings.length === 0 ? (
+            <EmptyRow colSpan={COLUMN_COUNT}>
               {/* An empty page with a non-zero total is a hand-typed offset
-                  past the end. Saying "no products match" there would be a
+                  past the end. Saying "no listings match" there would be a
                   lie about the filters rather than about the offset. */}
               {page.total > 0
                 ? "Nothing on this page. Go back to the first one."
                 : filtered
-                  ? "No products match those filters."
-                  : "No products yet. They appear here once your channels sync."}
+                  ? "No listings match those filters."
+                  : "No listings yet. They appear here once your channels sync."}
             </EmptyRow>
           ) : (
-            groups.map((row) => (
-              <GroupRow
+            listings.map((row) => (
+              <ListingRow
                 key={row.id}
-                group={row}
-                href={hrefWith({ group: row.id === openGroup ? undefined : row.id })}
-                open={row.id === openGroup}
+                listing={row}
+                href={hrefWith({ listing: row.id === openListing ? undefined : row.id })}
+                open={row.id === openListing}
               />
             ))
           )}
@@ -213,54 +201,64 @@ export default async function ListingsPage({
         start={page.start}
         limit={page.limit || PAGE_SIZE}
         hrefFor={(offset) => hrefWith({ start: offset ? String(offset) : undefined })}
-        unit="products"
+        unit="listings"
       />
 
-      {/* A group named in the URL that could not be read says so, rather than
+      {/* A listing named in the URL that could not be read says so, rather than
           silently rendering nothing — the link was to something specific. */}
       {opened?.error ? <Alert>{opened.error}</Alert> : null}
 
-      {group ? (
-        <GroupDetail group={group} closeHref={hrefWith({ group: undefined })} />
+      {detail ? (
+        <ListingDetailPanel
+          listing={detail}
+          closeHref={hrefWith({ listing: undefined })}
+        />
       ) : null}
-
-      <Unlinked
-        page={waiting}
-        error={waitingError}
-        hrefFor={(offset) =>
-          hrefWith({ ustart: offset ? String(offset) : undefined })
-        }
-      />
     </div>
   );
 }
 
-function GroupRow({
-  group,
+function ListingRow({
+  listing,
   href,
   open,
 }: {
-  group: ProductGroup;
+  listing: Listing;
   href: string;
   open: boolean;
 }) {
-  const { shopify, amazon } = byChannel(group.listings);
-  const health = healthPresentation(group.health);
-  const link = linkPresentation(group.link_method);
+  const health = healthPresentation(listing.health);
 
   return (
     <tr className={open ? "bg-highlight-100" : "transition-colors hover:bg-primary-600/[0.04]"}>
       <Td className="font-medium">
-        <Link href={href} className="underline-offset-2 hover:text-primary-600 hover:underline">
-          {group.name}
-        </Link>
+        <span className="flex items-center gap-2">
+          {listing.image_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={listing.image_url}
+              alt=""
+              loading="lazy"
+              className="h-8 w-8 shrink-0 rounded-xs border border-line object-cover"
+            />
+          ) : null}
+          <Link
+            href={href}
+            className="min-w-0 truncate underline-offset-2 hover:text-primary-600 hover:underline"
+          >
+            {listing.title || listing.external_id}
+          </Link>
+        </span>
       </Td>
-      <Td className="text-muted">{group.brand_sku}</Td>
       <Td>
-        <ChannelStatus listing={shopify} />
+        <ChannelBadge channel={listing.channel} />
       </Td>
-      <Td>
-        <ChannelStatus listing={amazon} />
+      <Td className="font-data text-muted">{listing.sku || "—"}</Td>
+      {/* The channel's own word, unmapped: a Shopify DRAFT and an Amazon
+          suppression are not the same problem and do not have the same fix. */}
+      <Td className="text-muted">{listing.status || "—"}</Td>
+      <Td align="right" className="font-data whitespace-nowrap">
+        {formatMoney(listing.price, listing.currency)}
       </Td>
       <Td>
         <span
@@ -271,36 +269,8 @@ function GroupRow({
           {health.label}
         </span>
       </Td>
-      <Td>
-        <span className="text-[11.5px] text-muted" title={link.blurb}>
-          {link.label}
-          {group.link_confidence ? (
-            <span className="font-data"> · {group.link_confidence}%</span>
-          ) : null}
-        </span>
-      </Td>
-      <Td className="whitespace-nowrap text-muted">{formatDateTime(group.last_synced_at)}</Td>
+      <Td className="whitespace-nowrap text-muted">{formatDateTime(listing.last_synced_at)}</Td>
     </tr>
-  );
-}
-
-/**
- * One channel's cell.
- *
- * An absent listing is "not listed", not an em dash: a product sold only on
- * Amazon is a valid product group, and a blank cell in a column where every
- * other row has a status reads as data that failed to load.
- */
-function ChannelStatus({ listing }: { listing?: ChannelListing }) {
-  if (!listing) {
-    return <span className="text-[11.5px] text-muted-soft">Not listed</span>;
-  }
-  const health = healthPresentation(listing.health);
-  return (
-    <span className="flex items-center gap-1.5" title={listing.status ?? health.label}>
-      <span aria-hidden className={`h-1.5 w-1.5 shrink-0 rounded-full ${health.dot}`} />
-      <span className={`text-[12px] ${health.ink}`}>{health.label}</span>
-    </span>
   );
 }
 

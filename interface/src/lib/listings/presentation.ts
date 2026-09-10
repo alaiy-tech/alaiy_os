@@ -1,7 +1,7 @@
-import type { ChannelListing, LinkMethod, ListingHealth } from "@/lib/product-groups/types";
+import type { Listing, ListingHealth } from "@/lib/listings/types";
 
 /**
- * How listing health and product links read.
+ * How listing health reads.
  *
  * Client-safe, and the same split as `lib/orders/flags.ts`: whether a listing
  * is suppressed is the channel's fact, what the seller is told about it is
@@ -57,44 +57,6 @@ export const HEALTH_FILTER_OPTIONS = [
 ];
 
 /**
- * How a product's two listings came to be treated as one product.
- *
- * Shown on the row because it is the difference between a fact and a guess: a
- * barcode match is certain, an AI-suggested one was confirmed by a person, and
- * a seller looking at a merged product deserves to know which.
- */
-export type LinkPresentation = { label: string; blurb: string; tone: "neutral" | "accent" };
-
-const LINKS: Record<LinkMethod, LinkPresentation> = {
-  barcode: {
-    label: "Barcode",
-    blurb: "Matched automatically: the same barcode on both channels. No guesswork.",
-    tone: "neutral",
-  },
-  ai_suggested: {
-    label: "Suggested",
-    blurb:
-      "No barcode on both sides, so the titles and descriptions were compared and someone confirmed the match.",
-    tone: "accent",
-  },
-  manual: {
-    label: "Linked by hand",
-    blurb: "Someone picked this match themselves.",
-    tone: "neutral",
-  },
-  exclusive: {
-    label: "One channel only",
-    blurb:
-      "Sold on a single channel on purpose — an Amazon-only bundle, say. Not a missing link.",
-    tone: "neutral",
-  },
-};
-
-export function linkPresentation(method: LinkMethod): LinkPresentation {
-  return LINKS[method] ?? LINKS.manual;
-}
-
-/**
  * What is thin about a listing, in the words a seller would use.
  *
  * Derived here rather than sent by the channel: Amazon and Shopify both report
@@ -102,7 +64,7 @@ export function linkPresentation(method: LinkMethod): LinkPresentation {
  * about how it will perform, not theirs. Saying which of these is the reason
  * for a yellow badge is the difference between a colour and an instruction.
  */
-export function listingWeaknesses(listing: ChannelListing): string[] {
+export function listingWeaknesses(listing: Listing): string[] {
   const notes: string[] = [];
 
   if (listing.images.length === 0) notes.push("no images");
@@ -123,18 +85,4 @@ export function listingWeaknesses(listing: ChannelListing): string[] {
   else if (description.length < 80) notes.push("a very short description");
 
   return notes;
-}
-
-/**
- * The channels a product group has, and the ones it does not.
- *
- * Returned as a fixed pair so the table's two status columns line up down the
- * page: a group with no Amazon listing leaves that column empty rather than
- * shifting its Shopify status into Amazon's place.
- */
-export function byChannel(listings: ChannelListing[]) {
-  return {
-    shopify: listings.find((l) => l.channel === "shopify"),
-    amazon: listings.find((l) => l.channel === "amazon"),
-  };
 }
