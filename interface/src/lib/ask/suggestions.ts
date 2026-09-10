@@ -60,11 +60,6 @@ const BY_ROUTE: Record<string, string[]> = {
     "Is anything failing to sync?",
     "Compare Shopify and Amazon this month",
   ],
-  "/support": [
-    "Which cases are closest to Amazon's auto-close?",
-    "Which cases have I not replied to yet?",
-    "Draft a follow-up for the oldest open case",
-  ],
   "/ratings": [
     "Explain the rating change on Canvas Tote Bag",
     "Is my Amazon rating trending toward the Buy Box risk?",

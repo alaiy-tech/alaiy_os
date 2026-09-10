@@ -7,9 +7,6 @@ import { ChatWorkspace } from "@/components/ask/chat-workspace";
 import { listChatSessions } from "@/lib/backend/chat";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import type { ChatSessionSummary } from "@/lib/backend/types";
-import { Alert } from "@/components/ui";
-import { urgency } from "@/lib/support/cases";
-import { buildMockCases } from "@/lib/support/mock-data";
 
 export const metadata = { title: "Ask Alaiy" };
 
@@ -56,16 +53,6 @@ export default async function HomePage({
   // what someone following a stale link wants.
   const known = sessions.some((row) => row.name === chat);
   const active = (known ? chat : sessions[0]?.name) ?? null;
-
-  // The Support tab's own alert, per the issue: a case idle for over a week
-  // or closing in on Amazon's auto-close should surface here too, not only on
-  // Support itself. Mock data, like the tab it points at — see the API
-  // constraint note on buildMockCases — so this reads the same seed list
-  // rather than anything a seller has added, which lives only in that tab's
-  // own client state.
-  const urgentSupportCases = buildMockCases().filter(
-    (supportCase) => supportCase.status !== "resolved" && urgency(supportCase),
-  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
