@@ -85,6 +85,11 @@ export async function ConnectStep({
         </p>
       </header>
 
+      {connected ? (
+        <Alert tone="info">
+          {connected === "shopify" ? "Shopify" : "Amazon"} connected. Nice.
+        </Alert>
+      ) : null}
       {error ? <Alert>{error}</Alert> : null}
       {loadError ? <Alert>{loadError}</Alert> : null}
 
