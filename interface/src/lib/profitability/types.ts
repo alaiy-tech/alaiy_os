@@ -16,17 +16,15 @@ import type { ChannelId } from "@/lib/backend/types";
 export type FeeBasis = "actual" | "estimated";
 
 /**
- * One product, on one channel — the grain a P&L row is computed at. A
- * product sold on both Amazon and Shopify is two of these, because the fee
- * structure, the price, and the margin genuinely differ per channel; the
- * table's Product Group row is these rolled up, not a third copy of the
- * numbers.
+ * One product, on one channel — the grain a P&L row is computed at, and now
+ * also the grain the table renders. A product sold on both Amazon and Shopify
+ * is two of these, because the fee structure, the price, and the margin
+ * genuinely differ per channel, and nothing rolls them back together: the
+ * product group that used to do it is gone app-wide.
  */
 export type ChannelPnlRow = {
   sku: string;
   title: string;
-  /** The row groups under — several SKUs (a size or colour) can share one. */
-  productGroup: string;
   channel: ChannelId;
   revenue: number;
   units: number;

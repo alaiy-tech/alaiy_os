@@ -4,13 +4,11 @@ import { TableFrame, Th } from "@/components/data/table";
 /**
  * What the seller sees while the Listings read is in flight.
  *
- * This tab is the slowest read in the app and it is slowest exactly when it is
- * most likely to be opened: nothing is grouped until a catalogue sync finishes,
- * so during a sync every product is unlinked and every one of them gets a
- * suggestion computed. Without this file the page is a Server Component that
- * awaits that read with nothing rendered — a blank screen for however long it
- * takes, and on a large catalogue mid-sync that was long enough to look broken
- * before the timeout turned it into an error.
+ * Cheaper than it was — the read no longer scores every unmatched product
+ * against the catalogue — but still a paged read of the widest columns in the
+ * app, and still worth covering. Without this file the page is a Server
+ * Component that awaits that read with nothing rendered, which on a large
+ * catalogue is a blank screen for long enough to look broken.
  *
  * The heading and the column headers are the real ones rather than grey blocks,
  * so nothing moves when the rows arrive and the seller can see which tab they
@@ -23,20 +21,20 @@ export default function LoadingListings() {
         <Eyebrow>Your data</Eyebrow>
         <h1 className="text-display-md">Listings</h1>
         <p className="text-[13px] text-muted">
-          One row per product, both channels side by side. Edits happen on the
-          channel — every listing here links out to it.
+          One row per listing, on every channel you sell through. Edits happen
+          on the channel — every listing here links out to it.
         </p>
       </div>
 
       <TableFrame minWidth="56rem">
         <thead>
           <tr>
-            <Th>Product</Th>
-            <Th>Brand SKU</Th>
-            <Th>Shopify</Th>
-            <Th>Amazon</Th>
+            <Th>Listing</Th>
+            <Th>Channel</Th>
+            <Th>SKU</Th>
+            <Th>Status</Th>
+            <Th align="right">Price</Th>
             <Th>Health</Th>
-            <Th>Linked by</Th>
             <Th>Synced</Th>
           </tr>
         </thead>
@@ -54,7 +52,7 @@ export default function LoadingListings() {
       </TableFrame>
 
       <p role="status" className="text-[12px] text-muted">
-        Loading your products…
+        Loading your listings…
       </p>
     </div>
   );
