@@ -1,8 +1,7 @@
 import type { ChannelPnlRow } from "./types";
 
 /**
- * The Buy Box heuristic — client-safe, like the equivalent files for Support
- * and Ratings.
+ * The Buy Box heuristic — client-safe, like the equivalent file for Ratings.
  *
  * **No margin maths here any more, and no roll-up.** The per-row margin
  * arrives from the backend, which is the only place that knows whether a fee

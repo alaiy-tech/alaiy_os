@@ -52,7 +52,6 @@ type NavItem = {
     | "/inventory"
     | "/profitability"
     | "/ratings"
-    | "/support"
     | "/dashboard"
     | "/orders"
     | "/inventory"
@@ -76,7 +75,6 @@ const PRIMARY: NavItem[] = [
   { label: "Inventory", href: "/inventory", icon: "inventory" },
   { label: "Profitability", href: "/profitability", icon: "profitability" },
   { label: "Ratings", href: "/ratings", icon: "ratings" },
-  { label: "Support", href: "/support", icon: "support" },
   // Amazon-only, and after the tabs that cover every channel. It sits in the
   // primary group rather than beside Channels because it is something a seller
   // reads, not something they configure — an account being suspended is the
@@ -107,8 +105,6 @@ const ICONS = {
   finance: "M10 3v14M6.5 6h5a2.5 2.5 0 0 1 0 5h-3a2.5 2.5 0 0 0 0 5h5",
   channels: "M7 4.5h6l1.5 3h-9l1.5-3ZM3.5 7.5h13v8a1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1v-8Zm4 3h5",
   ratings: "M10 3.3l1.9 4.1 4.4.5-3.3 3 .9 4.4L10 13.2l-3.9 2.1.9-4.4-3.3-3 4.4-.5L10 3.3Z",
-  support:
-    "M3.5 5.5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2H9l-3 3v-3H5.5a2 2 0 0 1-2-2v-6ZM6.5 8h7M6.5 10.5h4",
   settings:
     "M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM10 2.5v2M10 15.5v2M4.7 4.7l1.4 1.4M13.9 13.9l1.4 1.4M2.5 10h2M15.5 10h2M4.7 15.3l1.4-1.4M13.9 6.1l1.4-1.4",
 } as const;
