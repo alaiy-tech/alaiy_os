@@ -1,4 +1,5 @@
 import { Td } from "@/components/data/table";
+import { SellerCentralLink } from "@/components/channel/seller-central-link";
 import { formatDate } from "@/lib/format";
 import type { SellerFeedback } from "@/lib/ratings/types";
 import { RatingStars } from "./rating-stars";
@@ -38,14 +39,23 @@ export function FeedbackRow({ feedback }: { feedback: SellerFeedback }) {
         )}
       </Td>
       <Td className="whitespace-nowrap text-muted">
-        {feedback.order_number ?? (
-          <span
-            className="text-muted-soft"
-            title={`Amazon order ${feedback.order_id} — older than the orders we've synced, so it has no number here.`}
-          >
-            —
-          </span>
-        )}
+        <span className="inline-flex items-center gap-0.5">
+          {feedback.order_number ?? (
+            <span
+              className="text-muted-soft"
+              title={`Amazon order ${feedback.order_id} — older than the orders we've synced, so it has no number here.`}
+            >
+              —
+            </span>
+          )}
+          {/* The order, not Feedback Manager: feedback is about a transaction,
+              and the order is the page showing what the buyer is talking
+              about. Feedback Manager is linked from the tab heading. */}
+          <SellerCentralLink
+            href={feedback.admin_url}
+            label={`Open order ${feedback.order_number ?? feedback.order_id} in Seller Central`}
+          />
+        </span>
       </Td>
       <Td className="max-w-[16rem]">
         {feedback.products.length ? (

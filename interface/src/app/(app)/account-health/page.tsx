@@ -9,6 +9,7 @@ import {
 import { firstValue, hrefToString } from "@/lib/listing";
 import { formatDateTime, formatNumber, formatPercent } from "@/lib/format";
 import { Alert, ButtonLink, Eyebrow, Pill } from "@/components/ui";
+import { SellerCentralLink } from "@/components/channel/seller-central-link";
 import { bannerFor } from "@/lib/health/status";
 import { Contributing } from "@/app/(app)/account-health/contributing";
 import { MetricTiles } from "@/app/(app)/account-health/metric-tiles";
@@ -80,6 +81,17 @@ export default async function AccountHealthPage({
           {/* Not an error state. Amazon is the only channel with a suspension
               mechanism, so this tab has one channel by design. */}
           <Pill tone="warn">Amazon only</Pill>
+          {/* Amazon's own dashboard. A companion rather than a redirect: this
+              tab exists to say how much room a metric has left, which that
+              page does not. */}
+          <SellerCentralLink
+            href={health?.seller_central}
+            label="Open Account Health in Seller Central"
+            size="md"
+            className="ml-auto"
+          >
+            Seller Central
+          </SellerCentralLink>
         </div>
         <p className="text-[13px] text-muted">
           How much room is left before Amazon&rsquo;s thresholds, and which

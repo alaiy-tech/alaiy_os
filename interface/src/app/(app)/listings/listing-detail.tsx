@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { channelName } from "@/lib/channels";
+import { ChannelAdminLink } from "@/components/channel/seller-central-link";
 import { healthPresentation, listingWeaknesses } from "@/lib/listings/presentation";
 import type { Listing } from "@/lib/listings/types";
 
@@ -158,11 +159,18 @@ export function ListingDetailPanel({
               View on {channelName(channel)}
             </ExternalLink>
           ) : null}
-          {listing.admin_url ? (
-            <ExternalLink href={listing.admin_url}>
-              {channel === "amazon" ? "Open in Seller Central" : "Open in Shopify admin"}
-            </ExternalLink>
-          ) : null}
+          <ChannelAdminLink
+            channel={channel}
+            href={listing.admin_url}
+            label={
+              channel === "amazon"
+                ? `Open ${listing.sku ?? listing.external_id} in Seller Central`
+                : `Open ${listing.title ?? listing.external_id} in the Shopify admin`
+            }
+            className="-my-1"
+          >
+            {channel === "amazon" ? "Open in Seller Central" : "Open in Shopify admin"}
+          </ChannelAdminLink>
           <span className="ml-auto text-muted-soft">
             Synced {formatDateTime(listing.last_synced_at)}
           </span>

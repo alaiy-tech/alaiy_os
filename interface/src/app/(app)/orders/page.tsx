@@ -48,6 +48,10 @@ import {
   Toolbar,
 } from "@/components/data/toolbar";
 import { Alert, Eyebrow, pressClass } from "@/components/ui";
+import {
+  ChannelAdminLink,
+  SellerCentralLink,
+} from "@/components/channel/seller-central-link";
 import { ImportingBanner } from "@/components/data/importing-banner";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { FLAG_FILTER_OPTIONS } from "@/lib/orders/flags";
@@ -189,7 +193,17 @@ export default async function OrdersPage({
     <div className="mx-auto w-full max-w-6xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
         <Eyebrow>Your data</Eyebrow>
-        <h1 className="text-display-md">Orders</h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-display-md">Orders</h1>
+          <SellerCentralLink
+            href={page.seller_central}
+            label="Open Manage Orders in Seller Central"
+            size="md"
+            className="ml-auto"
+          >
+            Seller Central
+          </SellerCentralLink>
+        </div>
         <p className="text-[13px] text-muted">
           {windowLabel.toLowerCase()}, across every connected channel. One row
           per order, and anything that needs attention is at the top.
@@ -377,12 +391,24 @@ export default async function OrdersPage({
                   </Td>
                   <Td className="whitespace-nowrap">{formatDate(order.order_date)}</Td>
                   <Td className="font-medium">
-                    <Link
-                      href={href}
-                      className="underline-offset-2 hover:text-primary-600 hover:underline"
-                    >
-                      {order.order_number || order.external_order_id}
-                    </Link>
+                    <span className="inline-flex items-center gap-0.5">
+                      <Link
+                        href={href}
+                        className="underline-offset-2 hover:text-primary-600 hover:underline"
+                      >
+                        {order.order_number || order.external_order_id}
+                      </Link>
+                      {/* Beside the number rather than in a column of its own:
+                          a column would be empty on every row whose connection
+                          cannot supply one, and read as data missing. */}
+                      <ChannelAdminLink
+                        channel={order.channel}
+                        href={order.external_url}
+                        label={`Open order ${
+                          order.order_number || order.external_order_id
+                        } in ${order.channel === "amazon" ? "Seller Central" : "the Shopify admin"}`}
+                      />
+                    </span>
                   </Td>
                   <Td>
                     <ChannelBadge channel={order.channel} />

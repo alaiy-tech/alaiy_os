@@ -38,6 +38,7 @@ const EMPTY: RatingsPage = {
   concerns: [],
   products: [],
   improvements: [],
+  seller_central: null,
   synced_at: null,
   never_synced: true,
 };

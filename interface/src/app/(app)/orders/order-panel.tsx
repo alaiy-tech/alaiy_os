@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { ChannelBadge, FlagChips, StatusText } from "@/components/data/table";
 import { CloseOnEscape } from "@/app/(app)/orders/close-on-escape";
 import { pressClass } from "@/components/ui";
+import { SellerCentralMark } from "@/components/channel/seller-central-link";
 import { formatDate, formatDateTime, formatMoney, formatNumber } from "@/lib/format";
 import type { ChannelOrderDetail, OrderFlagRules } from "@/lib/backend/types";
 import { orderFlags } from "@/lib/orders/flags";
@@ -188,8 +189,13 @@ function Body({
           href={order.external_url}
           target="_blank"
           rel="noopener noreferrer"
-          className={`${pressClass({ size: "sm" })} w-full`}
+          className={`${pressClass({ size: "sm" })} w-full gap-2`}
         >
+          {/* The mark inside the press rather than instead of it. This is the
+              panel's one call to action and it has the room to say where it
+              goes; the mark is what makes it the same link as the glyph on
+              every row above. */}
+          {order.channel === "amazon" ? <SellerCentralMark /> : null}
           View in {order.destination ?? "the channel"}
           <span aria-hidden>↗</span>
         </a>

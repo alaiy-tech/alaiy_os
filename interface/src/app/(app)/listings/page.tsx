@@ -17,6 +17,10 @@ import {
   Toolbar,
 } from "@/components/data/toolbar";
 import { Alert, Eyebrow } from "@/components/ui";
+import {
+  ChannelAdminLink,
+  SellerCentralLink,
+} from "@/components/channel/seller-central-link";
 import { Pagination } from "@/components/data/pagination";
 import { SampleBanner } from "@/components/data/sample-banner";
 import { HEALTH_FILTER_OPTIONS, healthPresentation } from "@/lib/listings/presentation";
@@ -110,7 +114,19 @@ export default async function ListingsPage({
     <div className="mx-auto w-full max-w-6xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
         <Eyebrow>Your data</Eyebrow>
-        <h1 className="text-display-md">Listings</h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-display-md">Listings</h1>
+          {/* The list above the rows. Each row links to its own SKU; this is
+              Amazon's own catalogue page, for the seller who wants the lot. */}
+          <SellerCentralLink
+            href={page.seller_central}
+            label="Open Manage Inventory in Seller Central"
+            size="md"
+            className="ml-auto"
+          >
+            Seller Central
+          </SellerCentralLink>
+        </div>
         <p className="text-[13px] text-muted">
           One row per listing, on every channel you sell through. Edits happen
           on the channel — every listing here links out to it.
@@ -250,7 +266,20 @@ function ListingRow({
       <Td>
         <ChannelBadge channel={listing.channel} />
       </Td>
-      <Td className="font-data text-muted">{listing.sku || "—"}</Td>
+      <Td className="font-data text-muted">
+        <span className="inline-flex items-center gap-0.5">
+          {listing.sku || "—"}
+          {/* On the SKU, because that is what the channel's editor is keyed on
+              — SKU Central routes on the seller SKU, not the ASIN. */}
+          <ChannelAdminLink
+            channel={listing.channel}
+            href={listing.admin_url}
+            label={`Open ${listing.sku || listing.external_id} in ${
+              listing.channel === "amazon" ? "Seller Central" : "the Shopify admin"
+            }`}
+          />
+        </span>
+      </Td>
       {/* The channel's own word, unmapped: a Shopify DRAFT and an Amazon
           suppression are not the same problem and do not have the same fix. */}
       <Td className="text-muted">{listing.status || "—"}</Td>
