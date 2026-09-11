@@ -19,6 +19,51 @@ openssl rand -base64 32        # -> SESSION_SECRET
 npm run dev
 ```
 
+### Running it with nothing behind it
+
+```bash
+npm run dev:demo               # no .env.local needed
+```
+
+Opens on the Dashboard, signed in as a seller who does not exist, reading a
+workspace that does not exist. Every tab renders — Dashboard, Orders, Listings,
+Shipping, Inventory, Profitability, Ratings, Account Health, Channels and Ask
+Alaiy — with rows you can filter, sort, page through and open. A marker in the
+corner of every screen says the data is fabricated.
+
+It exists because checking a change to the Orders table should not require a
+Google account, an ERPNext bench and a workspace with ninety days of orders in
+it. Two choke points are replaced and nothing else is: `getSession` in
+`src/lib/auth/dal.ts` hands back a fabricated session, and `backendRequest` in
+`src/lib/backend/client.ts` answers from `src/lib/dev/` before it opens a
+socket. The pages, layouts, Server Actions and Route Handlers above them are
+the ones that ship, unaware.
+
+The fabricated world is one catalogue of fourteen products, and the listings,
+orders, stock cover, margins, carriers, tiles and alerts are all readings of it
+— so a tile and the table under it agree, and so does what Ask Alaiy tells you.
+It is seeded, not random: the same rows survive a reload, which is what makes a
+screenshot worth taking.
+
+The states that are hard to arrange against a real backend are the ones it
+deliberately holds: a suppressed Amazon listing, a channel a day behind on
+sync, a SKU whose fees Amazon declined to quote, a carrier too thin to quote a
+percentage for. Those are what the honesty fields on these tabs exist to render,
+and a demo where every flag was green would hide all of them.
+
+The base declares the flag in `interface/interface.config.json` as
+`"demo": "ALAIY_DEMO"`, so devbench can offer `devbench demo <client>` without
+knowing which app is the base or what its variable is called — the same way it
+already learns the environment the base reads. A client whose base declares no
+`demo` key is told so by name rather than started into a broken screen.
+
+`ALAIY_DEMO` cannot be turned on in a deployed app. `next build` inlines
+`NODE_ENV` as `"production"`, so the flag folds to `false` at build time and
+every branch behind it is eliminated — `DEMO_MODE` does not appear in the built
+server at all, and nothing under `src/lib/dev/` reaches a browser bundle. The
+fixtures are behind a dynamic `import()` in the backend client for that reason:
+the module is never loaded on a line that no longer exists.
+
 ## Architecture
 
 ### The browser never talks to the backend

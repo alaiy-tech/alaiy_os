@@ -2,6 +2,7 @@
   "app": "alaiy_os",
   "base": true,
   "acceptsContributions": false,
+  "demo": "ALAIY_DEMO",
   "env": {
     "ALAIY_BACKEND_URL": "backendUrl",
     "APP_URL": "appUrl",

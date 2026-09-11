@@ -6,6 +6,7 @@ import { MobileNav, Sidebar } from "@/components/shell/sidebar";
 import { AskPanel } from "@/components/ask/ask-panel";
 import { Logo } from "@/components/ui";
 import { ImportStatus } from "@/components/import/import-status";
+import { DemoBadge } from "@/components/dev/demo-badge";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { listChatSessions } from "@/lib/backend/chat";
 import type { ChatSessionSummary } from "@/lib/backend/types";
@@ -78,6 +79,9 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       {/* Mounted here, not on a page, so its poll survives navigation
           between tabs instead of restarting on each one. */}
       <ImportStatus initialJob={currentImport} />
+
+      {/* Only renders in demo mode, and takes no space in the layout. */}
+      <DemoBadge />
 
       <AskPanel
         greeting={greeting}

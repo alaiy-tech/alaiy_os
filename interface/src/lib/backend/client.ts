@@ -1,5 +1,6 @@
 import "server-only";
 import { env } from "@/lib/env";
+import { DEMO_MODE } from "@/lib/dev/demo";
 
 /**
  * The only module in the app that knows the backend exists.
@@ -64,6 +65,18 @@ export async function backendRequest<T>(
   options: RequestOptions = {},
 ): Promise<T> {
   const { method = "GET", query, body, userToken, cache, revalidate, tags } = options;
+
+  // Demo mode intercepts here rather than in each reader above: this is the one
+  // function every backend call in the app passes through, so one branch covers
+  // the tabs, the Server Actions and the polling Route Handlers alike — and the
+  // readers stay exactly as they ship. Imported dynamically so the fixtures are
+  // not pulled into a production server that can never reach this line.
+  if (DEMO_MODE) {
+    const { answerDemoRequest } = await import("@/lib/dev/demo-backend");
+    const answer = answerDemoRequest(path, query, body);
+    if (!answer.ok) throw new BackendError(answer.message, 501);
+    return answer.value as T;
+  }
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), env.backendTimeoutMs);

@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:demo": "ALAIY_DEMO=1 next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

@@ -8,6 +8,7 @@ import {
   effectiveStep,
   type SessionPayload,
 } from "@/lib/auth/session";
+import { DEMO_MODE, DEMO_SESSION } from "@/lib/dev/demo";
 
 /**
  * Data Access Layer.
@@ -19,7 +20,13 @@ import {
 
 export const getSession = cache(async (): Promise<SessionPayload | null> => {
   const store = await cookies();
-  return decrypt(store.get(SESSION_COOKIE)?.value);
+  const session = await decrypt(store.get(SESSION_COOKIE)?.value);
+  if (session) return session;
+  // Demo mode, and only in a dev build: everything above this layer — the
+  // pages, the layouts, the Server Actions and the Route Handlers — goes on
+  // believing it is reading a cookie. A real cookie still wins, so signing in
+  // for real with the flag on behaves normally.
+  return DEMO_MODE ? DEMO_SESSION : null;
 });
 
 /** Redirects to sign-in when there is no valid session. */
