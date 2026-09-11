@@ -59,12 +59,48 @@ export type ConnectorStatus = {
   error?: string;
 };
 
+/**
+ * What a seller lets Alaiy do with one channel, decided per permission.
+ *
+ * `allowed` is what approving the channel's consent screen already said, so it
+ * is the default for a permission nobody has touched. `needs_approval` keeps
+ * Alaiy off it unattended — the pass still runs when the seller asks for it
+ * here, because an approval queue nobody empties is a channel that quietly
+ * stops working. `blocked` is never, asked for or not.
+ */
+export type PermissionDecision = "allowed" | "needs_approval" | "blocked";
+
+/**
+ * One row of the channel's consent screen, as the seller met it.
+ *
+ * `label` and `grants` are the channel's own words — an SP-API role name, a
+ * Shopify scope — and not ours, because the seller checking this against
+ * Seller Central needs the two lists to read the same. `summary` is the one
+ * sentence that is ours.
+ */
+export type ChannelPermission = {
+  id: string;
+  label: string;
+  summary: string;
+  /** The underlying role or scope names, for checking against the channel. */
+  grants: string[];
+  /** The channel stops doing its main job without this one. */
+  core: boolean;
+  decision: PermissionDecision;
+};
+
 export type ImportStepId = "orders" | "inventory" | "settlements";
 
 export type ImportStep = {
   id: ImportStepId;
   channel: ChannelId;
-  status: "pending" | "running" | "done" | "failed";
+  /**
+   * `skipped` is a step the seller's own channel permissions refused. It is a
+   * fourth outcome rather than a failure: nothing went wrong, and telling them
+   * their import failed because they set a permission would send them looking
+   * for a fault.
+   */
+  status: "pending" | "running" | "done" | "failed" | "skipped";
   /** Records written so far, for the progress screen. */
   processed: number;
   total?: number;

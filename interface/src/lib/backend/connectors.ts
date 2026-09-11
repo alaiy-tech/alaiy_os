@@ -1,6 +1,11 @@
 import "server-only";
 import { backend } from "@/lib/backend/client";
-import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
+import type {
+  ChannelId,
+  ChannelPermission,
+  ConnectorStatus,
+  PermissionDecision,
+} from "@/lib/backend/types";
 
 /**
  * Channel connections.
@@ -79,6 +84,41 @@ export async function amazonAppStatus(
   userToken?: string,
 ): Promise<{ ready: boolean; missing: string[]; sandbox: boolean; draft: boolean }> {
   return backend.get(`${API}.amazon_app_status`, { userToken });
+}
+
+/**
+ * The channel's consent screen, as a list, with what the seller currently lets
+ * Alaiy do with each entry.
+ *
+ * Answers for a channel that has never been connected too — the catalogue is a
+ * property of the channel, not of the connection — so the section does not
+ * appear out of nowhere the moment a connection succeeds.
+ */
+export async function listPermissions(
+  workspaceId: string,
+  channel: ChannelId,
+  userToken?: string,
+): Promise<ChannelPermission[]> {
+  const result = await backend.get<ChannelPermission[] | null>(
+    `${API}.list_permissions`,
+    { query: { workspace: workspaceId, channel }, userToken },
+  );
+  return result ?? [];
+}
+
+/** Change one permission. Answers with the whole list, already re-read. */
+export async function setPermission(
+  workspaceId: string,
+  channel: ChannelId,
+  permission: string,
+  decision: PermissionDecision,
+  userToken?: string,
+): Promise<ChannelPermission[]> {
+  return backend.post(
+    `${API}.set_permission`,
+    { workspace: workspaceId, channel, permission, decision },
+    { userToken },
+  );
 }
 
 /** Drops the stored credentials. Already-synced rows are kept. */

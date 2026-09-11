@@ -7,11 +7,16 @@ import {
   syncChannelAction,
   type ChannelActionState,
 } from "./actions";
+import { ChannelPermissions } from "./channel-permissions";
 import { AmazonAction } from "@/components/connect/amazon-action";
 import { ShopifyForm } from "@/components/connect/shopify-form";
 import { Alert, Pill, Spinner, pressClass } from "@/components/ui";
 import { formatDate } from "@/lib/format";
-import type { ChannelId, ConnectorStatus } from "@/lib/backend/types";
+import type {
+  ChannelId,
+  ChannelPermission,
+  ConnectorStatus,
+} from "@/lib/backend/types";
 
 /**
  * One channel's card: what it is connected to, and the two things a seller can
@@ -39,6 +44,7 @@ export function ChannelCard({
   name,
   live,
   status,
+  permissions,
   amazonReady,
   amazonUnavailable,
 }: {
@@ -47,6 +53,8 @@ export function ChannelCard({
   /** Still connectable. Off means wind-down only — no connect, no sync. */
   live: boolean;
   status?: ConnectorStatus;
+  /** The channel's consent list. Null when that read failed. */
+  permissions: ChannelPermission[] | null;
   /** Whether the bench has SP-API app credentials. Amazon's row only. */
   amazonReady: boolean;
   /** That check itself failed, so we do not know either way. */
@@ -133,6 +141,18 @@ export function ChannelCard({
       {connected ? (
         <ConnectedControls channel={channel} name={name} live={live} />
       ) : null}
+
+      {/* Last, and on an unconnected card too. The list is a property of the
+          channel rather than of the connection, so "what would attaching
+          Amazon let you read?" is answerable before attaching it — read-only
+          there, because a setting saved against nothing is a setting that
+          reads later as though someone configured it for you. */}
+      <ChannelPermissions
+        channel={channel}
+        name={name}
+        connected={connected}
+        permissions={permissions}
+      />
     </div>
   );
 }

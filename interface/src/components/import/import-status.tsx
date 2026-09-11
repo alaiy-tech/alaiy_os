@@ -272,6 +272,16 @@ function StepState({ step }: { step: ImportStep }) {
       </span>
     );
   }
+  if (step.status === "skipped") {
+    // The seller's own permission setting stopped it, which is not a failure
+    // and must not be painted as one. The reason is the step's `error`, so it
+    // is on the tooltip where a failure's reason already is.
+    return (
+      <span className="shrink-0 text-[12px] text-muted" title={step.error}>
+        Not allowed
+      </span>
+    );
+  }
   if (step.status === "running") {
     return (
       <span className="shrink-0 font-data text-[12px] font-medium text-highlight-700">
