@@ -26,7 +26,22 @@ import type { ChannelId, PermissionDecision } from "@/lib/backend/types";
  * to.
  */
 
-export type ChannelActionState = { error?: string; notice?: string };
+export type ChannelActionState = {
+  error?: string;
+  notice?: string;
+  /**
+   * How many times the permission action has settled on this state hook.
+   *
+   * Exists so the permission dropdown has something that changes on *every*
+   * settled submission, success or failure. Keying it on the error text alone
+   * was not enough: two consecutive failures return the same message — the
+   * `OUR_FAULT` fallback is a constant — so the key held still and React
+   * reused the node, leaving the seller's second, unsaved choice on screen.
+   * A Server Action has no memory of its own, so the count is carried through
+   * the previous state rather than kept anywhere.
+   */
+  attempt?: number;
+};
 
 const KINDS: SyncKind[] = ["products", "orders"];
 
@@ -107,11 +122,16 @@ const DECISIONS: PermissionDecision[] = ["allowed", "needs_approval", "blocked"]
  * No notice on success. The dropdown showing the new value is the confirmation
  * — a line of prose under it saying the same thing is one more thing to read
  * on a screen whose whole job is to be scanned.
+ *
+ * Every return carries an incremented `attempt`, including the failures. That
+ * is what the dropdown keys on, so see the field's own note for why the error
+ * text could not do the job.
  */
 export async function setPermissionAction(
-  _prev: ChannelActionState,
+  prev: ChannelActionState,
   formData: FormData,
 ): Promise<ChannelActionState> {
+  const attempt = (prev.attempt ?? 0) + 1;
   const session = await requireOnboardedSession();
 
   const channel = readChannel(formData);
@@ -119,7 +139,7 @@ export async function setPermissionAction(
   const rawDecision = String(formData.get("decision") ?? "");
   const decision = DECISIONS.find((value) => value === rawDecision);
   if (!channel || !permission || !decision) {
-    return { error: "Unknown channel or permission setting." };
+    return { attempt, error: "Unknown channel or permission setting." };
   }
 
   try {
@@ -131,9 +151,9 @@ export async function setPermissionAction(
       session.backendToken,
     );
   } catch (error) {
-    return { error: userFacingError(error, OUR_FAULT) };
+    return { attempt, error: userFacingError(error, OUR_FAULT) };
   }
 
   refresh();
-  return {};
+  return { attempt };
 }

@@ -19,12 +19,16 @@ All notable changes to Alaiy OS Self Serve, grouped by the release that shipped 
   more than one role is held by the strictest of them.
 - Blocking or gating a *core* permission raises a warning on the card naming what
   stops refreshing, because orders and products come from those two.
-- The dropdown is uncontrolled and remounted on the stored value. Two wrong versions
-  came first: a plain uncontrolled select never picks up the new value, because
-  `refresh()` does not push a fresh `defaultValue` into a select someone has touched;
-  a controlled one loses to React's synchronous restore, which lands after the
-  transition carrying the new value. Both left the row reading "Always allow" under a
-  summary line counting a blocked permission.
+- The dropdown is uncontrolled and remounted on the stored value plus the action's
+  settle count. Three versions: a plain uncontrolled select never picks up the new
+  value, because `refresh()` does not push a fresh `defaultValue` into a select
+  someone has touched; a controlled one loses to React's synchronous restore, which
+  lands after the transition carrying the new value; and keying on the error text
+  left a second identical failure — the `OUR_FAULT` fallback is a constant — showing
+  an unsaved choice. All three left the row disagreeing with the summary line above it.
+- An unconnected card reads as a preview, not a grant: "what connecting Amazon would
+  ask for", no legend and no dropdowns, rather than telling a seller they approved
+  access to an account they have not attached.
 
 ## 0.1.19 — 2026-09-08
 

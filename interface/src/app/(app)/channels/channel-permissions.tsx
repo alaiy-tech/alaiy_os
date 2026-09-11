@@ -96,14 +96,28 @@ export function ChannelPermissions({
         >
           ▶
         </span>
-        Permissions — {summarise(permissions)}
+        Permissions — {summarise(permissions, connected)}
       </summary>
 
       <div className="space-y-3 border-t border-line px-5 py-4">
+        {/* Two readings of the same list, because an unconnected channel has
+            granted nothing. Saying "what you approved when you connected
+            Shopify" above a channel that is not connected presents access we
+            do not have as access we were given, which is the one thing this
+            screen exists to be straight about. */}
         <p className="text-[12px] leading-snug text-muted">
-          What you approved when you connected {name}, and what we may do with
-          each. Changing one here takes effect on the next sync; it does not
-          change anything on your {name} account.
+          {connected ? (
+            <>
+              What you approved when you connected {name}, and what we may do
+              with each. Changing one here takes effect on the next sync; it
+              does not change anything on your {name} account.
+            </>
+          ) : (
+            <>
+              What connecting {name} would ask for. Nothing here is granted
+              until you connect it, and you can narrow any of it afterwards.
+            </>
+          )}
         </p>
 
         {coreBlocked.length || coreAsking.length ? (
@@ -164,7 +178,7 @@ export function ChannelPermissions({
                 <DecisionForm
                   channel={channel}
                   permission={permission}
-                  resetKey={state.error ?? ""}
+                  resetKey={String(state.attempt ?? 0)}
                   formAction={formAction}
                 />
               ) : (
@@ -176,18 +190,21 @@ export function ChannelPermissions({
           ))}
         </ul>
 
-        {/* The legend. The term does not wrap — a two-word setting broken
-            across two lines stops reading as the name of a setting. */}
-        <dl className="space-y-0.5 text-[11.5px] text-muted-soft">
-          {DECISION_OPTIONS.map((option) => (
-            <div key={option.value} className="flex gap-1.5">
-              <dt className="shrink-0 font-medium whitespace-nowrap text-muted">
-                {option.label}
-              </dt>
-              <dd>{DECISION_HELP[option.value]}</dd>
-            </div>
-          ))}
-        </dl>
+        {/* The legend, and only where the controls it describes are. The term
+            does not wrap — a two-word setting broken across two lines stops
+            reading as the name of a setting. */}
+        {connected ? (
+          <dl className="space-y-0.5 text-[11.5px] text-muted-soft">
+            {DECISION_OPTIONS.map((option) => (
+              <div key={option.value} className="flex gap-1.5">
+                <dt className="shrink-0 font-medium whitespace-nowrap text-muted">
+                  {option.label}
+                </dt>
+                <dd>{DECISION_HELP[option.value]}</dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
       </div>
     </details>
   );
@@ -209,8 +226,13 @@ function grantNote(permission: ChannelPermission): string {
   return grants === permission.label ? "" : grants;
 }
 
-/** "all allowed", or the counts that are not. */
-function summarise(permissions: ChannelPermission[]): string {
+/**
+ * "all allowed", or the counts that are not — and on an unconnected channel,
+ * neither, because nothing has been granted and nothing is being allowed.
+ */
+function summarise(permissions: ChannelPermission[], connected: boolean): string {
+  if (!connected) return `${permissions.length} we'd ask for`;
+
   const counts = { allowed: 0, needs_approval: 0, blocked: 0 };
   for (const permission of permissions) counts[permission.decision] += 1;
 
@@ -252,9 +274,12 @@ function summarise(permissions: ChannelPermission[]): string {
  *
  * Keying on the stored value sidesteps both: the seller's pick stays in an
  * untouched DOM node while the action is in flight, and the answer arrives as
- * a different node. `resetKey` carries the action's error into that key so a
- * *failed* change is undone too, rather than leaving a setting on screen that
- * was never saved.
+ * a different node. `resetKey` puts the action's settle count in that key as
+ * well, so a *failed* change is undone too rather than left on screen having
+ * never been saved. The count rather than the error text, which was the first
+ * attempt at this: two consecutive failures return the same message — the
+ * `OUR_FAULT` fallback is a constant — so the key held still and the node was
+ * reused, and the seller's second unsaved choice stayed put.
  */
 function DecisionForm({
   channel,
