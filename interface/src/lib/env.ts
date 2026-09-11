@@ -1,4 +1,5 @@
 import "server-only";
+import { DEMO_MODE } from "@/lib/dev/demo";
 
 /**
  * Server-only environment access.
@@ -8,9 +9,26 @@ import "server-only";
  * the browser bundle.
  */
 
+/**
+ * What demo mode stands in for.
+ *
+ * Three of these are read at module scope — `session.ts` builds its signing key
+ * the moment it is imported — so without a fallback the app throws on the first
+ * request rather than rendering, and `ALAIY_DEMO=1` alone would not be enough
+ * to get a screen up. The backend URL is never dialled in this mode; it is here
+ * only so `env.backendUrl` has something to return if something reads it.
+ */
+const DEMO_FALLBACKS: Record<string, string> = {
+  ALAIY_BACKEND_URL: "http://demo.invalid",
+  APP_URL: "http://localhost:3000",
+  SESSION_SECRET: "alaiy-demo-mode-not-a-real-secret",
+};
+
 function required(name: string): string {
   const value = process.env[name];
   if (!value) {
+    const fallback = DEMO_MODE ? DEMO_FALLBACKS[name] : undefined;
+    if (fallback) return fallback;
     throw new Error(
       `Missing required environment variable ${name}. Copy .env.example to .env.local and fill it in.`,
     );

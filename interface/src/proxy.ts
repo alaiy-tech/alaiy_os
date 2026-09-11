@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE, decrypt, effectiveStep } from "@/lib/auth/session";
+import { DEMO_LANDING, DEMO_MODE } from "@/lib/dev/demo";
 
 /**
  * Optimistic route protection (Next.js 16 renamed `middleware` to `proxy`).
@@ -28,6 +29,17 @@ function isPublic(pathname: string): boolean {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Demo mode. Nothing is protected because nothing has been signed into, and
+  // the two routes whose whole job is to get someone signed in — the marketing
+  // page and /start — have nothing to show, so both land on the Dashboard.
+  if (DEMO_MODE) {
+    if (pathname === "/" || pathname === "/start") {
+      return NextResponse.redirect(new URL(DEMO_LANDING, request.url));
+    }
+    return NextResponse.next();
+  }
+
   const session = await decrypt(request.cookies.get(SESSION_COOKIE)?.value);
 
   if (!session && !isPublic(pathname)) {
