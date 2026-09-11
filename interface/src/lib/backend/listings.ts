@@ -50,6 +50,7 @@ const EMPTY: ListingsPage = {
   start: 0,
   limit: PAGE_SIZE,
   categories: [],
+  seller_central: null,
 };
 
 /**

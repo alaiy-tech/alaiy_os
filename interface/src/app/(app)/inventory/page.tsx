@@ -38,6 +38,10 @@ import {
   Toolbar,
 } from "@/components/data/toolbar";
 import { Alert, Eyebrow } from "@/components/ui";
+import {
+  ChannelAdminLink,
+  SellerCentralLink,
+} from "@/components/channel/seller-central-link";
 import { ImportingBanner } from "@/components/data/importing-banner";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { ChannelTabs } from "@/components/data/channel-tabs";
@@ -165,7 +169,19 @@ export default async function InventoryPage({
     <div className="mx-auto w-full max-w-5xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
         <Eyebrow>Your data</Eyebrow>
-        <h1 className="text-display-md">Inventory</h1>
+        <div className="flex flex-wrap items-center gap-2.5">
+          <h1 className="text-display-md">Inventory</h1>
+          {/* The same Manage Inventory page the Listings tab points at —
+              over there our two tabs are one screen. */}
+          <SellerCentralLink
+            href={page.seller_central}
+            label="Open Manage Inventory in Seller Central"
+            size="md"
+            className="ml-auto"
+          >
+            Seller Central
+          </SellerCentralLink>
+        </div>
         <p className="text-[13px] text-muted">
           {view === "products"
             ? "One row per product: every source's number, and how many days of cover that leaves."
@@ -279,7 +295,21 @@ export default async function InventoryPage({
             ) : (
               page.rows.map((product) => (
                 <tr key={product.name} className="transition-colors hover:bg-primary-600/[0.04]">
-                  <Td className="font-medium">{product.sku || "—"}</Td>
+                  <Td className="font-medium">
+                    <span className="inline-flex items-center gap-0.5">
+                      {product.sku || "—"}
+                      {/* On the SKU, not the title: the title already links to
+                          the buyer's page, and these are two different
+                          destinations that should not share one word. */}
+                      <ChannelAdminLink
+                        channel={product.channel}
+                        href={product.admin_url}
+                        label={`Open ${product.sku || product.title || "this product"} in ${
+                          product.channel === "amazon" ? "Seller Central" : "the Shopify admin"
+                        }`}
+                      />
+                    </span>
+                  </Td>
                   <Td>
                     {/* The channel's own listing, when it gave us a URL. New tab
                         because it leaves the app entirely. */}

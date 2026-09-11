@@ -1,5 +1,6 @@
 import { requireOnboardedSession } from "@/lib/auth/dal";
 import { Alert, ButtonLink, Eyebrow, Pill } from "@/components/ui";
+import { SellerCentralLink } from "@/components/channel/seller-central-link";
 import { loadRatings } from "@/lib/backend/ratings";
 import { channelName } from "@/lib/channels";
 import { formatDateTime } from "@/lib/format";
@@ -40,6 +41,17 @@ export default async function RatingsPage() {
           {/* Not an error state. Shopify has no reviews to read, so this tab
               has one channel by design. */}
           <Pill tone="warn">Amazon only</Pill>
+          {/* Feedback Manager: the page that answers for the seller rating
+              this tab can only approximate, and the one that shows the review
+              text SP-API will not return. */}
+          <SellerCentralLink
+            href={page.seller_central}
+            label="Open Feedback Manager in Seller Central"
+            size="md"
+            className="ml-auto"
+          >
+            Seller Central
+          </SellerCentralLink>
         </div>
         <p className="max-w-2xl text-[13px] text-muted">
           Your seller rating and the feedback behind it, plus what buyers are raising

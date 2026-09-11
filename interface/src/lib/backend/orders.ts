@@ -96,6 +96,9 @@ const EMPTY_ORDERS: OrdersPage = {
   limit: PAGE_SIZE,
   totals: EMPTY_TOTALS,
   rules: DEFAULT_RULES,
+  // No page, so nothing to link out of. Not a guessed Seller Central host: a
+  // failed read tells us nothing about the seller's marketplace.
+  seller_central: null,
 };
 
 export type OrdersResult = { page: OrdersPage; error?: string };

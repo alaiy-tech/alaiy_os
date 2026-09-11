@@ -56,18 +56,27 @@ export function mentionPhrase(share: number | null): string | null {
   return "raised occasionally";
 }
 
-/** Topics grouped by product, each product's own list already in Amazon's
- *  rank order — the per-product breakdown the tab draws under the banner. */
-export function topicsByProduct(topics: ReviewTopic[]): {
+export type TopicGroup = {
   sku: string;
   title: string;
+  /** This SKU in Seller Central. Taken from the group's first topic — they are
+   *  all the same product. */
+  admin_url: string | null;
   topics: ReviewTopic[];
-}[] {
-  const groups = new Map<string, { sku: string; title: string; topics: ReviewTopic[] }>();
+};
+
+/** Topics grouped by product, each product's own list already in Amazon's
+ *  rank order — the per-product breakdown the tab draws under the banner. */
+export function topicsByProduct(topics: ReviewTopic[]): TopicGroup[] {
+  const groups = new Map<string, TopicGroup>();
   for (const topic of topics) {
     const existing = groups.get(topic.sku) ?? {
       sku: topic.sku,
       title: topic.title,
+      // Every topic in a group is the same SKU, so they all carry the same
+      // link; the group takes the first one rather than repeating it on each
+      // chip, which would put a row of identical marks under one heading.
+      admin_url: topic.admin_url,
       topics: [],
     };
     existing.topics.push(topic);

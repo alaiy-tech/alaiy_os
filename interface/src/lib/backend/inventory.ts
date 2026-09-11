@@ -6,6 +6,7 @@ import type {
   ChannelProduct,
   InventorySummaryRow,
   Paged,
+  SellerCentralSection,
 } from "@/lib/backend/types";
 import type { StockPage } from "@/lib/inventory/types";
 
@@ -48,9 +49,17 @@ export type ProductQuery = {
   order?: "asc" | "desc";
 };
 
-const EMPTY: Paged<ChannelProduct> = { rows: [], total: 0, start: 0, limit: PAGE_SIZE };
+export type ProductsPage = Paged<ChannelProduct> & SellerCentralSection;
 
-export type ProductsResult = { page: Paged<ChannelProduct>; error?: string };
+const EMPTY: ProductsPage = {
+  rows: [],
+  total: 0,
+  start: 0,
+  limit: PAGE_SIZE,
+  seller_central: null,
+};
+
+export type ProductsResult = { page: ProductsPage; error?: string };
 
 /**
  * Returns the failure alongside an empty page instead of throwing.
@@ -65,7 +74,7 @@ export async function listProducts(
   userToken?: string,
 ): Promise<ProductsResult> {
   try {
-    const page = await backend.get<Paged<ChannelProduct> | null>(LIST, {
+    const page = await backend.get<ProductsPage | null>(LIST, {
       query: {
         channel: query.channel,
         search: query.search,

@@ -12,6 +12,7 @@ import {
   ratingDelta,
   topicsByProduct,
 } from "@/lib/ratings/presentation";
+import type { TopicGroup } from "@/lib/ratings/presentation";
 import type {
   ProductRatingRow,
   RatingImprovement,
@@ -19,6 +20,7 @@ import type {
   SellerFeedback,
   SellerRating,
 } from "@/lib/ratings/types";
+import { SellerCentralLink } from "@/components/channel/seller-central-link";
 import { FeedbackRow } from "./feedback-row";
 import { RatingStars } from "./rating-stars";
 
@@ -309,11 +311,7 @@ function Concerns({ concerns }: { concerns: ReviewTopic[] }) {
 
 /** Every topic per product, in Amazon's own rank order. The detail behind the
  *  banner, for the products it did not name. */
-function ProductTopics({
-  groups,
-}: {
-  groups: { sku: string; title: string; topics: ReviewTopic[] }[];
-}) {
+function ProductTopics({ groups }: { groups: TopicGroup[] }) {
   if (!groups.length) return null;
 
   return (
@@ -334,7 +332,16 @@ function ProductTopics({
             key={group.sku}
             className="space-y-1.5 rounded-sm border border-line bg-surface px-3.5 py-3"
           >
-            <p className="text-[13px] font-medium text-ink">{group.title}</p>
+            <p className="flex items-center gap-1 text-[13px] font-medium text-ink">
+              {group.title}
+              {/* Amazon publishes no review text at any API version, so the
+                  only way to read what is behind these topics is over there.
+                  That makes this link the rest of the answer, not a shortcut. */}
+              <SellerCentralLink
+                href={group.admin_url}
+                label={`Open ${group.sku} in Seller Central`}
+              />
+            </p>
             <ul className="flex flex-wrap gap-1.5">
               {group.topics.map((topic) => (
                 <li key={topic.topic}>
@@ -392,8 +399,14 @@ function ProductBreakdown({ rows }: { rows: ProductRatingRow[] }) {
               return (
                 <tr key={row.sku}>
                   <Td className="font-medium">
-                    <span className="block truncate" title={row.sku}>
-                      {row.title}
+                    <span className="flex items-center gap-1">
+                      <span className="min-w-0 truncate" title={row.sku}>
+                        {row.title}
+                      </span>
+                      <SellerCentralLink
+                        href={row.admin_url}
+                        label={`Open ${row.sku} in Seller Central`}
+                      />
                     </span>
                   </Td>
                   <Td align="right">
@@ -469,6 +482,11 @@ function Improvements({ improvements }: { improvements: RatingImprovement[] }) {
               <span className="font-semibold">{improvement.title}</span> went from{" "}
               {improvement.from.toFixed(1)} to {improvement.to.toFixed(1)}
               {improvement.period_end ? ` by ${formatDate(improvement.period_end)}` : null}.
+              <SellerCentralLink
+                href={improvement.admin_url}
+                label={`Open ${improvement.sku} in Seller Central`}
+                className="align-text-bottom"
+              />
             </p>
             <p className="pt-1 text-[12px] text-ok-ink/80">
               What changed is yours to know — Alaiy has no record of your packaging,

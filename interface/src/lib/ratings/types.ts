@@ -1,4 +1,4 @@
-import type { ChannelId } from "@/lib/backend/types";
+import type { ChannelId, SellerCentralSection } from "@/lib/backend/types";
 
 /**
  * The Ratings tab's shapes, as `api/ratings.py` returns them.
@@ -83,6 +83,10 @@ export type SellerFeedback = {
   order_id: string;
   order_number: string | null;
   products: string[];
+  /** This order in Seller Central. Feedback is about a *transaction*, so the
+   *  order is the page that shows what the buyer is talking about — Feedback
+   *  Manager has no per-row route to link to. */
+  admin_url: string | null;
 };
 
 export type TopicSentiment = "positive" | "neutral" | "negative";
@@ -108,6 +112,10 @@ export type ReviewTopic = {
   /** Amazon rebuilds these about weekly, so this reading is up to seven days
    *  old and the tab says so rather than implying this morning. */
   as_of_date: string | null;
+  /** This SKU in Seller Central. SKU Central and not the ASIN's detail page:
+   *  the ASIN is the product, and this row is read by the seller about to
+   *  change their own offer of it. Null on a row with no SKU. */
+  admin_url: string | null;
 };
 
 /**
@@ -130,6 +138,8 @@ export type ProductRatingRow = {
   period_end: string | null;
   points: number;
   review_count: null;
+  /** This SKU in Seller Central — see ReviewTopic.admin_url. */
+  admin_url: string | null;
 };
 
 /**
@@ -149,9 +159,11 @@ export type RatingImprovement = {
   delta: number;
   period_start: string | null;
   period_end: string | null;
+  /** This SKU in Seller Central — see ReviewTopic.admin_url. */
+  admin_url: string | null;
 };
 
-export type RatingsPage = {
+export type RatingsPage = SellerCentralSection & {
   connected: boolean;
   channels: ChannelSupport[];
   gaps: RatingsGap[];

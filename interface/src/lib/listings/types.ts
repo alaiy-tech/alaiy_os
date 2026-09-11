@@ -1,4 +1,4 @@
-import type { ChannelId } from "@/lib/backend/types";
+import type { ChannelId, SellerCentralSection } from "@/lib/backend/types";
 
 /**
  * A listing: one channel's offer of one SKU.
@@ -64,7 +64,7 @@ export type Listing = {
  * endpoint answers `listings` and a rename here would only move the mismatch.
  * The three paging fields are the same three as everywhere else.
  */
-export type ListingsPage = {
+export type ListingsPage = SellerCentralSection & {
   /**
    * True while these figures are fabricated. The banner that says so renders
    * off this, so it disappeared on its own the day the backend started

@@ -295,7 +295,7 @@ export type HealthGap = { key: string; title: string; detail: string };
 
 export type HealthStatus = "healthy" | "at_risk" | "action_required" | "unknown";
 
-export type AccountHealth = {
+export type AccountHealth = SellerCentralSection & {
   /** False when no Amazon account is attached — the tab is Amazon-only. */
   connected: boolean;
   /** Proximity to the thresholds, not merely whether one has been crossed. */
@@ -361,6 +361,22 @@ export type Paged<Row> = {
 };
 
 /**
+ * Where a whole tab lives in Seller Central.
+ *
+ * Carried on the page rather than derived here, for the reason every other
+ * channel link is: the host is the seller's own marketplace domain, which the
+ * backend resolves from the connection and never sends. Null is an answer —
+ * no Amazon account on this workspace, or none connected — and the mark is
+ * left off entirely rather than offering a seller somewhere they cannot go.
+ *
+ * Rows carry their own `external_url` or `admin_url`; this is the page above
+ * them.
+ */
+export type SellerCentralSection = {
+  seller_central: string | null;
+};
+
+/**
  * A product as one channel reports it — the grain is (product, channel), so a
  * SKU listed on both Shopify and Amazon is two rows. That is deliberate: the
  * price and the stock figure are per channel, and averaging them would invent
@@ -382,7 +398,10 @@ export type ChannelProduct = {
   available_qty?: number;
   external_product_id?: string;
   external_variant_id?: string;
+  /** The buyer's page — the storefront listing, not the seller's editor. */
   external_url?: string;
+  /** The seller's own editor for it: SKU Central, or the Shopify admin. */
+  admin_url?: string;
   image_url?: string;
   inventory_updated_at?: string;
   last_synced_at?: string;
@@ -519,11 +538,12 @@ export type OrderTotals = {
   by_currency: { currency: string | null; orders: number; order_value: number }[];
 };
 
-export type OrdersPage = Paged<ChannelOrder> & {
-  totals: OrderTotals;
-  /** The thresholds this page was flagged with, so the tab can say so. */
-  rules: OrderFlagRules;
-};
+export type OrdersPage = Paged<ChannelOrder> &
+  SellerCentralSection & {
+    totals: OrderTotals;
+    /** The thresholds this page was flagged with, so the tab can say so. */
+    rules: OrderFlagRules;
+  };
 
 /** One order and every line on it — what the detail panel reads. */
 export type ChannelOrderDetail = ChannelOrder & {
