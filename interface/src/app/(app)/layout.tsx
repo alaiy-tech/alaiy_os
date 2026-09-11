@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { requireOnboardedSession } from "@/lib/auth/dal";
 import { loadHomeTiles } from "@/lib/backend/dashboard";
 import { openingMessage } from "@/lib/ask/greeting";
@@ -8,6 +9,8 @@ import { ImportStatus } from "@/components/import/import-status";
 import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { listChatSessions } from "@/lib/backend/chat";
 import type { ChatSessionSummary } from "@/lib/backend/types";
+import { ShellProvider } from "@/components/shell/shell";
+import { SHELL_COOKIE, parseShellPrefs } from "@/lib/shell/prefs";
 
 /**
  * The signed-in shell: left rail, screen, and the Ask Alaiy panel on the right
@@ -15,12 +18,21 @@ import type { ChatSessionSummary } from "@/lib/backend/types";
  * point of putting it in a layout rather than on each page. The panel hides
  * itself on /home, where Ask is the screen rather than a sidecar.
  *
+ * Both side panels can be shut and dragged, and how the seller left them is
+ * read here from a cookie rather than restored on the client. The rail and the
+ * panel are in the first paint: a width applied after hydration is a width the
+ * seller watches snap into place on every navigation. `ShellProvider` takes it
+ * from here — see `components/shell/shell.tsx`.
+ *
  * The route group `(app)` keeps the URLs flat: this wraps /home, /orders,
  * /inventory and /channels without putting an "app" segment in the path.
  */
 export default async function AppLayout({ children }: LayoutProps<"/">) {
   const session = await requireOnboardedSession();
   const firstName = session.name?.split(" ")[0];
+  // Free: the route is already dynamic, because the session came out of a
+  // cookie one line above.
+  const shellPrefs = parseShellPrefs((await cookies()).get(SHELL_COOKIE)?.value);
 
   // Same cached call the Home page makes, so this costs no extra request. A
   // failure here is not worth breaking the shell for: the panel just opens
@@ -41,7 +53,7 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       ];
 
   return (
-    <div className="flex h-dvh overflow-hidden">
+    <ShellProvider initial={shellPrefs}>
       <Sidebar email={session.email} tier={session.tier} />
 
       <div className="flex min-w-0 flex-1 flex-col">
@@ -72,6 +84,6 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
         sessionId={sessions[0]?.name ?? null}
         importing={isImporting(currentImport)}
       />
-    </div>
+    </ShellProvider>
   );
 }

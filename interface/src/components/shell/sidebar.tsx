@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Logo } from "@/components/ui";
+import { useShell } from "@/components/shell/shell";
 
 /**
  * The left rail, in the order the spec fixes:
@@ -38,6 +39,13 @@ import { Logo } from "@/components/ui";
  * A client component because a layout cannot know the current pathname on the
  * server — there is no request-scoped way to read it, so the active row has to
  * be decided with `usePathname`.
+ *
+ * It collapses to icons rather than disappearing. The rail is the only way
+ * between tabs at this width, and a seller who reclaims the space still has to
+ * be able to leave the screen they are on — so the toggle trades the labels
+ * for the width, and keeps every destination reachable. Its width and its
+ * collapsed state come from `useShell`, which is also what the drag handle on
+ * its edge writes to; see `components/shell/shell.tsx`.
  */
 
 type NavItem = {
@@ -126,24 +134,42 @@ function Icon({ name }: { name: keyof typeof ICONS }) {
   );
 }
 
-function NavRow({ item, active }: { item: NavItem; active: boolean }) {
+function NavRow({
+  item,
+  active,
+  collapsed,
+}: {
+  item: NavItem;
+  active: boolean;
+  collapsed: boolean;
+}) {
   // The left border is on every row, transparent when inactive, so the icons
-  // stay on one edge whether or not a row is the current one.
-  const shared =
-    "flex items-center gap-2.5 rounded-sm border-l-2 py-2 pl-2.5 pr-3 text-[13px] transition-colors";
+  // stay on one edge whether or not a row is the current one. Collapsed, the
+  // row is the icon: the rule would be a second mark competing with the tint
+  // in a space too narrow for both, so the tint carries it alone.
+  const shared = collapsed
+    ? "flex items-center justify-center rounded-sm py-2 transition-colors"
+    : "flex items-center gap-2.5 rounded-sm border-l-2 py-2 pl-2.5 pr-3 text-[13px] transition-colors";
 
   if (!item.href) {
     return (
       <span
         aria-disabled
-        className={`${shared} cursor-default border-transparent text-white/35`}
+        className={`${shared} cursor-default text-white/35 ${collapsed ? "" : "border-transparent"}`}
+        // The only thing naming an unbuilt tab once the chip is gone.
         title={`${item.label} is not built yet`}
       >
         <Icon name={item.icon} />
-        <span className="flex-1">{item.label}</span>
-        <span className="rounded-xs bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/45">
-          Soon
-        </span>
+        {collapsed ? (
+          <span className="sr-only">{item.label} — not built yet</span>
+        ) : (
+          <>
+            <span className="flex-1">{item.label}</span>
+            <span className="rounded-xs bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/45">
+              Soon
+            </span>
+          </>
+        )}
       </span>
     );
   }
@@ -155,15 +181,56 @@ function NavRow({ item, active }: { item: NavItem; active: boolean }) {
     <Link
       href={item.href}
       aria-current={active ? "page" : undefined}
+      // Collapsed, the label is no longer on screen, so it has to reach the
+      // accessibility tree and the tooltip some other way.
+      aria-label={collapsed ? item.label : undefined}
+      title={collapsed ? item.label : undefined}
       className={`${shared} ${
         active
-          ? "border-highlight-300 bg-highlight-300/15 font-semibold text-highlight-300"
-          : "border-transparent text-white/70 hover:bg-white/10 hover:text-white"
+          ? `bg-highlight-300/15 font-semibold text-highlight-300 ${collapsed ? "" : "border-highlight-300"}`
+          : `text-white/70 hover:bg-white/10 hover:text-white ${collapsed ? "" : "border-transparent"}`
       }`}
     >
       <Icon name={item.icon} />
-      {item.label}
+      {collapsed ? null : item.label}
     </Link>
+  );
+}
+
+/**
+ * The rail's own toggle. A chevron pointing the way the rail will move, which
+ * is the one icon nobody has to be taught.
+ */
+function CollapseToggle({
+  collapsed,
+  onToggle,
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+}) {
+  const label = collapsed ? "Expand navigation" : "Collapse navigation to icons";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      title={label}
+      className="grid h-7 w-7 shrink-0 place-items-center rounded-sm text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        aria-hidden
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        <path d={collapsed ? "M8 5l4 5-4 5M4 4v12" : "M12 5l-4 5 4 5M16 4v12"} />
+      </svg>
+    </button>
   );
 }
 
@@ -173,19 +240,50 @@ function Divider() {
 
 export function Sidebar({ email, tier }: { email?: string; tier?: string }) {
   const pathname = usePathname();
+  const { prefs, update } = useShell();
+  const collapsed = prefs.railCollapsed;
 
   return (
     <nav
       aria-label="Main"
-      className="hidden h-full w-60 shrink-0 flex-col overflow-y-auto bg-primary-600 px-3 py-4 md:flex"
+      // `w-rail` is the shell's live token, not a fixed width: the drag handle
+      // and the collapse toggle both write it. `overflow-x-hidden` because a
+      // 60px rail would otherwise grow a horizontal scrollbar mid-transition.
+      className={`hidden h-full w-rail shrink-0 flex-col overflow-y-auto overflow-x-hidden bg-primary-600 py-4 md:flex ${
+        collapsed ? "px-2" : "px-3"
+      }`}
     >
-      <div className="px-2 pb-4">
-        <Logo onDark />
+      <div
+        className={`pb-4 ${
+          collapsed ? "flex flex-col items-center gap-3" : "flex items-center justify-between gap-2 px-2"
+        }`}
+      >
+        {collapsed ? (
+          // The wordmark does not fit, so the rail keeps the mark alone — the
+          // same square the launcher uses, which is the product's short form.
+          <span
+            aria-hidden
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-xs bg-highlight-300 font-sans text-[11px] font-bold text-primary-600"
+          >
+            A
+          </span>
+        ) : (
+          <Logo onDark />
+        )}
+        <CollapseToggle
+          collapsed={collapsed}
+          onToggle={() => update({ railCollapsed: !collapsed })}
+        />
       </div>
 
       <div className="space-y-0.5">
         {PRIMARY.map((item) => (
-          <NavRow key={item.label} item={item} active={pathname === item.href} />
+          <NavRow
+            key={item.label}
+            item={item}
+            active={pathname === item.href}
+            collapsed={collapsed}
+          />
         ))}
       </div>
 
@@ -193,33 +291,65 @@ export function Sidebar({ email, tier }: { email?: string; tier?: string }) {
 
       <div className="space-y-0.5">
         {SECONDARY.map((item) => (
-          <NavRow key={item.label} item={item} active={pathname === item.href} />
+          <NavRow
+            key={item.label}
+            item={item}
+            active={pathname === item.href}
+            collapsed={collapsed}
+          />
         ))}
       </div>
 
-      {/* Pushed to the bottom of the rail. */}
-      <div className="mt-auto space-y-2 border-t border-white/10 px-3 pt-3">
-        {email ? (
+      {/* Pushed to the bottom of the rail. Collapsed, the address and the tier
+          are the first things to go: neither is something a seller comes to
+          the rail for, and signing out is. */}
+      <div
+        className={`mt-auto space-y-2 border-t border-white/10 pt-3 ${collapsed ? "" : "px-3"}`}
+      >
+        {email && !collapsed ? (
           <p className="truncate text-[11px] text-white/50" title={email}>
             {email}
           </p>
         ) : null}
-        <div className="flex items-center justify-between gap-2">
-          {tier ? (
+        <div
+          className={`flex items-center gap-2 ${collapsed ? "justify-center" : "justify-between"}`}
+        >
+          {tier && !collapsed ? (
             <span className="rounded-xs bg-highlight-300/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-highlight-300">
               {tier}
             </span>
-          ) : (
-            <span />
-          )}
+          ) : null}
+          {!tier && !collapsed ? <span /> : null}
           {/* A form, not a link: signing out mutates the session cookie. */}
           <form action="/api/auth/logout" method="post">
-            <button
-              type="submit"
-              className="text-[11px] text-white/50 underline-offset-2 hover:text-white hover:underline"
-            >
-              Sign out
-            </button>
+            {collapsed ? (
+              <button
+                type="submit"
+                aria-label={email ? `Sign out of ${email}` : "Sign out"}
+                title={email ? `Sign out — ${email}` : "Sign out"}
+                className="grid h-7 w-7 place-items-center rounded-sm text-white/50 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <svg
+                  viewBox="0 0 20 20"
+                  aria-hidden
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12.5 6.5V4.5a1 1 0 0 0-1-1h-6a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2M9 10h7.5M14 7.5l2.5 2.5-2.5 2.5" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                className="text-[11px] text-white/50 underline-offset-2 hover:text-white hover:underline"
+              >
+                Sign out
+              </button>
+            )}
           </form>
         </div>
       </div>
