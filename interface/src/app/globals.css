@@ -163,14 +163,33 @@
      A token because two things have to agree on it: the panel itself, and
      anything that slides in beside it — the Orders detail panel lies across
      the table and stops at Ask's edge, so that Ask stays readable while an
-     order is being inspected. Written once here, widened below at xl. */
+     order is being inspected. Written once here, widened below at xl.
+
+     Both of these are *defaults*. The shell overwrites them inline once the
+     seller has dragged an edge or shut a panel — a closed panel is the same
+     token at 0px, which is how everything measuring against it gets out of
+     the way without being told. See `components/shell/shell.tsx`. */
   --spacing-ask-panel: 360px;
+
+  /* And how wide the left rail is when it is showing its labels. A token for
+     the same reason: the drag handle on its edge is positioned from this, and
+     it is not a child of the rail. */
+  --spacing-rail: 240px;
 }
 
 @media (width >= 80rem) {
   :root {
     --spacing-ask-panel: 400px;
   }
+}
+
+/* While an edge is being dragged. The pointer leaves the handle's own 8px
+   within a frame, so the resize cursor and the selection lock have to cover
+   the document or the drag reads as a botched text selection. */
+body.shell-resizing,
+body.shell-resizing * {
+  cursor: col-resize !important;
+  user-select: none !important;
 }
 
 /* The product is a paper-background app. Opt out of the UA dark scheme so
