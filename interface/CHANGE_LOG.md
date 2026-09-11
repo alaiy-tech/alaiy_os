@@ -4,6 +4,32 @@ All notable changes to Alaiy OS Self Serve, grouped by the release that shipped 
 
 ---
 
+## 0.1.20 — 2026-09-11
+
+**The consent screen, afterwards — permissions on the channel card**
+
+- Every channel card now carries the list of permissions the seller approved when
+  they connected it: Amazon's SP-API roles, a Shopify custom app's scopes, under the
+  channel's own names so the two can be read side by side. Closed by default; the
+  summary line says when something is narrowed.
+- Each row has a dropdown — **Always allow**, **Needs approval**, **Blocked**. These
+  are not decoration: `sync.start` and the worker both consult them, so "needs
+  approval" keeps the hourly and daily schedules off a permission while leaving
+  **Sync now** working, and "blocked" stops the pull either way. A pass drawing on
+  more than one role is held by the strictest of them.
+- Blocking or gating a *core* permission raises a warning on the card naming what
+  stops refreshing, because orders and products come from those two.
+- The dropdown is uncontrolled and remounted on the stored value plus the action's
+  settle count. Three versions: a plain uncontrolled select never picks up the new
+  value, because `refresh()` does not push a fresh `defaultValue` into a select
+  someone has touched; a controlled one loses to React's synchronous restore, which
+  lands after the transition carrying the new value; and keying on the error text
+  left a second identical failure — the `OUR_FAULT` fallback is a constant — showing
+  an unsaved choice. All three left the row disagreeing with the summary line above it.
+- An unconnected card reads as a preview, not a grant: "what connecting Amazon would
+  ask for", no legend and no dropdowns, rather than telling a seller they approved
+  access to an account they have not attached.
+
 ## 0.1.19 — 2026-09-08
 
 **Listings and Inventory read the real endpoints**

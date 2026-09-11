@@ -3,6 +3,7 @@ import type {
   BackendWorkspace,
   ChannelId,
   ChannelOrder,
+  ChannelPermission,
   ChannelProduct,
   ConnectorStatus,
   ContributingOrders,
@@ -18,6 +19,7 @@ import type {
   OrderFlagRules,
   OrderTotals,
   OrdersPage,
+  PermissionDecision,
   ReturnRateMetric,
   TileMetric,
   UnsettledMetric,
@@ -85,6 +87,8 @@ const state = {
   dismissed: new Set<string>(),
   disconnected: new Set<ChannelId>(),
   resyncedAt: new Map<ChannelId, string>(),
+  /** Sparse, like the backend's own table: only what was moved off the default. */
+  permissions: new Map<string, PermissionDecision>(),
 };
 
 /**
@@ -108,6 +112,80 @@ function connectors(): ConnectorStatus[] {
       ? { ...connector, last_synced_at: resynced, stale: false }
       : connector;
   });
+}
+
+/**
+ * The permission catalogue, mirroring `selfserve/permissions.py`.
+ *
+ * Copied rather than derived, because there is nothing to derive it from
+ * without a bench — and it is the same bargain the rest of this file makes.
+ * The labels and the grant names are the channels' own, so a screenshot taken
+ * in this mode is a screenshot of the real screen.
+ */
+const PERMISSIONS: Record<ChannelId, Omit<ChannelPermission, "decision">[]> = {
+  amazon: [
+    {
+      id: "amazon.orders",
+      label: "Inventory and Order Tracking",
+      summary: "Read your orders, what was in them, and where they got to.",
+      grants: ["Inventory and Order Tracking"],
+      core: true,
+    },
+    {
+      id: "amazon.listings",
+      label: "Product Listing",
+      summary:
+        "Read your catalogue — SKUs, titles, prices and stock — and the fee quote on each.",
+      grants: ["Product Listing"],
+      core: true,
+    },
+    {
+      id: "amazon.insights",
+      label: "Selling Partner Insights",
+      summary: "Read your account health, Buy Box share and review ratings.",
+      grants: ["Selling Partner Insights"],
+      core: false,
+    },
+    {
+      id: "amazon.finance",
+      label: "Finance and Accounting",
+      summary:
+        "Read the fees Amazon settled against each sale, so margins are the real ones.",
+      grants: ["Finance and Accounting"],
+      core: false,
+    },
+    {
+      id: "amazon.fulfilment",
+      label: "Amazon Fulfilment",
+      summary:
+        "Read FBA shipments, so dispatch times cover the parcels Amazon sends for you.",
+      grants: ["Amazon Fulfilment"],
+      core: false,
+    },
+  ],
+  shopify: [
+    {
+      id: "shopify.orders",
+      label: "Orders and customers",
+      summary: "Read your orders, their fulfilments and the buyer's name on each.",
+      grants: ["read_orders", "read_customers"],
+      core: true,
+    },
+    {
+      id: "shopify.catalogue",
+      label: "Products and inventory",
+      summary: "Read your products, their variants, and stock across your locations.",
+      grants: ["read_products", "read_inventory", "read_locations"],
+      core: true,
+    },
+  ],
+};
+
+function permissions(channel: ChannelId): ChannelPermission[] {
+  return (PERMISSIONS[channel] ?? []).map((entry) => ({
+    ...entry,
+    decision: state.permissions.get(entry.id) ?? "allowed",
+  }));
 }
 
 /* --- windows and metrics ------------------------------------------------- */
@@ -753,6 +831,16 @@ const ROUTES: Record<string, Handler> = {
     const channel = String(body.channel) as ChannelId;
     state.disconnected.add(channel);
     return { channel, connected: false };
+  },
+  "api.connections.list_permissions": (query) =>
+    permissions(str(query, "channel") as ChannelId),
+  "api.connections.set_permission": (_query, body) => {
+    const channel = String(body.channel) as ChannelId;
+    state.permissions.set(
+      String(body.permission),
+      String(body.decision) as PermissionDecision,
+    );
+    return permissions(channel);
   },
 
   /* imports */

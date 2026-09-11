@@ -177,13 +177,27 @@ export type Option = { value: string; label: string; disabled?: boolean };
 
 export function Select({
   options,
+  size = "md",
   className = "",
   ...props
-}: ComponentProps<"select"> & { options: Option[] }) {
+  // `size` is the house name for this everywhere else (see `Button`), so the
+  // native select attribute of the same name — a row count for a list box,
+  // which nothing here is — gives it up rather than the other way round.
+}: Omit<ComponentProps<"select">, "size"> & {
+  options: Option[];
+  size?: Size;
+}) {
+  // `sm` is the same control at the height a press is at `sm`, for a select
+  // that sits in a row beside text rather than under a field label. It drops
+  // the full width with it: a row select is as wide as its longest option,
+  // and stretching it across the row would make a three-word choice look
+  // like the subject of the row rather than the answer to it.
+  const shape =
+    size === "sm" ? "h-9 px-2.5 text-[12px]" : "h-11 w-full px-3 text-sm";
   return (
     <select
       {...props}
-      className={`h-11 w-full rounded-sm border border-line bg-white px-3 text-sm text-ink transition-colors hover:border-primary-600/40 focus:border-highlight-600 ${className}`}
+      className={`${shape} rounded-sm border border-line bg-white text-ink transition-colors hover:border-primary-600/40 focus:border-highlight-600 disabled:cursor-not-allowed disabled:opacity-45 ${className}`}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>
