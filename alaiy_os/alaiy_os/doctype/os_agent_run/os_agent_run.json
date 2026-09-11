@@ -21,6 +21,7 @@
   "image_preview",
   "error",
   "debug_section",
+  "tool_calls",
   "transcript"
  ],
  "fields": [
@@ -118,6 +119,14 @@
    "fieldname": "debug_section",
    "fieldtype": "Section Break",
    "label": "Debug"
+  },
+  {
+   "description": "Every tool this run called, in order: what it was asked and whether it answered. Derived from the run itself, not from anything the model says about it.",
+   "fieldname": "tool_calls",
+   "fieldtype": "Code",
+   "label": "Tool Calls (JSON)",
+   "options": "JSON",
+   "read_only": 1
   },
   {
    "description": "Full LLM message history for this run.",

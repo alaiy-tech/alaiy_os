@@ -6,6 +6,7 @@ LLM inside a web request. Callers poll the Run record.
 """
 
 import json
+import time
 import traceback
 
 import frappe
@@ -129,6 +130,7 @@ def run_queued(run):
 		# without it a failed run is undebuggable (the whole reason it failed is
 		# usually IN the transcript, e.g. an empty final reply).
 		messages = getattr(exc, "_agent_messages", None)
+		tool_calls = getattr(exc, "_agent_tool_calls", None)
 		# Undo any half-done tool side effects, then record the failure.
 		frappe.db.rollback()
 		doc.reload()
@@ -143,6 +145,7 @@ def run_queued(run):
 				"transcript": json.dumps(_redact_media(messages), indent=1, default=str)
 				if messages
 				else None,
+				"tool_calls": json.dumps(tool_calls, indent=1, default=str) if tool_calls else None,
 				"ended_at": now_datetime(),
 			},
 			commit=True,
@@ -159,6 +162,7 @@ def run_queued(run):
 			"status": "Success",
 			"output": result["output"],
 			"transcript": json.dumps(_redact_media(result["messages"]), indent=1, default=str),
+			"tool_calls": json.dumps(result["tool_calls"], indent=1, default=str),
 			"input_tokens": result["input_tokens"],
 			"output_tokens": result["output_tokens"],
 			"image_tokens": result["image_tokens"],
@@ -194,15 +198,21 @@ def _run_loop(run_doc):
 	agent = build_runnable(run_doc.agent)
 	messages = [{"role": "user", "content": run_doc.input or "Run."}]
 	usage = {"input_tokens": 0, "output_tokens": 0, "image_tokens": 0}
+	# What the run actually did, as opposed to what it later says it did. See
+	# _dispatch_tools.
+	ledger = []
 
 	try:
 		response = None
-		for _ in range(agent.max_turns):
+		for turn in range(1, agent.max_turns + 1):
 			response = _call(agent, messages, usage)
 			messages.append({"role": "assistant", "content": response["content"]})
 			if response["stop_reason"] != "tool_use":
 				break
-			messages.append({"role": "user", "content": _dispatch_tools(agent, response["content"], usage)})
+			messages.append({
+				"role": "user",
+				"content": _dispatch_tools(agent, response["content"], usage, ledger, turn),
+			})
 		else:
 			frappe.throw(f"Agent {agent.agent_id} exceeded max_turns ({agent.max_turns}).")
 
@@ -212,10 +222,14 @@ def _run_loop(run_doc):
 	except Exception as exc:
 		# Ride the transcript out on the exception so run_queued can store it
 		# with the failure — a failed run without its conversation is opaque.
+		# The ledger rides out for the same reason, and matters more on a
+		# failure: "it never called the tool" and "the tool errored" look
+		# identical in an output that never arrived.
 		exc._agent_messages = messages
+		exc._agent_tool_calls = ledger
 		raise
 
-	return {"output": output, "messages": messages, **usage}
+	return {"output": output, "messages": messages, "tool_calls": ledger, **usage}
 
 
 def _call(agent, messages, usage):
@@ -225,7 +239,39 @@ def _call(agent, messages, usage):
 	return response
 
 
-def _dispatch_tools(agent, content, usage):
+#: Longest string kept from a tool's arguments in the ledger. A query or a URL
+#: fits several times over; a base64 data URI or a whole listing payload does
+#: not, and the ledger is a record of WHAT was called, not a second transcript.
+LEDGER_MAX_CHARS = 500
+
+
+def _ledger_input(value):
+	"""A tool's arguments, shrunk to something worth storing on every call."""
+	if isinstance(value, str):
+		return value[:LEDGER_MAX_CHARS] + ("…" if len(value) > LEDGER_MAX_CHARS else "")
+	if isinstance(value, dict):
+		return {k: _ledger_input(v) for k, v in value.items()}
+	if isinstance(value, list):
+		return [_ledger_input(v) for v in value[:10]]
+	return value
+
+
+def _dispatch_tools(agent, content, usage, ledger=None, turn=None):
+	"""Run the tools the model asked for, and record that it asked.
+
+	`ledger` is the run's own account of its tool use: one entry per call, with
+	the arguments it was given and whether it answered. It exists because the
+	transcript — which has all of this already — is a conversation, and reading
+	a claim out of a conversation means trusting the speaker. A model that says
+	in its output that it "confirmed the spec against the manufacturer" either
+	has a `view_competitor_page` entry here for that URL or it does not, and no
+	amount of confident prose changes which. Callers cross-check against this;
+	`alaiy_os_agent_shopify_listing.provenance` is the worked example.
+
+	Deliberately records the call, not its result. Results are large (a fetched
+	page is 12k characters), they are already in the transcript, and what a
+	caller needs from here is whether the work happened.
+	"""
 	results = []
 	for block in content:
 		if block["type"] != "tool_use":
@@ -246,7 +292,9 @@ def _dispatch_tools(agent, content, usage):
 				"instead of calling a tool.",
 				is_error=True,
 			))
+			_ledger_add(ledger, turn, block, ok=False, error="unknown tool")
 			continue
+		started = time.monotonic()
 		try:
 			value = handler(**(block["input"] or {}))
 			if isinstance(value, dict) and "_usage" in value:
@@ -260,15 +308,35 @@ def _dispatch_tools(agent, content, usage):
 				)
 			else:
 				results.append(_tool_result(block["id"], json.dumps(value, default=str)))
+			_ledger_add(ledger, turn, block, ok=True, started=started)
 		except ToolStop:
 			# The one failure that does not go back to the model. It has said there
 			# is nothing to recover to, and a model handed that still has a schema
 			# telling it to produce something. See ToolStop.
 			raise
-		except Exception:
+		except Exception as exc:
 			# Tool failures go back to the LLM, not up the stack — it may recover.
 			results.append(_tool_result(block["id"], traceback.format_exc(limit=3), is_error=True))
+			_ledger_add(ledger, turn, block, ok=False, error=str(exc), started=started)
 	return results
+
+
+def _ledger_add(ledger, turn, block, ok, error=None, started=None):
+	"""One line in the run's account of itself. Never raises: a ledger that
+	cannot be written must not be the reason a working run fails."""
+	if ledger is None:
+		return
+	try:
+		ledger.append({
+			"turn": turn,
+			"tool": block.get("name"),
+			"input": _ledger_input(block.get("input") or {}),
+			"ok": bool(ok),
+			"error": (error or "")[:LEDGER_MAX_CHARS] or None,
+			"ms": int((time.monotonic() - started) * 1000) if started else None,
+		})
+	except Exception:
+		pass
 
 
 def _redact_media(messages):
