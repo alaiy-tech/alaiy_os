@@ -57,7 +57,7 @@ import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { FLAG_FILTER_OPTIONS } from "@/lib/orders/flags";
 import { FlagRules } from "@/app/(app)/orders/flag-rules";
 import { OrderPanel } from "@/app/(app)/orders/order-panel";
-import { OrderRow } from "@/app/(app)/orders/order-row";
+import { ClickableRow } from "@/components/data/clickable-row";
 
 export const metadata = { title: "Orders — Alaiy" };
 
@@ -385,7 +385,7 @@ export default async function OrdersPage({
               const isOpen = selectedKey === key;
 
               return (
-                <OrderRow key={key} href={hrefToString(href)} selected={isOpen}>
+                <ClickableRow key={key} href={hrefToString(href)} selected={isOpen}>
                   <Td>
                     <FlagChips flags={order.flags} rules={rules} />
                   </Td>
@@ -436,7 +436,7 @@ export default async function OrdersPage({
                   <Td className="whitespace-nowrap text-muted">
                     {formatDateTime(order.last_synced_at)}
                   </Td>
-                </OrderRow>
+                </ClickableRow>
               );
             })
           )}

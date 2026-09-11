@@ -21,6 +21,7 @@ import {
   ChannelAdminLink,
   SellerCentralLink,
 } from "@/components/channel/seller-central-link";
+import { ClickableRow } from "@/components/data/clickable-row";
 import { Pagination } from "@/components/data/pagination";
 import { SampleBanner } from "@/components/data/sample-banner";
 import { HEALTH_FILTER_OPTIONS, healthPresentation } from "@/lib/listings/presentation";
@@ -243,7 +244,10 @@ function ListingRow({
   const health = healthPresentation(listing.health);
 
   return (
-    <tr className={open ? "bg-highlight-100" : "transition-colors hover:bg-primary-600/[0.04]"}>
+    // Clicking anywhere on the row opens the listing — the link on the title
+    // is still the control a keyboard and a screen reader use, and the only
+    // one that needs no JavaScript.
+    <ClickableRow href={href} selected={open}>
       <Td className="font-medium">
         <span className="flex items-center gap-2">
           {listing.image_url ? (
@@ -296,7 +300,7 @@ function ListingRow({
         </span>
       </Td>
       <Td className="whitespace-nowrap text-muted">{formatDateTime(listing.last_synced_at)}</Td>
-    </tr>
+    </ClickableRow>
   );
 }
 
