@@ -51,6 +51,12 @@ sync, a SKU whose fees Amazon declined to quote, a carrier too thin to quote a
 percentage for. Those are what the honesty fields on these tabs exist to render,
 and a demo where every flag was green would hide all of them.
 
+The base declares the flag in `interface/interface.config.json` as
+`"demo": "ALAIY_DEMO"`, so devbench can offer `devbench demo <client>` without
+knowing which app is the base or what its variable is called — the same way it
+already learns the environment the base reads. A client whose base declares no
+`demo` key is told so by name rather than started into a broken screen.
+
 `ALAIY_DEMO` cannot be turned on in a deployed app. `next build` inlines
 `NODE_ENV` as `"production"`, so the flag folds to `false` at build time and
 every branch behind it is eliminated — `DEMO_MODE` does not appear in the built
