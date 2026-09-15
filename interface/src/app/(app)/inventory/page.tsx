@@ -30,6 +30,7 @@ import {
   Th,
 } from "@/components/data/table";
 import { Pagination } from "@/components/data/pagination";
+import { ProductImage } from "@/components/data/product-image";
 import { SummaryChip, SummaryStrip } from "@/components/data/summary";
 import {
   FilterField,
@@ -269,9 +270,16 @@ export default async function InventoryPage({
           </FilterField>
         </Toolbar>
 
-        <TableFrame minWidth="44rem">
+        <TableFrame minWidth="54rem">
           <thead>
             <tr>
+              {/* Unsortable and unlabelled, unlike every other column here:
+                  there is no order to put photographs in, and "Image" over a
+                  column of them tells nobody anything. Named for a screen
+                  reader, which reads the heading out with the cell. */}
+              <Th>
+                <span className="sr-only">Image</span>
+              </Th>
               <SortableTh {...heading("sku")}>SKU</SortableTh>
               <SortableTh {...heading("title")}>Product</SortableTh>
               <SortableTh {...heading("channel")}>Channel</SortableTh>
@@ -287,7 +295,7 @@ export default async function InventoryPage({
           </thead>
           <tbody>
             {page.rows.length === 0 ? (
-              <EmptyRow colSpan={7}>
+              <EmptyRow colSpan={8}>
                 {filtered
                   ? "No products match those filters."
                   : "No products yet. They appear here as soon as an import finishes."}
@@ -295,7 +303,14 @@ export default async function InventoryPage({
             ) : (
               page.rows.map((product) => (
                 <tr key={product.name} className="transition-colors hover:bg-primary-600/[0.04]">
-                  <Td className="font-medium">
+                  {/* The same size as the Listings tab's, from the same
+                      component: these are the same products read at a different
+                      grain, and a seller moving between the two tabs should be
+                      recognising them the same way. */}
+                  <Td className="w-16 pr-0">
+                    <ProductImage src={product.image_url} />
+                  </Td>
+                  <Td className="font-medium whitespace-nowrap">
                     <span className="inline-flex items-center gap-0.5">
                       {product.sku || "—"}
                       {/* On the SKU, not the title: the title already links to
@@ -336,7 +351,7 @@ export default async function InventoryPage({
                     {formatMoney(product.price, product.currency)}
                   </Td>
                   <Td align="right">{formatNumber(product.available_qty)}</Td>
-                  <Td className="whitespace-nowrap text-muted">
+                  <Td className="whitespace-nowrap text-[12px] text-muted">
                     {formatDate(product.last_synced_at)}
                   </Td>
                 </tr>

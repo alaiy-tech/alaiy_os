@@ -2,6 +2,7 @@ import Link from "next/link";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { channelName } from "@/lib/channels";
 import { ChannelAdminLink } from "@/components/channel/seller-central-link";
+import { ProductImage } from "@/components/data/product-image";
 import { healthPresentation, listingWeaknesses } from "@/lib/listings/presentation";
 import type { Listing } from "@/lib/listings/types";
 
@@ -101,57 +102,66 @@ export function ListingDetailPanel({
           </p>
         ) : null}
 
-        <Images listing={listing} />
+        {/* The picture first, and the facts beside it rather than under a strip
+            of thumbnails. What this listing looks like to a buyer is the thing
+            a seller opened the panel to see; the price and the status are what
+            they check once they have found it. Stacked on a phone, where side
+            by side would leave the facts a column too narrow to read. */}
+        <div className="flex flex-col gap-4 sm:flex-row">
+          <Gallery listing={listing} />
 
-        <dl className="space-y-2 text-[13px]">
-          <Field label="Price">
-            <span className="font-data">{formatMoney(listing.price, listing.currency)}</span>
-          </Field>
-          <Field label="Status">
-            {/* The channel's own word, unmapped — Shopify's ACTIVE and Amazon's
-                vocabulary do not mean the same thing, so neither is translated. */}
-            <span className="font-data">{listing.status || "—"}</span>
-          </Field>
-          <Field label={channel === "amazon" ? "ASIN" : "Handle"}>
-            <span className="font-data">{listing.external_id}</span>
-          </Field>
-          {listing.health_score !== null && listing.health_score !== undefined ? (
-            <Field label="Listing score">
-              <span className="font-data">{listing.health_score}/100</span>
-            </Field>
-          ) : null}
-        </dl>
+          <div className="min-w-0 flex-1 space-y-3">
+            <dl className="space-y-2 text-[13px]">
+              <Field label="Price">
+                <span className="font-data">{formatMoney(listing.price, listing.currency)}</span>
+              </Field>
+              <Field label="Status">
+                {/* The channel's own word, unmapped — Shopify's ACTIVE and Amazon's
+                    vocabulary do not mean the same thing, so neither is translated. */}
+                <span className="font-data">{listing.status || "—"}</span>
+              </Field>
+              <Field label={channel === "amazon" ? "ASIN" : "Handle"}>
+                <span className="font-data">{listing.external_id}</span>
+              </Field>
+              {listing.health_score !== null && listing.health_score !== undefined ? (
+                <Field label="Listing score">
+                  <span className="font-data">{listing.health_score}/100</span>
+                </Field>
+              ) : null}
+            </dl>
 
-        <div className="space-y-1">
-          <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-            Description
-          </p>
-          <p className="text-[13px] leading-snug text-muted">
-            {listing.description || "No description on this channel."}
-          </p>
-        </div>
-
-        {/* Bullets are an Amazon field. Shopify has none, so the section is
-            absent there rather than empty — an empty "Bullet points" heading on
-            a Shopify listing would read as a listing problem. */}
-        {channel === "amazon" ? (
-          <div className="space-y-1">
-            <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-              Bullet points ({listing.bullets?.length ?? 0} of 5)
-            </p>
-            {listing.bullets?.length ? (
-              <ul className="list-disc space-y-0.5 pl-4 text-[13px] leading-snug text-muted">
-                {listing.bullets.map((bullet) => (
-                  <li key={bullet}>{bullet}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-[13px] text-warn-ink">
-                None set. Amazon allows five, and they carry search weight.
+            <div className="space-y-1">
+              <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+                Description
               </p>
-            )}
+              <p className="text-[13px] leading-snug text-muted">
+                {listing.description || "No description on this channel."}
+              </p>
+            </div>
+
+            {/* Bullets are an Amazon field. Shopify has none, so the section is
+                absent there rather than empty — an empty "Bullet points" heading on
+                a Shopify listing would read as a listing problem. */}
+            {channel === "amazon" ? (
+              <div className="space-y-1">
+                <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
+                  Bullet points ({listing.bullets?.length ?? 0} of 5)
+                </p>
+                {listing.bullets?.length ? (
+                  <ul className="list-disc space-y-0.5 pl-4 text-[13px] leading-snug text-muted">
+                    {listing.bullets.map((bullet) => (
+                      <li key={bullet}>{bullet}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-[13px] text-warn-ink">
+                    None set. Amazon allows five, and they carry search weight.
+                  </p>
+                )}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
 
         <footer className="flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2.5 text-[12px]">
           {listing.storefront_url ? (
@@ -181,45 +191,62 @@ export function ListingDetailPanel({
 }
 
 /**
- * The images, with the count.
+ * The listing's images: the main one at size, the rest under it, and the count.
  *
- * Both channels' URLs load in the browser directly — Shopify's CDN and
- * Amazon's image host are both public — so no proxy is needed. The count
- * matters as much as the thumbnails: "2 images" beside a suppression for a
- * bad main image is most of the diagnosis.
+ * The main image is the largest thing on the panel, because it is what a buyer
+ * sees first and the only field here that can be judged at a glance — a seller
+ * scrolling to a suppressed listing usually knows why the moment they see it.
+ * The others follow as thumbnails; four of them, which is one tidy row under
+ * the main image at every width and past the point where a fifth would tell
+ * anyone anything the count does not.
  *
- * A plain `<img>`, not `next/image`: these are arbitrary third-party hosts,
- * and the optimiser needs each one allow-listed in next.config. An unoptimised
- * thumbnail is the right trade for a URL we do not control.
+ * The count still leads, and it matters as much as the pictures: "2 images"
+ * beside a suppression for a bad main image is most of the diagnosis.
+ *
+ * `images` is the field of record. `image_url` is the channel's main image and
+ * normally its first entry, so it is only a fallback — for a channel that gave
+ * us one and no list, where an empty gallery beside a rendered thumbnail
+ * elsewhere on the screen would be the app contradicting itself.
  */
-function Images({ listing }: { listing: Listing }) {
+function Gallery({ listing }: { listing: Listing }) {
+  const images = listing.images.length
+    ? listing.images
+    : listing.image_url
+      ? [listing.image_url]
+      : [];
+  const name = listing.title ?? "Product";
+  const [main, ...rest] = images;
+
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5 sm:w-48">
       <p className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-        Images ({listing.images.length})
+        Images ({images.length})
       </p>
-      {listing.images.length === 0 ? (
-        <p className="text-[13px] text-alert-ink">
-          No images. {channelName(listing.channel)} will not show this listing properly.
-        </p>
-      ) : (
+
+      <ProductImage
+        size="hero"
+        src={main}
+        alt={main ? `${name} — main image` : ""}
+      />
+
+      {rest.length ? (
         <div className="flex flex-wrap gap-1.5">
-          {listing.images.slice(0, 6).map((src, index) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+          {rest.slice(0, 4).map((src, index) => (
+            <ProductImage
               key={src}
+              size="thumb"
               src={src}
-              alt={
-                index === 0
-                  ? `${listing.title ?? "Product"} — main image`
-                  : `${listing.title ?? "Product"} — image ${index + 1}`
-              }
-              loading="lazy"
-              className="h-14 w-14 rounded-xs border border-line object-cover"
+              alt={`${name} — image ${index + 2}`}
             />
           ))}
         </div>
-      )}
+      ) : null}
+
+      {images.length === 0 ? (
+        <p className="text-[12px] leading-snug text-alert-ink">
+          {channelName(listing.channel)} will not show this listing properly.
+        </p>
+      ) : null}
     </div>
   );
 }
