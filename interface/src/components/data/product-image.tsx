@@ -70,6 +70,11 @@ export function ProductImage({
       src={src}
       alt={alt}
       loading="lazy"
+      // The channel's image host learns nothing about the seller from serving
+      // this. Without it the request carries the full page URL — which tab,
+      // which filters, which listing is open — to Shopify or Amazon, and a
+      // referrer is also a thing an image host can start refusing on.
+      referrerPolicy="no-referrer"
       // `cover` in a table and `contain` in the panel, and the two are different
       // jobs rather than an inconsistency. A column of squares all filled to the
       // same edges is what makes a list scannable; the main image on the detail
