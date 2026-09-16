@@ -23,6 +23,7 @@ import {
 } from "@/components/channel/seller-central-link";
 import { ClickableRow } from "@/components/data/clickable-row";
 import { Pagination } from "@/components/data/pagination";
+import { ProductImage } from "@/components/data/product-image";
 import { SampleBanner } from "@/components/data/sample-banner";
 import { HEALTH_FILTER_OPTIONS, healthPresentation } from "@/lib/listings/presentation";
 import { ListingDetailPanel } from "@/app/(app)/listings/listing-detail";
@@ -176,9 +177,14 @@ export default async function ListingsPage({
       <TableFrame minWidth="56rem">
         <thead>
           <tr>
+            {/* The image column carries no heading — "Image" over a column of
+                photographs is a word that tells nobody anything. It is still
+                named, for a screen reader reading the row's cells out. */}
+            <Th>
+              <span className="sr-only">Image</span>
+            </Th>
             <Th>Listing</Th>
             <Th>Channel</Th>
-            <Th>SKU</Th>
             <Th>Status</Th>
             <Th align="right">Price</Th>
             <Th>Health</Th>
@@ -248,45 +254,44 @@ function ListingRow({
     // is still the control a keyboard and a screen reader use, and the only
     // one that needs no JavaScript.
     <ClickableRow href={href} selected={open}>
-      <Td className="font-medium">
-        <span className="flex items-center gap-2">
-          {listing.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={listing.image_url}
-              alt=""
-              loading="lazy"
-              className="h-8 w-8 shrink-0 rounded-xs border border-line object-cover"
-            />
-          ) : null}
+      {/* No link on the image: the row already opens from a click anywhere, and
+          a second control pointing at the same place is one more stop for a
+          keyboard to pass through on the way to the title. */}
+      <Td className="w-16 pr-0">
+        <ProductImage src={listing.image_url} />
+      </Td>
+      {/* The SKU used to be a column of its own. It is under the title now,
+          quieter and half a step smaller: a seller finds the row by its picture
+          and its name, and reads the SKU once they have — which also buys the
+          title the width that column was taking. */}
+      <Td>
+        <div className="min-w-0 space-y-0.5">
           <Link
             href={href}
-            className="min-w-0 truncate underline-offset-2 hover:text-primary-600 hover:underline"
+            className="block truncate font-medium underline-offset-2 hover:text-primary-600 hover:underline"
           >
             {listing.title || listing.external_id}
           </Link>
-        </span>
+          <span className="flex items-center gap-0.5 text-[11.5px] text-muted">
+            <span className="truncate">{listing.sku || listing.external_id}</span>
+            {/* On the SKU, because that is what the channel's editor is keyed on
+                — SKU Central routes on the seller SKU, not the ASIN. */}
+            <ChannelAdminLink
+              channel={listing.channel}
+              href={listing.admin_url}
+              label={`Open ${listing.sku || listing.external_id} in ${
+                listing.channel === "amazon" ? "Seller Central" : "the Shopify admin"
+              }`}
+            />
+          </span>
+        </div>
       </Td>
       <Td>
         <ChannelBadge channel={listing.channel} />
       </Td>
-      <Td className="font-data text-muted">
-        <span className="inline-flex items-center gap-0.5">
-          {listing.sku || "—"}
-          {/* On the SKU, because that is what the channel's editor is keyed on
-              — SKU Central routes on the seller SKU, not the ASIN. */}
-          <ChannelAdminLink
-            channel={listing.channel}
-            href={listing.admin_url}
-            label={`Open ${listing.sku || listing.external_id} in ${
-              listing.channel === "amazon" ? "Seller Central" : "the Shopify admin"
-            }`}
-          />
-        </span>
-      </Td>
       {/* The channel's own word, unmapped: a Shopify DRAFT and an Amazon
           suppression are not the same problem and do not have the same fix. */}
-      <Td className="text-muted">{listing.status || "—"}</Td>
+      <Td className="text-[12px] text-muted">{listing.status || "—"}</Td>
       <Td align="right" className="font-data whitespace-nowrap">
         {formatMoney(listing.price, listing.currency)}
       </Td>
@@ -299,7 +304,9 @@ function ListingRow({
           {health.label}
         </span>
       </Td>
-      <Td className="whitespace-nowrap text-muted">{formatDateTime(listing.last_synced_at)}</Td>
+      <Td className="whitespace-nowrap text-[12px] text-muted">
+        {formatDateTime(listing.last_synced_at)}
+      </Td>
     </ClickableRow>
   );
 }
