@@ -196,6 +196,7 @@ def outcome(run, label=None):
 
 def _run_loop(run_doc):
 	agent = build_runnable(run_doc.agent)
+	_strip_prefetched_tools(agent, run_doc.input)
 	messages = [{"role": "user", "content": run_doc.input or "Run."}]
 	usage = {"input_tokens": 0, "output_tokens": 0, "image_tokens": 0}
 	# What the run actually did, as opposed to what it later says it did. See
@@ -230,6 +231,38 @@ def _run_loop(run_doc):
 		raise
 
 	return {"output": output, "messages": messages, "tool_calls": ledger, **usage}
+
+
+def _strip_prefetched_tools(agent, raw_input):
+	"""Remove any tool the run's own input already has the answer for.
+
+	`_context` is a convention, not a schema field: an agent whose payload-
+	building caller already resolved some of its tools' answers before the run
+	existed (e.g. `alaiy_os_agents.agents.listing.context.build_context`) may
+	drop them on the payload as `_context = {tool_id: result, ...}`. A tool
+	named there is not merely told to skip itself in the prompt — asking a
+	model to skip an available tool is a request, and it does not reliably
+	comply with one; it is taken out of what this run's completion call is
+	even offered, which is a guarantee instead. Core has no opinion about what
+	`_context` contains or which agent uses it: this only ever looks at its
+	keys, never its values.
+
+	A run with no `_context`, or one naming a tool this agent does not have,
+	changes nothing — every existing agent that has never heard of `_context`
+	runs exactly as before.
+	"""
+	if not raw_input:
+		return
+	try:
+		context = json.loads(raw_input).get("_context")
+	except (ValueError, AttributeError):
+		return
+	if not isinstance(context, dict) or not context:
+		return
+
+	agent.tools = [tool for tool in agent.tools if tool["name"] not in context]
+	for tool_id in context:
+		agent.handlers.pop(tool_id, None)
 
 
 def _call(agent, messages, usage):
