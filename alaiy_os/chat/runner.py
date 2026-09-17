@@ -820,6 +820,27 @@ def _elide_old_attachments(rows):
 
 
 # ── Persistence ──────────────────────────────────────────────────────────────
+def note(session, text):
+	"""Write a progress line: visible to the person, invisible to the model.
+
+	A tool that takes a long time and knows why should be able to say so. Handing
+	a job to an agent is the case this exists for — several of them in one turn is
+	a minute of silence otherwise, and "it is slow" and "it is stuck" look
+	identical from the outside.
+
+	The trick is `blocks=[]`. `_history` already drops any message with no blocks,
+	a guard that exists for a streaming turn that died before it wrote any — so a
+	row written with none is in the transcript a person reads and in none of the
+	LLM calls that follow. That matters beyond tidiness: a progress line replayed
+	into context is the model reading its own status updates back as though they
+	were findings, on every remaining turn, and paying for them.
+
+	Callers commit. This writes one row and nothing else, so a caller in the
+	middle of a tool can decide when it becomes visible to a poll.
+	"""
+	return _append(session, "assistant", [], text=text)
+
+
 def _append(
 	session,
 	role,
