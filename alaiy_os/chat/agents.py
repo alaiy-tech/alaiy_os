@@ -293,9 +293,32 @@ def run(arguments):
 	#
 	# Sequential, therefore: two agents in one reply are two runs one after the
 	# other, and a fan-out takes as long as its parts added up. That is the whole
-	# reason `_announce` exists. Running them at once is a change to
-	# `runner._run_tools`, which loops over the model's tool_use blocks — not a
-	# change here.
+	# reason `_announce` exists.
+	#
+	# Running them at once looks like a small change — `runner._run_tools` already
+	# loops over the model's tool_use blocks, so a pool would drop straight in — and
+	# it is not. Both routes were costed and neither is worth it yet:
+	#
+	#   * A thread pool would put this whole call in a worker thread, and a
+	#     delegation is almost entirely Frappe work: a Run inserted and committed,
+	#     `set_user`, a registry read, a tool loop of doctype reads, `db_set` on the
+	#     way out, and `frappe.db.rollback()` on failure. A bare thread has no
+	#     `frappe.local`, no connection and no session user, so each one would need
+	#     its own `frappe.init`/`connect` — N more DB connections per turn, and a
+	#     rollback path running alongside the parent's open transaction. This
+	#     codebase's one threaded fan-out
+	#     (alaiy_os_connector_shopify/listing/image_generation.py) exists under the
+	#     opposite rule: it resolves every Frappe read on the calling thread first
+	#     and keeps even `log_error` out of the workers.
+	#
+	#   * Enqueuing the children instead is clean per child — a real worker process
+	#     with a real context — but `execute_agent` and `run_turn` both use
+	#     `queue="long"`, so the parent would wait on children queued behind itself.
+	#     That needs a dedicated queue and a documented worker count before it is
+	#     parallel rather than merely deadlock-free.
+	#
+	# So the wait stays visible instead of short, and `_announce` is what makes it
+	# legible. Revisit when a real fan-out's latency is the complaint.
 	run_name = executor.run_now(agent, payload=args, trigger_type="Chat")
 
 	# The traceback stays on the Run; what reaches the model is one line it can
