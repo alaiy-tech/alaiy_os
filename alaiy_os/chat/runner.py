@@ -33,6 +33,7 @@ import traceback
 import frappe
 from frappe.utils import now_datetime
 
+from alaiy_os.chat import agents as chat_agents
 from alaiy_os.chat import artifacts as chat_artifacts
 from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
@@ -1070,17 +1071,22 @@ WEB_SEARCH_PROMPT = (
 #: `chat/tools.py` already puts pack tools first in the list, which is most of the
 #: work; this says out loud why they are there, because ordering alone does not
 #: stop a model reaching past them for a tool whose name it recognises.
-PACK_PROMPT = (
-	"Some of your tools are named `pack__tool` — `amazon_sp_api__get_health_summary`, "
-	"for example. The prefix is a connector or a curated area, and each of these was "
-	"written for one job by someone who knew that system.\n"
-	"- When one covers the question, use it. Do not reach for a generic document tool "
-	"instead, and do not reach for one first to 'check' — the prefixed tool already "
-	"knows which records hold the answer and what its fields mean.\n"
-	"- Read the descriptions before choosing. They say what the tool returns and when "
-	"to call it, and picking on the name alone is how you end up calling three.\n"
-	"- The generic tools are for everything the prefixed ones do not cover. That is "
-	"most of the site, and reaching for them there is right."
+#: Said when the site has agents to hand work to. The advice it replaces was about
+#: choosing between a connector's own tool and a generic one, because both were on
+#: the surface at once; now the connector's tools are inside its agent and the
+#: choice is whether to delegate at all.
+AGENT_PROMPT = (
+	"Some questions belong to a specialist agent rather than to you. `run_agent` "
+	"lists the ones this site has, each with what it covers.\n"
+	"- When a question is about a system one of them owns — a sales channel, a "
+	"supplier catalogue — hand it over rather than assembling the answer from "
+	"generic document tools. The agent holds tools written for that system by "
+	"someone who knew it, and the rules for reading what they return.\n"
+	"- Do not look the data up first to 'check'. The agent reads what it needs "
+	"itself, as its first step, and a lookup before delegating costs a round trip "
+	"and tells you nothing it will not find.\n"
+	"- The generic tools are for everything no agent covers. That is most of the "
+	"site, and reaching for them there is right."
 )
 
 
@@ -1200,8 +1206,8 @@ def _system_prompt(specs=None):
 	if any(spec.get("name") == chat_websearch.TOOL for spec in specs or []):
 		parts.append(WEB_SEARCH_PROMPT)
 
-	if any(chat_tools.PACK_SEPARATOR in (spec.get("name") or "") for spec in specs or []):
-		parts.append(PACK_PROMPT)
+	if any(spec.get("name") == chat_agents.TOOL for spec in specs or []):
+		parts.append(AGENT_PROMPT)
 
 	extra = _tenant_context()
 	if extra:

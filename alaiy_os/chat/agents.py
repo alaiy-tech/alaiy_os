@@ -44,13 +44,17 @@ answer to a question the registry already answers.
 
 ## Why the model must not do this work itself
 
-An agent's read tools are on the flat surface too (see `_pack_tools`), so the
-model *could* call `listing__get_product`, look at the data, and write something
-listing-shaped in prose. It would look like an answer. It would have none of the
-agent's prompt, none of the channel's rules, and nothing would be saved — and the
-validator that catches a banned phrase or a title three characters too long never
-runs. The description below says so in as many words, because that is the failure
-this tool exists to prevent and the model has every tool it needs to fall into it.
+An agent's own tools are no longer on the chat surface — `_pack_tools` is gone,
+and reaching a connector now means going through its agent. That removes the
+sharpest version of this failure, where the model called `listing__get_product`
+itself and wrote something listing-shaped in prose with none of the agent's
+prompt, none of the channel's rules, nothing saved, and the validator that
+catches a banned phrase or a title three characters too long never run.
+
+The softer version survives, which is why the description below still spends a
+paragraph on it. The generic document tools are still there, and a model that can
+read an Item can still assemble an answer that looks like the work. It would be
+the same answer with the same gaps.
 """
 
 import frappe
@@ -130,16 +134,16 @@ def _description(catalogue):
 		"produced. Each one has its own instructions, its own tools and its own "
 		"rules, and does work this conversation cannot do properly by hand.\n\n"
 		"Available on this site:\n" + "\n".join(lines) + "\n\n"
-		"**Use the agent rather than doing its job yourself.** Some of an agent's "
-		"own read tools are also on your tool list, so you can usually fetch the "
-		"same data and write something that looks like the answer. Do not: you "
-		"would be working without that agent's instructions and without the "
-		"validation it runs before saving, and nothing you wrote would be saved at "
-		"all. If a request matches an agent above, call this tool.\n\n"
+		"**Use the agent rather than doing its job yourself.** You can usually fetch "
+		"similar data with the generic document tools and write something that looks "
+		"like the answer. Do not: you would be working without that agent's "
+		"instructions, without the rules for reading what its tools return, and "
+		"without the validation it runs before saving — and nothing you wrote would "
+		"be saved at all. If a request matches an agent above, call this tool.\n\n"
 		"**Do not gather data first.** The agent reads whatever it needs itself, "
 		"through its own tools, as its first step. Looking the product up before "
 		"delegating tells you nothing the agent will not find, and costs a round "
-		"trip each time. Go straight to this tool; use those read tools only to "
+		"trip each time. Go straight to this tool; use the generic tools only to "
 		"answer a question on their own, where no agent is being run at all.\n\n"
 		"**Diagnosing a problem is not fixing it.** Other tools can often tell you "
 		"what is wrong — why a listing is suppressed, what a channel rejected — and "
