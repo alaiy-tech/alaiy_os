@@ -141,15 +141,12 @@ def _surface():
 	sources = _sources()
 	fac = _fac_specs()
 	core = {tool["name"]: tool for tool in _core_tools()}
-	packs = {tool["name"]: tool for tool in _pack_tools()}
 	tenant = _provided(sources)
 
-	# Four-way, not two: a tenant tool shadowing a core one is the same accident
+	# Three-way, not two: a tenant tool shadowing a core one is the same accident
 	# as one shadowing an FAC tool, and precedence-by-import-order is exactly
-	# what this check exists to refuse. Pack names are namespaced by pack id, so
-	# they should never collide — they are checked anyway, because "should never"
-	# is what this list is for.
-	local = [core, packs, tenant]
+	# what this check exists to refuse.
+	local = [core, tenant]
 	fac_names = {spec["name"] for spec in fac}
 	clash = set()
 	for i, group in enumerate(local):
@@ -160,29 +157,16 @@ def _surface():
 		frappe.log_error(title=f"Chat tool name collision: {', '.join(sorted(clash))}")
 		raise _SourceError("name collision")
 
-	provided = {**core, **packs, **tenant}
+	provided = {**core, **tenant}
 
-	# Core's and the packs' names are narrowed with FAC's rather than bypassing
-	# `_narrow` with the tenant tools. A `filter` may only ever shrink what it was
-	# given, so nothing is at risk — and it is the only way a deployment can
-	# withhold a core or pack tool from a scoped role.
-	offered = [spec["name"] for spec in fac] + list(core) + list(packs)
+	# Core's names are narrowed with FAC's rather than bypassing `_narrow` with the
+	# tenant tools. A `filter` may only ever shrink what it was given, so nothing is
+	# at risk — and it is the only way a deployment can withhold a core tool from a
+	# scoped role.
+	offered = [spec["name"] for spec in fac] + list(core)
 	kept = set(_narrow(offered, sources))
 
-	# Pack tools lead. The order in this list is the order the model reads, and a
-	# curated connector tool should be the first thing it considers for a question
-	# about that connector — a generic `list_documents` over the same doctype is a
-	# worse answer, and it is the one the model reaches for when it sees it first.
-	specs = [
-		{
-			"name": tool["name"],
-			"description": tool.get("description") or "",
-			ANTHROPIC_SCHEMA_KEY: tool.get(ANTHROPIC_SCHEMA_KEY) or EMPTY_SCHEMA,
-		}
-		for name, tool in packs.items()
-		if name in kept
-	]
-	specs.extend(spec for spec in fac if spec["name"] in kept)
+	specs = [spec for spec in fac if spec["name"] in kept]
 	specs.extend(
 		{
 			"name": tool["name"],
@@ -200,112 +184,6 @@ def _surface():
 	if allowed:
 		specs = [spec for spec in specs if spec["name"] in allowed]
 	return specs, provided
-
-
-#: Separates a pack id from a tool id in the name the model sees. Two underscores
-#: rather than a dot because Anthropic tool names are `^[a-zA-Z0-9_-]{1,64}$`.
-#:
-#: Namespacing is not decoration. It removes a whole class of failure — a pack
-#: that names a tool `search` would otherwise collide with FAC's and, because
-#: `_surface` refuses collisions rather than ranking them, take every tool on the
-#: site down with it. It also tells the model which connector a tool belongs to
-#: at the point it is choosing, which is most of what it needs to choose well.
-PACK_SEPARATOR = "__"
-
-
-def _pack_tools():
-	"""Every enabled pack's tools, in the tenant-source shape.
-
-	This is what lets "what is my account health?" reach a connector without the
-	user naming one. The alternative — a `run_pack(pack, question)` dispatch tool
-	over a nested loop — keeps the model's context smaller and is the right answer
-	once there are enough packs for that to matter. Flat is right while there are
-	two: the model sees the actual tools, so it picks one on its description
-	rather than on a summary of a pack, and there is no second loop to budget.
-
-	**Only reads are offered.** Every tool here is directly callable by the model,
-	with the chat's own prompt behind it and none of the owning agent's — so a
-	tool that changes something would be one the chat model runs without the rules
-	its agent exists to apply. `OS Agent Tool.effect` is what a row uses to say so,
-	and a `write` is skipped below; it stays reachable inside its own agent's run,
-	which is where those rules are.
-
-	The default is `read`, so a row that predates the field is offered exactly as
-	it was. That is safe for the connector packs, which register reads only and say
-	so in their manifests — and it is why an agent pack registering a writer has to
-	mark it, rather than relying on this module to guess.
-
-	Three gates, the last two mirroring `engine/factory.py` so a tool cannot be
-	reachable here and refused there:
-
-	  - the tool must only read (see above);
-	  - the connector must be enabled, when the row names one;
-	  - the user must hold what the row declares, so the surface never advertises
-	    a tool whose first call would be a refusal. A row declaring nothing is not
-	    filtered — `unmet` returns empty for it, the same way factory treats it.
-	"""
-	from alaiy_os.engine import permissions
-
-	tools = []
-	for agent_id in frappe.get_all(
-		"OS Agent Registry",
-		# An agent the chat can RUN does not also lend out its tools. Those are its
-		# internals — the steps its own prompt sequences — and on the flat surface
-		# they are both a duplicate and a trap: the model sees them before
-		# `run_agent` (pack tools lead, see `_surface`), fetches the same data
-		# itself, and either wastes a round trip per tool before delegating anyway
-		# or writes something answer-shaped with none of the agent's rules applied.
-		# Observed, not theoretical — a small model did the former three times over.
-		#
-		# Nothing is lost. A connector's own pack tools stay on the surface for
-		# questions asked on their own, which is what they were curated for; it is
-		# only an agent's private steps that come off.
-		filters={"is_enabled": 1, "chat_skill": 0},
-		pluck="name",
-		order_by="name asc",
-	):
-		doc = frappe.get_cached_doc("OS Agent Registry", agent_id)
-		for row in doc.tools:
-			# Unset counts as read: every row written before the field existed was
-			# one, and defaulting the other way would empty the surface on upgrade.
-			if (row.effect or "read") != "read":
-				continue
-			if row.connector and not frappe.db.get_value(
-				"OS Connector Registry", row.connector, "is_enabled"
-			):
-				continue
-			if permissions.unmet([row.as_dict()], frappe.session.user):
-				continue
-			tools.append(_pack_tool(doc, row))
-	return tools
-
-
-def _pack_tool(agent, row):
-	"""One `OS Agent Tool` row as a callable tool spec."""
-	schema = EMPTY_SCHEMA
-	if row.parameters_schema:
-		try:
-			schema = json.loads(row.parameters_schema)
-		except ValueError:
-			# Validated by the child controller on save and re-checked every
-			# migrate, so this means the row was edited by hand. An empty schema
-			# is the safe read: the model sends nothing rather than guessing.
-			frappe.log_error(title=f"Pack tool {row.tool_id} has unparseable parameters_schema")
-
-	def run(arguments, _handler=row.handler):
-		# Resolved per call, not at surface-build time: importing every pack's
-		# handler module to *describe* the tools would pull each connector's
-		# client into a turn that never calls one.
-		return frappe.get_attr(_handler)(**(arguments or {}))
-
-	return {
-		"name": f"{agent.name}{PACK_SEPARATOR}{row.tool_id}",
-		# The pack's own name leads, so a model scanning a flat list can see which
-		# connector each tool speaks to before reading the description.
-		"description": f"[{agent.agent_name}] {row.description or ''}".strip(),
-		ANTHROPIC_SCHEMA_KEY: schema,
-		"run": run,
-	}
 
 
 def _core_tools():
