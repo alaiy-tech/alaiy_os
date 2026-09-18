@@ -160,7 +160,7 @@ def _safe_avg(amount, qty):
 
 
 @frappe.whitelist()
-def get_products_overview(period="1M"):
+def get_products_overview(period="1M", include_active_skus=1):
 	"""The four Products KPI cards (units sold, on-hand units, average unit
 	value, active SKUs) in one call, each as {current, previous} for the
 	period-over-period comparison the cards render as a % badge.
@@ -170,6 +170,15 @@ def get_products_overview(period="1M"):
 	"previous" is approximated as active items that already existed
 	(creation <= period start), i.e. the delta reads as "new active SKUs
 	added this period" rather than a true point-in-time snapshot.
+
+	`include_active_skus=0` leaves that one figure out, and with it the only
+	query here that has no bound on how much it reads: the other three are
+	date-ranged over Sales Order and Stock Ledger Entry, while the SKU count is
+	a full scan of `tabItem` whatever the period. On a catalogue of a few
+	thousand items that costs nothing and the default says so; on one of
+	millions it is a table scan per page view, which is a caller's decision to
+	make and not this endpoint's. The key is then absent from the response
+	rather than zero, because zero is a claim about the catalogue.
 	"""
 	frappe.has_permission("Item", "read", throw=True)
 	days = PERIOD_DAYS.get(period)
@@ -186,24 +195,7 @@ def get_products_overview(period="1M"):
 	on_hand_now = _on_hand_as_of(today)
 	on_hand_before = _on_hand_as_of(period_start)
 
-	# One pass over the enabled items, not two. As two `frappe.db.count` calls
-	# these were separate full scans of `tabItem` differing only in the
-	# `creation` bound, which on a large catalog is two scans too many.
-	active = frappe.db.sql(
-		"""
-		select
-			count(*) as active_now,
-			coalesce(sum(case when creation <= %(period_start)s then 1 else 0 end), 0) as active_before
-		from `tabItem`
-		where disabled = 0
-		""",
-		{"period_start": period_start},
-		as_dict=True,
-	)
-	active_now = cint(active[0].active_now) if active else 0
-	active_before = cint(active[0].active_before) if active else 0
-
-	return {
+	overview = {
 		"period": period,
 		"units_sold": {"current": current_sales["qty"], "previous": previous_sales["qty"]},
 		"on_hand_units": {"current": on_hand_now, "previous": on_hand_before},
@@ -211,8 +203,29 @@ def get_products_overview(period="1M"):
 			"current": _safe_avg(current_sales["amount"], current_sales["qty"]),
 			"previous": _safe_avg(previous_sales["amount"], previous_sales["qty"]),
 		},
-		"active_skus": {"current": active_now, "previous": active_before},
 	}
+
+	if cint(include_active_skus):
+		# One pass over the enabled items, not two. As two `frappe.db.count` calls
+		# these were separate full scans of `tabItem` differing only in the
+		# `creation` bound, which on a large catalog is two scans too many.
+		active = frappe.db.sql(
+			"""
+			select
+				count(*) as active_now,
+				coalesce(sum(case when creation <= %(period_start)s then 1 else 0 end), 0) as active_before
+			from `tabItem`
+			where disabled = 0
+			""",
+			{"period_start": period_start},
+			as_dict=True,
+		)
+		overview["active_skus"] = {
+			"current": cint(active[0].active_now) if active else 0,
+			"previous": cint(active[0].active_before) if active else 0,
+		}
+
+	return overview
 
 
 @frappe.whitelist()
