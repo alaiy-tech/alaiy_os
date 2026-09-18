@@ -93,7 +93,7 @@ function Tile({
         <span aria-hidden className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${tone.dot}`} />
       </div>
 
-      <p className="pt-2 font-data text-[27px] font-semibold leading-none tracking-tight text-primary-600 tabular-nums">
+      <p className="pt-2 font-data text-stat font-semibold leading-none tracking-tight text-primary-600 tabular-nums">
         {formatPercent(metric.metric_value)}
       </p>
 
@@ -161,7 +161,7 @@ function SmallTile({ metric }: { metric: HealthMetric }) {
           {headroom ?? metricStatusLabel(metric.health_status)}
         </span>
       </span>
-      <span className="shrink-0 font-data text-[16px] font-semibold text-primary-600 tabular-nums">
+      <span className="shrink-0 font-data text-stat-sm font-semibold text-primary-600 tabular-nums">
         {formatPercent(metric.metric_value)}
       </span>
     </article>

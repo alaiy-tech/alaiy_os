@@ -14,7 +14,7 @@ import { bannerFor } from "@/lib/health/status";
 import { Contributing } from "@/app/(app)/account-health/contributing";
 import { MetricTiles } from "@/app/(app)/account-health/metric-tiles";
 import { TrendChart } from "@/app/(app)/account-health/trend-chart";
-import type { HealthGap, LateShipmentOutlook } from "@/lib/backend/types";
+import type { HealthGap, HealthStatus, LateShipmentOutlook } from "@/lib/backend/types";
 
 export const metadata = { title: "Account Health — Alaiy" };
 
@@ -111,10 +111,15 @@ export default async function AccountHealthPage({
               breach: "At risk" exists to be seen before anything crosses. */}
           <section
             aria-label="Account status"
-            className={`flex overflow-hidden rounded-sm border ${banner.card}`}
+            className={`flex items-start gap-3 rounded-sm border px-3.5 py-3 ${banner.card}`}
           >
-            <span aria-hidden className={`w-[3px] shrink-0 ${banner.rule}`} />
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-3.5 py-3">
+            <span
+              aria-hidden
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${banner.badge}`}
+            >
+              <BannerIcon status={health.status} />
+            </span>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
               <h2 className={`text-display-xs ${banner.ink}`}>{banner.label}</h2>
               <p className={`text-[13px] ${banner.ink}`}>
                 {health.never_synced
@@ -264,6 +269,36 @@ function Gaps({ gaps }: { gaps: HealthGap[] }) {
         ))}
       </ul>
     </section>
+  );
+}
+
+/** One glyph per account status — matches the idiom in dashboard/alert-bar.tsx. */
+function BannerIcon({ status }: { status: HealthStatus }) {
+  if (status === "healthy") {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4.5 10.5l3.5 3.5 7.5-8" />
+      </svg>
+    );
+  }
+  if (status === "at_risk") {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 3.5 17.5 16h-15L10 3.5ZM10 8v3.5M10 14h.01" />
+      </svg>
+    );
+  }
+  if (status === "action_required") {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M6.5 6.5l7 7M13.5 6.5l-7 7" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M7.5 7.5a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.7v.3M10 14.5h.01" />
+    </svg>
   );
 }
 
