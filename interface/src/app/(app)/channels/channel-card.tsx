@@ -37,6 +37,10 @@ import type {
 const CHANNEL_BLURB: Record<ChannelId, string> = {
   shopify: "Orders, products and inventory. Real-time once webhooks are live.",
   amazon: "Orders and inventory over SP-API.",
+  flipkart: "Orders, listings and seller-tier metrics.",
+  myntra: "Orders, catalogue and returns.",
+  nykaa: "Orders and catalogue.",
+  ajio: "Orders and catalogue, once Ajio approves your seller application.",
 };
 
 export function ChannelCard({

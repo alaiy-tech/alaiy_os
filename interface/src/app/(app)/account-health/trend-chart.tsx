@@ -163,7 +163,7 @@ function Panel({
               y={Math.max(targetY - 3, 8)}
               textAnchor="end"
               fill="var(--color-alert-ink)"
-              style={{ fontSize: "8px", fontFamily: "var(--font-data)" }}
+              style={{ fontSize: "var(--text-micro)", fontFamily: "var(--font-data)" }}
             >
               limit {formatPercent(target)}
             </text>
