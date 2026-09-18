@@ -39,6 +39,17 @@ plus three image capabilities, for tools that produce imagery rather than text:
 
     white_background(image_url) -> {"white_bg_url": str}
 
+    remove_background(image_data_uri, background_color=None, background_prompt=None,
+                       shadow="soft", shadow_intensity=None, output_size=None, padding=None)
+        -> {"b64": str, "media_type": str}
+
+    the last mats the photo and gives it a new background — exactly one of
+    `background_color` (a flat hex, the house finish) or `background_prompt`
+    (free text, a generated lifestyle scene) — without touching the product's
+    own pixels. Currently served by Photoroom's Image Editing API on both
+    clients below; `output_size` / `padding` follow Photoroom's own syntax
+    rather than a generic one, since nothing else backs this capability yet.
+
 one that reads the public web:
 
     web_search(query) -> {"answer": str, "citations": [{"title", "url"}]}
@@ -81,6 +92,17 @@ MAX_TOKENS = 4096
 OPENROUTER_IMAGES_URL = "https://openrouter.ai/api/v1/images"
 DEFAULT_IMAGE_MODEL = "openai/gpt-image-1"
 IMAGE_TIMEOUT = 180
+
+# Photoroom's Image Editing API (v2/edit): matting, flat-colour background and
+# AI shadow in one call. NOT the older "Remove Background API" (bg_color/size/
+# crop) — that one has no shadow and no prompt-generated background, both of
+# which the house finish and the lifestyle feature need.
+PHOTOROOM_EDIT_URL = "https://image-api.photoroom.com/v2/edit"
+# Requesting a lighter/darker-than-default shadow needs this exact header,
+# pinned to the model version the override params were verified against.
+PHOTOROOM_SHADOW_MODEL_VERSION = "2026-04-15"
+PHOTOROOM_TIMEOUT = 60
+PHOTOROOM_SHADOW_MODES = {"soft": "ai.soft", "hard": "ai.hard", "none": "none"}
 
 # Whisper's own REST endpoint. Not OpenRouter's — it has no transcription API,
 # only chat completions — so this is the one call in this file that reaches a
@@ -126,6 +148,8 @@ class ByokClient:
 	    ai_base_url   — optional; any Anthropic-compatible endpoint, e.g.
 	                    https://openrouter.ai/api or a LiteLLM proxy.
 	                    Unset = Anthropic direct.
+	    photoroom_api_key — for remove_background(); an x-api-key credential
+	                    from https://app.photoroom.com.
 	"""
 
 	def __init__(self):
@@ -136,14 +160,21 @@ class ByokClient:
 		self._image_model = frappe.conf.get("image_generate_model") or DEFAULT_IMAGE_MODEL
 		self._transcribe_key = frappe.conf.get("openai_api_key")
 		self._transcribe_model = frappe.conf.get("transcribe_model") or DEFAULT_TRANSCRIBE_MODEL
+		self._photoroom_key = frappe.conf.get("photoroom_api_key")
 
 	def image_support(self):
 		"""What this client can do, without making a call."""
 		# Translation and white-background both go through the same single
 		# specialised vendor, with its own auth and response contract, not a
 		# model API, and not something core carries an integration for. The
-		# managed client serves both via the billing service.
-		return {"generate": bool(self._image_key), "translate": False, "white_bg": False}
+		# managed client serves both via the billing service. remove_background
+		# is different: Photoroom, reachable directly with a site_config key.
+		return {
+			"generate": bool(self._image_key),
+			"translate": False,
+			"white_bg": False,
+			"remove_background": bool(self._photoroom_key),
+		}
 
 	def web_search_support(self):
 		"""Whether this site can reach the public web, without making a call.
@@ -337,6 +368,44 @@ class ByokClient:
 			"which reaches it through the managed billing service instead."
 		)
 
+	def remove_background(
+		self,
+		image_data_uri,
+		background_color=None,
+		background_prompt=None,
+		shadow="soft",
+		shadow_intensity=None,
+		output_size=None,
+		padding=None,
+		padding_sides=None,
+	):
+		"""One photo, matted and optionally given a new background, via
+		Photoroom on the site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential
+
+		See `engine/llm.py`'s `remove_background` for the parameter contract.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot remove backgrounds. Set photoroom_api_key in "
+				"site_config.json, or install alaiy_os_ai_client to use the managed "
+				"image service."
+			)
+		return _photoroom_edit(
+			self._photoroom_key,
+			image_data_uri,
+			background_color=background_color,
+			background_prompt=background_prompt,
+			shadow=shadow,
+			shadow_intensity=shadow_intensity,
+			output_size=output_size,
+			padding=padding,
+			padding_sides=padding_sides,
+		)
+
 	def transcribe_support(self):
 		"""Whether this site can transcribe voice input, without making a call."""
 		return bool(self._transcribe_key)
@@ -391,6 +460,83 @@ def extension_for(mime_type):
 		"audio/mpeg": "mp3",
 		"audio/wav": "wav",
 	}.get((mime_type or "").split(";")[0].strip().lower(), "webm")
+
+
+def _decode_data_uri(data_uri):
+	"""`data:<media_type>;base64,<b64>` -> (media_type, raw bytes)."""
+	import base64
+
+	header, _, encoded = data_uri.partition(",")
+	media_type = header.removeprefix("data:").removesuffix(";base64") or "image/png"
+	return media_type, base64.b64decode(encoded)
+
+
+def _photoroom_edit(
+	api_key,
+	image_data_uri,
+	background_color=None,
+	background_prompt=None,
+	shadow="soft",
+	shadow_intensity=None,
+	output_size=None,
+	padding=None,
+	padding_sides=None,
+):
+	"""The one place Photoroom's v2/edit wire format is expressed for BYOK.
+
+	Mirrors `alaiy_os_billing_service.app.providers.remove_background` — the
+	managed client's equivalent path — deliberately: the two are independent
+	callers with independent credentials, the same way `generate_image` is
+	expressed once here and again in that service's `providers.py`.
+
+	At most one of `background_color` / `background_prompt`; neither means a
+	transparent cutout (see that function's docstring for why that mode
+	matters, not just the coloured ones).
+	"""
+	import requests
+
+	if background_color and background_prompt:
+		raise ValueError("_photoroom_edit takes at most one of background_color, background_prompt")
+
+	media_type, content = _decode_data_uri(image_data_uri)
+
+	mode = PHOTOROOM_SHADOW_MODES.get(shadow, shadow)
+	headers = {"x-api-key": api_key}
+	data = {"removeBackground": "true"}
+	if background_color:
+		data["background.color"] = background_color.lstrip("#")
+	elif background_prompt:
+		data["background.prompt"] = background_prompt
+	if shadow_intensity is not None and mode.startswith("ai."):
+		data["shadow.mode"] = "ai.auto-with-overrides"
+		data["shadow.softnessOverride"] = "0" if shadow == "hard" else "1"
+		data["shadow.intensityOverride"] = str(shadow_intensity)
+		headers["pr-ai-shadows-model-version"] = PHOTOROOM_SHADOW_MODEL_VERSION
+	else:
+		data["shadow.mode"] = mode
+	if output_size:
+		data["outputSize"] = output_size
+	if padding is not None:
+		data["padding"] = str(padding)
+	for side, value in (padding_sides or {}).items():
+		data[f"padding{side.capitalize()}"] = str(value)
+
+	resp = requests.post(
+		PHOTOROOM_EDIT_URL,
+		headers=headers,
+		data=data,
+		files={"imageFile": ("photo", content, media_type)},
+		timeout=PHOTOROOM_TIMEOUT,
+	)
+	if resp.status_code != 200:
+		raise RuntimeError(f"Background removal failed ({resp.status_code}): {resp.text[:500]}")
+
+	import base64
+
+	return {
+		"b64": base64.b64encode(resp.content).decode("ascii"),
+		"media_type": resp.headers.get("Content-Type", "image/png").split(";")[0].strip(),
+	}
 
 
 def get_ai_client():

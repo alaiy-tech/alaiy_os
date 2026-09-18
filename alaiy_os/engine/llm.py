@@ -72,6 +72,46 @@ def generate_image(prompt, reference_data_uri=None):
 	return _client().generate_image(prompt, reference_data_uri=reference_data_uri)
 
 
+def remove_background(
+	image_data_uri,
+	*,
+	background_color=None,
+	background_prompt=None,
+	shadow="soft",
+	shadow_intensity=None,
+	output_size=None,
+	padding=None,
+	padding_sides=None,
+):
+	"""One photo, matted and optionally given a new background ->
+	{"b64", "media_type"}.
+
+	Same seam as `generate_image`: a tool should not hold a provider key or
+	know a provider's wire format. At most one of `background_color` (a
+	`#rrggbb` hex — the house finish) or `background_prompt` (free text — a
+	generated lifestyle background); neither means a transparent cutout.
+	Either way the product's own pixels are kept and only the background is
+	touched. `shadow` is "soft" | "hard" | "none"; `shadow_intensity` (0..1)
+	optionally lightens or darkens it. `output_size` / `padding` /
+	`padding_sides` follow Photoroom's own syntax (see `engine/ai_client.py`)
+	since this call is currently Photoroom-specific; they are simply ignored
+	by a client that doesn't need them.
+
+	Raises `Unsupported` if this deployment's client has no background/matting
+	provider configured.
+	"""
+	return _client().remove_background(
+		image_data_uri,
+		background_color=background_color,
+		background_prompt=background_prompt,
+		shadow=shadow,
+		shadow_intensity=shadow_intensity,
+		output_size=output_size,
+		padding=padding,
+		padding_sides=padding_sides,
+	)
+
+
 def web_search_support():
 	"""Whether this site can reach the public web at all.
 
