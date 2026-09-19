@@ -32,8 +32,8 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
   // kind, and "no data yet" is one sentence that is true.
   if (!dashboard.has_any_orders) {
     return (
-      <div className="rounded-sm border border-line bg-white px-4 py-8 text-center">
-        <p className="text-[13px] text-muted">
+      <div className="rounded-lg border border-line bg-white px-4 py-8 text-center">
+        <p className="text-body text-muted">
           No orders have arrived from your channels yet. Your figures appear
           here as soon as the first import finishes.
         </p>
@@ -55,6 +55,9 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
     <div className="space-y-2">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Tile
+          index={0}
+          icon={<BarChartIcon />}
+          badge="mint"
           label="GMV today"
           value={formatMoney(gmv.value, currency)}
           delta={percentDelta(gmv.change_pct)}
@@ -67,6 +70,9 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
           }
         />
         <Tile
+          index={1}
+          icon={<BagIcon />}
+          badge="blue"
           label="Orders today"
           value={formatNumber(orders.value)}
           delta={percentDelta(orders.change_pct)}
@@ -75,6 +81,9 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
           title="Distinct orders placed since midnight, across every connected channel."
         />
         <Tile
+          index={2}
+          icon={<PercentIcon />}
+          badge="sky"
           label="Return rate"
           value={formatPercent(returns.value)}
           delta={pointDelta(returns.change_pp)}
@@ -90,6 +99,9 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
           }
         />
         <Tile
+          index={3}
+          icon={<WalletIcon />}
+          badge="lavender"
           label="Unsettled"
           value={unsettled.available ? formatMoney(unsettled.value, currency) : NO_VALUE}
           footnote={
@@ -126,7 +138,17 @@ export function KpiTiles({ dashboard }: { dashboard: HomeDashboard }) {
  * the sign, so the colour is reinforcement and never the only reading — see
  * the contrast note in DESIGN.md.
  */
+const BADGES = {
+  mint: "bg-highlight-100 text-highlight-700",
+  blue: "bg-highlight-200 text-highlight-700",
+  sky: "bg-primary-50 text-primary-600",
+  lavender: "bg-highlight-100 text-primary-500",
+} as const;
+
 function Tile({
+  index,
+  icon,
+  badge,
   label,
   value,
   delta,
@@ -134,6 +156,9 @@ function Tile({
   footnote,
   title,
 }: {
+  index: number;
+  icon: ReactNode;
+  badge: keyof typeof BADGES;
   label: string;
   value: string;
   delta?: Delta;
@@ -142,13 +167,22 @@ function Tile({
   title?: string;
 }) {
   return (
-    <article className="rounded-sm border border-line bg-white px-4 py-3.5" title={title}>
-      <h3 className="font-sans text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
-        {label}
-      </h3>
-      {/* Geist and tabular figures: this is the number the seller came for,
-          and Poppins sets numerals proportionally. */}
-      <p className="pt-2 font-data text-[27px] font-semibold leading-none tracking-tight text-primary-600 tabular-nums">
+    <article
+      className="animate-rise rounded-lg border border-line bg-white px-5 py-[18px]"
+      style={{ animationDelay: `${index * 70}ms`, animationFillMode: "backwards" }}
+      title={title}
+    >
+      <div className="flex items-center justify-between">
+        <span
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-full ${BADGES[badge]}`}
+        >
+          {icon}
+        </span>
+      </div>
+      <h3 className="pt-3 font-sans text-[12px] font-medium text-muted">{label}</h3>
+      {/* Poppins with tabular numerals: this is the number the seller came
+          for, holding its column steady without a separate data face. */}
+      <p className="pt-1 font-data text-stat font-semibold leading-none tracking-tight text-ink tabular-nums">
         {value}
       </p>
       <p className="flex flex-wrap items-baseline gap-x-1.5 pt-2.5 text-[12px] leading-tight">
@@ -156,6 +190,38 @@ function Tile({
         <span className="text-muted">{footnote}</span>
       </p>
     </article>
+  );
+}
+
+function BarChartIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 15V9M10 15V5M16 15v-4" />
+    </svg>
+  );
+}
+
+function BagIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5.5 7h9l.6 9H4.9l.6-9ZM7.5 7V5.5a2.5 2.5 0 0 1 5 0V7" />
+    </svg>
+  );
+}
+
+function PercentIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 5.5 5.5 14.5M6.25 7.5a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5ZM13.75 15a1.25 1.25 0 1 0 0-2.5 1.25 1.25 0 0 0 0 2.5Z" />
+    </svg>
+  );
+}
+
+function WalletIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 6.5h11a1 1 0 0 1 1 1V14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7.5a1 1 0 0 1 1-1ZM13 10.5h2.5" />
+    </svg>
   );
 }
 

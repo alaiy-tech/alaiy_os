@@ -65,12 +65,18 @@ function AlertCard({ alert }: { alert: HomeAlert }) {
   if (gone) return null;
 
   return (
-    <li className={`flex overflow-hidden rounded-sm border ${style.card}`}>
-      {/* The bright value, as a rule down the leading edge. Three of these
-          stacked is how the bar shows its ranking without three type sizes. */}
-      <span aria-hidden className={`w-[3px] shrink-0 ${style.rule}`} />
+    <li className={`flex items-start gap-3 rounded-lg border px-3.5 py-3 ${style.card}`}>
+      {/* The bright value, as an icon badge — ranking three alerts at a
+          glance without three type sizes, and without the hard leading-edge
+          bar the flat card language retired. */}
+      <span
+        aria-hidden
+        className={`grid h-8 w-8 shrink-0 place-items-center rounded-full ${style.badge}`}
+      >
+        <AlertIcon tone={alert.tone} />
+      </span>
 
-      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-4 gap-y-1.5 px-3.5 py-2.5">
+      <div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-4 gap-y-1.5">
         <div className="min-w-0 flex-1 space-y-0.5">
           <p className={`text-[13px] font-semibold ${style.ink}`}>
             {/* The tone is a colour, and a colour cannot be read out. */}
@@ -111,6 +117,29 @@ function AlertCard({ alert }: { alert: HomeAlert }) {
         </div>
       </div>
     </li>
+  );
+}
+
+/** One glyph per tone — urgent, worth a look, or the brand's own note. */
+function AlertIcon({ tone }: { tone: HomeAlert["tone"] }) {
+  if (tone === "alert") {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M10 3.5 17.5 16h-15L10 3.5ZM10 8v3.5M10 14h.01" />
+      </svg>
+    );
+  }
+  if (tone === "warn") {
+    return (
+      <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 8.5h10l-.7 6.5H5.7L5 8.5ZM7.5 8.5V6a2.5 2.5 0 0 1 5 0v2.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 13.5V9.5M10 6.5h.01M3 10a7 7 0 1 0 14 0 7 7 0 0 0-14 0Z" />
+    </svg>
   );
 }
 

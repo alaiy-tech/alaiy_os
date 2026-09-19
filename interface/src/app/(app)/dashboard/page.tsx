@@ -75,8 +75,8 @@ export default async function DashboardPage() {
     <div className="mx-auto w-full max-w-6xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
         <Eyebrow>Your morning</Eyebrow>
-        <h1 className="text-display-md">Where the business stands</h1>
-        <p className="text-[13px] text-muted">
+        <h1 className="text-display-lg">Where the business stands</h1>
+        <p className="text-body text-muted">
           Today against the same point last week, and anything Alaiy noticed
           since you were last here.
         </p>
@@ -106,7 +106,7 @@ export default async function DashboardPage() {
           <h2 className="text-display-sm">Latest orders</h2>
           <Link
             href="/orders"
-            className="text-[12px] text-muted underline-offset-2 hover:text-primary-600 hover:underline"
+            className="text-[13px] font-medium text-highlight-600 underline-offset-2 hover:text-primary-600 hover:underline"
           >
             All orders, problems first →
           </Link>
