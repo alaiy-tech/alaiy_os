@@ -112,6 +112,33 @@ def remove_background(
 	)
 
 
+def virtual_model(image_data_uri, *, model_preset=None, scene_preset=None, pose=None, prompt=None, size=None):
+	"""One photo, shown worn by a generated person -> {"b64", "media_type"}.
+
+	Same seam as `remove_background`, with a DIFFERENT guarantee: this is the
+	one image capability on this seam that does NOT promise the product's own
+	pixels survive untouched — showing something worn means generating the
+	scene around it, and Photoroom's own model may reinterpret the product in
+	the process. Treat the result as a styled/marketing render, never as a
+	stand-in for the authoritative product photo a customer is buying.
+
+	All of `model_preset` / `scene_preset` / `pose` / `size` are optional and
+	follow Photoroom's own preset names (see `engine/ai_client.py`); `prompt`
+	is free text, e.g. "street style". Leaving everything unset asks Photoroom
+	to choose automatically.
+
+	Raises `Unsupported` if this deployment's client has no provider for it.
+	"""
+	return _client().virtual_model(
+		image_data_uri,
+		model_preset=model_preset,
+		scene_preset=scene_preset,
+		pose=pose,
+		prompt=prompt,
+		size=size,
+	)
+
+
 def web_search_support():
 	"""Whether this site can reach the public web at all.
 
