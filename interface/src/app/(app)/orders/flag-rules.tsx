@@ -31,7 +31,7 @@ export function FlagRules({ rules }: { rules: OrderFlagRules }) {
       <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[12px] text-muted transition-colors hover:text-primary-600">
         <span
           aria-hidden
-          className="text-[10px] transition-transform group-open:rotate-90"
+          className="text-meta transition-transform group-open:rotate-90"
         >
           ▶
         </span>

@@ -140,7 +140,7 @@ function Row({ row, hasWms }: { row: StockRow; hasWms: boolean }) {
 
       <Td>
         <span
-          className="rounded-xs border border-line bg-surface px-1.5 py-0.5 font-sans text-[10.5px] font-medium uppercase tracking-[0.08em] text-muted"
+          className="rounded-xs border border-line bg-surface px-1.5 py-0.5 font-sans text-meta font-medium uppercase tracking-[0.08em] text-muted"
           title={hasWms ? source.blurb : "No WMS is configured, so ERPNext is the stock master."}
         >
           {source.label}
