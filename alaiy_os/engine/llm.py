@@ -79,6 +79,8 @@ def remove_background(
 	background_prompt=None,
 	shadow="soft",
 	shadow_intensity=None,
+	shadow_spread=None,
+	shadow_direction=None,
 	output_size=None,
 	padding=None,
 	padding_sides=None,
@@ -92,10 +94,15 @@ def remove_background(
 	generated lifestyle background); neither means a transparent cutout.
 	Either way the product's own pixels are kept and only the background is
 	touched. `shadow` is "soft" | "hard" | "none"; `shadow_intensity` (0..1)
-	optionally lightens or darkens it. `output_size` / `padding` /
-	`padding_sides` follow Photoroom's own syntax (see `engine/ai_client.py`)
-	since this call is currently Photoroom-specific; they are simply ignored
-	by a client that doesn't need them.
+	optionally lightens or darkens it, and only takes effect alongside
+	`shadow_spread` (how long the shadow is, e.g. "short"/"medium"/"long" or a
+	0-90 degree angle) and `shadow_direction` (which way it falls, e.g.
+	"behind" or a 0-360 degree angle) — all three switch Photoroom into its
+	override mode; left unset, Photoroom guesses the shadow's angle and length
+	itself, which reads as inconsistent from photo to photo. `output_size` /
+	`padding` / `padding_sides` follow Photoroom's own syntax (see
+	`engine/ai_client.py`) since this call is currently Photoroom-specific;
+	they are simply ignored by a client that doesn't need them.
 
 	Raises `Unsupported` if this deployment's client has no background/matting
 	provider configured.
@@ -106,6 +113,8 @@ def remove_background(
 		background_prompt=background_prompt,
 		shadow=shadow,
 		shadow_intensity=shadow_intensity,
+		shadow_spread=shadow_spread,
+		shadow_direction=shadow_direction,
 		output_size=output_size,
 		padding=padding,
 		padding_sides=padding_sides,

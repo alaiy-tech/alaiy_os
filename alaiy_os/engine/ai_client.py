@@ -386,6 +386,8 @@ class ByokClient:
 		background_prompt=None,
 		shadow="soft",
 		shadow_intensity=None,
+		shadow_spread=None,
+		shadow_direction=None,
 		output_size=None,
 		padding=None,
 		padding_sides=None,
@@ -412,6 +414,8 @@ class ByokClient:
 			background_prompt=background_prompt,
 			shadow=shadow,
 			shadow_intensity=shadow_intensity,
+			shadow_spread=shadow_spread,
+			shadow_direction=shadow_direction,
 			output_size=output_size,
 			padding=padding,
 			padding_sides=padding_sides,
@@ -553,6 +557,8 @@ def _photoroom_edit(
 	background_prompt=None,
 	shadow="soft",
 	shadow_intensity=None,
+	shadow_spread=None,
+	shadow_direction=None,
 	output_size=None,
 	padding=None,
 	padding_sides=None,
@@ -582,6 +588,18 @@ def _photoroom_edit(
 		data["shadow.mode"] = "ai.auto-with-overrides"
 		data["shadow.softnessOverride"] = "0" if shadow == "hard" else "1"
 		data["shadow.intensityOverride"] = str(shadow_intensity)
+		# Without these two, Photoroom guesses the shadow's angle and length
+		# itself — which is exactly what read as "improper" on a real photo:
+		# a shadow this seam asks for as a tight, near-vertical contact shadow
+		# ("hard, but light... sitting on the surface, not floating") came
+		# back at whatever angle/length Photoroom's own auto-detection picked,
+		# inconsistent from photo to photo. Left as override knobs rather than
+		# hardcoded so a caller with a different physical brief (a raking
+		# side-light, say) is not stuck with this one's defaults.
+		if shadow_spread:
+			data["shadow.spreadOverride"] = shadow_spread
+		if shadow_direction:
+			data["shadow.directionOverride"] = shadow_direction
 		headers["pr-ai-shadows-model-version"] = PHOTOROOM_SHADOW_MODEL_VERSION
 	else:
 		data["shadow.mode"] = mode
