@@ -30,7 +30,7 @@ capability without making a call. Never widen `complete` with a streaming
 argument instead: an override that does not accept it would raise TypeError on
 every turn.
 
-plus three image capabilities, for tools that produce imagery rather than text:
+plus four image capabilities, for tools that produce imagery rather than text:
 
     generate_image(prompt, reference_data_uri=None)
         -> {"b64": str, "media_type": str, "usage": dict}
@@ -41,12 +41,22 @@ plus three image capabilities, for tools that produce imagery rather than text:
                        shadow="soft", shadow_intensity=None, output_size=None, padding=None)
         -> {"b64": str, "media_type": str}
 
-    the last mats the photo and gives it a new background — exactly one of
-    `background_color` (a flat hex, the house finish) or `background_prompt`
-    (free text, a generated lifestyle scene) — without touching the product's
-    own pixels. Currently served by Photoroom's Image Editing API on both
-    clients below; `output_size` / `padding` follow Photoroom's own syntax
-    rather than a generic one, since nothing else backs this capability yet.
+    virtual_model(image_data_uri, model_preset=None, scene_preset=None,
+                  pose=None, prompt=None, size=None)
+        -> {"b64": str, "media_type": str}
+
+    `remove_background` mats the photo and gives it a new background — at most
+    one of `background_color` (a flat hex, the house finish) or
+    `background_prompt` (free text, a generated lifestyle scene); neither means
+    a transparent cutout. `virtual_model` puts the product on a generated
+    person instead — a DIFFERENT guarantee applies here: unlike every other
+    capability on this seam, it does NOT promise the product's own pixels are
+    kept, because showing something worn means generating the scene around it.
+    A caller using this must treat the result as a styled/marketing render, not
+    a stand-in for the authoritative product photo. Currently served by
+    Photoroom's Image Editing API on both clients below; their string/size
+    arguments follow Photoroom's own syntax rather than a generic one, since
+    nothing else backs either capability yet.
 
 one that reads the public web:
 
@@ -169,6 +179,7 @@ class ByokClient:
 			"generate": bool(self._image_key),
 			"translate": False,
 			"remove_background": bool(self._photoroom_key),
+			"virtual_model": bool(self._photoroom_key),
 		}
 
 	def web_search_support(self):
@@ -390,6 +401,42 @@ class ByokClient:
 			padding_sides=padding_sides,
 		)
 
+	def virtual_model(
+		self,
+		image_data_uri,
+		model_preset=None,
+		scene_preset=None,
+		pose=None,
+		prompt=None,
+		size=None,
+	):
+		"""One photo, shown worn by a virtual model, via Photoroom on the
+		site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential (same one remove_background uses)
+
+		See `engine/llm.py`'s `virtual_model` for the parameter contract, and
+		`_photoroom_virtual_model`'s docstring for the caveat that Photoroom's
+		own docs scope this to clothing, not confirmed for jewelry/watches.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot generate on-model photos. Set photoroom_api_key "
+				"in site_config.json, or install alaiy_os_ai_client to use the "
+				"managed image service."
+			)
+		return _photoroom_virtual_model(
+			self._photoroom_key,
+			image_data_uri,
+			model_preset=model_preset,
+			scene_preset=scene_preset,
+			pose=pose,
+			prompt=prompt,
+			size=size,
+		)
+
 	def transcribe_support(self):
 		"""Whether this site can transcribe voice input, without making a call."""
 		return bool(self._transcribe_key)
@@ -455,6 +502,34 @@ def _decode_data_uri(data_uri):
 	return media_type, base64.b64decode(encoded)
 
 
+def _photoroom_post(api_key, image_data_uri, data, headers=None):
+	"""POST one photo to Photoroom's v2/edit with the given form fields.
+
+	Shared by `_photoroom_edit` and `_photoroom_virtual_model`: both are the
+	same endpoint and the same image-upload mechanics, and only the field set
+	differs between "mat and finish" and "put this on a model".
+	"""
+	import base64
+
+	import requests
+
+	media_type, content = _decode_data_uri(image_data_uri)
+	resp = requests.post(
+		PHOTOROOM_EDIT_URL,
+		headers={"x-api-key": api_key, **(headers or {})},
+		data=data,
+		files={"imageFile": ("photo", content, media_type)},
+		timeout=PHOTOROOM_TIMEOUT,
+	)
+	if resp.status_code != 200:
+		raise RuntimeError(f"Photoroom request failed ({resp.status_code}): {resp.text[:500]}")
+
+	return {
+		"b64": base64.b64encode(resp.content).decode("ascii"),
+		"media_type": resp.headers.get("Content-Type", "image/png").split(";")[0].strip(),
+	}
+
+
 def _photoroom_edit(
 	api_key,
 	image_data_uri,
@@ -477,15 +552,11 @@ def _photoroom_edit(
 	transparent cutout (see that function's docstring for why that mode
 	matters, not just the coloured ones).
 	"""
-	import requests
-
 	if background_color and background_prompt:
 		raise ValueError("_photoroom_edit takes at most one of background_color, background_prompt")
 
-	media_type, content = _decode_data_uri(image_data_uri)
-
 	mode = PHOTOROOM_SHADOW_MODES.get(shadow, shadow)
-	headers = {"x-api-key": api_key}
+	headers = {}
 	data = {"removeBackground": "true"}
 	if background_color:
 		data["background.color"] = background_color.lstrip("#")
@@ -505,22 +576,49 @@ def _photoroom_edit(
 	for side, value in (padding_sides or {}).items():
 		data[f"padding{side.capitalize()}"] = str(value)
 
-	resp = requests.post(
-		PHOTOROOM_EDIT_URL,
-		headers=headers,
-		data=data,
-		files={"imageFile": ("photo", content, media_type)},
-		timeout=PHOTOROOM_TIMEOUT,
-	)
-	if resp.status_code != 200:
-		raise RuntimeError(f"Background removal failed ({resp.status_code}): {resp.text[:500]}")
+	return _photoroom_post(api_key, image_data_uri, data, headers)
 
-	import base64
 
-	return {
-		"b64": base64.b64encode(resp.content).decode("ascii"),
-		"media_type": resp.headers.get("Content-Type", "image/png").split(";")[0].strip(),
+def _photoroom_virtual_model(
+	api_key,
+	image_data_uri,
+	model_preset=None,
+	scene_preset=None,
+	pose=None,
+	prompt=None,
+	size=None,
+):
+	"""Put a product photo on a virtual model, via Photoroom's `virtualModel.*`
+	fields on the same v2/edit endpoint.
+
+	Photoroom's own docs describe this as built for CLOTHING ("meant to be
+	used with images that feature clothing items") — nothing in their
+	documentation confirms it does a convincing job of, say, a bracelet on a
+	wrist or a ring on a hand. Worth checking against a real piece from the
+	catalog before trusting this for a jewelry/watch site.
+
+	`removeBackground=false` and `referenceBox=originalImage`: without these
+	Photoroom mats the product out first and generates a scene around a bare
+	cutout, discarding the framing the product was actually shot in — flags
+	from the same "auto" quickstart Photoroom's own docs show for this mode.
+	"""
+	data = {
+		"virtualModel.mode": "ai.auto",
+		"removeBackground": "false",
+		"referenceBox": "originalImage",
 	}
+	if model_preset:
+		data["virtualModel.model.preset.name"] = model_preset
+	if scene_preset:
+		data["virtualModel.scene.preset.name"] = scene_preset
+	if pose:
+		data["virtualModel.pose"] = pose
+	if prompt:
+		data["virtualModel.prompt"] = prompt
+	if size:
+		data["virtualModel.size"] = size
+
+	return _photoroom_post(api_key, image_data_uri, data)
 
 
 def get_ai_client():
