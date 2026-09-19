@@ -68,7 +68,7 @@ export function BuyBoxPanel({
       {healthy.length ? (
         <details className="group rounded-sm border border-line bg-surface">
           <summary className="flex cursor-pointer list-none items-center gap-2 px-3.5 py-2.5 text-[12px] text-muted transition-colors hover:text-primary-600">
-            <span aria-hidden className="text-[10px] transition-transform group-open:rotate-90">
+            <span aria-hidden className="text-meta transition-transform group-open:rotate-90">
               ▶
             </span>
             {healthy.length} SKU{healthy.length === 1 ? "" : "s"} winning the Buy Box

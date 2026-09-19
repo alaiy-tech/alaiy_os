@@ -56,7 +56,7 @@ export function OrderPanel({
             <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-primary-500">
               Order
             </p>
-            <h2 className="truncate font-data text-[17px] font-semibold text-primary-600">
+            <h2 className="truncate font-data text-display-xs font-semibold text-primary-600">
               {title}
             </h2>
           </div>
