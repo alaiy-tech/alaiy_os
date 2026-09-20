@@ -73,7 +73,7 @@ export function AskPanel({
           <div className="min-w-0">
             {/* The display face, small: this is a name, not a label. */}
             <h2 className="text-display-xs text-primary-600">Ask Alaiy</h2>
-            <p className="truncate text-[10.5px] leading-tight text-muted">
+            <p className="truncate text-meta leading-tight text-muted">
               Answers from your own data
             </p>
           </div>
@@ -188,7 +188,7 @@ export function AskPanel({
         >
           <span
             aria-hidden
-            className="grid h-5 w-5 shrink-0 place-items-center rounded-xs bg-highlight-300 font-sans text-[10px] font-bold text-primary-600"
+            className="grid h-5 w-5 shrink-0 place-items-center rounded-xs bg-highlight-300 font-sans text-meta font-bold text-primary-600"
           >
             A
           </span>

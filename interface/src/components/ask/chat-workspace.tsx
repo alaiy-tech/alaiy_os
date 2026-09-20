@@ -34,12 +34,17 @@ export function ChatWorkspace({
   greeting,
   suggestions,
   importing,
+  belowHero,
 }: {
   sessions: ChatSessionSummary[];
   initialActive: string | null;
   greeting: string[];
   suggestions: string[];
   importing: boolean;
+  /** Server-rendered content shown under the composer on the first screen
+   *  only — the KPI tiles, the alert bar, the trend chart. Never shown once
+   *  a conversation has started, where the transcript is the screen. */
+  belowHero?: React.ReactNode;
 }) {
   const [rows, setRows] = useState(sessions);
   // Which chat the conversation is on. Null means an unstarted one.
@@ -70,6 +75,7 @@ export function ChatWorkspace({
           greeting={greeting}
           suggestions={suggestions}
           importing={importing}
+          belowHero={belowHero}
           variant="hero"
           onSessionStarted={(id, title) => {
             setRows((current) => [
