@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { formatDate } from "@/lib/format";
+import { useEffect, useState } from "react";
+import { formatDate, formatRelativeDate } from "@/lib/format";
 import type { ChatSessionSummary } from "@/lib/backend/types";
 import { Eyebrow, pressClass } from "@/components/ui";
 
@@ -36,6 +36,12 @@ export function SessionRail({
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
+  // Null until mounted, so the server render and the first client render
+  // agree on the plain "YYYY-MM-DD" date — only after that do the rows
+  // upgrade to "Today"/"Yesterday"/a weekday, read off the viewer's own
+  // clock rather than guessed at during the server pass.
+  const [today, setToday] = useState<Date | null>(null);
+  useEffect(() => setToday(new Date()), []);
 
   async function remove(id: string) {
     setBusy(id);
@@ -94,7 +100,7 @@ export function SessionRail({
                     type="button"
                     onClick={() => router.push(`/home?chat=${encodeURIComponent(row.name)}`)}
                     aria-current={current ? "true" : undefined}
-                    className={`w-full rounded-sm border px-2.5 py-2 pr-8 text-left transition-colors ${
+                    className={`w-full rounded-md border px-2.5 py-2 pr-8 text-left transition-colors ${
                       current
                         ? "border-primary-600 bg-white"
                         : "border-transparent hover:border-line hover:bg-white"
@@ -110,12 +116,18 @@ export function SessionRail({
                     >
                       {row.title?.trim() || "Untitled chat"}
                     </span>
-                    {/* Date only, never a "2h ago": the backend sends a naive
-                        timestamp in the site's timezone, so anything computed
-                        against the browser clock would be a guess. */}
+                    {/* Never "2h ago" — the backend sends a naive timestamp in
+                        the site's timezone, and anything computed to the hour
+                        against the browser clock would be a real guess. A
+                        day-level label ("Yesterday", "Mon") is coarse enough
+                        to read off the viewer's own calendar day safely; the
+                        exact date stays in the tooltip. */}
                     {when ? (
-                      <span className="mt-0.5 block font-data text-[10.5px] text-muted-soft">
-                        {formatDate(when)}
+                      <span
+                        className="mt-0.5 block font-data text-meta text-muted-soft"
+                        title={formatDate(when)}
+                      >
+                        {today ? formatRelativeDate(when, today) : formatDate(when)}
                       </span>
                     ) : null}
                   </button>

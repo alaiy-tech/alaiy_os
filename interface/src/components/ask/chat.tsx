@@ -53,6 +53,7 @@ export function Chat({
   suggestions,
   importing = false,
   variant,
+  belowHero,
   onSessionStarted,
 }: {
   /** The chat to open, or null to start one on the first question. */
@@ -63,6 +64,8 @@ export function Chat({
   /** The first import is still running, so answers would be on partial data. */
   importing?: boolean;
   variant: "hero" | "panel";
+  /** Server-rendered content under the composer, first screen only. */
+  belowHero?: React.ReactNode;
   /** Told the id when a question creates a session, so a rail can add it. */
   onSessionStarted?: (id: string, title: string) => void;
 }) {
@@ -250,7 +253,7 @@ export function Chat({
         <div
           className={
             centred
-              ? "mx-auto flex min-h-full w-full max-w-xl flex-col justify-center gap-7 px-5 py-10 sm:px-6"
+              ? "mx-auto w-full max-w-4xl px-6 py-12 sm:px-10"
               : hero
                 ? "mx-auto w-full max-w-2xl space-y-5 px-5 py-7 sm:px-6"
                 : "space-y-4 px-4 py-4"
@@ -259,11 +262,15 @@ export function Chat({
           {centred ? (
             <>
               <Masthead greeting={greeting} />
-              <div className="space-y-3">
+              <div
+                className="animate-rise space-y-4"
+                style={{ animationDelay: "80ms", animationFillMode: "backwards" }}
+              >
                 {composer}
                 {prompts}
               </div>
               {error ? <Alert>{error}</Alert> : null}
+              {belowHero ? <div className="pt-8">{belowHero}</div> : null}
             </>
           ) : (
             <>
@@ -272,7 +279,7 @@ export function Chat({
                 <Turn key={message.seq} message={message} hero={hero} />
               ))}
               {pending ? (
-                <Bubble role="user" hero={hero}>
+                <Bubble role="user">
                   {pending.text}
                 </Bubble>
               ) : null}
@@ -315,37 +322,45 @@ export function Mark({ size = 7 }: { size?: 7 | 12 }) {
   return (
     <span
       aria-hidden
-      className={`grid shrink-0 place-items-center rounded-sm bg-primary-600 font-sans font-bold text-white ${box}`}
+      className={`grid shrink-0 place-items-center rounded-md bg-primary-600 font-sans font-bold text-white ${box}`}
     >
       A
     </span>
   );
 }
 
-/** The mark, the name and Alaiy's opening read — the first screen's header. */
+/**
+ * The first screen's header: a plain prompt as the headline, and Alaiy's
+ * actual read of the seller's own figures as the line underneath it.
+ *
+ * The headline used to be the greeting itself — real and specific, but also
+ * the longest line on the screen, which fought the "big bold question" shape
+ * this screen is built around. Keeping both: the question a visitor expects,
+ * and directly under it, the one thing that isn't filler copy anywhere else
+ * on this page.
+ */
 function Masthead({ greeting }: { greeting: string[] }) {
   return (
-    <div className="flex flex-col items-center gap-4 text-center">
-      <Mark size={12} />
-      <div className="space-y-3">
-        <h1 className="text-display-lg">Ask Alaiy</h1>
-        <div className="space-y-1.5">
-          {greeting.map((line, index) => (
-            // The opening line is the display face — it is Alaiy speaking, and
-            // the one sentence on this screen that is read rather than scanned.
-            // Everything after it is body copy.
-            <p
-              key={index}
-              className={
-                index === 0
-                  ? "font-display text-quote text-ink"
-                  : "text-[13.5px] leading-relaxed text-muted"
-              }
-            >
-              {line}
-            </p>
-          ))}
-        </div>
+    <div className="animate-rise space-y-3">
+      <h1 className="max-w-3xl text-display-lg text-ink">
+        What can I help you with today?
+      </h1>
+      <div className="max-w-2xl space-y-1.5">
+        {greeting.map((line, index) => (
+          // The opening line is the display face, italic — it is Alaiy
+          // speaking, and the one sentence on this screen that is read
+          // rather than scanned. Everything after it is body copy.
+          <p
+            key={index}
+            className={
+              index === 0
+                ? "font-display text-quote italic text-ink"
+                : "text-body leading-relaxed text-muted"
+            }
+          >
+            {line}
+          </p>
+        ))}
       </div>
     </div>
   );
@@ -355,11 +370,11 @@ function Masthead({ greeting }: { greeting: string[] }) {
 function Opening({ greeting }: { greeting: string[] }) {
   return (
     <Row>
-      <div className="space-y-1.5 rounded-sm border border-highlight-400 bg-highlight-100 px-3.5 py-3">
+      <div className="space-y-1.5 rounded-lg border border-highlight-400 bg-highlight-100 px-3.5 py-3">
         {greeting.map((line, index) => (
           <p
             key={index}
-            className={`text-[13px] leading-relaxed ${
+            className={`text-body leading-relaxed ${
               index === 0 ? "font-medium text-ink" : "text-muted"
             }`}
           >
@@ -393,7 +408,7 @@ function Row({ children }: { children: React.ReactNode }) {
 function Turn({ message, hero }: { message: ChatMessage; hero: boolean }) {
   if (message.role === "user") {
     return (
-      <Bubble role="user" hero={hero}>
+      <Bubble role="user">
         {message.text}
       </Bubble>
     );
@@ -405,7 +420,7 @@ function Turn({ message, hero }: { message: ChatMessage; hero: boolean }) {
         <ToolTrace calls={message.tool_calls} errored={message.tool_errors} />
       ) : null}
       {message.text.trim() ? (
-        <Bubble role="assistant" hero={hero}>
+        <Bubble role="assistant">
           <Markdown text={message.text} />
           {message.partial ? <Caret /> : null}
         </Bubble>
@@ -416,14 +431,12 @@ function Turn({ message, hero }: { message: ChatMessage; hero: boolean }) {
 
 function Bubble({
   role,
-  hero,
   children,
 }: {
   role: "user" | "assistant";
-  hero: boolean;
   children: React.ReactNode;
 }) {
-  const size = hero ? "text-[14px]" : "text-[13px]";
+  const size = "text-body";
 
   if (role === "user") {
     // The seller's own words are the one navy panel on this screen — used
@@ -432,7 +445,7 @@ function Bubble({
     return (
       <div className="flex animate-rise justify-end">
         <div
-          className={`max-w-[85%] whitespace-pre-wrap break-words rounded-sm bg-primary-600 px-4 py-2.5 leading-relaxed text-white ${size}`}
+          className={`max-w-[85%] whitespace-pre-wrap break-words rounded-lg bg-primary-600 px-4 py-2.5 leading-relaxed text-white ${size}`}
         >
           {children}
         </div>
@@ -443,7 +456,7 @@ function Bubble({
   // Alaiy's answer is a card on paper: white, one line, no blur.
   return (
     <div
-      className={`break-words rounded-sm border border-line bg-white px-4 py-3 leading-relaxed text-ink ${size}`}
+      className={`break-words rounded-lg border border-line bg-white px-4 py-3 leading-relaxed text-ink ${size}`}
     >
       {children}
     </div>
@@ -474,10 +487,10 @@ function ToolTrace({
         return (
           <li
             key={call.id ?? n}
-            className={`inline-flex items-center gap-1.5 rounded-xs border px-2.5 py-1 text-[11px] font-medium ${
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium ${
               broke
                 ? "border-alert/40 bg-alert-soft text-alert-ink"
-                : "border-line bg-surface text-muted"
+                : "border-line bg-white text-muted"
             }`}
             title={call.input ? JSON.stringify(call.input) : undefined}
           >
@@ -508,13 +521,15 @@ const LABELS: Record<string, string> = {
   seller_aggregate: "Totalled your order lines",
   seller_orders: "Looked at your orders",
   seller_inventory: "Checked your inventory",
+  seller_channels: "Read your channels",
+  seller_compare: "Compared with the period before",
 };
 
 /** Mid-thought, in the gutter the answer will arrive in. */
 function Thinking() {
   return (
     <Row>
-      <div className="inline-flex items-center gap-2.5 rounded-sm border border-line bg-white px-3.5 py-2.5">
+      <div className="inline-flex items-center gap-2.5 rounded-lg border border-line bg-white px-3.5 py-2.5">
         <span aria-hidden className="flex items-center gap-1">
           {[0, 1, 2].map((n) => (
             <span
@@ -561,53 +576,63 @@ function Chips({
 }) {
   const shown = items.slice(0, 4);
 
-  // A suggestion is a thing to press, so on the first screen — where they are
-  // half the point of it — the cards borrow the press's own geometry: they lift
-  // towards the reader and their shadow turns accent blue. Not the full button
-  // shape, because a question is a sentence and sentences are not set in
-  // letterspaced small caps.
+  // On the first screen a suggestion is a small leading icon plus the
+  // question in a row, lifting gently towards the reader on hover with a
+  // soft shadow — this system's own resting-flat, hover-lifts language,
+  // never the old hard press-shadow. Pills under a transcript and the
+  // docked stack keep their own quieter shapes.
   const styles = {
     cards:
-      "group flex items-center justify-between gap-3 rounded-sm border border-line bg-white px-3.5 py-2.5 text-left text-[13px] text-primary-600 transition-[transform,box-shadow] duration-100 hover:-translate-x-0.5 hover:-translate-y-0.5 hover:border-primary-600 hover:shadow-press-lift active:translate-x-1 active:translate-y-1 active:shadow-none",
+      "group inline-flex items-center gap-2 rounded-lg border border-line bg-white px-4 py-2 text-left text-[13px] text-ink transition-[transform,box-shadow] duration-100 hover:-translate-y-0.5 hover:border-primary-300 hover:shadow-sm",
     pills:
-      "inline-flex items-center gap-1.5 rounded-xs border border-line bg-white px-3 py-1.5 text-left text-[12.5px] text-primary-600 transition-colors hover:border-primary-600 hover:bg-highlight-100",
+      "inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-1.5 text-left text-[12.5px] text-primary-600 transition-colors hover:border-primary-600 hover:bg-highlight-100",
     stack:
-      "group flex w-full items-center justify-between gap-2 rounded-xs border border-line bg-white px-3 py-2 text-left text-[12.5px] text-primary-600 transition-colors hover:border-primary-600 hover:bg-highlight-100",
+      "group flex w-full items-center justify-between gap-2 rounded-md border border-line bg-white px-3 py-2 text-left text-[12.5px] text-primary-600 transition-colors hover:border-primary-600 hover:bg-highlight-100",
   };
 
   return (
     <div className="space-y-2">
       {label ? (
-        <p className="text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-primary-500">
           {label}
         </p>
       ) : null}
       <div
         className={
           layout === "cards"
-            ? "grid gap-2 sm:grid-cols-2"
+            ? "flex flex-wrap gap-2.5"
             : layout === "pills"
               ? "flex flex-wrap gap-2"
               : "space-y-1.5"
         }
       >
-        {shown.map((item) => (
-          <button key={item} type="button" onClick={() => onPick(item)} className={styles[layout]}>
-            <span className={layout === "pills" ? "" : "min-w-0"}>{item}</span>
-            {layout === "pills" ? null : (
+        {shown.map((item, index) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => onPick(item)}
+            className={`${styles[layout]}${layout === "cards" ? " animate-rise" : ""}`}
+            style={
+              layout === "cards"
+                ? { animationDelay: `${140 + index * 60}ms`, animationFillMode: "backwards" }
+                : undefined
+            }
+          >
+            {layout === "cards" ? (
               <svg
                 viewBox="0 0 20 20"
                 aria-hidden
-                className="h-3.5 w-3.5 shrink-0 text-highlight-600 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:opacity-100"
+                className="h-3.5 w-3.5 shrink-0 text-highlight-600"
                 fill="none"
                 stroke="currentColor"
                 strokeWidth="1.75"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               >
-                <path d="M4 10h11M11 6l4 4-4 4" />
+                <path d="M4 6h12M4 10h8M4 14h5" />
               </svg>
-            )}
+            ) : null}
+            <span className="min-w-0">{item}</span>
           </button>
         ))}
       </div>
@@ -655,11 +680,12 @@ function Composer({
         }}
         // The pill carries the focus state, because the field inside it opts
         // out of the app's ring — see `.field-in-a-box` in globals.css.
-        // On the first screen the box wears the press's own block shadow —
-        // it is the one thing to do on that screen, and the shadow is what says
-        // so. Docked under a transcript it is furniture, so it is just a card.
-        className={`flex items-end gap-2 rounded-sm border-2 bg-white p-2 transition-[border-color,box-shadow] duration-100 focus-within:border-highlight-600 ${
-          lifted ? "border-primary-600 shadow-press" : "border-line"
+        // On the first screen the box wears this system's own soft shadow —
+        // it is the one thing to do on that screen, and the shadow is what
+        // says so. Docked under a transcript it is furniture, so it is just
+        // a card.
+        className={`flex items-end gap-2 rounded-lg border bg-white p-2 transition-[border-color,box-shadow] duration-100 focus-within:border-highlight-600 ${
+          lifted ? "border-primary-300 shadow-md" : "border-line"
         }`}
       >
         <textarea
@@ -686,11 +712,11 @@ function Composer({
               : busy
                 ? "Alaiy is answering…"
                 : hero
-                  ? "Ask Alaiy anything about your data…"
+                  ? "Ask Alaiy"
                   : "Ask about your data…"
           }
           className={`field-in-a-box max-h-40 flex-1 resize-none bg-transparent px-2 py-2 text-ink placeholder:text-muted-soft disabled:cursor-not-allowed ${
-            hero ? "min-h-11 text-[15px]" : "min-h-10 text-sm"
+            hero ? "min-h-12 text-lead" : "min-h-10 text-sm"
           }`}
         />
         <button
@@ -699,7 +725,7 @@ function Composer({
           aria-label="Send"
           // The accent plate with navy on it — the system's one bright
           // control, and this is the action the whole screen is for.
-          className={`grid shrink-0 place-items-center rounded-sm bg-highlight-300 text-primary-600 transition-colors hover:bg-highlight-400 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-soft ${
+          className={`grid shrink-0 place-items-center rounded-full bg-highlight-300 text-primary-600 transition-colors hover:bg-highlight-400 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-soft ${
             hero ? "h-11 w-11" : "h-10 w-10"
           }`}
         >
