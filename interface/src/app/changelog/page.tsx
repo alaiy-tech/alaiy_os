@@ -39,7 +39,7 @@ export default async function ChangelogPage() {
           {latest && <Pill tone="accent">Latest {latest.version}</Pill>}
         </div>
 
-        {summary && <p className="mt-4 max-w-2xl text-[15px] text-muted">{summary}</p>}
+        {summary && <p className="mt-4 max-w-2xl text-lead text-muted">{summary}</p>}
 
         {notes.length > 0 && (
           // Native disclosure, so the page needs no client component to hold a
@@ -80,7 +80,7 @@ function ReleaseSection({ release }: { release: Release }) {
         <p className="mt-1 text-[13px] text-muted">{formatReleaseDate(release.date)}</p>
       </div>
 
-      <div className="min-w-0 space-y-5 text-[14px] leading-relaxed text-muted">
+      <div className="min-w-0 space-y-5 text-body leading-relaxed text-muted">
         {release.blocks.map((block, n) => (
           <BlockBody key={n} block={block} />
         ))}
