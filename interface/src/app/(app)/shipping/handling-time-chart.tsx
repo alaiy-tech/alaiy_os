@@ -90,7 +90,7 @@ export function HandlingTimeChart({ points }: { points: HandlingTimePoint[] }) {
                 y={y(tick)}
                 textAnchor="end"
                 dominantBaseline="middle"
-                className="fill-muted-soft text-[9px]"
+                className="fill-muted-soft text-micro"
               >
                 {tick}h
               </text>
@@ -140,14 +140,14 @@ export function HandlingTimeChart({ points }: { points: HandlingTimePoint[] }) {
             />
           ) : null}
 
-          <text x={PAD.left} y={VIEW_HEIGHT - 8} className="fill-muted-soft text-[9px]">
+          <text x={PAD.left} y={VIEW_HEIGHT - 8} className="fill-muted-soft text-micro">
             {formatDate(points[0]?.date)}
           </text>
           <text
             x={VIEW_WIDTH - PAD.right}
             y={VIEW_HEIGHT - 8}
             textAnchor="end"
-            className="fill-muted-soft text-[9px]"
+            className="fill-muted-soft text-micro"
           >
             {formatDate(last?.date)}
           </text>

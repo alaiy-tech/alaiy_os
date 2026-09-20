@@ -283,7 +283,7 @@ function EstimatedMark({
 
   return (
     <span
-      className="ml-1 text-[10px] font-semibold uppercase tracking-[0.06em] text-warn-ink"
+      className="ml-1 text-meta font-semibold uppercase tracking-[0.06em] text-warn-ink"
       title={`Amazon's quote for what it would charge, not what it has taken — it settles two to four weeks after a sale.${coverage}`}
     >
       est.
