@@ -157,14 +157,14 @@ export function ImportStatus({ initialJob }: { initialJob: ImportJob | null }) {
           ) : failed ? (
             <span
               aria-hidden
-              className="grid h-4 w-4 place-items-center rounded-full bg-alert text-[10px] font-bold text-white"
+              className="grid h-4 w-4 place-items-center rounded-full bg-alert text-meta font-bold text-white"
             >
               !
             </span>
           ) : (
             <span
               aria-hidden
-              className="grid h-4 w-4 place-items-center rounded-full bg-ok text-[9px] font-bold text-white"
+              className="grid h-4 w-4 place-items-center rounded-full bg-ok text-micro font-bold text-white"
             >
               ✓
             </span>

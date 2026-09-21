@@ -143,19 +143,20 @@ function NavRow({
   active: boolean;
   collapsed: boolean;
 }) {
-  // The left border is on every row, transparent when inactive, so the icons
-  // stay on one edge whether or not a row is the current one. Collapsed, the
-  // row is the icon: the rule would be a second mark competing with the tint
-  // in a space too narrow for both, so the tint carries it alone.
+  // No left-edge rule: the active row's soft background tint plus its bold,
+  // accent-coloured label already carry the signal on their own — a border
+  // rule on top of that would be a second, redundant way of saying the same
+  // thing, and this system's depth/emphasis language is fill and shadow, not
+  // a hairline down one edge.
   const shared = collapsed
     ? "flex items-center justify-center rounded-sm py-2 transition-colors"
-    : "flex items-center gap-2.5 rounded-sm border-l-2 py-2 pl-2.5 pr-3 text-[13px] transition-colors";
+    : "flex items-center gap-2.5 rounded-sm py-2 pl-3 pr-3 text-[13px] transition-colors";
 
   if (!item.href) {
     return (
       <span
         aria-disabled
-        className={`${shared} cursor-default text-white/35 ${collapsed ? "" : "border-transparent"}`}
+        className={`${shared} cursor-default text-white/35`}
         // The only thing naming an unbuilt tab once the chip is gone.
         title={`${item.label} is not built yet`}
       >
@@ -165,7 +166,7 @@ function NavRow({
         ) : (
           <>
             <span className="flex-1">{item.label}</span>
-            <span className="rounded-xs bg-white/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.12em] text-white/45">
+            <span className="rounded-xs bg-white/10 px-1.5 py-0.5 text-meta font-medium uppercase tracking-[0.12em] text-white/45">
               Soon
             </span>
           </>
@@ -174,9 +175,10 @@ function NavRow({
     );
   }
 
-  // The active row is the accent blue, and carries a hard blue rule down its
-  // left edge: on a navy rail, "slightly less dark" is a weak signal, and the
-  // rule is the same unblurred block of colour the buttons press against.
+  // The active row is a solid mint plate with navy text — the one "you are
+  // here" marker in the system, confirmed against the mockup's own
+  // rendered output (a solid `#D5F3F3` fill, not a tint, with ink-coloured
+  // text on top of it). Nothing else in the product uses this colour.
   return (
     <Link
       href={item.href}
@@ -187,8 +189,8 @@ function NavRow({
       title={collapsed ? item.label : undefined}
       className={`${shared} ${
         active
-          ? `bg-highlight-300/15 font-semibold text-highlight-300 ${collapsed ? "" : "border-highlight-300"}`
-          : `text-white/70 hover:bg-white/10 hover:text-white ${collapsed ? "" : "border-transparent"}`
+          ? "bg-active font-semibold text-primary-600"
+          : "text-white/70 hover:bg-white/10 hover:text-white"
       }`}
     >
       <Icon name={item.icon} />
@@ -315,7 +317,7 @@ export function Sidebar({ email, tier }: { email?: string; tier?: string }) {
           className={`flex items-center gap-2 ${collapsed ? "justify-center" : "justify-between"}`}
         >
           {tier && !collapsed ? (
-            <span className="rounded-xs bg-highlight-300/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-highlight-300">
+            <span className="rounded-xs bg-highlight-300/20 px-2 py-0.5 text-meta font-semibold uppercase tracking-[0.12em] text-highlight-300">
               {tier}
             </span>
           ) : null}
@@ -371,7 +373,10 @@ export function MobileNav() {
   return (
     <nav
       aria-label="Main"
-      className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 md:hidden"
+      // The mask fades both edges so a scrollable strip this narrow always
+      // shows a sliver of the next tab — a mobile visitor (Casey) never has
+      // to guess there's more without an arrow or a scrollbar to notice.
+      className="flex gap-1 overflow-x-auto border-b border-line px-3 py-2 [mask-image:linear-gradient(to_right,transparent,black_16px,black_calc(100%-16px),transparent)] md:hidden"
     >
       {built.map((item) => {
         const active = pathname === item.href;
