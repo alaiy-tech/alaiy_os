@@ -120,6 +120,14 @@ PHOTOROOM_EDIT_URL = "https://image-api.photoroom.com/v2/edit"
 PHOTOROOM_SHADOW_MODEL_VERSION = "2026-04-15"
 PHOTOROOM_TIMEOUT = 60
 PHOTOROOM_SHADOW_MODES = {"soft": "ai.soft", "hard": "ai.hard", "none": "none"}
+# shadow.softnessOverride is a 0..1 DIAL, not a switch — "0 means a very hard
+# shadow, 1 means a very soft shadow" (docs.photoroom.com/image-editing-api-
+# plus-plan/ai-shadows). Sending the literal extreme (1.0) for "soft" is what
+# produced a shadow confirmed live as "extremely big": maximum softness
+# means maximum spread/blur, not just a softer edge. This sits well short of
+# that extreme — soft enough to read as ai.soft rather than ai.hard, nowhere
+# near soft enough to balloon into a diffuse blob.
+PHOTOROOM_SOFT_SOFTNESS_OVERRIDE = 0.35
 
 # editWithAI.prompt is a required field on Photoroom's side — there is no
 # "just use your own default" mode the way virtualModel has. This is
@@ -631,7 +639,7 @@ def _photoroom_edit(
 		data["background.prompt"] = background_prompt
 	if shadow_intensity is not None and mode.startswith("ai."):
 		data["shadow.mode"] = "ai.auto-with-overrides"
-		data["shadow.softnessOverride"] = "0" if shadow == "hard" else "1"
+		data["shadow.softnessOverride"] = "0" if shadow == "hard" else str(PHOTOROOM_SOFT_SOFTNESS_OVERRIDE)
 		data["shadow.intensityOverride"] = str(shadow_intensity)
 		# Without these two, Photoroom guesses the shadow's angle and length
 		# itself — which is exactly what read as "improper" on a real photo:
