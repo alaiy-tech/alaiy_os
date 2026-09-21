@@ -1,9 +1,10 @@
 # How AI calls work
 
 Every AI call goes through `alaiy_os.engine.llm` — `complete()` for text, plus
-`generate_image()` and `translate_image()` for imagery. None of them talk to a
-provider themselves: each asks Frappe's `ai_client` hook for a client and hands
-the request to it. Whichever app registered that hook last wins.
+`generate_image()`, `translate_image()` and `white_background()` for imagery.
+None of them talk to a provider themselves: each asks Frappe's `ai_client`
+hook for a client and hands the request to it. Whichever app registered that
+hook last wins.
 
 No app outside this seam should hold a provider credential or make a provider
 HTTP call. That is the whole point of it.
@@ -34,10 +35,11 @@ For image generation, add your own OpenRouter key:
 image API is OpenRouter's own endpoint, so a site pointing `ai_base_url`
 elsewhere still needs this to reach it.
 
-Image *translation* is not available on BYOK — it is a single specialised vendor
-rather than a model API, and core carries no integration for it. `image_support()`
-reports `{"generate": ..., "translate": False}` and the method raises
-`Unsupported`.
+Image *translation* and *white-backgrounding* are not available on BYOK —
+they are a single specialised vendor rather than a model API, and core
+carries no integration for it. `image_support()` reports
+`{"generate": ..., "translate": False, "white_bg": False}` and
+`translate_image` / `white_background` both raise `Unsupported`.
 
 ## With the ai_client app (managed)
 
@@ -49,14 +51,16 @@ tracks per-site spend, enforces budgets, and shows a "top up" message when
 credits run out.
 
 Image calls take a different route to the same balance: the managed client posts
-to the billing service's `/image/generate` and `/image/translate`, which hold the
-provider keys and charge each call against the same per-site budget.
+to the billing service's `/image/generate`, `/image/translate` and
+`/image/white-background`, which hold the provider keys and charge each call
+against the same per-site budget.
 
-They go there rather than through the gateway because of translation — that
-vendor is not an LLM (no model id, its own auth and response contract), so no
-gateway can front it whatever the model catalogue carries. Billing has to serve
-it either way, and generation sits beside it so both share one credential holder
-and one metering path.
+They go there rather than through the gateway because of translation and
+white-backgrounding — that vendor is not an LLM (no model id, its own auth and
+response contract), so no gateway can front either of its endpoints whatever
+the model catalogue carries. Billing has to serve them either way, and
+generation sits beside them so all three share one credential holder and one
+metering path.
 
 Callers never see the difference, and are not affected if it changes: routing
 lives entirely behind the seam.
@@ -79,7 +83,9 @@ generate_image(prompt, reference_data_uri=None) -> {
 
 translate_image(image_url) -> {"translated_url": str}
 
-image_support() -> {"generate": bool, "translate": bool}
+white_background(image_url) -> {"white_bg_url": str}
+
+image_support() -> {"generate": bool, "translate": bool, "white_bg": bool}
 ```
 
 A client that cannot serve a capability raises `Unsupported` (exported from
@@ -103,5 +109,5 @@ with ThreadPoolExecutor(...) as pool:
     pool.map(lambda s: client.generate_image(s), shots)
 ```
 
-`llm.generate_image()` / `llm.translate_image()` are the convenience path for a
-single call on the current thread.
+`llm.generate_image()` / `llm.translate_image()` / `llm.white_background()` are
+the convenience path for a single call on the current thread.
