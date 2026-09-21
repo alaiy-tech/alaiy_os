@@ -107,6 +107,18 @@ def translate_image(image_url):
 	return _client().translate_image(image_url)
 
 
+def white_background(image_url):
+	"""One photo, put on a plain white background -> {"white_bg_url"}.
+
+	Same shape as `translate_image` and the same reason to keep it separate:
+	this is the same provider's other endpoint, not a general compositing
+	tool. The URL returned belongs to the provider and may expire; re-hosting
+	it is the caller's job. `image_url` must be publicly reachable — the
+	provider fetches it itself rather than receiving bytes.
+	"""
+	return _client().white_background(image_url)
+
+
 def transcribe_support():
 	"""Whether this site can transcribe voice input at all.
 

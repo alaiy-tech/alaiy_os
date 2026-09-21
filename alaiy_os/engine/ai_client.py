@@ -30,12 +30,14 @@ capability without making a call. Never widen `complete` with a streaming
 argument instead: an override that does not accept it would raise TypeError on
 every turn.
 
-plus two image capabilities, for tools that produce imagery rather than text:
+plus three image capabilities, for tools that produce imagery rather than text:
 
     generate_image(prompt, reference_data_uri=None)
         -> {"b64": str, "media_type": str, "usage": dict}
 
     translate_image(image_url) -> {"translated_url": str}
+
+    white_background(image_url) -> {"white_bg_url": str}
 
 one that reads the public web:
 
@@ -137,10 +139,11 @@ class ByokClient:
 
 	def image_support(self):
 		"""What this client can do, without making a call."""
-		# Translation is a single specialised vendor with its own JWT auth and
-		# response contract — not a model API, and not something core carries an
-		# integration for. The managed client serves it via the billing service.
-		return {"generate": bool(self._image_key), "translate": False}
+		# Translation and white-background both go through the same single
+		# specialised vendor, with its own auth and response contract, not a
+		# model API, and not something core carries an integration for. The
+		# managed client serves both via the billing service.
+		return {"generate": bool(self._image_key), "translate": False, "white_bg": False}
 
 	def web_search_support(self):
 		"""Whether this site can reach the public web, without making a call.
@@ -319,8 +322,19 @@ class ByokClient:
 	def translate_image(self, image_url):
 		"""Not available on BYOK — see image_support()."""
 		raise Unsupported(
-			"This site cannot translate images. Install alaiy_os_ai_client, which "
-			"serves image translation through the managed billing service."
+			"This site cannot translate images: the provider's own JWT-signed "
+			"credentials aren't a key this app takes directly, unlike "
+			"generate_image's OpenRouter key. Install alaiy_os_ai_client, which "
+			"reaches it through the managed billing service instead."
+		)
+
+	def white_background(self, image_url):
+		"""Not available on BYOK — see image_support()."""
+		raise Unsupported(
+			"This site cannot put images on a white background, for the same "
+			"reason as translate_image: the provider's own JWT-signed credentials "
+			"aren't a key this app takes directly. Install alaiy_os_ai_client, "
+			"which reaches it through the managed billing service instead."
 		)
 
 	def transcribe_support(self):
