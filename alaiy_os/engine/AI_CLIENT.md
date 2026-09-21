@@ -36,8 +36,27 @@ elsewhere still needs this to reach it.
 
 Image *translation* is not available on BYOK — it is a single specialised vendor
 rather than a model API, and core carries no integration for it. `image_support()`
-reports `{"generate": ..., "translate": False}` and the method raises
-`Unsupported`.
+reports `{"generate": ..., "translate": False, "remove_background": ..., "virtual_model": ...}`
+and `translate_image` raises `Unsupported`.
+
+For background removal / the house finish, add a Photoroom key:
+
+```json
+"photoroom_api_key": "..."
+```
+
+`remove_background()` mats the photo with Photoroom's Image Editing API
+(v2/edit) and gives it either a flat colour background (the house finish) or a
+generated one from a text prompt (a lifestyle scene) — either way the
+product's own pixels are kept, only the background changes.
+
+The same key also serves `virtual_model()`, which puts the product on a
+generated person via Photoroom's `virtualModel.*` fields on the same endpoint.
+Unlike every other image capability here, it does NOT promise the product's
+pixels survive untouched — showing something worn means generating the scene
+around it — so a caller must treat the result as a styled render, not the
+authoritative product photo. Photoroom's own docs describe this feature as
+built for clothing; it is unverified for jewelry/accessories.
 
 ## With the ai_client app (managed)
 
@@ -49,8 +68,9 @@ tracks per-site spend, enforces budgets, and shows a "top up" message when
 credits run out.
 
 Image calls take a different route to the same balance: the managed client posts
-to the billing service's `/image/generate` and `/image/translate`, which hold the
-provider keys and charge each call against the same per-site budget.
+to the billing service's `/image/generate`, `/image/translate`,
+`/image/remove-background` and `/image/virtual-model`, which hold the provider
+keys and charge each call against the same per-site budget.
 
 They go there rather than through the gateway because of translation — that
 vendor is not an LLM (no model id, its own auth and response contract), so no
@@ -79,7 +99,19 @@ generate_image(prompt, reference_data_uri=None) -> {
 
 translate_image(image_url) -> {"translated_url": str}
 
-image_support() -> {"generate": bool, "translate": bool}
+remove_background(image_data_uri, background_color=None, background_prompt=None,
+                   shadow="soft", shadow_intensity=None, output_size=None, padding=None) -> {
+    "b64": str, "media_type": str,
+}
+
+virtual_model(image_data_uri, model_preset=None, scene_preset=None,
+              pose=None, prompt=None, size=None) -> {
+    "b64": str, "media_type": str,
+}
+
+image_support() -> {
+    "generate": bool, "translate": bool, "remove_background": bool, "virtual_model": bool,
+}
 ```
 
 A client that cannot serve a capability raises `Unsupported` (exported from

@@ -30,7 +30,7 @@ capability without making a call. Never widen `complete` with a streaming
 argument instead: an override that does not accept it would raise TypeError on
 every turn.
 
-plus three image capabilities, for tools that produce imagery rather than text:
+plus five image capabilities, for tools that produce imagery rather than text:
 
     generate_image(prompt, reference_data_uri=None)
         -> {"b64": str, "media_type": str, "usage": dict}
@@ -38,6 +38,34 @@ plus three image capabilities, for tools that produce imagery rather than text:
     translate_image(image_url) -> {"translated_url": str}
 
     white_background(image_url) -> {"white_bg_url": str}
+
+    remove_background(image_data_uri, background_color=None, background_prompt=None,
+                       shadow="soft", shadow_intensity=None, output_size=None, padding=None)
+        -> {"b64": str, "media_type": str}
+
+    virtual_model(image_data_uri, model_preset=None, scene_preset=None,
+                  pose=None, prompt=None, size=None)
+        -> {"b64": str, "media_type": str}
+
+    stage_product(image_data_uri, prompt=None, seed=None)
+        -> {"b64": str, "media_type": str}
+
+    `remove_background` mats the photo and gives it a new background — at most
+    one of `background_color` (a flat hex, the house finish) or
+    `background_prompt` (free text, a generated lifestyle scene); neither means
+    a transparent cutout. `virtual_model` and `stage_product` both put the
+    product into a generated scene instead — a DIFFERENT guarantee applies to
+    both: unlike every other capability on this seam, neither promises the
+    product's own pixels are kept, because generating the scene around it means
+    regenerating the product too. A caller using either must treat the result
+    as a styled/marketing render, not a stand-in for the authoritative product
+    photo. The two differ in what Photoroom scopes them to: `virtual_model` to
+    clothing, `stage_product` (Photoroom's own "Product Staging" tool,
+    prompt-driven rather than preset-driven) to "hard goods, accessories, bags,
+    jewelry, shoes" — the better fit for a site whose catalogue is neither.
+    Currently served by Photoroom's Image Editing API on both clients below;
+    their string/size arguments follow Photoroom's own syntax rather than a
+    generic one, since nothing else backs any of the three yet.
 
 one that reads the public web:
 
@@ -81,6 +109,36 @@ MAX_TOKENS = 4096
 OPENROUTER_IMAGES_URL = "https://openrouter.ai/api/v1/images"
 DEFAULT_IMAGE_MODEL = "openai/gpt-image-1"
 IMAGE_TIMEOUT = 180
+
+# Photoroom's Image Editing API (v2/edit): matting, flat-colour background and
+# AI shadow in one call. NOT the older "Remove Background API" (bg_color/size/
+# crop) — that one has no shadow and no prompt-generated background, both of
+# which the house finish and the lifestyle feature need.
+PHOTOROOM_EDIT_URL = "https://image-api.photoroom.com/v2/edit"
+# Requesting a lighter/darker-than-default shadow needs this exact header,
+# pinned to the model version the override params were verified against.
+PHOTOROOM_SHADOW_MODEL_VERSION = "2026-04-15"
+PHOTOROOM_TIMEOUT = 60
+PHOTOROOM_SHADOW_MODES = {"soft": "ai.soft", "hard": "ai.hard", "none": "none"}
+# shadow.softnessOverride is a 0..1 DIAL, not a switch — "0 means a very hard
+# shadow, 1 means a very soft shadow" (docs.photoroom.com/image-editing-api-
+# plus-plan/ai-shadows). Sending the literal extreme (1.0) for "soft" is what
+# produced a shadow confirmed live as "extremely big": maximum softness
+# means maximum spread/blur, not just a softer edge. This sits well short of
+# that extreme — soft enough to read as ai.soft rather than ai.hard, nowhere
+# near soft enough to balloon into a diffuse blob.
+PHOTOROOM_SOFT_SOFTNESS_OVERRIDE = 0.35
+
+# editWithAI.prompt is a required field on Photoroom's side — there is no
+# "just use your own default" mode the way virtualModel has. This is
+# Photoroom's own prompt behind its "Product Staging" tool (see
+# `_photoroom_stage_product`), used whenever a caller has no more specific
+# scene in mind, so calling stage_product with no prompt at all still gets
+# Photoroom's intended default rather than an API error.
+PHOTOROOM_STAGE_PRODUCT_DEFAULT_PROMPT = (
+	"Make it a professional lifestyle photoshoot with the provided object or "
+	"subject as the focus of the scene."
+)
 
 # Whisper's own REST endpoint. Not OpenRouter's — it has no transcription API,
 # only chat completions — so this is the one call in this file that reaches a
@@ -126,6 +184,8 @@ class ByokClient:
 	    ai_base_url   — optional; any Anthropic-compatible endpoint, e.g.
 	                    https://openrouter.ai/api or a LiteLLM proxy.
 	                    Unset = Anthropic direct.
+	    photoroom_api_key — for remove_background(); an x-api-key credential
+	                    from https://app.photoroom.com.
 	"""
 
 	def __init__(self):
@@ -136,14 +196,23 @@ class ByokClient:
 		self._image_model = frappe.conf.get("image_generate_model") or DEFAULT_IMAGE_MODEL
 		self._transcribe_key = frappe.conf.get("openai_api_key")
 		self._transcribe_model = frappe.conf.get("transcribe_model") or DEFAULT_TRANSCRIBE_MODEL
+		self._photoroom_key = frappe.conf.get("photoroom_api_key")
 
 	def image_support(self):
 		"""What this client can do, without making a call."""
 		# Translation and white-background both go through the same single
 		# specialised vendor, with its own auth and response contract, not a
 		# model API, and not something core carries an integration for. The
-		# managed client serves both via the billing service.
-		return {"generate": bool(self._image_key), "translate": False, "white_bg": False}
+		# managed client serves both via the billing service. remove_background
+		# is different: Photoroom, reachable directly with a site_config key.
+		return {
+			"generate": bool(self._image_key),
+			"translate": False,
+			"white_bg": False,
+			"remove_background": bool(self._photoroom_key),
+			"virtual_model": bool(self._photoroom_key),
+			"stage_product": bool(self._photoroom_key),
+		}
 
 	def web_search_support(self):
 		"""Whether this site can reach the public web, without making a call.
@@ -337,6 +406,110 @@ class ByokClient:
 			"which reaches it through the managed billing service instead."
 		)
 
+	def remove_background(
+		self,
+		image_data_uri,
+		background_color=None,
+		background_prompt=None,
+		shadow="soft",
+		shadow_intensity=None,
+		shadow_spread=None,
+		shadow_direction=None,
+		output_size=None,
+		padding=None,
+		padding_sides=None,
+	):
+		"""One photo, matted and optionally given a new background, via
+		Photoroom on the site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential
+
+		See `engine/llm.py`'s `remove_background` for the parameter contract.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot remove backgrounds. Set photoroom_api_key in "
+				"site_config.json, or install alaiy_os_ai_client to use the managed "
+				"image service."
+			)
+		return _photoroom_edit(
+			self._photoroom_key,
+			image_data_uri,
+			background_color=background_color,
+			background_prompt=background_prompt,
+			shadow=shadow,
+			shadow_intensity=shadow_intensity,
+			shadow_spread=shadow_spread,
+			shadow_direction=shadow_direction,
+			output_size=output_size,
+			padding=padding,
+			padding_sides=padding_sides,
+		)
+
+	def virtual_model(
+		self,
+		image_data_uri,
+		model_preset=None,
+		scene_preset=None,
+		pose=None,
+		prompt=None,
+		size=None,
+	):
+		"""One photo, shown worn by a virtual model, via Photoroom on the
+		site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential (same one remove_background uses)
+
+		See `engine/llm.py`'s `virtual_model` for the parameter contract, and
+		`_photoroom_virtual_model`'s docstring for the caveat that Photoroom's
+		own docs scope this to clothing, not confirmed for jewelry/watches.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot generate on-model photos. Set photoroom_api_key "
+				"in site_config.json, or install alaiy_os_ai_client to use the "
+				"managed image service."
+			)
+		return _photoroom_virtual_model(
+			self._photoroom_key,
+			image_data_uri,
+			model_preset=model_preset,
+			scene_preset=scene_preset,
+			pose=pose,
+			prompt=prompt,
+			size=size,
+		)
+
+	def stage_product(self, image_data_uri, prompt=None, seed=None):
+		"""One photo, staged into a full lifestyle scene — held, worn, or on a
+		table — via Photoroom on the site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential (same one remove_background uses)
+
+		See `engine/llm.py`'s `stage_product` for the parameter contract, and
+		`_photoroom_stage_product`'s docstring for why this, not
+		`virtual_model`, is what the "worn" additional-photo kind calls, and
+		for the same no-pixel-fidelity caveat that capability carries.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot stage product photos. Set photoroom_api_key "
+				"in site_config.json, or install alaiy_os_ai_client to use the "
+				"managed image service."
+			)
+		return _photoroom_stage_product(
+			self._photoroom_key,
+			image_data_uri,
+			prompt=prompt,
+			seed=seed,
+		)
+
 	def transcribe_support(self):
 		"""Whether this site can transcribe voice input, without making a call."""
 		return bool(self._transcribe_key)
@@ -391,6 +564,186 @@ def extension_for(mime_type):
 		"audio/mpeg": "mp3",
 		"audio/wav": "wav",
 	}.get((mime_type or "").split(";")[0].strip().lower(), "webm")
+
+
+def _decode_data_uri(data_uri):
+	"""`data:<media_type>;base64,<b64>` -> (media_type, raw bytes)."""
+	import base64
+
+	header, _, encoded = data_uri.partition(",")
+	media_type = header.removeprefix("data:").removesuffix(";base64") or "image/png"
+	return media_type, base64.b64decode(encoded)
+
+
+def _photoroom_post(api_key, image_data_uri, data, headers=None):
+	"""POST one photo to Photoroom's v2/edit with the given form fields.
+
+	Shared by `_photoroom_edit` and `_photoroom_virtual_model`: both are the
+	same endpoint and the same image-upload mechanics, and only the field set
+	differs between "mat and finish" and "put this on a model".
+	"""
+	import base64
+
+	import requests
+
+	media_type, content = _decode_data_uri(image_data_uri)
+	resp = requests.post(
+		PHOTOROOM_EDIT_URL,
+		headers={"x-api-key": api_key, **(headers or {})},
+		data=data,
+		files={"imageFile": ("photo", content, media_type)},
+		timeout=PHOTOROOM_TIMEOUT,
+	)
+	if resp.status_code != 200:
+		raise RuntimeError(f"Photoroom request failed ({resp.status_code}): {resp.text[:500]}")
+
+	return {
+		"b64": base64.b64encode(resp.content).decode("ascii"),
+		"media_type": resp.headers.get("Content-Type", "image/png").split(";")[0].strip(),
+	}
+
+
+def _photoroom_edit(
+	api_key,
+	image_data_uri,
+	background_color=None,
+	background_prompt=None,
+	shadow="soft",
+	shadow_intensity=None,
+	shadow_spread=None,
+	shadow_direction=None,
+	output_size=None,
+	padding=None,
+	padding_sides=None,
+):
+	"""The one place Photoroom's v2/edit wire format is expressed for BYOK.
+
+	Mirrors `alaiy_os_billing_service.app.providers.remove_background` — the
+	managed client's equivalent path — deliberately: the two are independent
+	callers with independent credentials, the same way `generate_image` is
+	expressed once here and again in that service's `providers.py`.
+
+	At most one of `background_color` / `background_prompt`; neither means a
+	transparent cutout (see that function's docstring for why that mode
+	matters, not just the coloured ones).
+	"""
+	if background_color and background_prompt:
+		raise ValueError("_photoroom_edit takes at most one of background_color, background_prompt")
+
+	mode = PHOTOROOM_SHADOW_MODES.get(shadow, shadow)
+	headers = {}
+	data = {"removeBackground": "true"}
+	if background_color:
+		data["background.color"] = background_color.lstrip("#")
+	elif background_prompt:
+		data["background.prompt"] = background_prompt
+	if shadow_intensity is not None and mode.startswith("ai."):
+		data["shadow.mode"] = "ai.auto-with-overrides"
+		data["shadow.softnessOverride"] = "0" if shadow == "hard" else str(PHOTOROOM_SOFT_SOFTNESS_OVERRIDE)
+		data["shadow.intensityOverride"] = str(shadow_intensity)
+		# Without these two, Photoroom guesses the shadow's angle and length
+		# itself — which is exactly what read as "improper" on a real photo:
+		# a shadow this seam asks for as a tight, near-vertical contact shadow
+		# ("hard, but light... sitting on the surface, not floating") came
+		# back at whatever angle/length Photoroom's own auto-detection picked,
+		# inconsistent from photo to photo. Left as override knobs rather than
+		# hardcoded so a caller with a different physical brief (a raking
+		# side-light, say) is not stuck with this one's defaults.
+		if shadow_spread:
+			data["shadow.spreadOverride"] = shadow_spread
+		if shadow_direction:
+			data["shadow.directionOverride"] = shadow_direction
+		headers["pr-ai-shadows-model-version"] = PHOTOROOM_SHADOW_MODEL_VERSION
+	else:
+		data["shadow.mode"] = mode
+	if output_size:
+		data["outputSize"] = output_size
+	if padding is not None:
+		data["padding"] = str(padding)
+	for side, value in (padding_sides or {}).items():
+		data[f"padding{side.capitalize()}"] = str(value)
+
+	return _photoroom_post(api_key, image_data_uri, data, headers)
+
+
+def _photoroom_virtual_model(
+	api_key,
+	image_data_uri,
+	model_preset=None,
+	scene_preset=None,
+	pose=None,
+	prompt=None,
+	size=None,
+):
+	"""Put a product photo on a virtual model, via Photoroom's `virtualModel.*`
+	fields on the same v2/edit endpoint.
+
+	Photoroom's own docs describe this as built for CLOTHING ("meant to be
+	used with images that feature clothing items") — nothing in their
+	documentation confirms it does a convincing job of, say, a bracelet on a
+	wrist or a ring on a hand. Worth checking against a real piece from the
+	catalog before trusting this for a jewelry/watch site. See
+	`_photoroom_stage_product` for the tool Photoroom actually markets for
+	that case ("Product Staging" — hard goods, accessories, bags, jewelry,
+	shoes) and which this seam's own `stage_product` capability now uses for
+	the "worn" additional-photo kind instead of this one.
+	"""
+	data = {
+		"virtualModel.mode": "ai.auto",
+		"removeBackground": "false",
+		"referenceBox": "originalImage",
+	}
+	if model_preset:
+		data["virtualModel.model.preset.name"] = model_preset
+	if scene_preset:
+		data["virtualModel.scene.preset.name"] = scene_preset
+	if pose:
+		data["virtualModel.pose"] = pose
+	if prompt:
+		data["virtualModel.prompt"] = prompt
+	if size:
+		data["virtualModel.size"] = size
+
+	return _photoroom_post(api_key, image_data_uri, data)
+
+
+def _photoroom_stage_product(api_key, image_data_uri, prompt=None, seed=None):
+	"""Put a product photo into a full lifestyle scene — held, worn, or on a
+	table — via Photoroom's `editWithAI.*` fields on the same v2/edit
+	endpoint. This is the API shape behind what Photoroom's own tools call
+	"Product Staging": there is no separate `productStaging.*` parameter
+	family or endpoint, `editWithAI` free-form prompting is the whole
+	mechanism, and Product Staging is just Photoroom's own canned prompt on
+	top of it.
+
+	UNLIKE `remove_background`'s `background_prompt` (which only ever repaints
+	what is behind the product), this regenerates the ENTIRE image, the
+	product included — the same guarantee gap `virtual_model` has, not the one
+	`remove_background` has. Photoroom explicitly scopes its own Product
+	Staging tool to "hard goods, accessories, bags, jewelry, shoes", which is
+	why the "worn" additional-photo kind uses this rather than
+	`virtual_model` (scoped to clothing) — but a caller here still gets no
+	pixel-fidelity guarantee and must treat the result as a styled render.
+
+	`removeBackground=false` and `referenceBox=originalImage`: the same flags
+	`_photoroom_virtual_model` sends and for the same reason — without them
+	Photoroom mats the product out first and stages a scene around a bare
+	cutout, discarding the framing the product was actually shot in.
+
+	`prompt` with no more specific guidance falls back to Photoroom's own
+	"Product Staging" wording, so a caller that wants the closest match to
+	that named tool can just call this with no prompt at all.
+	"""
+	data = {
+		"editWithAI.mode": "ai.auto",
+		"editWithAI.prompt": prompt or PHOTOROOM_STAGE_PRODUCT_DEFAULT_PROMPT,
+		"removeBackground": "false",
+		"referenceBox": "originalImage",
+	}
+	if seed is not None:
+		data["editWithAI.seed"] = str(seed)
+
+	return _photoroom_post(api_key, image_data_uri, data)
 
 
 def get_ai_client():
