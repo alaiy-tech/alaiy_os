@@ -322,16 +322,19 @@ class ByokClient:
 	def translate_image(self, image_url):
 		"""Not available on BYOK — see image_support()."""
 		raise Unsupported(
-			"This site cannot translate images. Install alaiy_os_ai_client, which "
-			"serves image translation through the managed billing service."
+			"This site cannot translate images: the provider's own JWT-signed "
+			"credentials aren't a key this app takes directly, unlike "
+			"generate_image's OpenRouter key. Install alaiy_os_ai_client, which "
+			"reaches it through the managed billing service instead."
 		)
 
 	def white_background(self, image_url):
 		"""Not available on BYOK — see image_support()."""
 		raise Unsupported(
-			"This site cannot put images on a white background. Install "
-			"alaiy_os_ai_client, which serves this through the managed billing "
-			"service."
+			"This site cannot put images on a white background, for the same "
+			"reason as translate_image: the provider's own JWT-signed credentials "
+			"aren't a key this app takes directly. Install alaiy_os_ai_client, "
+			"which reaches it through the managed billing service instead."
 		)
 
 	def transcribe_support(self):
