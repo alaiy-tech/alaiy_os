@@ -96,7 +96,7 @@ function Squiggle() {
  * because they are also needed by the row-scale actions in the connect step
  * and by a couple of anchors, and a second copy of that geometry would drift.
  */
-type Ground = "light" | "dark" | "alert" | "quiet";
+type Ground = "light" | "dark" | "alert" | "quiet" | "link";
 
 const grounds: Record<Ground, string> = {
   light: "press press-light",
@@ -104,7 +104,7 @@ const grounds: Record<Ground, string> = {
   /** The destructive confirm, and the only press that is not navy. */
   alert: "press press-alert",
   /**
-   * Not a press at all: no border, no shadow, no travel.
+   * Not a press at all: no fill, no shadow, no travel.
    *
    * For an action that must be available without being offered — "Cancel"
    * beside a confirm, "Clear" beside a filter. Making these the full shape
@@ -113,6 +113,14 @@ const grounds: Record<Ground, string> = {
    */
   quiet:
     "inline-flex items-center justify-center gap-2 rounded-sm text-[13px] font-medium text-muted transition-colors hover:bg-primary-600/5 hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-45",
+  /**
+   * An inline text action, not a button at all — "Export CSV", "View all →".
+   * Confirmed against the mockup: these render as plain accent-coloured
+   * text with no border, background or padding of their own, distinct from
+   * `quiet`'s muted-until-hovered treatment.
+   */
+  link:
+    "inline-flex items-center gap-1 text-[13px] font-medium text-highlight-600 transition-colors hover:text-primary-600 disabled:cursor-not-allowed disabled:opacity-45",
 };
 
 /** Two heights: the form-scale default, and `sm` for a control inside a row. */
@@ -152,16 +160,16 @@ export function ButtonLink({
 /**
  * A text field.
  *
- * White on paper, because a card is the one thing that is white here and a
- * field is a card you can type in. Square-cornered like everything else; the
- * border brightens to the accent on focus, which is the ring the app uses
- * everywhere.
+ * White on the ground, because a card is the one thing that is white here
+ * and a field is a card you can type in. Square-cornered like everything
+ * else; the border brightens to the accent on focus, which is the ring the
+ * app uses everywhere.
  */
 export function Input({ className = "", ...props }: ComponentProps<"input">) {
   return (
     <input
       {...props}
-      className={`h-11 w-full rounded-sm border border-line bg-white px-3.5 text-sm text-ink transition-colors placeholder:text-muted-soft hover:border-primary-600/40 focus:border-highlight-600 ${className}`}
+      className={`h-11 w-full rounded-md border border-line bg-white px-3.5 text-sm text-ink transition-colors placeholder:text-muted-soft hover:border-primary-600/40 focus:border-highlight-600 ${className}`}
     />
   );
 }
@@ -197,7 +205,7 @@ export function Select({
   return (
     <select
       {...props}
-      className={`${shape} rounded-sm border border-line bg-white text-ink transition-colors hover:border-primary-600/40 focus:border-highlight-600 disabled:cursor-not-allowed disabled:opacity-45 ${className}`}
+      className={`${shape} rounded-md border border-line bg-white text-ink transition-colors hover:border-primary-600/40 focus:border-highlight-600 disabled:cursor-not-allowed disabled:opacity-45 ${className}`}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value} disabled={option.disabled}>
@@ -227,19 +235,16 @@ export function Field({
 }
 
 /**
- * A card: white, one line, square.
+ * A card: white on the off-white ground, one hairline, no shadow.
  *
- * No shadow. The system's shadow is the button's hard block, and putting a
- * blurred one under a card would be a different design — the 1px line against
- * paper is what separates the two surfaces, and it is enough because paper is
- * not white.
+ * Confirmed against the mockup's own rendered output: a real card computes
+ * to a 16px radius, a 0.8px border, and `box-shadow: none` — the shadow
+ * tokens in globals.css are for surfaces that genuinely float over the
+ * page, not the resting card language.
  */
 export function Card({ className = "", ...props }: ComponentProps<"div">) {
   return (
-    <div
-      {...props}
-      className={`rounded-sm border border-line bg-white p-6 ${className}`}
-    />
+    <div {...props} className={`rounded-lg border border-line bg-white p-6 ${className}`} />
   );
 }
 
