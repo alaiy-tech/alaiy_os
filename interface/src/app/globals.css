@@ -1,157 +1,165 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Alaiy — the design system.
+   Alaiy — the design system: "The Morning Briefing."
 
-   Four values carry the whole product. Everything below is derived from them
-   and nothing else is invented:
+   Sourced from an authored Claude Design mockup (not an invented world) —
+   token values below are read directly off that mockup's own computed
+   styles, not guessed. One navy hue carries ink, panels and the accent, at
+   different lightness steps; white cards float on an off-white ground, told
+   apart by a hairline border rather than a shadow; one mint tone marks
+   "you are here" and nothing else. Values:
 
-     paper   #F7F4EF   the ground the entire product sits on
-     navy    #003254   every panel, and every word of text
-     blue    #91D1F2   the one accent
-     border  #DFD9CD   the line between a card and the ground
+     ink       #0D2B45   sidebar, headings, primary text
+     mid       #1A4A6B   readable mid-tone
+     link      #1E5F8B   interactive text, focus, the "accent" role
+     accent    #AED6F1   a tint — a plate, a segmented control's active fill
+     ground    #F7F9FC   the page
+     card      #FFFFFF   every card, on the ground
+     mint      #D5F3F3   the ONE "current location" marker — sidebar's
+                         active nav item. Not a general accent.
 
-   THE GROUND IS PAPER, NOT WHITE
-   Paper is not one option in a rotation — it is the surface, and navy is used
-   with intent (the rail, a CTA panel, a footer) rather than alternated with
-   it. White survives in exactly one role: a card sitting *on* paper, which is
-   how the system's own swatches are drawn. So `bg-white` in a component means
-   "this is a card", and the page underneath it is always paper.
+   WHY ONE HUE, NOT TWO
+   The Arcade Ledger and Calm Console systems this file carried earlier this
+   session each spent a separate accent hue. This mockup spends one: navy at
+   several lightness steps does ink, panel and "link" duty; mint is reserved
+   for exactly one job (marking the current nav item) rather than being a
+   second general-purpose accent.
 
-   HEX, NOT OKLCH
-   Several of these blues sit on the sRGB gamut edge, and an out-of-gamut oklch
-   is mapped differently by the build than by a browser. Writing the resolved
-   value is exact, and it keeps the value and the comment the same thing.
+   CARDS GET A LINE, NOT A SHADOW
+   Confirmed against the mockup's own rendered output: a KPI tile and a
+   table-section card both compute to a 16px radius, a 0.8px hairline
+   border, and `box-shadow: none`. The shadow tokens below exist for
+   genuinely floating surfaces (a toast, a drawer, the nav bar's own edge) —
+   applying one to a resting card is a regression, not a detail.
 
-   CONTRAST
-   Navy on paper is 12.1:1 and blue on navy is 8.0:1, so the brand pairs are
-   not the problem — the derived ones are, and each was measured. `muted` is
-   6.6:1 on paper. Every status colour has a bright value for fills and dots
-   and a darker *-ink for text: the inks are 6.2-6.6:1 on their own soft
-   grounds and ~6.9:1 on paper. The bright values are 1.9-4.1:1 and are never
-   text; each dot is paired with a spelled-out label, so it is redundant
-   reinforcement rather than the only way to read a state.
-
-   WHY THERE IS A STATUS PALETTE AT ALL
-   The system says two colours and one accent, which is right for a page that
-   is read once. This product has to say "that sync failed" and "those figures
-   are stale" in a table a seller scans daily, and blue cannot carry both a
-   link and a failure. So the status set is kept deliberately narrow — three
-   hues, each with one bright step and one ink — retuned warm so it sits on
-   paper rather than on the white it was mixed for. See DESIGN.md.
+   RADIUS IS MULTI-STEP AGAIN
+   Unlike the single-5px Arcade Ledger, this system draws four real steps
+   (4/8/12/16px) plus a full pill — confirmed against a KPI card (16px), a
+   segmented control and the sidebar's active-nav pill (both effectively
+   full-round).
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Navy. 600 is the brand; 400-500 are the readable mid-tones. */
-  --color-primary-50: #eef4f8;
-  --color-primary-100: #d8e6ef;
-  --color-primary-200: #aecadb;
-  --color-primary-300: #7ba5bd;
-  --color-primary-400: #3f7898;
-  --color-primary-500: #124e70;
-  --color-primary-600: #003254;
-  --color-primary-700: #002741;
-  --color-primary-800: #001c30;
-  --color-primary-900: #00121f;
+  /* Navy. 600 is the brand ink — the sidebar, headings, primary text.
+     300-400 are light enough to serve as the "accent" role (a tint, a
+     segmented control's active fill, a focus ring): this system spends one
+     hue for both ink and accent rather than pairing navy with a separate
+     blue. 700-900 are interpolated for a hover/pressed step on a filled
+     navy surface. */
+  --color-primary-50: #eff6fb;
+  --color-primary-100: #d6eaf8;
+  --color-primary-200: #c0e0f4;
+  --color-primary-300: #aed6f1;
+  --color-primary-400: #1e5f8b;
+  --color-primary-500: #1a4a6b;
+  --color-primary-600: #0d2b45;
+  --color-primary-700: #0b2540;
+  --color-primary-800: #0a2238;
+  --color-primary-900: #071826;
 
-  /* The one accent. 300 is the brand blue — a plate a seller reads navy text
-     on (8.0:1), never a text colour itself. 600-700 are the steps that can
-     carry 12px type on paper; 500 exists for a dot or a bar, where it is a
-     fill rather than a word. */
-  --color-highlight-100: #eaf6fc;
-  --color-highlight-200: #c8e8f8;
-  --color-highlight-300: #91d1f2;
-  --color-highlight-400: #6dbfe8;
-  --color-highlight-500: #2e9fd3;
-  --color-highlight-600: #0080ba;
-  --color-highlight-700: #00648f;
+  /* The same hue, reused for the "accent" role rather than a second one —
+     300 is the light tint (a plate, a chip fill), 400/600 are the
+     interactive/link tone, 100-200 are the palest tints (an info notice's
+     ground). Kept as a distinct token family because the rest of the app
+     already calls on `highlight-*` by name; the values now alias the navy
+     ramp's light end instead of a separate hue. */
+  --color-highlight-100: #eaf4fb;
+  --color-highlight-200: #d6eaf8;
+  --color-highlight-300: #aed6f1;
+  --color-highlight-400: #bde0f7;
+  --color-highlight-500: #1e5f8b;
+  --color-highlight-550: #1e5f8b;
+  --color-highlight-600: #1e5f8b;
+  --color-highlight-700: #1a4a6b;
 
-  /* Healthy / needs-attention / broken. Bright for fills, bars and dots... */
-  --color-ok: #1f9d5f;
-  --color-ok-soft: #dcf2e0;
-  --color-warn: #e08a1e;
-  --color-warn-soft: #fbeecf;
-  --color-alert: #d9401a;
-  --color-alert-soft: #fbe3d9;
+  /* The one "you are here" colour. Not a general accent — its only job is
+     the sidebar's active nav item, confirmed against the mockup's own
+     rendered output (`background-color: rgb(213, 243, 243)`). Reaching for
+     it anywhere else reopens a second accent this system deliberately
+     doesn't have. */
+  --color-active: #d5f3f3;
 
-  /* ...and these for any text, on the soft grounds above or on paper. */
-  --color-ok-ink: #0a6136;
-  --color-warn-ink: #7d4708;
-  --color-alert-ink: #a02310;
+  /* Healthy / caution / action-required, renamed to this mockup's own
+     status vocabulary but kept on the app's existing ok/warn/alert tokens
+     so every `bg-ok-soft`/`text-warn-ink` call site updates for free. */
+  --color-ok: #16a34a;
+  --color-ok-soft: #eaf7ef;
+  --color-warn: #d97706;
+  --color-warn-soft: #fdf4e3;
+  --color-alert: #dc2626;
+  --color-alert-soft: #fdeded;
 
-  --color-ink: #003254;
-  --color-muted: #455a63;
-  /* The quietest legible text: a hint under a field, a date under a chat
-     title, a placeholder. A measured colour rather than `text-muted/70`,
-     because an alpha is a guess — the ones this replaces measured 2.3:1 to
-     4.1:1 on paper, all of them under the 4.5:1 a 12px line needs. This is
-     4.7:1 on paper and 5.2:1 on white, and still clearly a step down from
-     `muted`. Anything quieter than this is not text; it is decoration, and
-     should be `aria-hidden` rather than dimmer. */
-  --color-muted-soft: #5c7078;
-  --color-line: #dfd9cd;
-  --color-paper: #f7f4ef;
-  /* `canvas` is the ground, and the ground is paper. Named separately so a
-     component can say which of the two it means. */
-  --color-canvas: #f7f4ef;
-  /* A deeper paper, for a ground that has to sit *inside* paper — a filter
-     bar, a disabled step. Warm, because a blue tint here fights the ground. */
-  --color-surface: #efe9dd;
+  --color-ok-ink: #15803d;
+  --color-warn-ink: #92400e;
+  --color-alert-ink: #991b1b;
 
-  /* ONE SHAPE, ONE RADIUS.
-     The system draws a single 5px corner and squares everything else, so every
-     radius step resolves to it. That is deliberate: it means `rounded-xl` and
-     `rounded-2xl` left in a component cannot reintroduce a second shape
-     language, and a full round is reserved for things that are genuinely round
-     — a dot, a spinner, an avatar. */
-  --radius-xs: 3px;
-  --radius-sm: 5px;
-  --radius-md: 5px;
-  --radius-lg: 5px;
-  --radius-xl: 5px;
-  --radius-2xl: 5px;
-  --radius-3xl: 5px;
+  --color-ink: #0d2b45;
+  --color-muted: #64748b;
+  --color-muted-soft: #94a3b8;
+  --color-line: #e2e8f0;
+  --color-paper: #f7f9fc;
+  --color-canvas: #f7f9fc;
+  /* Cards are pure white on the off-white ground above — the two ARE
+     visually distinct here (unlike the last system), so `surface` goes back
+     to meaning "a card sitting on the ground" rather than a deeper tone
+     nested inside one. */
+  --color-surface: #ffffff;
 
-  /* HARD SHADOWS ONLY.
-     The system has exactly one shadow: an offset, unblurred block of colour —
-     the thing that makes a button read as a key to press. A blurred shadow
-     under a card would be a different system, so a card gets a 1px line and
-     nothing else, and only a surface genuinely floating over the page (a
-     toast, a dialog) gets the block. */
-  --shadow-press: 4px 4px 0 var(--color-primary-600);
-  --shadow-press-lift: 6px 6px 0 var(--color-highlight-300);
-  --shadow-press-dark: 4px 4px 0 rgb(255 255 255 / 0.25);
-  /* The exception to "cards get a line, not a shadow": a surface genuinely
-     floating over the page, which needs to say so. Navy at low alpha rather
-     than solid, because it falls across whatever the page is showing. */
-  --shadow-float: 10px 10px 0 rgb(0 50 84 / 0.14);
+  /* FOUR REAL RADIUS STEPS, PLUS A PILL.
+     Confirmed against real rendered elements: a KPI/table card computes to
+     16px; a segmented control and the sidebar's active-nav pill compute to
+     effectively full-round. */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-2xl: 24px;
+  --radius-3xl: 24px;
 
-  /* Playfair Display for anything that is read once — headings, the greeting,
-     a figure being shown off. Poppins for everything read at length: body
-     copy, labels, buttons, nav. Geist carries table rows, SKUs and money: at
-     12-13px Poppins is wider and looser, and it sets numerals proportionally,
-     so a column of figures shifts under its own alignment. `font-data` is
-     that opt-in, and it is the only reason a third face exists. */
+  /* SOFT, FOR FLOATING SURFACES ONLY.
+     Confirmed a resting card carries NO shadow — just the hairline border
+     above. These four steps plus `nav` are for what genuinely floats over
+     the page: a toast, a drawer, a dropdown, the sticky nav bar's own
+     bottom edge. */
+  --shadow-sm: 0 1px 4px rgb(13 43 69 / 0.06);
+  --shadow-md: 0 2px 12px rgb(13 43 69 / 0.08);
+  --shadow-lg: 0 4px 24px rgb(13 43 69 / 0.12);
+  --shadow-xl: 0 8px 40px rgb(13 43 69 / 0.16);
+  --shadow-nav: 0 2px 16px rgb(13 43 69 / 0.1);
+  /* Kept as a name so the handful of call sites that reach for "a surface
+     genuinely floating over the page" (the import toast, the Orders detail
+     drawer, a chart tooltip) don't need to change — only what it draws did. */
+  --shadow-float: var(--shadow-lg);
+
+  /* Playfair Display narrows to Title/Section only in this system — not
+     every heading. Poppins carries H3-H6, body, labels, nav, buttons, AND
+     table/KPI figures with tabular numerals: this mockup does not spend a
+     separate data face the way the Arcade Ledger spent Geist. `font-data`
+     repoints to Poppins so the ~20 existing `.font-data`/`font-data` call
+     sites (which only ever wanted tabular-nums, not a different typeface)
+     keep working unchanged. */
   --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
+  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  --font-data: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-label: var(--font-jetbrains-mono), ui-monospace, monospace;
+  --font-data: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
 
   /* THE DISPLAY SCALE.
-     Five steps, named for the job rather than the size, because the size is
-     the thing most likely to be nudged and the job is not. Every heading in
-     the product is one of these — an `h1` with an arbitrary pixel value is how
-     a scale becomes a list of numbers nobody can review.
-
-     `quote` is the odd one: it is Alaiy speaking in its own voice — the
-     greeting on the first screen, and the italic pull-quote the system draws.
-     It is display-face body copy, so unlike the headings it gets a line height
-     you can read a sentence at. */
+     `display-lg` is this system's "Title" (36px) — confirmed against the
+     mockup's own tokens frame ("Title · 36/600"), weight 600 rather than
+     700. `display-md` becomes this system's "Section" (was 26px; the
+     mockup's Section is 20px, confirmed "Section · 20/600" — a real value
+     change, not drift). The xl/sm/xs steps are carried over unchanged;
+     nothing in this mockup pass exercises them. */
   --text-display-xl: 52px;
   --text-display-xl--line-height: 1.04;
   --text-display-lg: 36px;
   --text-display-lg--line-height: 1.08;
-  --text-display-md: 26px;
-  --text-display-md--line-height: 1.12;
+  --text-display-md: 20px;
+  --text-display-md--line-height: 1.3;
   --text-display-sm: 18px;
   --text-display-sm--line-height: 1.2;
   --text-display-xs: 16px;
@@ -159,21 +167,28 @@
   --text-quote: 20px;
   --text-quote--line-height: 1.4;
 
-  /* How wide Ask Alaiy is when it is docked to the right of a data tab.
-     A token because two things have to agree on it: the panel itself, and
-     anything that slides in beside it — the Orders detail panel lies across
-     the table and stops at Ask's edge, so that Ask stays readable while an
-     order is being inspected. Written once here, widened below at xl.
+  /* THE FIGURE SCALE.
+     `stat` is this mockup's own KPI size (confirmed "KPI · 30/600 tnum"),
+     up from the previous system's 27px. `stat-sm` is carried over for a
+     secondary-tile scale this pass doesn't exercise. */
+  --text-stat: 30px;
+  --text-stat-sm: 16px;
 
-     Both of these are *defaults*. The shell overwrites them inline once the
-     seller has dragged an edge or shut a panel — a closed panel is the same
-     token at 0px, which is how everything measuring against it gets out of
-     the way without being told. See `components/shell/shell.tsx`. */
+  /* THE BODY SCALE.
+     `body` moves to 14px, this mockup's own value ("Body · 14/400") — a
+     real, deliberate bump from the dense-UI 13px the last two systems
+     used. `lead` and `table` sit either side of it: `table` at 13.5px
+     (confirmed "Table · 13.5/400") for table rows specifically, `lead` at
+     15px carried over for a single prominent supporting line. `meta`/
+     `micro` are carried over named steps below `label` for a secondary
+     caption and a chart's own axis text. */
+  --text-lead: 15px;
+  --text-body: 14px;
+  --text-table: 13.5px;
+  --text-meta: 10px;
+  --text-micro: 9px;
+
   --spacing-ask-panel: 360px;
-
-  /* And how wide the left rail is when it is showing its labels. A token for
-     the same reason: the drag handle on its edge is positioned from this, and
-     it is not a child of the rail. */
   --spacing-rail: 240px;
 }
 
@@ -183,17 +198,12 @@
   }
 }
 
-/* While an edge is being dragged. The pointer leaves the handle's own 8px
-   within a frame, so the resize cursor and the selection lock have to cover
-   the document or the drag reads as a botched text selection. */
 body.shell-resizing,
 body.shell-resizing * {
   cursor: col-resize !important;
   user-select: none !important;
 }
 
-/* The product is a paper-background app. Opt out of the UA dark scheme so
-   form controls and scrollbars stay light regardless of OS setting. */
 :root {
   color-scheme: light;
 }
@@ -204,40 +214,25 @@ body {
   position: relative;
 }
 
-/* ---------------------------------------------------------------------------
-   The grain.
-
-   Not decoration — it is what stops a flat fill from reading as plain beige,
-   and it is why paper looks like paper and navy looks like ink on it. One
-   fixed layer over the whole viewport at 5%, blended rather than drawn, so it
-   sits on every surface including the ones that float above the page.
-
-   Fixed and `pointer-events: none`, so it neither scrolls (no repaint cost per
-   frame) nor intercepts a click. Above the app's own z-indexes on purpose: a
-   dialog that lost the grain would look like a different product.
-   --------------------------------------------------------------------------- */
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: 9999;
-  pointer-events: none;
-  opacity: 0.05;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Headings are the display face by default, so a component cannot forget.
-   `text-wrap: balance` because these are short, deliberate lines. */
-:where(h1, h2, h3, h4) {
+/* h1/h2 are Playfair at 600 (this system's Title/Section, not 700-weight
+   headlines); h3-h6 stay Poppins semibold. `text-wrap: balance` because
+   these are short, deliberate lines. */
+:where(h1, h2) {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
   line-height: 1.08;
   letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
-/* One consistent focus ring, in the bright blue. */
+:where(h3, h4, h5, h6) {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  text-wrap: balance;
+}
+
+/* One consistent focus ring, in the link/accent tone. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-highlight-600);
   outline-offset: 2px;
@@ -259,92 +254,80 @@ body::before {
   outline: none;
 }
 
-/* Geist has tabular figures; this makes them the default wherever the data
-   face is used, so money and counts line up down a column. */
+/* Numerals stay lining/tabular wherever the data face is used, so money and
+   counts line up down a column — regardless of which typeface is behind it. */
 .font-data {
   font-variant-numeric: tabular-nums;
 }
 
 @layer components {
   /* -------------------------------------------------------------------------
-     The arcade press — the one button shape.
+     The press — this system's one button shape.
 
-     There is no filled "primary" any more. Every call to action is this
-     outlined shape with a hard, unblurred shadow: it lifts towards the reader
-     on hover and its shadow turns accent blue, then on click the shadow
-     collapses to nothing as the button travels into where the shadow was. The
-     travel and the shadow have to add up to the same distance or the press
-     looks like a slide.
-
-     In `@layer components`, so a utility class on a call site still wins — a
-     button that needs to be full width or a different height says so with
-     Tailwind and does not have to fight this.
+     Filled navy, no border, a soft shadow that only appears on hover (a
+     resting button is as flat as a resting card) and a light lift. No hard
+     offset block anywhere in this system — see the shadow tokens above.
      ------------------------------------------------------------------------- */
   .press {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: var(--radius-sm);
-    border-width: 2px;
-    border-style: solid;
-    background: transparent;
-    font-weight: 600;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    border-radius: var(--radius-md);
+    border-width: 0;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     transition:
       transform 100ms ease,
       box-shadow 100ms ease,
+      background-color 100ms ease,
       opacity 100ms ease;
   }
 
   .press-light {
-    color: var(--color-primary-600);
-    border-color: var(--color-primary-600);
-    box-shadow: var(--shadow-press);
-  }
-
-  .press-dark {
     color: #fff;
-    border-color: rgb(255 255 255 / 0.6);
-    box-shadow: var(--shadow-press-dark);
+    background: var(--color-primary-600);
   }
 
-  /* The one press that is not brand-coloured: the destructive confirm.
-     It keeps the geometry exactly — it has to read as a key — and takes the
-     alert ink for its border and its block, so the colour is the only thing
-     saying this one does something that cannot be taken back. Its lift stays
-     in its own hue rather than turning blue, because blue here would read as
-     "and now it is safe". */
+  /* On a navy panel (the sidebar): the mint "current" tone would be a
+     location marker, not a button, so a press here stays a light plate
+     instead — navy text on the palest accent tint. */
+  .press-dark {
+    color: var(--color-primary-600);
+    background: var(--color-primary-100);
+  }
+
   .press-alert {
-    color: var(--color-alert-ink);
-    border-color: var(--color-alert-ink);
-    box-shadow: 4px 4px 0 var(--color-alert-ink);
+    color: #fff;
+    background: var(--color-alert);
   }
 
-  /* Hover and press are identical on every ground — the shape is the shape. */
-  .press-light:hover:not(:disabled),
+  .press-light:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: var(--color-primary-700);
+    box-shadow: var(--shadow-md);
+  }
+
   .press-dark:hover:not(:disabled) {
-    transform: translate(-2px, -2px);
-    box-shadow: var(--shadow-press-lift);
+    transform: translateY(-1px);
+    background: var(--color-highlight-200);
+    box-shadow: var(--shadow-sm);
   }
 
   .press-alert:hover:not(:disabled) {
-    transform: translate(-2px, -2px);
-    box-shadow: 6px 6px 0 var(--color-alert);
+    transform: translateY(-1px);
+    background: var(--color-alert-ink);
+    box-shadow: var(--shadow-md);
   }
 
   .press-light:active:not(:disabled),
   .press-dark:active:not(:disabled),
   .press-alert:active:not(:disabled) {
-    transform: translate(4px, 4px);
-    box-shadow: 0 0 0 transparent;
+    transform: translateY(0);
+    box-shadow: none;
   }
 
-  /* Disabled sits flat where it was pressed: no shadow to promise a press
-     that will not happen, and no travel on hover. */
   .press:disabled {
     cursor: not-allowed;
     opacity: 0.45;
@@ -355,23 +338,18 @@ body::before {
   /* -------------------------------------------------------------------------
      The eyebrow — a section's name, above its heading.
 
-     Letterspaced small caps in navy, with the blue squiggle. Used for anything
-     that labels rather than says: a column group, a filter's name, the
-     "Recent" over a list.
-
-     Navy at 68%, not the 55% the system draws. 55% measures 3.35:1 on paper,
-     which is fine for a 40px marketing eyebrow the eye skims past and not fine
-     for a 12px one that is the only thing naming a section — a seller who
-     cannot read "RECENT" cannot tell what the list under it is. 68% is
-     4.79:1 and is still visibly quieter than the heading it sits above.
+     Confirmed against the mockup's own tokens frame: "Eyebrow · 11/600
+     +.14em". JetBrains Mono, navy at 68% so it stays quieter than the
+     heading it sits above without dropping under 4.5:1.
      ------------------------------------------------------------------------- */
   .eyebrow {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 0.18em;
+    font-family: var(--font-label);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
     text-transform: uppercase;
     color: color-mix(in oklab, var(--color-primary-600) 68%, transparent);
   }
@@ -379,15 +357,6 @@ body::before {
 
 /* ---------------------------------------------------------------------------
    Motion, for Ask Alaiy.
-
-   Two things only, because a conversation is the one screen in the product
-   where movement carries meaning: a message arriving, and the assistant being
-   mid-thought. Both are announced by the transcript itself, so both stop under
-   `prefers-reduced-motion` rather than being softened.
-
-   `rise` runs on insertion, which is exactly once per message — a partial
-   answer is the same element re-rendered longer, so it does not re-fire and
-   the text does not judder as it is written.
    --------------------------------------------------------------------------- */
 
 @keyframes alaiy-rise {
@@ -405,8 +374,6 @@ body::before {
   animation: alaiy-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* The thinking dots. Scale rather than travel, so the row's height is fixed
-   and the composer below it does not shift. */
 @keyframes alaiy-pulse-dot {
   0%,
   70%,
@@ -430,10 +397,10 @@ body::before {
     animation: none;
   }
 
-  /* The press keeps its shadow change — that is the affordance — but stops
-     travelling. */
   .press {
-    transition: box-shadow 100ms ease;
+    transition:
+      box-shadow 100ms ease,
+      background-color 100ms ease;
   }
 
   .press-light:hover:not(:disabled),
