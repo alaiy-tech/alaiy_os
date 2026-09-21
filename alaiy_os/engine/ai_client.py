@@ -139,8 +139,8 @@ class ByokClient:
 
 	def image_support(self):
 		"""What this client can do, without making a call."""
-		# Translation and white-background are both alphashop -- a single
-		# specialised vendor with its own JWT auth and response contract, not a
+		# Translation and white-background both go through the same single
+		# specialised vendor, with its own auth and response contract, not a
 		# model API, and not something core carries an integration for. The
 		# managed client serves both via the billing service.
 		return {"generate": bool(self._image_key), "translate": False, "white_bg": False}
