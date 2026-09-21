@@ -70,4 +70,35 @@ def submit_feedback(session, message, sentiment, screen, agent_trail, feedback=N
 		}
 	).insert()
 
+	_score_in_langfuse(session, message, sentiment, feedback)
+
 	return {"name": row.name}
+
+
+def _score_in_langfuse(session, message, sentiment, feedback):
+	"""Best-effort: attach this feedback to the Langfuse trace of the LLM
+	call(s) that produced `message`, via alaiy_os_ai_client's
+	`score_chat_message` (this module doesn't and shouldn't know Langfuse's
+	client shape -- see that function's docstring).
+
+	A bench without alaiy_os_ai_client installed, or without Langfuse
+	configured, or any failure reaching it, must never take the feedback
+	submission down with it -- the `OS Chat Feedback` row above is already
+	the record of record regardless.
+	"""
+	try:
+		from alaiy_os_ai_client.ai.client import score_chat_message
+	except ImportError:
+		return
+
+	try:
+		seq = frappe.db.get_value("OS Chat Message", message, "seq")
+		score_chat_message(
+			session,
+			seq,
+			name="user_feedback",
+			value=1.0 if sentiment == "Up" else 0.0,
+			comment=feedback or None,
+		)
+	except Exception:
+		frappe.log_error(title="Could not score chat feedback in Langfuse")
