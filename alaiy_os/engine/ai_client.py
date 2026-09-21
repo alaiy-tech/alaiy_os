@@ -30,7 +30,7 @@ capability without making a call. Never widen `complete` with a streaming
 argument instead: an override that does not accept it would raise TypeError on
 every turn.
 
-plus four image capabilities, for tools that produce imagery rather than text:
+plus five image capabilities, for tools that produce imagery rather than text:
 
     generate_image(prompt, reference_data_uri=None)
         -> {"b64": str, "media_type": str, "usage": dict}
@@ -47,18 +47,25 @@ plus four image capabilities, for tools that produce imagery rather than text:
                   pose=None, prompt=None, size=None)
         -> {"b64": str, "media_type": str}
 
+    stage_product(image_data_uri, prompt=None, seed=None)
+        -> {"b64": str, "media_type": str}
+
     `remove_background` mats the photo and gives it a new background — at most
     one of `background_color` (a flat hex, the house finish) or
     `background_prompt` (free text, a generated lifestyle scene); neither means
-    a transparent cutout. `virtual_model` puts the product on a generated
-    person instead — a DIFFERENT guarantee applies here: unlike every other
-    capability on this seam, it does NOT promise the product's own pixels are
-    kept, because showing something worn means generating the scene around it.
-    A caller using this must treat the result as a styled/marketing render, not
-    a stand-in for the authoritative product photo. Currently served by
-    Photoroom's Image Editing API on both clients below; their string/size
-    arguments follow Photoroom's own syntax rather than a generic one, since
-    nothing else backs either capability yet.
+    a transparent cutout. `virtual_model` and `stage_product` both put the
+    product into a generated scene instead — a DIFFERENT guarantee applies to
+    both: unlike every other capability on this seam, neither promises the
+    product's own pixels are kept, because generating the scene around it means
+    regenerating the product too. A caller using either must treat the result
+    as a styled/marketing render, not a stand-in for the authoritative product
+    photo. The two differ in what Photoroom scopes them to: `virtual_model` to
+    clothing, `stage_product` (Photoroom's own "Product Staging" tool,
+    prompt-driven rather than preset-driven) to "hard goods, accessories, bags,
+    jewelry, shoes" — the better fit for a site whose catalogue is neither.
+    Currently served by Photoroom's Image Editing API on both clients below;
+    their string/size arguments follow Photoroom's own syntax rather than a
+    generic one, since nothing else backs any of the three yet.
 
 one that reads the public web:
 
@@ -113,6 +120,17 @@ PHOTOROOM_EDIT_URL = "https://image-api.photoroom.com/v2/edit"
 PHOTOROOM_SHADOW_MODEL_VERSION = "2026-04-15"
 PHOTOROOM_TIMEOUT = 60
 PHOTOROOM_SHADOW_MODES = {"soft": "ai.soft", "hard": "ai.hard", "none": "none"}
+
+# editWithAI.prompt is a required field on Photoroom's side — there is no
+# "just use your own default" mode the way virtualModel has. This is
+# Photoroom's own prompt behind its "Product Staging" tool (see
+# `_photoroom_stage_product`), used whenever a caller has no more specific
+# scene in mind, so calling stage_product with no prompt at all still gets
+# Photoroom's intended default rather than an API error.
+PHOTOROOM_STAGE_PRODUCT_DEFAULT_PROMPT = (
+	"Make it a professional lifestyle photoshoot with the provided object or "
+	"subject as the focus of the scene."
+)
 
 # Whisper's own REST endpoint. Not OpenRouter's — it has no transcription API,
 # only chat completions — so this is the one call in this file that reaches a
@@ -185,6 +203,7 @@ class ByokClient:
 			"white_bg": False,
 			"remove_background": bool(self._photoroom_key),
 			"virtual_model": bool(self._photoroom_key),
+			"stage_product": bool(self._photoroom_key),
 		}
 
 	def web_search_support(self):
@@ -457,6 +476,32 @@ class ByokClient:
 			size=size,
 		)
 
+	def stage_product(self, image_data_uri, prompt=None, seed=None):
+		"""One photo, staged into a full lifestyle scene — held, worn, or on a
+		table — via Photoroom on the site's own key.
+
+		site_config keys:
+		    photoroom_api_key — an x-api-key credential (same one remove_background uses)
+
+		See `engine/llm.py`'s `stage_product` for the parameter contract, and
+		`_photoroom_stage_product`'s docstring for why this, not
+		`virtual_model`, is what the "worn" additional-photo kind calls, and
+		for the same no-pixel-fidelity caveat that capability carries.
+		Thread-safe: reads only state captured in __init__.
+		"""
+		if not self._photoroom_key:
+			raise Unsupported(
+				"This site cannot stage product photos. Set photoroom_api_key "
+				"in site_config.json, or install alaiy_os_ai_client to use the "
+				"managed image service."
+			)
+		return _photoroom_stage_product(
+			self._photoroom_key,
+			image_data_uri,
+			prompt=prompt,
+			seed=seed,
+		)
+
 	def transcribe_support(self):
 		"""Whether this site can transcribe voice input, without making a call."""
 		return bool(self._transcribe_key)
@@ -629,12 +674,11 @@ def _photoroom_virtual_model(
 	used with images that feature clothing items") — nothing in their
 	documentation confirms it does a convincing job of, say, a bracelet on a
 	wrist or a ring on a hand. Worth checking against a real piece from the
-	catalog before trusting this for a jewelry/watch site.
-
-	`removeBackground=false` and `referenceBox=originalImage`: without these
-	Photoroom mats the product out first and generates a scene around a bare
-	cutout, discarding the framing the product was actually shot in — flags
-	from the same "auto" quickstart Photoroom's own docs show for this mode.
+	catalog before trusting this for a jewelry/watch site. See
+	`_photoroom_stage_product` for the tool Photoroom actually markets for
+	that case ("Product Staging" — hard goods, accessories, bags, jewelry,
+	shoes) and which this seam's own `stage_product` capability now uses for
+	the "worn" additional-photo kind instead of this one.
 	"""
 	data = {
 		"virtualModel.mode": "ai.auto",
@@ -651,6 +695,45 @@ def _photoroom_virtual_model(
 		data["virtualModel.prompt"] = prompt
 	if size:
 		data["virtualModel.size"] = size
+
+	return _photoroom_post(api_key, image_data_uri, data)
+
+
+def _photoroom_stage_product(api_key, image_data_uri, prompt=None, seed=None):
+	"""Put a product photo into a full lifestyle scene — held, worn, or on a
+	table — via Photoroom's `editWithAI.*` fields on the same v2/edit
+	endpoint. This is the API shape behind what Photoroom's own tools call
+	"Product Staging": there is no separate `productStaging.*` parameter
+	family or endpoint, `editWithAI` free-form prompting is the whole
+	mechanism, and Product Staging is just Photoroom's own canned prompt on
+	top of it.
+
+	UNLIKE `remove_background`'s `background_prompt` (which only ever repaints
+	what is behind the product), this regenerates the ENTIRE image, the
+	product included — the same guarantee gap `virtual_model` has, not the one
+	`remove_background` has. Photoroom explicitly scopes its own Product
+	Staging tool to "hard goods, accessories, bags, jewelry, shoes", which is
+	why the "worn" additional-photo kind uses this rather than
+	`virtual_model` (scoped to clothing) — but a caller here still gets no
+	pixel-fidelity guarantee and must treat the result as a styled render.
+
+	`removeBackground=false` and `referenceBox=originalImage`: the same flags
+	`_photoroom_virtual_model` sends and for the same reason — without them
+	Photoroom mats the product out first and stages a scene around a bare
+	cutout, discarding the framing the product was actually shot in.
+
+	`prompt` with no more specific guidance falls back to Photoroom's own
+	"Product Staging" wording, so a caller that wants the closest match to
+	that named tool can just call this with no prompt at all.
+	"""
+	data = {
+		"editWithAI.mode": "ai.auto",
+		"editWithAI.prompt": prompt or PHOTOROOM_STAGE_PRODUCT_DEFAULT_PROMPT,
+		"removeBackground": "false",
+		"referenceBox": "originalImage",
+	}
+	if seed is not None:
+		data["editWithAI.seed"] = str(seed)
 
 	return _photoroom_post(api_key, image_data_uri, data)
 

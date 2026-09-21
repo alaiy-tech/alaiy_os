@@ -148,6 +148,28 @@ def virtual_model(image_data_uri, *, model_preset=None, scene_preset=None, pose=
 	)
 
 
+def stage_product(image_data_uri, *, prompt=None, seed=None):
+	"""One photo, staged into a full lifestyle scene — held, worn, or on a
+	table -> {"b64", "media_type"}.
+
+	Same seam as `remove_background`, with the same DIFFERENT guarantee
+	`virtual_model` carries: this does NOT promise the product's own pixels
+	survive untouched, because staging a scene around it means regenerating
+	the product too. Treat the result as a styled/marketing render, never as
+	a stand-in for the authoritative product photo a customer is buying.
+
+	Where this differs from `virtual_model`: Photoroom scopes that one to
+	clothing, and this one — its own "Product Staging" tool underneath — to
+	"hard goods, accessories, bags, jewelry, shoes". `prompt` is free text,
+	e.g. "worn on a wrist, close up"; leaving it unset falls back to
+	Photoroom's own Product Staging wording rather than failing, since
+	Photoroom's side treats the prompt as required.
+
+	Raises `Unsupported` if this deployment's client has no provider for it.
+	"""
+	return _client().stage_product(image_data_uri, prompt=prompt, seed=seed)
+
+
 def web_search_support():
 	"""Whether this site can reach the public web at all.
 
