@@ -53,8 +53,8 @@ export function alertTarget(alert: HomeAlert): AlertTarget | null {
 export type AlertStyle = {
   /** The card. A soft ground and its own border, on paper. */
   card: string;
-  /** The 3px rule down the leading edge, in the bright value. */
-  rule: string;
+  /** The icon badge — a soft-filled circle carrying the tone. */
+  badge: string;
   /** Every word in the card. */
   ink: string;
   /** Read out in place of the colour. */
@@ -64,13 +64,13 @@ export type AlertStyle = {
 const STYLES: Record<HomeAlert["tone"], AlertStyle> = {
   alert: {
     card: "border-alert/30 bg-alert-soft",
-    rule: "bg-alert",
+    badge: "bg-alert-soft text-alert-ink",
     ink: "text-alert-ink",
     srLabel: "Urgent",
   },
   warn: {
     card: "border-warn/40 bg-warn-soft",
-    rule: "bg-warn",
+    badge: "bg-warn-soft text-warn-ink",
     ink: "text-warn-ink",
     srLabel: "Worth a look",
   },
@@ -78,7 +78,7 @@ const STYLES: Record<HomeAlert["tone"], AlertStyle> = {
   // system reserves for exactly this.
   info: {
     card: "border-highlight-400 bg-highlight-100",
-    rule: "bg-highlight-500",
+    badge: "bg-highlight-200 text-primary-600",
     ink: "text-primary-600",
     srLabel: "For information",
   },

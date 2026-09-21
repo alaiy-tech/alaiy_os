@@ -52,7 +52,8 @@ export type BannerPresentation = {
   /** One sentence: what this means, not what the state is called again. */
   blurb: string;
   card: string;
-  rule: string;
+  /** The icon badge — a soft-filled circle carrying the tone. */
+  badge: string;
   ink: string;
 };
 
@@ -61,7 +62,7 @@ const BANNERS: Record<HealthStatus, BannerPresentation> = {
     label: "Healthy",
     blurb: "Every metric Amazon reports is inside its limit, with room to spare.",
     card: "border-ok/30 bg-ok-soft",
-    rule: "bg-ok",
+    badge: "bg-ok-soft text-ok-ink",
     ink: "text-ok-ink",
   },
   at_risk: {
@@ -69,7 +70,7 @@ const BANNERS: Record<HealthStatus, BannerPresentation> = {
     blurb:
       "Nothing has breached yet, but at least one metric is close enough that a bad week would take it over.",
     card: "border-warn/40 bg-warn-soft",
-    rule: "bg-warn",
+    badge: "bg-warn-soft text-warn-ink",
     ink: "text-warn-ink",
   },
   action_required: {
@@ -77,7 +78,7 @@ const BANNERS: Record<HealthStatus, BannerPresentation> = {
     blurb:
       "At least one metric is past Amazon's published limit. This is the state accounts get suspended from.",
     card: "border-alert/30 bg-alert-soft",
-    rule: "bg-alert",
+    badge: "bg-alert-soft text-alert-ink",
     ink: "text-alert-ink",
   },
   unknown: {
@@ -85,7 +86,7 @@ const BANNERS: Record<HealthStatus, BannerPresentation> = {
     blurb:
       "Amazon hasn't reported any performance metrics for this account yet, so there is nothing to judge.",
     card: "border-line bg-surface",
-    rule: "bg-muted/40",
+    badge: "bg-surface text-muted",
     ink: "text-muted",
   },
 };

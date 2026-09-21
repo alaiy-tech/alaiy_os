@@ -179,6 +179,77 @@ const PERMISSIONS: Record<ChannelId, Omit<ChannelPermission, "decision">[]> = {
       core: true,
     },
   ],
+  flipkart: [
+    {
+      id: "flipkart.orders",
+      label: "Orders",
+      summary: "Read your orders and their shipment status.",
+      grants: ["orders.read"],
+      core: true,
+    },
+    {
+      id: "flipkart.listings",
+      label: "Listings",
+      summary: "Read your catalogue, prices and listing health per SKU.",
+      grants: ["listings.read"],
+      core: true,
+    },
+    {
+      id: "flipkart.seller",
+      label: "Seller metrics",
+      summary: "Read your seller-tier metrics, so Account Health covers Flipkart too.",
+      grants: ["seller.read"],
+      core: false,
+    },
+  ],
+  myntra: [
+    {
+      id: "myntra.orders",
+      label: "Orders and returns",
+      summary: "Read your orders and their return status.",
+      grants: ["orders.read"],
+      core: true,
+    },
+    {
+      id: "myntra.catalogue",
+      label: "Catalogue",
+      summary: "Read your catalogue and stock per style.",
+      grants: ["catalogue.read"],
+      core: true,
+    },
+  ],
+  nykaa: [
+    {
+      id: "nykaa.orders",
+      label: "Orders",
+      summary: "Read your orders. Nykaa doesn't expose seller-health metrics to outside apps.",
+      grants: ["orders.read"],
+      core: true,
+    },
+    {
+      id: "nykaa.catalogue",
+      label: "Catalogue",
+      summary: "Read your catalogue and stock.",
+      grants: ["catalogue.read"],
+      core: true,
+    },
+  ],
+  ajio: [
+    {
+      id: "ajio.orders",
+      label: "Orders",
+      summary: "Read your orders, once Ajio approves your seller application.",
+      grants: ["orders.read"],
+      core: true,
+    },
+    {
+      id: "ajio.catalogue",
+      label: "Catalogue",
+      summary: "Read your catalogue and stock.",
+      grants: ["catalogue.read"],
+      core: true,
+    },
+  ],
 };
 
 function permissions(channel: ChannelId): ChannelPermission[] {

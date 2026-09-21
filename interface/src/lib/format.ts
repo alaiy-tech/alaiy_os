@@ -118,6 +118,53 @@ export function formatDate(value?: string | null): string {
 }
 
 /**
+ * The same date, read relative to a day the caller supplies: "Today",
+ * "Yesterday", a weekday name inside the last week, or "19 Sep" further back.
+ *
+ * Deliberately takes `today` as a parameter rather than reading `new Date()`
+ * itself — a component calling this from a server-rendered first pass would
+ * otherwise fix "today" at request time, then disagree with the browser's
+ * own clock on hydration. Callers that need the viewer's real "today" get it
+ * client-side (after mount, so the server and the first client render still
+ * agree) and pass it in; see `session-rail.tsx`.
+ *
+ * `Date.UTC` both ways, same reasoning as `weekdayName`: only comparing two
+ * values built the same way is guaranteed not to shift by timezone.
+ */
+export function formatRelativeDate(value: string | null | undefined, today: Date): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value ?? "");
+  if (!match) return NO_VALUE;
+  const [, year, month, day] = match;
+  const at = Date.UTC(Number(year), Number(month) - 1, Number(day));
+  const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+  const daysAgo = Math.round((start - at) / 86_400_000);
+
+  if (daysAgo === 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  if (daysAgo > 1 && daysAgo < 7) {
+    const weekday = weekdayName(value);
+    if (weekday) return weekday.slice(0, 3);
+  }
+  const at_ = new Date(at);
+  return `${at_.getUTCDate()} ${MONTHS[at_.getUTCMonth()]}`;
+}
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+
+/**
  * The same value, to the minute.
  *
  * For "last update", where the day alone is not the answer — a seller asking

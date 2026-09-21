@@ -37,7 +37,7 @@ export type AuthResult = {
   token?: string;
 };
 
-export type ChannelId = "shopify" | "amazon";
+export type ChannelId = "shopify" | "amazon" | "flipkart" | "myntra" | "nykaa" | "ajio";
 
 export type ConnectorStatus = {
   channel: ChannelId;

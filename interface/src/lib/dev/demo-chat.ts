@@ -3,6 +3,7 @@ import type {
   ChatMessage,
   ChatSession,
   ChatSessionSummary,
+  ChatToolCall,
 } from "@/lib/backend/types";
 import { DEMO_CURRENCY, stamp, world } from "@/lib/dev/demo-seed";
 
@@ -27,9 +28,19 @@ type DemoChat = {
   title: string | null;
   messages: ChatMessage[];
   /** The reply being written, if any. Committed by the poll that outlives it. */
-  pending?: { seq: number; answer: string; startedAt: number; creation: string };
+  pending?: {
+    seq: number;
+    answer: string;
+    tools: ChatToolCall[];
+    startedAt: number;
+    creation: string;
+  };
   modified: string;
 };
+
+function toolCall(name: string): ChatToolCall {
+  return { id: `${name}-${Math.random().toString(36).slice(2, 8)}`, name, input: {} };
+}
 
 const chats = new Map<string, DemoChat>();
 let counter = 0;
@@ -58,6 +69,7 @@ function message(
   partial = false,
   seq?: number,
   creation?: string,
+  tools: ChatToolCall[] = [],
 ): ChatMessage {
   return {
     name: `${chat.name}-${seq ?? chat.messages.length + 1}`,
@@ -67,7 +79,7 @@ function message(
     attachments: [],
     mentions: [],
     skill: null,
-    tool_calls: [],
+    tool_calls: tools,
     tool_errors: [],
     partial,
     creation: creation ?? stamp(new Date()),
@@ -83,7 +95,7 @@ function message(
  * invented figure — this mode exists to check a UI, and a stub that made up
  * plausible answers would be the one part of it that could mislead.
  */
-function answerFor(question: string): string {
+function answerFor(question: string): { text: string; tools: ChatToolCall[] } {
   const { orders, stockRows } = world();
   const asked = question.toLowerCase();
 
@@ -96,60 +108,104 @@ function answerFor(question: string): string {
     const stuck = orders
       .filter((order) => order.flags.includes("stuck"))
       .sort((a, b) => b.ageHours - a.ageHours);
-    return (
-      `**${stuck.length} orders** are past your unshipped threshold right now — ` +
-      `${stuck.filter((o) => o.channel === "amazon").length} on Amazon and ` +
-      `${stuck.filter((o) => o.channel === "shopify").length} on Shopify.\n\n` +
-      `The oldest is ${stuck[0]?.order_number ?? "—"}, placed ` +
-      `${Math.round((stuck[0]?.ageHours ?? 0) / 24)} days ago. Open the Orders tab ` +
-      `with the "Not shipped" filter to work through them.`
-    );
+    return {
+      tools: [toolCall("seller_orders")],
+      text:
+        `**${stuck.length} orders** are past your unshipped threshold right now — ` +
+        `${stuck.filter((o) => o.channel === "amazon").length} on Amazon and ` +
+        `${stuck.filter((o) => o.channel === "shopify").length} on Shopify.\n\n` +
+        `The oldest is ${stuck[0]?.order_number ?? "—"}, placed ` +
+        `${Math.round((stuck[0]?.ageHours ?? 0) / 24)} days ago. Open the Orders tab ` +
+        `with the "Not shipped" filter to work through them.`,
+    };
   }
 
   if (/(stock|inventory|run out|reorder|cover)/.test(asked)) {
     const critical = stockRows
       .filter((row) => row.band === "critical" || row.band === "low")
       .slice(0, 4);
-    return (
-      `**${critical.length} listings** are inside two weeks of cover:\n\n` +
-      critical
-        .map(
-          (row) =>
-            `- ${row.brand_sku} — ${row.name} · ${row.days_of_cover ?? "—"} days left on ${row.channel}`,
-        )
-        .join("\n") +
-      `\n\nPO-2423 covers the brass diyas and lands in four days. Nothing is on order for the seagrass baskets.`
-    );
+    return {
+      tools: [toolCall("seller_inventory")],
+      text:
+        `**${critical.length} listings** are inside two weeks of cover:\n\n` +
+        critical
+          .map(
+            (row) =>
+              `- ${row.brand_sku} — ${row.name} · ${row.days_of_cover ?? "—"} days left on ${row.channel}`,
+          )
+          .join("\n") +
+        `\n\nPO-2423 covers the brass diyas and lands in four days. Nothing is on order for the seagrass baskets.`,
+    };
+  }
+
+  if (/(compare|compared|vs\.?|yesterday|last friday|last week|how did)/.test(asked)) {
+    // Two adjacent windows, same length, so "yesterday vs. the day before"
+    // reads as a fair comparison rather than a today-vs-a-whole-week one.
+    const recent = orders.filter((order) => order.ageHours <= 24);
+    const prior = orders.filter((order) => order.ageHours > 24 && order.ageHours <= 48);
+    const byChannel = (rows: typeof orders, channel: "amazon" | "shopify") =>
+      rows
+        .filter((order) => order.channel === channel)
+        .reduce((sum, order) => sum + (order.merchandise_total ?? 0), 0);
+    const rows: [string, number, number][] = [
+      ["Amazon", byChannel(recent, "amazon"), byChannel(prior, "amazon")],
+      ["Shopify", byChannel(recent, "shopify"), byChannel(prior, "shopify")],
+    ];
+    const changePct = (now: number, before: number) =>
+      before > 0 ? `${now >= before ? "+" : ""}${(((now - before) / before) * 100).toFixed(1)}%` : "—";
+    const totalNow = rows.reduce((sum, [, now]) => sum + now, 0);
+    const totalBefore = rows.reduce((sum, [, , before]) => sum + before, 0);
+    return {
+      tools: [toolCall("seller_channels"), toolCall("seller_aggregate"), toolCall("seller_compare")],
+      text:
+        `Today so far is ${money(totalNow)} against ${money(totalBefore)} the day before ` +
+        `(${changePct(totalNow, totalBefore)}).\n\n` +
+        `| CHANNEL | TODAY | YESTERDAY | CHANGE |\n` +
+        `|---|---|---|---|\n` +
+        rows
+          .map(
+            ([name, now, before]) =>
+              `| ${name} | ${money(now)} | ${money(before)} | ${changePct(now, before)} |`,
+          )
+          .join("\n"),
+    };
   }
 
   if (/(sales|revenue|gmv|selling|today)/.test(asked)) {
     const week = orders.filter((order) => order.ageHours <= 24 * 7);
     const gmv = week.reduce((sum, order) => sum + (order.merchandise_total ?? 0), 0);
-    return (
-      `Over the last 7 days you took **${week.length} orders** worth ` +
-      `**${money(gmv)}** in merchandise value.\n\n` +
-      `Amazon is ${Math.round((week.filter((o) => o.channel === "amazon").length / Math.max(week.length, 1)) * 100)}% ` +
-      `of that by order count. The Dashboard tiles compare this against the 7 days before it.`
-    );
+    return {
+      tools: [toolCall("seller_metrics"), toolCall("seller_aggregate")],
+      text:
+        `Over the last 7 days you took **${week.length} orders** worth ` +
+        `**${money(gmv)}** in merchandise value.\n\n` +
+        `Amazon is ${Math.round((week.filter((o) => o.channel === "amazon").length / Math.max(week.length, 1)) * 100)}% ` +
+        `of that by order count. The Dashboard tiles compare this against the 7 days before it.`,
+    };
   }
 
   if (/(refund|return|cancel)/.test(asked)) {
     const refunded = orders.filter((order) => order.flags.includes("refunded"));
     const cancelled = orders.filter((order) => order.flags.includes("cancelled"));
-    return (
-      `In the last 45 days: **${refunded.length} refunded** and **${cancelled.length} cancelled** orders.\n\n` +
-      `Neither channel gives us RMA returns, so the return-rate tile on the Dashboard ` +
-      `is those two together — it says so on the tile rather than claiming to be a real return rate.`
-    );
+    return {
+      tools: [toolCall("seller_orders")],
+      text:
+        `In the last 45 days: **${refunded.length} refunded** and **${cancelled.length} cancelled** orders.\n\n` +
+        `Neither channel gives us RMA returns, so the return-rate tile on the Dashboard ` +
+        `is those two together — it says so on the tile rather than claiming to be a real return rate.`,
+    };
   }
 
-  return (
-    `This is demo mode, so I'm reading the same fabricated workspace the tabs are — ` +
-    `I can answer about **orders**, **stock cover**, **sales** and **refunds** from it.\n\n` +
-    `Anything else I'd have to invent, which would make this screen the one part of ` +
-    `demo mode you couldn't trust. Ask me one of those, or switch off \`ALAIY_DEMO\` ` +
-    `and point the app at a real backend.`
-  );
+  return {
+    tools: [],
+    text:
+      `This is demo mode, so I'm reading the same fabricated workspace the tabs are — ` +
+      `I can answer about **orders**, **stock cover**, **sales**, **refunds** and how ` +
+      `channels **compare** from it.\n\n` +
+      `Anything else I'd have to invent, which would make this screen the one part of ` +
+      `demo mode you couldn't trust. Ask me one of those, or switch off \`ALAIY_DEMO\` ` +
+      `and point the app at a real backend.`,
+  };
 }
 
 export function createSession(title?: string): ChatSession {
@@ -187,9 +243,11 @@ export function sendMessage(
   chat.messages.push(message(chat, "user", text, false, seq));
   chat.title ??= text.slice(0, 60);
   chat.modified = stamp(new Date());
+  const { text: answer, tools } = answerFor(text);
   chat.pending = {
     seq: seq + 1,
-    answer: answerFor(text),
+    answer,
+    tools,
     startedAt: Date.now(),
     creation: stamp(new Date()),
   };
@@ -221,8 +279,8 @@ export function getMessages(name: string, after = 0, partial = true): ChatFeed {
   // rather than on a timer: there is no scheduler in a request/response server,
   // and the poll is the only thing that reliably happens.
   if (chat.pending && Date.now() - chat.pending.startedAt >= WRITE_MS) {
-    const { seq, answer, creation } = chat.pending;
-    chat.messages.push(message(chat, "assistant", answer, false, seq, creation));
+    const { seq, answer, tools, creation } = chat.pending;
+    chat.messages.push(message(chat, "assistant", answer, false, seq, creation, tools));
     chat.pending = undefined;
     chat.modified = stamp(new Date());
   }
@@ -236,7 +294,15 @@ export function getMessages(name: string, after = 0, partial = true): ChatFeed {
     const upto = Math.max(1, Math.floor(chat.pending.answer.length * progress));
     const text = chat.pending.answer.slice(0, upto).replace(/\S*$/, "");
     messages.push(
-      message(chat, "assistant", text, true, chat.pending.seq, chat.pending.creation),
+      message(
+        chat,
+        "assistant",
+        text,
+        true,
+        chat.pending.seq,
+        chat.pending.creation,
+        chat.pending.tools,
+      ),
     );
   }
 

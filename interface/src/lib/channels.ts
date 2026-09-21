@@ -20,12 +20,22 @@ export type ChannelDefinition = {
   /**
    * Connectable today.
    *
-   * Off removes the channel from onboarding, from the Channels tab and from
-   * every channel filter, and makes its connect action refuse a direct post.
-   * It deliberately does not hide an existing connection: that card stays, so
-   * a store attached while the channel was live can still be disconnected.
+   * Off removes the channel from onboarding, from the Channels tab's connect
+   * action and from `isLiveChannel`, and makes its connect action refuse a
+   * direct post. It deliberately does not hide an existing connection: that
+   * card stays, so a store attached while the channel was live can still be
+   * disconnected.
    */
   live: boolean;
+  /**
+   * Shown with demo data (`ALAIY_DEMO=1`) even though it isn't a real,
+   * connectable channel yet — same "ship the shell before the substance is
+   * guessed" pattern as Finance/Settings, applied to a channel instead of a
+   * tab. Never true outside demo fixtures; a real workspace simply has no
+   * orders/listings from a channel it hasn't connected, so filter lists built
+   * from real data never need this flag to look complete.
+   */
+  demoOnly?: boolean;
   /** Walkthrough shown inline on the connect step. */
   helpVideoUrl: string;
   helpVideoPoster?: string;
@@ -46,10 +56,45 @@ export const CHANNELS: ChannelDefinition[] = [
     live: true,
     helpVideoUrl: "https://cdn.alaiy.com/help/connect-amazon.mp4",
   },
+  {
+    id: "flipkart",
+    name: "Flipkart",
+    blurb: "Orders, listings and seller-tier metrics over Flipkart's Seller API.",
+    live: false,
+    demoOnly: true,
+    helpVideoUrl: "https://cdn.alaiy.com/help/connect-flipkart.mp4",
+  },
+  {
+    id: "myntra",
+    name: "Myntra",
+    blurb: "Orders, catalogue and returns over Myntra's Partner API.",
+    live: false,
+    demoOnly: true,
+    helpVideoUrl: "https://cdn.alaiy.com/help/connect-myntra.mp4",
+  },
+  {
+    id: "nykaa",
+    name: "Nykaa",
+    blurb: "Orders and catalogue. Nykaa doesn't share seller-health metrics with outside apps.",
+    live: false,
+    demoOnly: true,
+    helpVideoUrl: "https://cdn.alaiy.com/help/connect-nykaa.mp4",
+  },
+  {
+    id: "ajio",
+    name: "Ajio",
+    blurb: "Orders and catalogue, once Ajio approves your seller application.",
+    live: false,
+    demoOnly: true,
+    helpVideoUrl: "https://cdn.alaiy.com/help/connect-ajio.mp4",
+  },
 ];
 
 /** The catalogue as far as a seller is concerned: what they can connect. */
 export const LIVE_CHANNELS = CHANNELS.filter((channel) => channel.live);
+
+/** Live channels, plus the demo-only ones a seller sees under `ALAIY_DEMO=1`. */
+export const DEMO_CHANNELS = CHANNELS.filter((channel) => channel.live || channel.demoOnly);
 
 /** Ids alone, for the server actions that validate a posted channel. */
 export const CHANNEL_IDS: ChannelId[] = CHANNELS.map((channel) => channel.id);
@@ -68,9 +113,15 @@ export function isLiveChannel(value: string): value is ChannelId {
 /**
  * Options for a channel filter, without the leading "all" entry — screens word
  * that differently ("All", "All channels") and it is not a channel.
+ *
+ * Reads `DEMO_CHANNELS` rather than `LIVE_CHANNELS`: a filter's job is to
+ * cover whatever channels a workspace's data actually has rows from, and in
+ * demo mode that's all six. A real, non-demo workspace never has orders from
+ * a channel it hasn't connected, so this stays honest without needing to
+ * check `ALAIY_DEMO` itself.
  */
 export function channelOptions(): { value: ChannelId; label: string }[] {
-  return LIVE_CHANNELS.map((channel) => ({ value: channel.id, label: channel.name }));
+  return DEMO_CHANNELS.map((channel) => ({ value: channel.id, label: channel.name }));
 }
 
 /**
