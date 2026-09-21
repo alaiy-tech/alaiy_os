@@ -28,7 +28,7 @@ export function SummaryChip({
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pt-1">
         {figures.map((figure) => (
           <p key={figure.label} className="text-[13px] text-muted">
-            <span className="pr-1 font-data text-[16px] font-semibold text-primary-600">
+            <span className="pr-1 font-data text-stat-sm font-semibold text-primary-600">
               {figure.value}
             </span>
             {figure.label}
@@ -68,7 +68,7 @@ export function Figure({
 }) {
   return (
     <p className="text-[13px] text-muted" title={title}>
-      <span className="pr-1 font-data text-[16px] font-semibold text-primary-600">
+      <span className="pr-1 font-data text-stat-sm font-semibold text-primary-600">
         {value}
       </span>
       {label}

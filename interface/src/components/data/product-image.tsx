@@ -21,10 +21,10 @@ const SIZES: Record<ProductImageSize, { box: string; label: string }> = {
   /** A table row. 64px — four times the area of the 32px thumbnail this
    *  replaces, which is the difference between a decoration and something a
    *  seller can actually identify a product by while scrolling. */
-  row: { box: "h-16 w-16", label: "text-[9px]" },
+  row: { box: "h-16 w-16", label: "text-micro" },
   /** The rest of a listing's images. Four of these and the gaps between them
    *  come to exactly one row under the main image. */
-  thumb: { box: "h-10 w-10", label: "text-[9px]" },
+  thumb: { box: "h-10 w-10", label: "text-micro" },
   /** The detail panel's main image. Smaller on a phone, where it is stacked
    *  above the facts rather than beside them and 192px would be most of the
    *  first screen. */
