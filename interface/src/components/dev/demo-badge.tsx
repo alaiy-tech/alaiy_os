@@ -21,7 +21,7 @@ export function DemoBadge() {
   return (
     <p
       role="status"
-      className="pointer-events-none fixed bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-full border border-warn/40 bg-warn-soft px-3 py-1 text-[11px] font-semibold tracking-wide text-warn-ink shadow-sm"
+      className="pointer-events-none fixed bottom-3 left-1/2 z-50 -translate-x-1/2 rounded-full border border-warn/40 bg-warn-soft px-3 py-1 text-[11px] font-semibold tracking-wide text-warn-ink shadow-float"
     >
       Demo data — nothing here is real
     </p>

@@ -31,13 +31,14 @@ export function TableFrame({
   return (
     // The sideways scroll belongs to the table's own wrapper. On the page it
     // would drag the sidebar and the Ask panel along with it.
-    <div className="overflow-x-auto rounded-sm border border-line bg-white">
-      {/* `font-data` is Geist: this is the surface a seller scans a thousand
-          rows of, and Poppins is wider and looser at 13px. Headings opt back
-          into the brand face below. */}
+    <div className="overflow-x-auto rounded-lg border border-line bg-white">
+      {/* `font-data` carries tabular numerals: this is the surface a seller
+          scans a thousand rows of, and `text-table` (13.5px) is this
+          system's own confirmed table-row size. Headings opt back into the
+          brand face below. */}
       <table
         style={{ minWidth }}
-        className="w-full border-collapse text-left font-data text-[13px]"
+        className="w-full border-collapse text-left font-data text-table"
       >
         {children}
       </table>
@@ -126,10 +127,12 @@ export function Td({
 /**
  * The channel a row came from.
  *
- * A dot plus a pill, matching every other status in the product. The two
- * channels get two distinct hues rather than two shades of one, because
- * telling them apart is the whole job of the column — and the label is still
- * spelled out, so the colour is a shortcut and never the only signal.
+ * A dot plus a pill, matching every other status in the product. Six
+ * channels now share four status-adjacent hues plus two blue steps off the
+ * primary ramp — telling them apart is the whole job of the column, but the
+ * label is still spelled out, so a repeated hue (Flipkart/Nykaa both read as
+ * "blue") is never the only signal, only Shopify's/Amazon's/Myntra's own
+ * colours are unambiguous on sight.
  */
 export function ChannelBadge({ channel }: { channel: string }) {
   const tones: Record<string, { pill: string; dot: string }> = {
@@ -140,6 +143,22 @@ export function ChannelBadge({ channel }: { channel: string }) {
     amazon: {
       pill: "border-warn/40 bg-warn-soft text-warn-ink",
       dot: "bg-warn",
+    },
+    myntra: {
+      pill: "border-alert/30 bg-alert-soft text-alert-ink",
+      dot: "bg-alert",
+    },
+    flipkart: {
+      pill: "border-highlight-300 bg-highlight-100 text-highlight-700",
+      dot: "bg-highlight-600",
+    },
+    nykaa: {
+      pill: "border-primary-300 bg-primary-100 text-primary-600",
+      dot: "bg-primary-500",
+    },
+    ajio: {
+      pill: "border-line bg-surface text-muted",
+      dot: "bg-muted/60",
     },
   };
   const tone = tones[channel] ?? { pill: "border-line bg-surface text-muted", dot: "bg-muted/50" };
