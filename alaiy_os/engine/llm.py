@@ -72,6 +72,104 @@ def generate_image(prompt, reference_data_uri=None):
 	return _client().generate_image(prompt, reference_data_uri=reference_data_uri)
 
 
+def remove_background(
+	image_data_uri,
+	*,
+	background_color=None,
+	background_prompt=None,
+	shadow="soft",
+	shadow_intensity=None,
+	shadow_spread=None,
+	shadow_direction=None,
+	output_size=None,
+	padding=None,
+	padding_sides=None,
+):
+	"""One photo, matted and optionally given a new background ->
+	{"b64", "media_type"}.
+
+	Same seam as `generate_image`: a tool should not hold a provider key or
+	know a provider's wire format. At most one of `background_color` (a
+	`#rrggbb` hex — the house finish) or `background_prompt` (free text — a
+	generated lifestyle background); neither means a transparent cutout.
+	Either way the product's own pixels are kept and only the background is
+	touched. `shadow` is "soft" | "hard" | "none"; `shadow_intensity` (0..1)
+	optionally lightens or darkens it, and only takes effect alongside
+	`shadow_spread` (how long the shadow is, e.g. "short"/"medium"/"long" or a
+	0-90 degree angle) and `shadow_direction` (which way it falls, e.g.
+	"behind" or a 0-360 degree angle) — all three switch Photoroom into its
+	override mode; left unset, Photoroom guesses the shadow's angle and length
+	itself, which reads as inconsistent from photo to photo. `output_size` /
+	`padding` / `padding_sides` follow Photoroom's own syntax (see
+	`engine/ai_client.py`) since this call is currently Photoroom-specific;
+	they are simply ignored by a client that doesn't need them.
+
+	Raises `Unsupported` if this deployment's client has no background/matting
+	provider configured.
+	"""
+	return _client().remove_background(
+		image_data_uri,
+		background_color=background_color,
+		background_prompt=background_prompt,
+		shadow=shadow,
+		shadow_intensity=shadow_intensity,
+		shadow_spread=shadow_spread,
+		shadow_direction=shadow_direction,
+		output_size=output_size,
+		padding=padding,
+		padding_sides=padding_sides,
+	)
+
+
+def virtual_model(image_data_uri, *, model_preset=None, scene_preset=None, pose=None, prompt=None, size=None):
+	"""One photo, shown worn by a generated person -> {"b64", "media_type"}.
+
+	Same seam as `remove_background`, with a DIFFERENT guarantee: this is the
+	one image capability on this seam that does NOT promise the product's own
+	pixels survive untouched — showing something worn means generating the
+	scene around it, and Photoroom's own model may reinterpret the product in
+	the process. Treat the result as a styled/marketing render, never as a
+	stand-in for the authoritative product photo a customer is buying.
+
+	All of `model_preset` / `scene_preset` / `pose` / `size` are optional and
+	follow Photoroom's own preset names (see `engine/ai_client.py`); `prompt`
+	is free text, e.g. "street style". Leaving everything unset asks Photoroom
+	to choose automatically.
+
+	Raises `Unsupported` if this deployment's client has no provider for it.
+	"""
+	return _client().virtual_model(
+		image_data_uri,
+		model_preset=model_preset,
+		scene_preset=scene_preset,
+		pose=pose,
+		prompt=prompt,
+		size=size,
+	)
+
+
+def stage_product(image_data_uri, *, prompt=None, seed=None):
+	"""One photo, staged into a full lifestyle scene — held, worn, or on a
+	table -> {"b64", "media_type"}.
+
+	Same seam as `remove_background`, with the same DIFFERENT guarantee
+	`virtual_model` carries: this does NOT promise the product's own pixels
+	survive untouched, because staging a scene around it means regenerating
+	the product too. Treat the result as a styled/marketing render, never as
+	a stand-in for the authoritative product photo a customer is buying.
+
+	Where this differs from `virtual_model`: Photoroom scopes that one to
+	clothing, and this one — its own "Product Staging" tool underneath — to
+	"hard goods, accessories, bags, jewelry, shoes". `prompt` is free text,
+	e.g. "worn on a wrist, close up"; leaving it unset falls back to
+	Photoroom's own Product Staging wording rather than failing, since
+	Photoroom's side treats the prompt as required.
+
+	Raises `Unsupported` if this deployment's client has no provider for it.
+	"""
+	return _client().stage_product(image_data_uri, prompt=prompt, seed=seed)
+
+
 def web_search_support():
 	"""Whether this site can reach the public web at all.
 
@@ -105,6 +203,18 @@ def translate_image(image_url):
 	itself rather than receiving bytes.
 	"""
 	return _client().translate_image(image_url)
+
+
+def white_background(image_url):
+	"""One photo, put on a plain white background -> {"white_bg_url"}.
+
+	Same shape as `translate_image` and the same reason to keep it separate:
+	this is the same provider's other endpoint, not a general compositing
+	tool. The URL returned belongs to the provider and may expire; re-hosting
+	it is the caller's job. `image_url` must be publicly reachable — the
+	provider fetches it itself rather than receiving bytes.
+	"""
+	return _client().white_background(image_url)
 
 
 def transcribe_support():
