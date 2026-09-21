@@ -1,357 +1,234 @@
-# Alaiy — the design system, as built
-
-Four values carry the whole product:
-
-| | | |
-|---|---|---|
-| **Paper** | `#F7F4EF` | the ground the entire product sits on |
-| **Navy** | `#003254` | every panel, and every word of text |
-| **Highlight blue** | `#91D1F2` | the one accent |
-| **Border** | `#DFD9CD` | the line between a card and the ground |
-
-Everything else in [globals.css](src/app/globals.css) is derived from those, and
-nothing is invented that is not needed to say something the four cannot.
-
-The system as drawn is a marketing system: a page read once, top to bottom.
-This is a product a seller opens every morning and scans a thousand table rows
-in. Where the two disagree, this file says which won and why — see
-[Where this departs from the system](#where-this-departs-from-the-system). The
-short version: every rule about **ground, shape, shadow, type and the button**
-is applied literally. The additions are all about *state* — saying "that sync
-failed" — which a two-colour system has no vocabulary for.
-
+---
+name: Alaiy
+description: A commerce operating system for D2C brands — inventory, orders, suppliers, channels, and AI agents in one place.
+colors:
+  navy-50: "#eff6fb"
+  navy-100: "#d6eaf8"
+  navy-200: "#c0e0f4"
+  navy-300: "#aed6f1"
+  navy-400: "#1e5f8b"
+  navy-500: "#1a4a6b"
+  navy-600: "#0d2b45"
+  navy-700: "#0b2540"
+  navy-800: "#0a2238"
+  navy-900: "#071826"
+  mint-active: "#d5f3f3"
+  ink: "#0d2b45"
+  muted: "#64748b"
+  muted-soft: "#94a3b8"
+  line: "#e2e8f0"
+  ground: "#f7f9fc"
+  card: "#ffffff"
+  ok: "#16a34a"
+  ok-soft: "#eaf7ef"
+  ok-ink: "#15803d"
+  warn: "#d97706"
+  warn-soft: "#fdf4e3"
+  warn-ink: "#92400e"
+  alert: "#dc2626"
+  alert-soft: "#fdeded"
+  alert-ink: "#991b1b"
+typography:
+  title:
+    fontFamily: "var(--font-playfair), Georgia, 'Times New Roman', serif"
+    fontSize: "36px"
+    fontWeight: 600
+    lineHeight: 1.08
+    role: "H1 — a data tab's own page title, once per page"
+  section:
+    fontFamily: "var(--font-playfair), Georgia, 'Times New Roman', serif"
+    fontSize: "20px"
+    fontWeight: 600
+    lineHeight: 1.3
+    role: "H2 — a section heading inside a page, e.g. 'Latest orders'"
+  heading:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontWeight: 600
+    lineHeight: 1.2
+    role: "H3-H6 — card and panel titles"
+  eyebrow:
+    fontFamily: "var(--font-jetbrains-mono), ui-monospace, monospace"
+    fontSize: "11px"
+    fontWeight: 600
+    letterSpacing: "0.14em"
+    role: "a section's name above its heading — 'YOUR MORNING'"
+  stat:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "30px"
+    fontWeight: 600
+    fontFeatureSettings: "tabular-nums"
+    role: "a KPI tile's own figure"
+  lead:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "15px"
+    fontWeight: 400
+    role: "one prominent line of supporting copy"
+  body:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.5
+    role: "the dense-UI default — most of what the product actually reads at"
+  table:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "13.5px"
+    fontWeight: 400
+    fontFeatureSettings: "tabular-nums"
+    role: "table rows specifically"
+  caption:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    role: "a secondary caption — a footnote, a synced-at timestamp, a tool-trace chip"
+  chip:
+    fontFamily: "var(--font-poppins), ui-sans-serif, system-ui, sans-serif"
+    fontSize: "12.5px"
+    fontWeight: 500
+    role: "a small pressable chip or pill's own label — a suggestion pill, an alert's dismiss control"
+rounded:
+  xs: "4px"
+  sm: "8px"
+  md: "12px"
+  lg: "16px"
+  xl: "24px"
+  pill: "9999px"
+spacing:
+  ask-panel: "360px"
+  ask-panel-xl: "400px"
+components:
+  press:
+    backgroundColor: "{colors.navy-600}"
+    textColor: "#ffffff"
+    rounded: "{rounded.md}"
+    height: "44px"
+    fontFamily: "var(--font-poppins)"
+  card:
+    backgroundColor: "{colors.card}"
+    rounded: "{rounded.lg}"
+    padding: "20px"
+    border: "0.8px solid {colors.line}"
+  input:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.md}"
+    height: "44px"
+    padding: "0 14px"
 ---
 
-## The ground is paper, not white
+# Design System: Alaiy
 
-Paper is not one option in a rotation. It is *the* surface, and navy is used
-with intent — the rail, the sign-in masthead, the seller's own words in a
-transcript — rather than alternated with it.
+## Overview
 
-White survives in exactly one role: **a card sitting on paper**, which is how
-the system's own colour swatches are drawn. So in a component:
+**"The Morning Briefing."** Sourced from an authored Claude Design mockup — every token below is read off that mockup's own rendered output (computed `border-radius`, `box-shadow`, `color`, exact type sizes), not invented or guessed. This is the third visual system this file has recorded this year; unlike the second (a drift the product corrected back out of), this one replaces the incumbent by deliberate brief, and the old one is retired as evidence of what the product was rather than kept as a parallel truth.
 
-- `bg-canvas` — the page. Paper. Also `bg-paper`, the same value under the name
-  of the thing rather than the role.
-- `bg-white` — "this is a card." A card, a field, a table, an answer.
-- `bg-surface` (`#EFE9DD`) — a deeper paper, for a ground that has to sit
-  *inside* paper: a filter bar, a table's header band, a collapsed helper. It is
-  warm on purpose; a blue tint here fights the ground.
-- `bg-primary-600` — a navy panel. Used with intent, never in rotation.
+One navy hue carries ink, panels and the interactive/accent role at different lightness steps, rather than pairing navy with a separate accent colour the way the prior two systems each did. White cards float on an off-white ground, told apart by a hairline border — confirmed against the mockup's own real elements, a card computes to a 16px radius, a 0.8px border, and **no box-shadow at rest**. One mint tone (`#D5F3F3`) marks "you are here" and nothing else — the sidebar's active nav item, exclusively.
 
-A hover wash on paper is `bg-primary-600/5` or `bg-primary-600/[0.04]` — navy
-diluted, so it stays in the same family as the ground. It is never a blue tint;
-blue is the accent, not a neutral.
+**Key Characteristics:**
+- One hue (navy) does ink, panel and accent duty; a separate mint marks only the current location in the sidebar.
+- Cards get a hairline border and no shadow; the shadow tokens exist for genuinely floating surfaces (a toast, a drawer, the nav bar's edge) only.
+- Four real radius steps (4/8/12/16px) plus a full pill, not one flat value.
+- Playfair Display narrows to Title (36px) and Section (20px) only — every other heading and all body/table/KPI text is Poppins, including tabular figures (no separate "data" face).
 
-## One shape
+## Colors
 
-The system draws a single 5px corner and squares everything else, so **every
-radius step resolves to one of two values**:
+Navy at several lightness steps, plus one status set and one single-purpose mint.
 
-```
---radius-xs: 3px    a chip, a status pill, a tiny icon button
---radius-sm: 5px    everything else
---radius-md .. 3xl  all 5px
-```
+### Primary
+- **Ink** (`#0D2B45`, navy-600): the sidebar, headings, primary text. Unchanged in spirit from every prior system — always the panel/ink colour.
+- **Link** (`#1E5F8B`, navy-400): interactive text, focus rings — this system's "accent" role, at a lighter step of the same hue rather than a second colour.
+- **Accent tint** (`#AED6F1`, navy-300): a plate, a segmented control's active fill.
 
-`rounded-md` through `rounded-3xl` collapsing to 5px is deliberate: a
-`rounded-2xl` left behind in a component cannot quietly reintroduce a second
-shape language.
+### Neutral
+- **Ground** (`#F7F9FC`): the page.
+- **Card** (`#FFFFFF`): every card, table and field — visually distinct from the ground in this system (unlike the immediately-prior one, where the two had converged).
+- **Line** (`#E2E8F0`): the hairline border that is the only thing separating a card from the ground now that shadows are reserved for floating surfaces.
+- **Muted** (`#64748B`) / **Muted soft** (`#94A3B8`): secondary and quietest legible text.
 
-`rounded-full` is reserved for things that are genuinely round — a status dot, a
-spinner, the ring on a bullet. There are seven of them in the codebase and every
-one is a circle.
-
-## One shadow
-
-The system has exactly one shadow: an **offset, unblurred block of colour**. It
-is what makes a button read as a key to press, and it is the only thing in the
-product that casts one.
-
-```
---shadow-press       4px 4px 0 navy     a button at rest
---shadow-press-lift  6px 6px 0 blue     a button under the cursor
---shadow-press-dark  4px 4px 0 white/25 a button on a navy panel
---shadow-float      10px 10px 0 navy/14 a surface genuinely floating
-```
-
-A card gets a 1px line and **nothing else**. The 1px line against paper is what
-separates the two surfaces, and it is enough precisely because paper is not
-white — the old blurred `shadow-lift` existed to fake that separation on a white
-ground and has no job here.
-
-`--shadow-float` is the one exception, for the import toast: a surface lying
-across whatever the page is showing has to say it is above it. Navy at low alpha
-rather than solid, because it falls over content.
-
-## The arcade press
-
-There is **no filled "primary" button**. Every call to action is the same
-outlined shape: it lifts towards the reader on hover and its shadow turns accent
-blue, then on click the shadow collapses to nothing as the button travels into
-where the shadow was. The travel and the shadow add up to the same distance, or
-the press reads as a slide.
-
-The geometry lives once, in `@layer components` in globals.css, as `.press` plus
-a ground. It is in a layer so a utility class at a call site still wins — a
-button that needs `w-full` says so in Tailwind and does not have to fight the
-component.
-
-Use it through `Button`, `ButtonLink`, or `pressClass()` from
-[components/ui](src/components/ui/index.tsx):
-
-```tsx
-<Button>Book a demo →</Button>                       // on paper
-<Button ground="dark">Sign up / Login</Button>        // on a navy panel
-<Button ground="alert" size="sm">Yes, disconnect</Button>
-<Button ground="quiet">Cancel</Button>
-<a href="…" className={pressClass()}>Continue with Google</a>
-```
-
-**Grounds** — the only choice is what colour the button is standing on:
-
-| `ground` | |
-|---|---|
-| `light` (default) | navy on paper |
-| `dark` | white on a navy panel |
-| `alert` | the destructive confirm — see below |
-| `quiet` | not a press at all — see below |
-
-**Sizes** — `md` (h-11, form scale) and `sm` (h-9, a control inside a row).
-`sm` is a real size in the system rather than an `h-9` appended to `md`, so
-which height wins is a decision and not an accident of stylesheet order.
-
-**Since nothing is filled, nothing is ranked.** Two buttons side by side are the
-same shape, and which one a screen wants taken is said by where it is and what
-it reads — not by how loud it is. This is why `Connect`/`Cancel` and
-`Products`/`Orders` no longer have a primary and a secondary.
-
-### `quiet`, and why it exists
-
-`quiet` has no border, no shadow and no travel. It is for an action that must be
-*available* without being *offered* — "Cancel" beside a confirm, "Clear" beside
-a filter, "Details" on a toast.
-
-Making these the full shape would give a way out the same weight as the thing
-itself, and a screen where every control is a key to press has no emphasis left
-anywhere.
-
-### `alert`, and why it keeps the shape
-
-The disconnect confirm is the only press in the product that is not
-brand-coloured. It keeps the geometry exactly — it has to read as a key — and
-takes the alert ink for its border and its block, so colour is the only thing
-saying this one cannot be taken back. Its hover lift stays in its own hue rather
-than turning blue, because blue there would read as "and now it is safe."
-
-### Disabled
-
-A disabled press sits flat where it was pressed: no shadow to promise a press
-that will not happen, and no travel on hover.
-
-## Type
-
-Three faces, each with one job. Loaded in
-[app/layout.tsx](src/app/layout.tsx).
-
-| | | |
-|---|---|---|
-| **Playfair Display** | `font-display` | anything read once: headings, Alaiy's greeting |
-| **Poppins** | `font-sans` | everything read at length: body, labels, nav, buttons |
-| **Geist** | `font-data` | what a seller reads a thousand rows of |
-
-`h1`–`h4` are the display face by default, via a `:where()` rule in globals.css,
-so a component cannot forget. `text-wrap: balance` comes with it, because these
-are short deliberate lines.
-
-**Why a third face.** The system names two, and a third needs justifying. At
-12–13px Poppins is wider and looser than Geist, and — the actual reason — it
-sets numerals **proportionally**, so a column of money shifts under its own
-alignment. `.font-data` also turns on `tabular-nums`. It is scoped to table
-cells, SKUs, dates and figures, and it is the only reason a third family exists.
-
-### The display scale
-
-Five steps and a quote, named for the job rather than the size, because the size
-is the thing most likely to be nudged and the job is not:
-
-| utility | px / line-height | where |
-|---|---|---|
-| `text-display-xl` | 52 / 1.04 | the sign-in hero. Once, in the whole product |
-| `text-display-lg` | 36 / 1.08 | Ask Alaiy's masthead, an onboarding step's `h1` |
-| `text-display-md` | 26 / 1.12 | a data tab's own `h1` |
-| `text-display-sm` | 18 / 1.20 | a card's or a connector row's `h2` |
-| `text-display-xs` | 16 / 1.25 | a heading inside something small — the toast |
-| `text-quote` | 20 / 1.40 | Alaiy speaking in its own voice |
-
-`text-quote` is the odd one: display-face *body copy*, so unlike the headings it
-gets a line height you can read a sentence at. It carries the greeting on the
-first screen, and it is where the system's italic pull-quote would go.
-
-**An `h1` with an arbitrary pixel value is how a scale becomes a list of numbers
-nobody can review.** There are none left in the product.
-
-Body copy stays in Tailwind's own steps and the 11–15px arbitrary sizes the data
-surfaces were already tuned at; those are density decisions per table, not a
-brand scale.
-
-### The eyebrow
-
-A section's name, above its heading — letterspaced small caps with the accent
-squiggle. Use the component, not the class:
-
-```tsx
-<Eyebrow>Your data</Eyebrow>
-```
-
-The squiggle is `aria-hidden`; the label carries the meaning. Smaller labels
-that are not section names (a column heading, a filter's name) are Poppins
-semibold, 11px, `uppercase tracking-[0.12em]`, in `text-primary-500` — the
-eyebrow's idiom at a size the eyebrow's letterspacing would not survive.
-
-## The grain
-
-Not decoration. It is what stops a flat fill from reading as plain beige, and it
-is why paper looks like paper and navy looks like ink on it.
-
-One fixed `body::before` layer over the whole viewport: an inline SVG
-`feTurbulence`, 5% opacity, `mix-blend-mode: overlay`. Fixed and
-`pointer-events: none`, so it neither repaints per scrolled frame nor
-intercepts a click. Its `z-index: 9999` is above the app's own stacking on
-purpose — a dialog that lost the grain would look like a different product.
-
-## Colour, in practice
-
-The navy and blue scales exist so a component does not have to reach for an
-arbitrary alpha. The steps that matter:
-
-- `primary-600` — the brand navy. Panels, text, borders, the press.
-- `primary-500` (`#124E70`) — the readable mid-tone for a small label on a light
-  ground. 7.4:1 on `surface`.
-- `highlight-300` — the brand blue. **A plate you read navy text on** (8.0:1),
-  never a text colour: on paper it is 1.5:1.
-- `highlight-500/600/700` — the vivid steps. 500 for a dot or a progress bar;
-  600 for a focus ring and an icon; 700 when a 12px figure has to be blue.
-- `ink` / `muted` / `muted-soft` — text, in descending order of loudness.
-  `muted-soft` is where text *stops*: anything quieter is not text, it is
-  decoration, and should be `aria-hidden` rather than dimmer.
+### The one mint
+`#D5F3F3` marks the sidebar's active nav item and nothing else — not a general second accent. Reaching for it anywhere else reopens a second accent this system deliberately doesn't have.
 
 ### Status
+Healthy `#16A34A`/`#EAF7EF`, caution `#D97706`/`#FDF4E3`, action-required `#DC2626`/`#FDEDED` — each with a darker `-ink` step for text on its own soft ground.
 
-Three hues, each with one bright step and one `-ink`:
+### Named Rules
+**The One Hue Rule.** Navy carries ink, panel and accent at different lightness steps. Reaching for a second hue for "the accent" is how the prior two systems each ended up spending two colours where this one spends one.
 
-```
-ok    #1F9D5F  ok-soft    #DCF2E0  ok-ink    #0A6136
-warn  #E08A1E  warn-soft  #FBEECF  warn-ink  #7D4708
-alert #D9401A  alert-soft #FBE3D9  alert-ink #A02310
-```
+**Cards Get a Line, Not a Shadow.** A resting card's only separation from the ground is its hairline border. A shadow under a resting card is a regression, confirmed against the mockup's own computed styles twice (a KPI tile, a table-section card — both `box-shadow: none`).
 
-The rule is strict: **the bright value drives fills, bars and dots; `-ink`
-carries every word.** Bright-on-soft reads well at hero scale and measures
-1.9–4.1:1, which is nowhere near what a seller reading a table at 12px needs.
+## Typography
 
-## Contrast
+**Display Font:** Playfair Display, narrowed to two roles only: Title (H1, 36px/600) and Section (H2, 20px/600).
+**Body Font:** Poppins — H3-H6, body copy, labels, nav, buttons, table rows and KPI figures alike.
+**Label Font:** JetBrains Mono — the Eyebrow only.
 
-Every text pair was measured. Navy on paper is 12.1:1 and blue on navy is
-8.0:1, so the brand pairs were never the problem — the derived ones are:
+**Character:** One geometric sans carries almost everything; the serif is reserved for the two headline moments a page gets, not spent on every heading the way the immediately-prior system spent it on H1-H6 uniformly.
 
-| pair | ratio |
-|---|---|
-| navy on paper / white / surface | 12.1 / 13.3 / 11.0 |
-| navy on the blue plate | 8.0 |
-| white on navy | 13.3 |
-| `muted` on paper / white | 6.6 / 7.3 |
-| `muted-soft` on paper / white | 4.7 / 5.2 |
-| `primary-500` on `surface` (a table heading) | 7.4 |
-| `-ink` on its own soft ground | 6.2 – 6.6 |
-| the eyebrow | 4.8 |
-| the focus ring on paper (needs 3.0) | 4.0 |
+### Hierarchy
+- **Title** (600, 36px, Playfair): a data tab's own page title — confirmed against the mockup's own tokens frame ("Title · 36/600 → Where the business stands").
+- **Section** (600, 20px, Playfair): a section heading inside a page — confirmed ("Section · 20/600 → Latest orders").
+- **Heading** (600, Poppins): a card or panel's own title, H3-H6.
+- **Eyebrow** (600, 11px, JetBrains Mono, tracking +0.14em): a section's name above its heading.
+- **Stat** (600, 30px, Poppins, tabular): a KPI tile's own figure — confirmed ("KPI · 30/600 tnum").
+- **Lead** (400, 15px): one prominent supporting line.
+- **Body** (400, 14px): the dense-UI default — confirmed ("Body · 14/400"), a real bump from the 13px the prior two systems used.
+- **Table** (400, 13.5px, tabular): table rows specifically — confirmed ("Table · 13.5/400").
+- **Caption** (400, 12px): a secondary caption — a footnote, a synced-at timestamp, a tool-trace chip's own label.
+- **Chip** (500, 12.5px): a small pressable chip or pill's own label — a suggestion pill, an alert's dismiss control.
 
-Three things sit below 3:1, each deliberately:
+### Named Rules
+**No Separate Data Face.** KPI figures and table rows are Poppins with `font-variant-numeric: tabular-nums`, not a distinct geometric/mono typeface the way the prior system spent Geist. Confirmed directly in the mockup's own tokens frame: "Poppins for everything else, tabular figures on every number."
 
-- **Status dots.** Every one is paired with its own spelled-out label
-  ("Connected", "Failed", "shopify"), so the dot is redundant reinforcement
-  rather than the only way to read a state. They are `aria-hidden`.
-- **The eyebrow's squiggle.** Decorative and `aria-hidden`. The system draws it
-  in `#91D1F2`, which is 1.5:1 on paper — near invisible. It is
-  `highlight-500` here, which is 3.0:1 and still unmistakably the accent.
-- **A disabled press** (2.6:1). WCAG 1.4.3 exempts inactive controls, and the
-  point of the state is that it is not available.
+## Layout
 
-Two things that used to sit below the line and no longer do: the eyebrow (the
-system's 55% navy measured 3.4:1, and is 68% here at 4.8:1), and the string of
-`text-muted/50`–`/80` guesses that measured 2.3–4.1:1 and are now the one
-measured `muted-soft`.
+Unchanged from the prior system: a left rail (`--spacing-rail`, 240px) and a docked Ask Alaiy panel (`--spacing-ask-panel`, 360px, widening to 400px at the `80rem` breakpoint), both flexbox rather than grid so the main column and the Orders detail panel resize off the same CSS variable with no coordination code. This is a surface reskin; it doesn't touch the shell's proportions or the sidebar's flat structure.
 
-## Naming
+## Elevation & Depth
 
-**The product is "Alaiy". Never "Alaiy OS."** That is the ERPNext backend's
-name, and a seller has no reason to ever meet it. It survives only in
-[lib/backend](src/lib/backend/) doc comments, which are genuinely about that
-backend.
+Flat by default. A card's only separation from the ground is a 0.8px hairline border — confirmed twice against real rendered elements (`box-shadow: none`). The shadow tokens exist solely for a surface that genuinely floats over the page: a toast, the Orders detail drawer, a dropdown, a tooltip.
 
-The wordmark carries no "OS" beside it, and no lettering of its own: on paper it
-keeps its navy-and-blue colouring, and on navy it uses the reversed lockup where
-"al" and "y" invert to white and the "ai" at the centre stays accent blue —
-never a flat white silhouette.
+### Shadow Vocabulary
+- **sm** (`0 1px 4px rgb(13 43 69 / 0.06)`): a button's hover lift.
+- **md** (`0 2px 12px rgb(13 43 69 / 0.08)`): a button's stronger hover state; the hero composer's resting lift.
+- **lg** (`0 4px 24px rgb(13 43 69 / 0.12)`): a genuinely floating surface — aliased as `--shadow-float` for the handful of call sites (the import toast, the Orders drawer, a chart tooltip) that already used that name.
+- **xl** (`0 8px 40px rgb(13 43 69 / 0.16)`): a modal, if one is ever needed.
+- **nav** (`0 2px 16px rgb(13 43 69 / 0.1)`): the sticky nav bar's own bottom edge.
 
-## Where this departs from the system
+### Named Rules
+**Floating Only.** A shadow means "this is not part of the page flow." Anything that sits in the page's own flow — a card, a KPI tile, a table — gets a border, never a shadow.
 
-Four places, all of them because a product has to say things a page read once
-does not.
+## Shapes
 
-**1. A status palette exists.** "Two colours, one accent" is right for a page
-that is read once. This product has to say "that sync failed" and "those totals
-are incomplete" in a table a seller scans daily, and blue cannot carry both a
-link and a failure. The set is kept to three hues with one bright step and one
-ink each, retuned warm so it sits on paper rather than on the white it was
-originally mixed for.
+Four real steps: 4px (a small badge), 8px (a button, an input), 12px (a select, a session-rail row), 16px (a card, a table). `rounded-full` for genuinely round things — a dot, a spinner, an avatar-style icon plate — plus the sidebar's active-nav pill and a segmented control, both confirmed effectively full-round against the mockup's own rendered output.
 
-**2. The eyebrow is navy at 68%, not 55%.** 55% measures 3.4:1 on paper — fine
-for a 40px marketing eyebrow the eye skims past, not fine for a 12px one that is
-the only thing naming a section.
+## Components
 
-**3. A third typeface, for numerals only.** See [Type](#type). Poppins sets
-figures proportionally; a column of money that shifts under its own alignment is
-a worse offence against the design than a third font file.
+### Buttons (the `.press` system)
+Filled navy, no border. Flat at rest — a soft shadow only appears on hover, alongside a light upward lift; both settle back to flat on click. No hard offset shadow anywhere in this system.
+- **Light** (on the page ground): filled navy, white text.
+- **Dark** (on the navy sidebar): filled with the palest accent tint, navy text — a navy-on-navy fill would vanish, so the sidebar's own primary action takes the tint instead.
+- **Alert**: filled solid alert-red, white text.
+- **Quiet**: not a press at all — muted text, no fill, for a de-emphasized action ("Cancel").
+- **Link**: an inline text action ("Export CSV", "View all →") — plain accent-coloured text with no fill, border or padding of its own, confirmed against the mockup's own rendered output.
 
-**4. `quiet` is not a press.** The system says every call to action is the one
-shape. Taken literally, a "Cancel" gets the same weight as the confirm it sits
-beside. `quiet` is the smallest possible carve-out: the low-emphasis escape
-hatch, and nothing else.
+### Cards
+16px radius, white background, a 0.8px hairline border, no shadow at rest. 20px padding standard.
 
-## Where things live
+### Inputs
+White background, hairline border, 12px radius, 44px height. Border brightens to the accent on focus. Ask Alaiy's composer keeps the app's one exception: the focus state lives on the bordered box (`focus-within`), not the field itself.
 
-| | |
-|---|---|
-| [app/globals.css](src/app/globals.css) | every token, `.press`, `.eyebrow`, the grain, the two animations |
-| [app/layout.tsx](src/app/layout.tsx) | the three faces |
-| [components/ui/index.tsx](src/components/ui/index.tsx) | `Button`, `ButtonLink`, `pressClass`, `Input`, `Select`, `Field`, `Card`, `Alert`, `Pill`, `Eyebrow`, `Logo`, `Spinner` |
-| [components/data/](src/components/data/) | the table, toolbar, pagination and summary primitives |
-| [components/ask/chat.tsx](src/components/ask/chat.tsx) | the conversation, and `Mark` — Alaiy's plate, shared with the panel header |
-| [app/(app)/dashboard/](src/app/(app)/dashboard/) | the KPI tile, and the alert card — a soft ground with the bright value as a 3px rule down its leading edge |
-| [app/(app)/account-health/](src/app/(app)/account-health/) | the metric tile, and the only chart in the product — small multiples in inline SVG, navy line against a dashed alert-hue threshold |
+### Navigation
+Unchanged flat sidebar (not the mockup's own grouped-sections layout, by explicit choice) — navy panel, white wordmark. The one nav-specific colour in the whole system: the active item is a solid mint (`#D5F3F3`) plate with navy text, not a tint of the accent.
 
-## Adding to this
+## Do's and Don'ts
 
-- Reach for a token before an arbitrary value. If none fits, the honest move is
-  usually to add one and say why in the comment, not to write `#3f7898` inline.
-- A new heading is one of the six display steps.
-- A new button is `Button` with a `ground`. If it needs a shape that is not the
-  press, the question to answer first is why it is a button.
-- A new colour with a job ("this means stale") needs a measured pair — a bright
-  value and an ink — not one value used for both.
-- Anything below 4.5:1 that a seller has to read is a bug, and anything below
-  3:1 has to be redundant with a word.
+**Do**
+- Reach for navy at a lighter step (300/400) when something needs the "accent" role, rather than a second hue.
+- Give a card a hairline border and stop there; reach for a shadow only when the surface genuinely floats over the page.
+- Use one of the four named radius steps (4/8/12/16px) before writing an arbitrary value.
+- Set KPI and table figures in Poppins with `font-variant-numeric: tabular-nums` — there is no separate data face to reach for.
 
-## Motion
-
-Two things only, both in the conversation, because that is the one screen where
-movement carries meaning: a message arriving (`.animate-rise`, which fires on
-insertion so a streaming answer does not judder) and the assistant being
-mid-thought (`.animate-dot`, which scales rather than travels so the composer
-below it does not shift).
-
-Both stop entirely under `prefers-reduced-motion` rather than being softened,
-because the transcript announces both anyway. The press stops travelling there
-too but keeps its shadow change — that is the affordance, not the decoration.
+**Don't**
+- Use the mint active-pill colour anywhere except the sidebar's current nav item.
+- Add a hard offset shadow anywhere — that belonged to an earlier system this file no longer describes.
+- Spend Playfair on anything past Title/Section — H3-H6 and body copy are Poppins.
+- Assume the sidebar groups into sections or that Ask Alaiy defaults to collapsed — this pass explicitly kept the existing flat nav and docked-by-default panel; only the visual language changed.
