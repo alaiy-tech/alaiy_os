@@ -101,12 +101,6 @@ ai_client = "alaiy_os.engine.ai_client.get_ai_client"
 #
 # chat_tool_sources = ["alaiy_os_globali.chat_tools.source"]
 
-# The same seam for `/skills`. Each entry narrows the runnable slug list for the
-# current user — for a deployment whose agents compute figures wider than the
-# caller may see. Also intersect-only, also fails closed. See chat/skills.py.
-#
-# chat_skill_filter = ["alaiy_os_globali.chat_skills.filter_skills"]
-
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 

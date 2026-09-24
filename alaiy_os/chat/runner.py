@@ -37,7 +37,6 @@ from alaiy_os.chat import agents as chat_agents
 from alaiy_os.chat import artifacts as chat_artifacts
 from alaiy_os.chat import attachments as chat_attachments
 from alaiy_os.chat import mentions as chat_mentions
-from alaiy_os.chat import skills as chat_skills
 from alaiy_os.chat import suggest as chat_suggest
 from alaiy_os.chat import tools as chat_tools
 from alaiy_os.chat import websearch as chat_websearch
@@ -94,7 +93,7 @@ def default_model():
 
 
 def start_turn(
-	session, text, attachments=None, skill=None, skill_args=None, screen=None, mentions=None
+	session, text, attachments=None, screen=None, mentions=None
 ):
 	"""Append the user's message and enqueue the turn. Returns the message seq.
 
@@ -103,22 +102,11 @@ def start_turn(
 	user's own words as ordinary text blocks — the model never sees a file, only
 	a document quoted into the conversation.
 
-	`skill` is an `OS Agent Registry` skill slug (see `chat/skills.py`). It is
-	resolved here so an unknown slug is a 417 on the send rather than a failure
-	that only shows up in the thread a minute later, but it is *run* on the
-	worker — the agent behind it makes its own LLM calls.
-
-	`skill_args` is that skill's arguments, checked against the pack's declared
-	Input Schema here for the same reason the slug is: a bad argument belongs on
-	the request that made it, not in a thread a minute later. A pack that declares
-	no schema takes none, and sending some is an error rather than a silent drop —
-	see `skills.validate_args`.
-
 	`mentions` is what the user picked with `@` (see `chat/mentions.py`), as
 	`[{kind, value}]`. Every one is re-resolved against its source here, so the
 	label and dates that reach the model are the site's rather than the client's,
-	and a stale pick is dropped rather than believed. Unlike `skill`, that never
-	throws: the user's own words still say what they were asking about.
+	and a stale pick is dropped rather than believed. That never throws: the
+	user's own words still say what they were asking about.
 
 	`screen` is whatever route the client was on, recorded on the message.
 
@@ -131,23 +119,6 @@ def start_turn(
 		frappe.throw("This chat is still working on the previous message.")
 
 	text = (text or "").strip()
-	if skill:
-		skill = str(skill).strip().lstrip("/").lower()
-		chat_skills.resolve(skill)
-		# The words typed alongside the command fill a single required argument,
-		# so `/amazon is SKU ABC listed?` works from a picker that knows nothing
-		# about this skill's schema. An explicit `skill_args` always wins.
-		skill_args = chat_skills.fill_from_text(skill, skill_args, text)
-		skill_args = chat_skills.validate_args(skill, skill_args)
-		# The message needs words: it is what the user sees in their own bubble,
-		# what names the session in the rail, and what the model reads as the
-		# request the tool result is answering. Arguments go in the visible text
-		# too — a bubble reading just "/amazon" when the user asked about one ASIN
-		# loses what they actually asked, both for them and for the model reading
-		# it back three turns later.
-		text = text or _skill_text(skill, skill_args)
-	elif skill_args:
-		frappe.throw("skill_args was sent without a skill.")
 
 	att_blocks, meta, consumed = _attachment_blocks(session, attachments)
 	if not text and not att_blocks:
@@ -172,8 +143,6 @@ def start_turn(
 		text=text,
 		attachments=meta,
 		mentions=mention_meta,
-		skill=skill,
-		skill_args=skill_args,
 		screen=screen,
 	)
 
@@ -268,16 +237,10 @@ def run_turn(session):
 
 
 def _drive(doc):
-	"""One turn, from the pending skill to the status flip."""
+	"""One turn, from the first LLM call to the status flip."""
 	session = doc.name
 
 	try:
-		skill, skill_args = _pending_skill(doc.name)
-		if skill:
-			# Writes the tool_use/tool_result pair, so by the time _loop reads the
-			# history the agent's output is the last thing in it and the model's
-			# first call is the one that narrates it.
-			chat_skills.run_skill(doc.name, skill, _append, args=skill_args)
 		_loop(doc)
 	except Exception:
 		# Messages already written stay written — unlike a batch run, the
@@ -304,47 +267,6 @@ def _drive(doc):
 	# as failed because its follow-up chips could not be written.
 	chat_suggest.attach(doc)
 	doc.db_set({"status": "Idle", "last_activity": now_datetime()}, commit=True)
-
-
-def _skill_text(slug, args):
-	"""The user-visible words for a skill send that carried no text of its own.
-
-	`/amazon (asin=B01234)` rather than a JSON blob: this is read by a person in
-	their own chat bubble first, and by the model second.
-	"""
-	if not args:
-		return f"/{slug}"
-	pairs = ", ".join(f"{k}={v}" for k, v in args.items())
-	return f"/{slug} ({pairs})"
-
-
-def _pending_skill(session):
-	"""The slug to dispatch before this turn's first LLM call, if any.
-
-	Read from the last stored message rather than passed through the enqueue,
-	because the enqueue is deduplicated on the session (see `start_turn`): a
-	second send whose job was dropped must still have its skill run by whichever
-	job wins. Once `run_skill` has written its pair the last message is a
-	tool_result, so this cannot dispatch the same skill twice.
-	"""
-	last = frappe.db.get_value(
-		"OS Chat Message",
-		{"session": session},
-		["role", "skill_used", "skill_args"],
-		order_by="seq desc",
-		as_dict=True,
-	)
-	if not last or last.role != "user" or not last.skill_used:
-		return None, None
-	# Stored as text by `_append` and validated on the send, so a parse failure
-	# here means the row was edited by hand. Run on defaults rather than killing
-	# the turn: the slug is still the user's intent.
-	try:
-		args = json.loads(last.skill_args) if last.skill_args else None
-	except ValueError:
-		frappe.log_error(title=f"OS Chat Message skill_args unparseable for {session}")
-		args = None
-	return last.skill_used, args
 
 
 def _next_seq(session):
@@ -849,8 +771,6 @@ def _append(
 	text=None,
 	attachments=None,
 	mentions=None,
-	skill=None,
-	skill_args=None,
 	screen=None,
 	is_partial=False,
 ):
@@ -867,8 +787,6 @@ def _append(
 			"blocks": json.dumps(blocks, default=str),
 			"attachments": json.dumps(attachments) if attachments else None,
 			"mentions": json.dumps(mentions) if mentions else None,
-			"skill_used": skill,
-			"skill_args": json.dumps(skill_args) if skill_args else None,
 			"screen": screen,
 			"is_partial": 1 if is_partial else 0,
 		}

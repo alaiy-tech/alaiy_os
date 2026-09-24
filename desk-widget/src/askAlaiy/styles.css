@@ -673,7 +673,7 @@
   background: var(--control-bg, rgba(0, 0, 0, 0.06));
 }
 
-/* Pickers (skills, mentions) */
+/* Pickers (mentions) */
 .ask-alaiy-picker {
   position: absolute;
   left: 10px;
@@ -720,24 +720,10 @@
   font-size: 13px;
   font-weight: 600;
 }
-.ask-alaiy-picker-sub {
-  margin-left: 8px;
-  font-size: 13px;
-  color: var(--disabled-text-color, #888);
-}
 .ask-alaiy-picker-sub-block {
   display: block;
   font-size: 11.5px;
   color: var(--disabled-text-color, #888);
-}
-.ask-alaiy-picker-desc {
-  display: block;
-  margin-top: 2px;
-  font-size: 11.5px;
-  color: var(--disabled-text-color, #888);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .ask-alaiy-picker-group-label {
   position: sticky;

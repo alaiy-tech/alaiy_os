@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   createChatSession, deleteChatSession, deleteChatAttachment, getChatMessages, listChatSessions,
-  listChatSkills, sendChatMessage, uploadChatAttachment,
+  sendChatMessage, uploadChatAttachment,
   type ChatAttachmentMeta, type ChatMention, type ChatMessage, type ChatSessionSummary,
-  type ChatSkill, type ChatToolCall, FrappeError,
+  type ChatToolCall, FrappeError,
 } from "./chat";
 
 const POLL_MS = 1500;
@@ -40,7 +40,6 @@ export interface ThreadTurn {
   toolCalls: ChatToolCall[];
   toolErrors: Set<string>;
   attachments: ChatAttachmentMeta[];
-  skill: string | null;
   mentions: ChatMention[];
   /** Still being written: text grows on every poll, tool_calls empty until it
    * settles. Drives the caret and suppresses anything wrong to show mid-answer. */
@@ -103,7 +102,6 @@ export function useAskAlaiy() {
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAttachment[]>([]);
-  const [skills, setSkills] = useState<ChatSkill[] | null>(null);
   const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
 
@@ -111,7 +109,6 @@ export function useAskAlaiy() {
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const activeSession = useRef<string | null>(null);
   const uploadSeq = useRef(0);
-  const skillsPromise = useRef<Promise<ChatSkill[]> | null>(null);
 
   const refreshSessions = useCallback(() => {
     setSessionsLoading(true);
@@ -152,7 +149,7 @@ export function useAskAlaiy() {
         upsert({
           key: message.name, role: "user", text: message.text,
           toolCalls: [], toolErrors: new Set(),
-          attachments: files, skill: message.skill ?? null,
+          attachments: files,
           mentions: message.mentions ?? [],
           partial: false,
         });
@@ -172,7 +169,6 @@ export function useAskAlaiy() {
       toolCalls: message.tool_calls,
       toolErrors: new Set(message.tool_errors),
       attachments: produced,
-      skill: null,
       mentions: [],
       partial: message.partial,
     });
@@ -219,7 +215,7 @@ export function useAskAlaiy() {
   }, [sessionId, setSessionId]);
 
   const send = useCallback(
-    async (text: string, opts?: { skill?: string; mentions?: ChatMention[] }) => {
+    async (text: string, opts?: { mentions?: ChatMention[] }) => {
       const trimmed = text.trim();
       const ready = pending.filter((a) => a.status === "ready" && a.name);
       if ((!trimmed && !ready.length) || running) return;
@@ -241,7 +237,6 @@ export function useAskAlaiy() {
           toolCalls: [],
           toolErrors: new Set(),
           attachments: displayAttachments,
-          skill: opts?.skill ?? null,
           mentions,
           partial: false,
         },
@@ -255,7 +250,6 @@ export function useAskAlaiy() {
           session,
           text: trimmed || undefined,
           attachments: ready.map((a) => a.name!),
-          skill: opts?.skill,
           screen: frappe.get_route_str(),
           mentions: mentions.map((m) => ({ kind: m.kind, value: m.value })),
         });
@@ -317,16 +311,6 @@ export function useAskAlaiy() {
       return p.filter((a) => a.localId !== localId);
     });
   }, []);
-
-  const ensureSkillsLoaded = useCallback(async (): Promise<ChatSkill[]> => {
-    if (skills !== null) return skills;
-    if (!skillsPromise.current) {
-      skillsPromise.current = listChatSkills().catch(() => []);
-    }
-    const result = await skillsPromise.current;
-    setSkills(result);
-    return result;
-  }, [skills]);
 
   const load = useCallback(
     async (name: string) => {
@@ -391,6 +375,5 @@ export function useAskAlaiy() {
     sessions, sessionsLoading,
     send, load, newChat, remove, refreshSessions,
     attachments: pending, uploadFiles, removeAttachment,
-    skills, ensureSkillsLoaded,
   };
 }

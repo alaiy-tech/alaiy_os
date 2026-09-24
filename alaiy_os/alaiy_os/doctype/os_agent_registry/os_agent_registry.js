@@ -56,13 +56,8 @@ function render_details_view(frm) {
 				.join(" ")
 		: `<span class="text-muted">${__("No tools configured")}</span>`;
 
-	const avatar = frm.doc.agent_avatar || "/assets/images/client-logo-square.png";
-	const statusPill = frm.doc.is_enabled
-		? `<span class="indicator-pill green">${__("Enabled")}</span>`
-		: `<span class="indicator-pill gray">${__("Disabled")}</span>`;
-
 	// Human-readable name for the heading; keep the machine agent_id visible
-	// but demoted to a small code chip beside the status.
+	// but demoted to a small code chip beneath it.
 	const title = frm.doc.agent_name || frm.doc.agent_id || "";
 
 	// The system prompt is authored in Markdown — render it so headings, bold
@@ -82,17 +77,11 @@ function render_details_view(frm) {
 		<div class="os-agent-details-wrapper">
 			<div class="frappe-card os-agent-details" style="margin-bottom: var(--s-gap);">
 				<div style="display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin-bottom:var(--s-gap);">
-					<div style="display:flex; align-items:center; gap:14px;">
-						<img src="${avatar}" style="width:48px; height:48px; border-radius:var(--s-radius); object-fit:cover; box-shadow:var(--s-shadow-sm);">
-						<div>
-							<div style="font-family:var(--s-font-serif); font-weight:var(--s-heading-weight); font-size:20px; color:var(--s-heading);">
-								${frappe.utils.escape_html(title)}
-							</div>
-							<div style="display:flex; align-items:center; gap:8px; margin-top:6px;">
-								${statusPill}
-								<code class="text-muted" style="font-size:12px;">${frappe.utils.escape_html(frm.doc.agent_id || "")}</code>
-							</div>
+					<div>
+						<div style="font-family:var(--s-font-serif); font-weight:var(--s-heading-weight); font-size:20px; color:var(--s-heading);">
+							${frappe.utils.escape_html(title)}
 						</div>
+						<code class="text-muted" style="font-size:12px;">${frappe.utils.escape_html(frm.doc.agent_id || "")}</code>
 					</div>
 					<button class="btn btn-primary btn-sm os-agent-edit-btn">${__("Edit")}</button>
 				</div>

@@ -1,20 +1,19 @@
-"""Settings surface for agents: enable/disable, and what each tool needs.
+"""Settings surface for agents: who each runs as, and what each tool needs.
 
 Two questions this answers, which the Desk list view cannot:
 
-  1. Which agents exist, which are on, and who does each run as.
+  1. Which agents exist, and who does each run as.
   2. For every tool, what permission does it need, and does the agent's
      Run As User actually have it right now.
 
-(2) is why enabling is gated here rather than being a bare checkbox. An agent
-whose user cannot read Sales Invoice does not fail loudly — it quietly reports
-zeros, which is worse. `frappe.get_list` returns an empty set for a user without
-permission, so an under-permissioned agent looks like a quiet business day.
+(2) matters because an agent whose user cannot read Sales Invoice would not
+fail loudly on its own — it would quietly report zeros, which is worse.
+`frappe.get_list` returns an empty set for a user without permission, so an
+under-permissioned agent looks like a quiet business day.
 
-The gate here is design-time. `engine/factory.py` re-checks the same
-declarations against the same user before every run, through the shared
-`engine/permissions.py` — a role revoked after an agent was switched on would
-otherwise bring the zeros back with the switch still on.
+`engine/factory.py` enforces the same declarations against the same user
+before every run, through the shared `engine/permissions.py`, so such a run
+fails instead. This surface is where an operator sees that coming.
 """
 
 import frappe
@@ -28,15 +27,14 @@ ADMINISTRATOR = "Administrator"
 
 @frappe.whitelist()
 def list_agents():
-	"""Every registered agent with its enable state and permission readiness."""
+	"""Every registered agent with its permission readiness."""
 	if not frappe.has_permission("OS Agent Registry", "read"):
 		frappe.throw("Not permitted.", frappe.PermissionError)
 
 	agents = []
 	for row in frappe.get_all(
 		"OS Agent Registry",
-		fields=["name", "agent_id", "agent_name", "description", "icon",
-				"is_enabled", "run_as_user", "model", "page"],
+		fields=["name", "agent_id", "agent_name", "description", "run_as_user", "model"],
 		order_by="agent_name",
 	):
 		user = row.run_as_user or ADMINISTRATOR
@@ -70,54 +68,18 @@ def list_agents():
 			"agent_id": row.agent_id,
 			"agent_name": row.agent_name,
 			"description": row.description,
-			"icon": row.icon,
 			"model": row.model,
-			"page": row.page,
-			"is_enabled": bool(row.is_enabled),
 			"run_as_user": user,
 			"runs_as_administrator": not row.run_as_user,
 			"tools": tool_views,
 			"permissions_satisfied": not unmet,
 			"unmet_permissions": unmet,
-			# Read-only agents are safe to leave on; anything that writes is a
-			# deliberate decision, so surface it at agent level too.
+			# Anything that writes is a deliberate decision, so surface it at
+			# agent level too.
 			"writes": any(t["writes"] for t in tool_views),
 		})
 
 	return agents
-
-
-@frappe.whitelist()
-def set_agent_enabled(agent, enabled, force=False):
-	"""
-	Turn an agent on or off.
-
-	Enabling is refused when the agent's Run As User is missing a permission its
-	tools declare, because the resulting runs would silently report nothing
-	rather than fail. `force` overrides that for a deliberate operator decision
-	— disabling is never gated.
-	"""
-	if not frappe.has_permission("OS Agent Registry", "write"):
-		frappe.throw("Not permitted.", frappe.PermissionError)
-
-	enabled = frappe.parse_json(enabled) if isinstance(enabled, str) else enabled
-	enabled = bool(enabled)
-	force = bool(frappe.parse_json(force) if isinstance(force, str) else force)
-
-	if enabled and not force:
-		state = next((a for a in list_agents() if a["agent_id"] == agent), None)
-		if state and not state["permissions_satisfied"]:
-			frappe.throw(
-				"{0} cannot be enabled: {1} is missing {2}. "
-				"Grant the permission, change Run As User, or enable with force.".format(
-					agent, state["run_as_user"], "; ".join(state["unmet_permissions"])
-				),
-				title="Missing permissions",
-			)
-
-	frappe.db.set_value("OS Agent Registry", agent, "is_enabled", 1 if enabled else 0)
-	frappe.db.commit()
-	return {"agent": agent, "is_enabled": enabled}
 
 
 @frappe.whitelist()
@@ -134,12 +96,10 @@ def set_agent_run_as_user(agent, user=None):
 	rewrites every permission answer on it — the caller should render what comes
 	back rather than patching its own copy.
 
-	An agent that is already on stays on, even when the new user cannot satisfy
-	its tools. Switching it off here would be a second surprise for an operator
-	who asked for one thing, and it is no longer needed to stay safe: since
-	`engine/factory.py` re-checks the declarations, such a run now fails loudly
-	instead of reporting zeros. The row comes back saying both — enabled, and
-	missing permissions.
+	The change is accepted even when the new user cannot satisfy the agent's
+	tools: `engine/factory.py` re-checks the declarations, so such a run fails
+	loudly instead of reporting zeros. The row comes back saying which
+	permissions are missing.
 	"""
 	if not frappe.has_permission("OS Agent Registry", "write"):
 		frappe.throw("Not permitted.", frappe.PermissionError)

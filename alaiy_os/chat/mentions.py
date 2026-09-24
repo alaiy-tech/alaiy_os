@@ -53,10 +53,9 @@ any extras are rebuilt from the source on every send, so a stale menu — a tab
 left open across a permission change, or a hand-edited request — cannot smuggle
 in a record the user may no longer read, nor a date range they made up.
 
-A mention that fails to resolve is **dropped silently**, deliberately unlike a
-skill slug, which throws. A skill is the user's whole intent, so getting it
-wrong must fail loudly; a mention is one hint among several, and killing the
-message over a stale one is worse than answering without it.
+A mention that fails to resolve is **dropped silently**, deliberately: a
+mention is one hint among several, and killing the message over a stale one is
+worse than answering without it.
 """
 
 import json

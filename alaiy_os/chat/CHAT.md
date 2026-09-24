@@ -29,8 +29,7 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 | method | args | returns |
 |---|---|---|
 | `create_session` | `title?`, `model?` | `{session, title, model, status}` |
-| `send_message` | `session`, `text?`, `attachments?`, `skill?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
-| `list_skills` | — | the `/` command catalogue |
+| `send_message` | `session`, `text?`, `attachments?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
 | `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[], suggestions[]}` — the poll endpoint |
 | `list_sessions` | `limit=50` | the caller's sessions, newest first |
@@ -57,7 +56,7 @@ on screen for good. An unmodified consumer therefore sees exactly what it always
 did: nothing until the message is complete.
 
 A message is
-`{seq, role, text, attachments[], mentions[], skill, tool_calls[], tool_errors[], partial}`.
+`{seq, role, text, attachments[], mentions[], tool_calls[], tool_errors[], partial}`.
 `tool_calls` is `{id, name, input}` per tool the assistant invoked; a tool's
 *result* is not returned — it is raw JSON the model has already summarised in its
 reply, and can be megabytes. Read `OS Chat Message.blocks` directly if you need
@@ -105,9 +104,8 @@ The client draws the groups it is given and knows nothing about which is which.
 re-resolved server-side on send: the label and any dates are rebuilt from the
 source, and only `kind` and `value` are read from the client. The gap between
 searching and sending can be minutes, a permission change, or a hand-written
-request. A mention that fails to resolve is **dropped silently** — unlike a
-skill slug, which throws. A skill is the user's whole intent; a mention is one
-hint among several, and killing the message over a stale one answers nothing.
+request. A mention that fails to resolve is **dropped silently**: a mention is
+one hint among several, and killing the message over a stale one answers nothing.
 
 Two ordering constraints, both load-bearing:
 
@@ -126,39 +124,22 @@ client reconciles at submit rather than tracking offsets: a broken token stops
 being a mention and goes on as prose. The model still reads the words either
 way; only the resolved record is lost.
 
-## Skills (`/`)
+## Agents (`run_agent`)
 
-A skill is an `OS Agent Registry` row that ticked `chat_skill` and set a
-`skill_slug` — so `list_skills` is a query, not a second registry, and an agent
-app declares its skills in the same `agent_meta` manifest it already writes.
+The chat model can hand a job to any `OS Agent Registry` agent through the
+`run_agent` tool (`chat/agents.py`). The tool is offered only when the site has
+agents, and its description lists each one by `agent_id` with its arguments
+(from the agent's Input Schema), so "write the Amazon listing for ABC-123"
+becomes a call rather than an improvisation.
 
-`send_message(skill="daily-digest")` runs that agent to completion **before**
-the chat model's first call, and injects its output as a tool result:
-
-```
-user      "/daily-digest"                        skill_used = daily-digest
-assistant [tool_use name="skill:daily-digest"]   ┐ written by skills.run_skill
-user      [tool_result <the agent's JSON>]       ┘
-assistant "GMV was ₹4.2L yesterday, up 8%…"      ← the normal _loop
-```
-
-Reusing the tool round-trip shape means nothing new has to render, `_trim`
-keeps the pair together, and the model turns schema-validated JSON into prose —
-which is why chat responses can stay markdown instead of needing a block format
-for tiles and tables. Follow-ups work because the numbers are in the history.
-
-Skills take **no arguments**: the agent runs on its own defaults and the user
-refines conversationally in the next message.
-
-The gate is not `OS Agent Run`'s permission (System Manager only — that would
-put skills out of reach of the managers they are for). `run_turn` has already
-pinned the worker to the session's owner, so the agent's tool handlers read as
-that user with their row-level permissions applied. `chat_skill` is therefore a
-**claim about the agent**: every tool enforces its own permissions and none of
-them write. Tick it deliberately.
+Every agent is offered; there is no per-agent opt-in. The run adopts the agent's
+Run As User when one is set, otherwise it keeps the session owner `run_turn` has
+already pinned, so tool reads apply that user's row-level permissions. Tools
+that write are reachable this way too.
 
 `engine.executor.run_now()` is what runs the agent in-process. Enqueuing a child
-job and polling for it would deadlock a single-worker bench.
+job and polling for it would deadlock a single-worker bench. At most
+`MAX_DELEGATIONS_PER_TURN` agents run per turn, one after another.
 
 ## Attachments
 
@@ -389,7 +370,7 @@ ride along, because "how did that brand do the month before?" is exactly the chi
 this exists to make cheap — the resolved dates behind them are the turn's business,
 not this one's.
 
-No tenant hook, yet. `chat_suggestion_filter` in the style of `chat_skill_filter`
+No tenant hook, yet. `chat_suggestion_filter` in the style of `chat_tool_sources`
 is the obvious next seam if a deployment needs to veto or rewrite what is offered,
 and nothing in the storage or the wire shape has to change when it lands.
 
@@ -574,22 +555,22 @@ apps may each contribute one. `chat_system_prompt` overrides everything,
 including those, which is why it is checked first.
 
 The other tenant seams are `chat_mention_sources` — what a user can name with
-`@` (see **Mentions** above) — and `chat_tool_sources` / `chat_skill_filter`,
-which decide what the assistant may *read*.
+`@` (see **Mentions** above) — and `chat_tool_sources`, which decides what the
+assistant may *read*.
 
-Those last two exist because FAC's checks are Frappe's: a role holds a
+That last one exists because FAC's checks are Frappe's: a role holds a
 doctype's read permission or it does not. A deployment scoping rows more
 narrowly than that — brands assigned per user, where the brand hangs off the
 Item behind an order line rather than the order — cannot express it in the
 registry, so a generic tool hands such a user the whole dataset. A source may
 narrow the tool list, and may contribute tools of its own that apply the
-deployment's real scoping. `chat_skill_filter` does the same for `/skills`.
+deployment's real scoping.
 
-Both **fail closed**, unlike the two hooks above: a broken source leaves the
+It **fails closed**, unlike the two hooks above: a broken source leaves the
 assistant with no tools rather than the unscoped set, because degrading open
 there is a disclosure and not a cosmetic loss. Symptom is an assistant that
 says it has no tools; cause is in the Error Log under the source's name. See
-`tools.py` and `skills.py` for the full contract.
+`tools.py` for the full contract.
 
 `chat_tools` in site_config composes with them, and applies first: a site that
 pins that list is stating the complete surface, so a tenant-contributed tool

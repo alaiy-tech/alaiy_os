@@ -17,7 +17,6 @@ GET  /api/method/alaiy_os.api.chat.preview_file    -> an xlsx/pptx/docx attachme
 GET  /api/method/alaiy_os.api.chat.list_sessions   -> the caller's sessions
 POST /api/method/alaiy_os.api.chat.delete_session  -> {"deleted": "CHAT-..."}
 GET  /api/method/alaiy_os.api.chat.list_tools      -> what the assistant can do
-GET  /api/method/alaiy_os.api.chat.list_skills     -> the `/` command catalogue
 GET  /api/method/alaiy_os.api.chat.list_mentions   -> the `@` picker's options
 
 `send_message` returns as soon as the turn is queued; the client then polls
@@ -52,7 +51,7 @@ from werkzeug.wrappers import Response
 # inside the one function that needs it most.
 from alaiy_os.chat import attachments
 from alaiy_os.chat import mentions as chat_mentions
-from alaiy_os.chat import runner, skills, tools
+from alaiy_os.chat import runner, tools
 from alaiy_os.engine import llm
 
 # Whisper's own cap. Checked here so an over-long recording fails with a
@@ -89,20 +88,10 @@ def send_message(
 	session,
 	text=None,
 	attachments=None,
-	skill=None,
-	skill_args=None,
 	screen=None,
 	mentions=None,
 ):
-	"""Queue one turn. `skill` is a slug from `list_skills`; `screen` is the caller's route.
-
-	An unknown skill throws here rather than on the worker, so the picker gets a
-	real error instead of a conversation that quietly answers the wrong thing.
-
-	`skill_args` is that skill's arguments, as an object or a JSON string — the
-	shape `list_skills` publishes as its `input_schema`. Validated against that
-	schema on this request, so a form can show the error against the field that
-	caused it. Omit it for a skill that takes none, which is most of them.
+	"""Queue one turn. `screen` is the caller's route.
 
 	`mentions` is `[{kind, value}]` from `list_mentions` — the records the user
 	picked with `@`. Each is re-resolved server-side, so only `kind` and `value`
@@ -115,8 +104,6 @@ def send_message(
 		session,
 		text,
 		attachments=attachments,
-		skill=skill,
-		skill_args=skill_args,
 		screen=screen,
 		mentions=mentions,
 	)
@@ -528,7 +515,6 @@ def get_messages(session, after=0, partial=0):
 			"blocks",
 			"attachments",
 			"mentions",
-			"skill_used",
 			"is_partial",
 			"creation",
 		],
@@ -635,7 +621,7 @@ def stream_messages(session, after=0):
 				filters={"session": session, "seq": (">", cursor)},
 				fields=[
 					"name", "seq", "role", "text", "blocks", "attachments",
-					"mentions", "skill_used", "is_partial", "creation",
+					"mentions", "is_partial", "creation",
 				],
 				order_by="seq asc",
 			)
@@ -683,16 +669,6 @@ def delete_session(session):
 def list_tools():
 	"""What the assistant can do *for this user* — for the UI and for support."""
 	return [{"name": spec["name"], "description": spec["description"]} for spec in tools.tool_specs()]
-
-
-@frappe.whitelist()
-def list_skills():
-	"""The `/` picker's catalogue: [{slug, label, description, icon}].
-
-	Every enabled agent that opted into `chat_skill`. Invoke one by passing its
-	slug to `send_message` — see `chat/skills.py` for what that does to the thread.
-	"""
-	return skills.catalogue()
 
 
 @frappe.whitelist()
@@ -772,7 +748,6 @@ def _present(row):
 		"text": row.text or "",
 		"attachments": json.loads(row.attachments or "[]"),
 		"mentions": json.loads(row.mentions or "[]"),
-		"skill": row.skill_used,
 		"tool_calls": tool_calls,
 		"tool_errors": tool_errors,
 		"partial": bool(row.is_partial),
