@@ -14,3 +14,11 @@ alaiy_os/workspace/
 # bundle doesn't. See desk-widget/README.md.
 desk-widget/node_modules/
 alaiy_os/public/dist/
+.impeccable
+.claude
+.github/agents
+.github/hooks
+.github/skills
+PRODUCT.md
+interface/.claude
+interface/.impeccable
