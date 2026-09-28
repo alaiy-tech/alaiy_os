@@ -20,6 +20,23 @@ def get_all_connectors():
     )
 
 
+def _require_single(settings_doctype):
+    """
+    This generic screen edits exactly one settings row per connector via
+    frappe.get_single -- it has no way to pick among several. A connector
+    that holds multiple named rows (e.g. one per store) needs its own
+    per-record settings UI, not this one; registering such a doctype here
+    would silently read/write whichever row frappe.get_single happens to
+    resolve, which is wrong on any bench with more than one.
+    """
+    if not frappe.get_meta(settings_doctype).issingle:
+        frappe.throw(
+            f"'{settings_doctype}' is not a Single DocType, so it can't be edited through "
+            "this generic connector-settings screen. This connector needs its own "
+            "settings UI for multiple stores/rows."
+        )
+
+
 @frappe.whitelist()
 def get_connector_config(connector_id):
     """Return field metadata + current values for a connector's settings DocType."""
@@ -30,6 +47,7 @@ def get_connector_config(connector_id):
         frappe.throw("No settings DocType configured for this connector.")
     if not frappe.db.exists("DocType", settings_doctype):
         frappe.throw(f"Settings DocType '{settings_doctype}' not found.")
+    _require_single(settings_doctype)
 
     RENDERABLE = {"Data", "Password", "Int", "Float", "Link", "Select", "Check", "Text", "Small Text", "Section Break"}
     meta = frappe.get_meta(settings_doctype)
@@ -62,6 +80,7 @@ def get_connector_config(connector_id):
 def get_connector_password(connector_id, fieldname):
     """Return the decrypted value of a Password field for display."""
     registry = frappe.get_doc("OS Connector Registry", connector_id)
+    _require_single(registry.settings_doctype)
     meta = frappe.get_meta(registry.settings_doctype)
     field_meta = meta.get_field(fieldname)
     if not field_meta or field_meta.fieldtype != "Password":
@@ -82,6 +101,7 @@ def save_and_test(connector_id, values):
     settings_doctype = registry.settings_doctype
     test_method = registry.test_method
 
+    _require_single(settings_doctype)
     doc = frappe.get_single(settings_doctype)
     meta = frappe.get_meta(settings_doctype)
 
