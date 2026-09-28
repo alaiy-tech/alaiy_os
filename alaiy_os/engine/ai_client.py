@@ -32,7 +32,7 @@ every turn.
 
 plus five image capabilities, for tools that produce imagery rather than text:
 
-    generate_image(prompt, reference_data_uri=None)
+    generate_image(prompt, reference_data_uri=None, model=None)
         -> {"b64": str, "media_type": str, "usage": dict}
 
     translate_image(image_url) -> {"translated_url": str}
@@ -336,7 +336,7 @@ class ByokClient:
 					on_text(event.delta.text)
 			return self._result(stream.get_final_message())
 
-	def generate_image(self, prompt, reference_data_uri=None):
+	def generate_image(self, prompt, reference_data_uri=None, model=None):
 		"""One image, via OpenRouter's Unified Image API on the site's own key.
 
 		site_config keys:
@@ -346,6 +346,10 @@ class ByokClient:
 		A separate key from `ai_api_key` on purpose: the image API is OpenRouter's
 		own endpoint, so a site pointing `ai_base_url` at some other
 		Anthropic-compatible provider still needs an OpenRouter key to reach it.
+
+		`model` overrides `image_generate_model` for this one call - unset, the
+		site's own configured default renders it, same as before this parameter
+		existed.
 
 		Thread-safe: reads only state captured in __init__.
 		"""
@@ -359,7 +363,7 @@ class ByokClient:
 			)
 
 		payload = {
-			"model": self._image_model,
+			"model": model or self._image_model,
 			"prompt": prompt,
 			"n": 1,
 			"output_format": "png",

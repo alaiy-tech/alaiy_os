@@ -61,15 +61,23 @@ def stream(model, system, messages, tools=None, on_text=None):
 	return client.stream(model, system, messages, tools=tools, on_text=on_text)
 
 
-def generate_image(prompt, reference_data_uri=None):
+def generate_image(prompt, reference_data_uri=None, model=None):
 	"""One generated image -> {"b64", "media_type", "usage"}.
 
 	Same seam as `complete`, for the same reason: a tool should not hold a
 	provider key or know a provider's wire format. `reference_data_uri` is the
 	photo being edited, already base64-encoded by the caller — only the caller can
 	read its own Frappe Files.
+
+	`model` picks the provider for THIS call - left unset, whatever this
+	deployment's `ai_client` defaults to renders it, same as every ordinary
+	caller. A caller with a real need for a specific model (legible small text
+	in the render, say) passes it explicitly rather than the shared default
+	changing under everyone else. Support for a given model string is entirely
+	this deployment's `ai_client`'s own business - there is no fixed catalogue
+	here.
 	"""
-	return _client().generate_image(prompt, reference_data_uri=reference_data_uri)
+	return _client().generate_image(prompt, reference_data_uri=reference_data_uri, model=model)
 
 
 def remove_background(
