@@ -92,7 +92,18 @@ PLAIN_EXTENSIONS = {
 SHEET_EXTENSIONS = {".xlsx", ".xlsm"}
 DELIMITED_EXTENSIONS = {".csv": ",", ".tsv": "\t"}
 
-SUPPORTED = PLAIN_EXTENSIONS | SHEET_EXTENSIONS | set(DELIMITED_EXTENSIONS) | {".pdf"}
+# The legacy binary Excel format. openpyxl (what `_xlsx` uses) cannot open it,
+# and no other parser is carried here -- but a tool that needs one whole
+# (Flipkart's bulk-listing automation, which must save it back byte-identical
+# apart from the cells it changes) still needs the file to reach disk. So this
+# is "supported" in the sense of "accepted, not text-extracted" -- see
+# `extract()`'s `.xls` branch below -- rather than unsupported outright.
+LEGACY_SHEET_EXTENSIONS = {".xls"}
+
+SUPPORTED = (
+	PLAIN_EXTENSIONS | SHEET_EXTENSIONS | LEGACY_SHEET_EXTENSIONS
+	| set(DELIMITED_EXTENSIONS) | {".pdf"}
+)
 
 
 def extension_of(file_name):
@@ -102,15 +113,6 @@ def extension_of(file_name):
 def check_supported(file_name):
 	"""Validate the extension, returning it. Throws with a usable message."""
 	ext = extension_of(file_name)
-
-	if ext == ".xls":
-		# openpyxl reads the OOXML format only; the legacy binary .xls needs a
-		# separate library we do not carry. Say so rather than "unsupported".
-		frappe.throw(
-			frappe._("{0} is in the old Excel format. Save it as .xlsx and attach it again.").format(
-				file_name
-			)
-		)
 
 	if ext not in SUPPORTED:
 		frappe.throw(
@@ -157,6 +159,14 @@ def extract(file_name, content):
 	failing. Read the bytes yourself.
 	"""
 	ext = check_supported(file_name)
+
+	if ext in LEGACY_SHEET_EXTENSIONS:
+		# Not parsed at all -- see LEGACY_SHEET_EXTENSIONS above. Returning
+		# fixed, non-empty placeholder text here (rather than "") is what
+		# lets this skip the "no text could be read" throw below; a tool
+		# that needs this file's actual data reads the saved File directly,
+		# never this placeholder.
+		return f"[{file_name} is a legacy .xls spreadsheet -- binary format, not text-extracted.]"
 
 	if ext == ".pdf":
 		text = _pdf(content)
@@ -317,6 +327,18 @@ def pointer_block(meta, can_run_code=False):
 	is the only way back to the file on a later turn.
 	"""
 	ext = extension_of(meta.get("file_name"))
+	if ext in LEGACY_SHEET_EXTENSIONS:
+		return {
+			"type": "text",
+			"text": (
+				f'<attachment name="{meta.get("file_name")}" file_url="{meta.get("file_url")}"/>\n'
+				f"The user attached this file. It is a legacy .xls spreadsheet — binary "
+				f"format, not readable by {FILE_TOOL} or any other text tool, and its "
+				f"contents are not included here. Do not try to read or describe it "
+				f"yourself. If a chat tool exists for this kind of file (e.g. a Flipkart "
+				f"listing tool), call that tool directly; it reads the file on its own."
+			),
+		}
 	if ext in SHEET_EXTENSIONS or ext in DELIMITED_EXTENSIONS:
 		how = "Use operation \"parse_data\" for the rows"
 		if can_run_code:
