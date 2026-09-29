@@ -1,9 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { usePathname } from "next/navigation";
 import { Alert, Spinner } from "@/components/ui";
 import { Markdown } from "@/components/ask/markdown";
+import { VendorDealTable } from "@/components/ask/vendor-deal-table";
+import type { EvaluatedRow } from "@/lib/dev/vendor-sheet";
+import { parseVendorFile, buildVendorSheetMessage } from "@/lib/dev/vendor-sheet";
 import type { ChatFeed, ChatMessage, ChatStatus } from "@/lib/backend/types";
 
 /** How often to ask for more while a turn is being written. */
@@ -125,6 +128,19 @@ export function Chat({
     [absorb],
   );
 
+  // `partial` changes on every tick by construction (it is a timestamp-sliced
+  // string), so it — and status/sending, which the same tick sets — cannot sit
+  // in the effect below's dependency array without retriggering it every poll:
+  // that reran the effect body, which calls `tick()` unconditionally, which
+  // updates `partial` again, which reran the effect again — a same-frame loop
+  // with no throttle from POLL_MS, and the browser tab pegged at 100% CPU
+  // until the answer finished streaming. A ref sidesteps it: the interval
+  // reads the latest values without being a dependency on them.
+  const live = useRef({ status, partial, sending });
+  useEffect(() => {
+    live.current = { status, partial, sending };
+  });
+
   // Load the conversation, then keep polling while a turn is in flight.
   useEffect(() => {
     if (!session) return;
@@ -153,6 +169,7 @@ export function Chat({
         return;
       }
       // Idle and nothing half-written means there is nothing to wait for.
+      const { status, partial, sending } = live.current;
       if (status !== "Running" && !partial && !sending) return;
       tick();
     }, POLL_MS);
@@ -161,7 +178,7 @@ export function Chat({
       cancelled = true;
       clearInterval(timer);
     };
-  }, [session, poll, status, partial, sending]);
+  }, [session, poll]);
 
   // Follow the answer as it is written, but only from near the bottom: a
   // seller who has scrolled up to read an earlier answer should stay there.
@@ -228,6 +245,7 @@ export function Chat({
       draft={draft}
       setDraft={setDraft}
       onSubmit={() => ask(draft)}
+      onAsk={ask}
       busy={busy}
       importing={importing}
       hero={hero}
@@ -414,6 +432,10 @@ function Turn({ message, hero }: { message: ChatMessage; hero: boolean }) {
     );
   }
 
+  const vendorDeals = message.tool_calls.find(
+    (call) => call.name === "seller_evaluate_vendor_deals",
+  )?.input as { fileNames: string[]; rows: EvaluatedRow[] } | undefined;
+
   return (
     <Row>
       {message.tool_calls.length ? (
@@ -424,6 +446,9 @@ function Turn({ message, hero }: { message: ChatMessage; hero: boolean }) {
           <Markdown text={message.text} />
           {message.partial ? <Caret /> : null}
         </Bubble>
+      ) : null}
+      {!message.partial && vendorDeals?.rows.length ? (
+        <VendorDealTable fileNames={vendorDeals.fileNames} rows={vendorDeals.rows} />
       ) : null}
     </Row>
   );
@@ -523,6 +548,7 @@ const LABELS: Record<string, string> = {
   seller_inventory: "Checked your inventory",
   seller_channels: "Read your channels",
   seller_compare: "Compared with the period before",
+  seller_evaluate_vendor_deals: "Checked the vendor sheet against Amazon",
 };
 
 /** Mid-thought, in the gutter the answer will arrive in. */
@@ -644,6 +670,7 @@ function Composer({
   draft,
   setDraft,
   onSubmit,
+  onAsk,
   busy,
   importing,
   hero,
@@ -652,12 +679,34 @@ function Composer({
   draft: string;
   setDraft: (value: string) => void;
   onSubmit: () => void;
+  /** Sends a specific message immediately, bypassing the draft box — what an
+   *  attached vendor sheet uses, since its message is built from the parsed
+   *  file rather than typed. */
+  onAsk: (text: string) => void;
   busy: boolean;
   importing: boolean;
   hero: boolean;
   /** On the first screen, where it is the one thing to do. */
   lifted: boolean;
 }) {
+  const [parsing, setParsing] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
+
+  async function onFilesChosen(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = ""; // so picking the same file again still fires onChange
+    if (!files.length) return;
+
+    setParsing(true);
+    try {
+      const sheets = await Promise.all(files.map((file) => parseVendorFile(file)));
+      const question = draft.trim() || "I've got a vendor sheet — what's worth buying?";
+      onAsk(buildVendorSheetMessage(question, sheets));
+      setDraft("");
+    } finally {
+      setParsing(false);
+    }
+  }
   const disabled = busy || importing;
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -688,6 +737,43 @@ function Composer({
           lifted ? "border-primary-300 shadow-md" : "border-line"
         }`}
       >
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".csv,.xlsx,.xls"
+          multiple
+          aria-label="Vendor sheet file"
+          // Visually hidden rather than display:none — display:none also
+          // removes it from the accessibility tree, which is what a screen
+          // reader (and browser automation) uses to find it at all.
+          className="absolute h-px w-px overflow-hidden opacity-0"
+          onChange={onFilesChosen}
+        />
+        <button
+          type="button"
+          disabled={disabled || parsing}
+          onClick={() => fileInput.current?.click()}
+          aria-label="Attach a vendor sheet"
+          title="Attach a vendor sheet (.csv, .xlsx)"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted transition-colors hover:bg-canvas hover:text-ink disabled:cursor-not-allowed disabled:text-muted-soft"
+        >
+          {parsing ? (
+            <Spinner />
+          ) : (
+            <svg
+              viewBox="0 0 20 20"
+              aria-hidden
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M13.5 6.5 8 12a2 2 0 1 0 2.83 2.83l5.5-5.5a3.5 3.5 0 0 0-4.95-4.95l-5.5 5.5a5 5 0 0 0 7.07 7.07" />
+            </svg>
+          )}
+        </button>
         <textarea
           ref={box}
           rows={1}

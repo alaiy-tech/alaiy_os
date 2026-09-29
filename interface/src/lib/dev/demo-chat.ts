@@ -6,6 +6,7 @@ import type {
   ChatToolCall,
 } from "@/lib/backend/types";
 import { DEMO_CURRENCY, stamp, world } from "@/lib/dev/demo-seed";
+import { VENDOR_SHEET_MARKER, evaluateVendorRows, type VendorRow } from "@/lib/dev/vendor-sheet";
 
 /**
  * Ask Alaiy, without an Ask Alaiy.
@@ -38,8 +39,8 @@ type DemoChat = {
   modified: string;
 };
 
-function toolCall(name: string): ChatToolCall {
-  return { id: `${name}-${Math.random().toString(36).slice(2, 8)}`, name, input: {} };
+function toolCall(name: string, input: unknown = {}): ChatToolCall {
+  return { id: `${name}-${Math.random().toString(36).slice(2, 8)}`, name, input };
 }
 
 const chats = new Map<string, DemoChat>();
@@ -184,6 +185,10 @@ function answerFor(question: string): { text: string; tools: ChatToolCall[] } {
     };
   }
 
+  if (/(vendor|deal|worth buying|sheet|source|cream)/.test(asked)) {
+    return vendorDealResult(["Sample vendor sheet"], SAMPLE_VENDOR_ROWS);
+  }
+
   if (/(refund|return|cancel)/.test(asked)) {
     const refunded = orders.filter((order) => order.flags.includes("refunded"));
     const cancelled = orders.filter((order) => order.flags.includes("cancelled"));
@@ -199,12 +204,56 @@ function answerFor(question: string): { text: string; tools: ChatToolCall[] } {
   return {
     tools: [],
     text:
-      `This is demo mode, so I'm reading the same fabricated workspace the tabs are — ` +
-      `I can answer about **orders**, **stock cover**, **sales**, **refunds** and how ` +
-      `channels **compare** from it.\n\n` +
-      `Anything else I'd have to invent, which would make this screen the one part of ` +
-      `demo mode you couldn't trust. Ask me one of those, or switch off \`ALAIY_DEMO\` ` +
-      `and point the app at a real backend.`,
+      `I can help with **orders**, **stock cover**, **sales**, **refunds**, how ` +
+      `channels **compare**, and checking a vendor sheet against your Amazon catalog. ` +
+      `Try asking about one of those.`,
+  };
+}
+
+/**
+ * A vendor sheet Nathan-style: what's worth buying, computed the same way the
+ * real `seller_evaluate_vendor_deals` tool does (referral + FBA fee estimate,
+ * bucketed on gating and margin). The composer parses an uploaded file client
+ * side (no backend to upload to in demo mode) and embeds the rows in the
+ * message text behind VENDOR_SHEET_MARKER; sendMessage below strips that
+ * marker before it ever reaches a chat bubble. Asking without a file falls
+ * back to a small fixed sample so the flow works from a typed question too.
+ */
+const SAMPLE_VENDOR_ROWS: VendorRow[] = [
+  { query: "8901234567890", title: "Brass Diya Set, Pack of 6", cost: 180, upc: "8901234567890" },
+  { query: "8901234567906", title: "Seagrass Storage Basket, Large", cost: 420, upc: "8901234567906" },
+  { query: "Bamboo Serving Tray, Set of 2", title: "Bamboo Serving Tray, Set of 2", cost: 210, upc: null },
+  { query: "Ceramic Planter, Medium", title: "Ceramic Planter, Medium", cost: 260, upc: null },
+  { query: "8901234567937", title: "Jute Table Runner, 72 inch", cost: 150, upc: "8901234567937" },
+  { query: "Woven Placemat Set", title: "Woven Placemat Set", cost: 90, upc: null },
+];
+
+function extractVendorSheet(
+  text: string,
+): { cleanText: string; fileNames: string[]; rows: VendorRow[] } | null {
+  const at = text.indexOf(VENDOR_SHEET_MARKER);
+  if (at === -1) return null;
+  const end = text.lastIndexOf("-->");
+  if (end === -1) return null;
+  try {
+    const payload = JSON.parse(text.slice(at + VENDOR_SHEET_MARKER.length, end)) as {
+      fileNames: string[];
+      rows: VendorRow[];
+    };
+    return { cleanText: text.slice(0, at).trim(), fileNames: payload.fileNames, rows: payload.rows };
+  } catch {
+    return null;
+  }
+}
+
+function vendorDealResult(fileNames: string[], rows: VendorRow[]): { text: string; tools: ChatToolCall[] } {
+  const evaluated = evaluateVendorRows(rows);
+  const worthBuying = evaluated.filter((r) => r.bucket === "worth_buying").length;
+  return {
+    tools: [toolCall("seller_evaluate_vendor_deals", { fileNames, rows: evaluated })],
+    text:
+      `Checked **${evaluated.length} rows** against your Amazon catalog — gating, current buy box ` +
+      `price, and estimated fees. **${worthBuying} are worth buying.**`,
   };
 }
 
@@ -239,11 +288,19 @@ export function sendMessage(
   const chat = chats.get(name);
   if (!chat) return { seq: 0, status: "Error" };
 
+  // A file upload rides in as a marker appended to the message — see
+  // extractVendorSheet. Stripped before it ever reaches a stored message or
+  // the title, so a seller's chat history never shows raw JSON.
+  const uploaded = extractVendorSheet(text);
+  const shown = uploaded ? uploaded.cleanText : text;
+
   const seq = chat.messages.length + 1;
-  chat.messages.push(message(chat, "user", text, false, seq));
-  chat.title ??= text.slice(0, 60);
+  chat.messages.push(message(chat, "user", shown, false, seq));
+  chat.title ??= shown.slice(0, 60);
   chat.modified = stamp(new Date());
-  const { text: answer, tools } = answerFor(text);
+  const { text: answer, tools } = uploaded
+    ? vendorDealResult(uploaded.fileNames, uploaded.rows)
+    : answerFor(text);
   chat.pending = {
     seq: seq + 1,
     answer,
@@ -318,6 +375,7 @@ export function getMessages(name: string, after = 0, partial = true): ChatFeed {
           "Which orders are past their ship-by date?",
           "What am I about to run out of?",
           "How did the last 7 days compare?",
+          "I've got a vendor sheet — what's worth buying?",
         ],
   };
 }
