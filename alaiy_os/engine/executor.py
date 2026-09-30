@@ -205,11 +205,23 @@ def _run_loop(run_doc):
 
 	try:
 		response = None
+		reminded = False
 		for turn in range(1, agent.max_turns + 1):
 			response = _call(agent, messages, usage)
 			messages.append({"role": "assistant", "content": response["content"]})
 			if response["stop_reason"] != "tool_use":
-				break
+				# One reminder, and only with two turns left to act on it -- one for
+				# the tool call, one for the reply after it. With fewer, heeding it
+				# would run the loop out and fail a run that had just done the work,
+				# so the run ends here exactly as it always has.
+				reminder = (
+					None if reminded or turn > agent.max_turns - 2 else _remind_required(agent, ledger)
+				)
+				if not reminder:
+					break
+				reminded = True
+				messages.append({"role": "user", "content": reminder})
+				continue
 			messages.append({
 				"role": "user",
 				"content": _dispatch_tools(agent, response["content"], usage, ledger, turn),
@@ -231,6 +243,39 @@ def _run_loop(run_doc):
 		raise
 
 	return {"output": output, "messages": messages, "tool_calls": ledger, **usage}
+
+
+def _remind_required(agent, ledger):
+	"""The reminder for a run about to finish without a tool it declared required, or None.
+
+	An agent may declare `required_tools` -- tools a run is expected to have called
+	successfully before it replies, such as the listing agent's `save_listing`,
+	which is what writes its work anywhere. Without this, a model that produced
+	the finished listing as its reply and simply never called the tool ended as a
+	Success with nothing saved, and the only sign was a missing record downstream.
+
+	A reminder, not a gate. The run is never failed for ignoring it: some runs
+	legitimately skip the tool (the listing agent's URL-only enrichment has no
+	record to save to), and only the model can tell. So it is asked once, told it
+	may reply again if the tool does not apply, and whatever it does next ends the
+	run exactly as it would have. An agent that declares nothing never reaches
+	this, and a tool the run was not offered -- stripped by `_context`, say -- is
+	not asked for.
+	"""
+	required = getattr(agent, "required_tools", None) or ()
+	if not required:
+		return None
+	done = {entry["tool"] for entry in ledger if entry.get("ok")}
+	missing = [tool for tool in required if tool in agent.handlers and tool not in done]
+	if not missing:
+		return None
+	names = ", ".join(f"`{tool}`" for tool in missing)
+	return (
+		f"You have not successfully called {names} in this run, and this agent is "
+		"expected to before it finishes. If this run calls for it, call it now, then "
+		"give your final reply. If it genuinely does not apply to this run, reply "
+		"with your final answer again."
+	)
 
 
 def _strip_prefetched_tools(agent, raw_input):

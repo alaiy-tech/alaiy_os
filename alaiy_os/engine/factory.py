@@ -27,6 +27,9 @@ class RunnableAgent:
 	output_schema: dict | None
 	tools: list = field(default_factory=list)  # LLM-facing tool specs
 	handlers: dict = field(default_factory=dict)  # tool_id -> callable
+	# tool_ids the run should have called successfully before it finishes. See
+	# executor._remind_required. Empty for every agent that declares none.
+	required_tools: tuple = ()
 
 
 def build_runnable(agent_id):
@@ -98,4 +101,10 @@ def build_runnable(agent_id):
 		output_schema=output_schema,
 		tools=tools,
 		handlers=handlers,
+		required_tools=parse_tool_ids(agent.get("required_tools")),
 	)
+
+
+def parse_tool_ids(value):
+	"""A newline- or comma-separated list of tool ids, as a tuple. Blank is ()."""
+	return tuple(t.strip() for t in (value or "").replace(",", "\n").splitlines() if t.strip())

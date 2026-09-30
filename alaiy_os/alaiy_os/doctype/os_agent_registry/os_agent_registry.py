@@ -14,6 +14,7 @@ class OSAgentRegistry(Document):
 		if self.output_format == "JSON":
 			self._validate_output_schema()
 		self._validate_unique_tool_ids()
+		self._validate_required_tools()
 		self._validate_skill()
 
 	def _validate_output_schema(self):
@@ -55,6 +56,18 @@ class OSAgentRegistry(Document):
 		)
 		if clash:
 			frappe.throw(f"Skill Slug <code>{self.skill_slug}</code> is already used by agent {clash}.")
+
+	def _validate_required_tools(self):
+		"""A required tool this agent does not have could never be satisfied, so every
+		run would pay for a reminder it cannot act on. Refuse it at save instead."""
+		from alaiy_os.engine.factory import parse_tool_ids
+
+		have = {row.tool_id for row in self.tools}
+		unknown = [t for t in parse_tool_ids(self.required_tools) if t not in have]
+		if unknown:
+			frappe.throw(
+				f"Required Tools names {', '.join(unknown)}, which this agent does not have."
+			)
 
 	def _validate_unique_tool_ids(self):
 		seen = set()

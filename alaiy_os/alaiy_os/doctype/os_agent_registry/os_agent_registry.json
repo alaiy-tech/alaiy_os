@@ -22,6 +22,7 @@
   "engine_section",
   "model",
   "max_turns",
+  "required_tools",
   "system_prompt",
   "tools_section",
   "tools",
@@ -143,6 +144,12 @@
    "label": "Max Turns"
   },
   {
+   "description": "Tool ids, one per line, that a run should have called successfully before it finishes. A run that tries to finish without one is reminded once, then finishes as it would have. It is never failed for it. Blank: no requirement.",
+   "fieldname": "required_tools",
+   "fieldtype": "Small Text",
+   "label": "Required Tools"
+  },
+  {
    "fieldname": "system_prompt",
    "fieldtype": "Text",
    "label": "System Prompt",
@@ -195,7 +202,7 @@
  ],
  "image_field": "agent_avatar",
  "links": [],
- "modified": "2026-07-20 00:00:00.000000",
+ "modified": "2026-09-30 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Agent Registry",
