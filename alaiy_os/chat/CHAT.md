@@ -28,7 +28,7 @@ whitelisted method (session cookie or `Authorization: token key:secret`).
 
 | method | args | returns |
 |---|---|---|
-| `create_session` | `title?`, `model?` | `{session, title, model, status}` |
+| `create_session` | `title?` | `{session, title, status}` — the model is set server-side (`chat_model` in site config) and recorded on the session, never chosen or returned |
 | `send_message` | `session`, `text?`, `attachments?`, `screen?`, `mentions?` | `{seq, status}` — queues the turn, returns immediately |
 | `list_mentions` | `q?`, `kind?` | the `@` picker's options, grouped by kind |
 | `get_messages` | `session`, `after=0`, `partial=0` | `{status, error, messages[], suggestions[]}` — the poll endpoint |

@@ -17,7 +17,6 @@ export type ChatStatus = "Idle" | "Running" | "Failed";
 export interface ChatSessionSummary {
   name: string;
   title: string | null;
-  model: string;
   status: ChatStatus;
   last_activity: string | null;
   modified: string;
@@ -101,7 +100,6 @@ export interface UploadAttachmentResult {
 export interface CreateSessionResult {
   session: string;
   title: string | null;
-  model: string;
   status: ChatStatus;
 }
 
@@ -125,7 +123,7 @@ export class FrappeError extends Error {
   }
 }
 
-export const createChatSession = (params: { title?: string; model?: string } = {}) =>
+export const createChatSession = (params: { title?: string } = {}) =>
   frappe.xcall<CreateSessionResult>(`${NS}.create_session`, params);
 
 export const listChatSessions = (limit = 50) =>

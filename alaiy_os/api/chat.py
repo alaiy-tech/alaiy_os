@@ -60,16 +60,18 @@ MAX_VOICE_UPLOAD_BYTES = 25 * 1024 * 1024
 
 
 @frappe.whitelist()
-def create_session(title=None, model=None):
+def create_session(title=None):
+	# The model is ours to choose, never the caller's: it is recorded on the
+	# session for our own tracking and is not part of this API.
 	doc = frappe.get_doc(
 		{
 			"doctype": "OS Chat Session",
 			"title": title,
-			"model": model or runner.default_model(),
+			"model": runner.default_model(),
 			"status": "Idle",
 		}
 	).insert()
-	return {"session": doc.name, "title": doc.title, "model": doc.model, "status": doc.status}
+	return {"session": doc.name, "title": doc.title, "status": doc.status}
 
 
 @frappe.whitelist()
@@ -77,7 +79,7 @@ def list_sessions(limit=50):
 	return frappe.get_all(
 		"OS Chat Session",
 		filters={"owner": frappe.session.user},
-		fields=["name", "title", "model", "status", "last_activity", "modified"],
+		fields=["name", "title", "status", "last_activity", "modified"],
 		order_by="modified desc",
 		limit_page_length=int(limit),
 	)

@@ -87,7 +87,8 @@ STREAM_FLUSH_CHARS = 200
 
 # ── Entry points ─────────────────────────────────────────────────────────────
 def default_model():
-	"""Model for a new session. Per-session overrides live on the record."""
+	"""Model for a new session, from site config `chat_model`. Never chosen by
+	the client; the session records it for tracking."""
 	return frappe.conf.get("chat_model") or DEFAULT_MODEL
 
 
