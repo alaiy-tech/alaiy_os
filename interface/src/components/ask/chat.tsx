@@ -361,18 +361,20 @@ function Masthead({ greeting }: { greeting: string[] }) {
   return (
     <div className="animate-rise space-y-3">
       <h1 className="max-w-3xl text-display-lg text-ink">
-        What can I help you with today?
+        What can I help you with <span className="serif">today?</span>
       </h1>
       <div className="max-w-2xl space-y-1.5">
         {greeting.map((line, index) => (
-          // The opening line is the display face, italic — it is Alaiy
-          // speaking, and the one sentence on this screen that is read
-          // rather than scanned. Everything after it is body copy.
+          // The opening line is the serif, italic — it is Alaiy speaking,
+          // and the one sentence on this screen that is read rather than
+          // scanned. Everything after it is body copy. This is the system's
+          // one whole-line use of the serif; everywhere else it is only the
+          // accent half of a headline.
           <p
             key={index}
             className={
               index === 0
-                ? "font-display text-quote italic text-ink"
+                ? "serif text-quote text-ink"
                 : "text-body leading-relaxed text-muted"
             }
           >

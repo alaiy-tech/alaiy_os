@@ -175,10 +175,14 @@ function NavRow({
     );
   }
 
-  // The active row is a solid mint plate with navy text — the one "you are
-  // here" marker in the system, confirmed against the mockup's own
-  // rendered output (a solid `#D5F3F3` fill, not a tint, with ink-coloured
-  // text on top of it). Nothing else in the product uses this colour.
+  // The active row is a solid plate of the palest blue tint with ink text.
+  // The landing's rule is that the current thing is the most contrasted
+  // thing against its own ground — an active progress dot is solid ink
+  // among light-grey neighbours, an active module pill "lights up navy".
+  // The rail IS ink, so it inverts that: the plate goes light and the text
+  // goes ink. MobileNav, on the light ground, takes the rule the right way
+  // up (see the bottom of this file). The mint this used to be has no
+  // counterpart in the landing palette and is gone.
   return (
     <Link
       href={item.href}
@@ -387,7 +391,7 @@ export function MobileNav() {
             aria-current={active ? "page" : undefined}
             className={`whitespace-nowrap rounded-sm px-3.5 py-1.5 text-[13px] transition-colors ${
               active
-                ? "bg-highlight-300 font-semibold text-primary-600"
+                ? "bg-primary-600 font-semibold text-white"
                 : "text-muted hover:bg-primary-600/5 hover:text-primary-600"
             }`}
           >

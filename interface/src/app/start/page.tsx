@@ -64,22 +64,23 @@ export default async function StartPage({
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">
-      <section className="hidden flex-col justify-between bg-primary-600 p-12 text-white lg:flex">
+      {/* The dotted texture is the landing page's own, on both halves — this
+          is the one screen a seller meets before the dense UI starts, and it
+          is the screen they arrive at straight off that page. */}
+      <section className="dot-grid-dark hidden flex-col justify-between bg-primary-600 p-12 text-white lg:flex">
         <Logo onDark />
 
         <div className="max-w-md space-y-8">
-          {/* The accent underline is the hero's own device, and the only
-              decoration on either headline. */}
+          {/* The split headline is the landing page's own device, and the
+              only decoration on either: the line turns into the serif,
+              italic, for its second half. On this ink panel the accent takes
+              the light blue tint rather than #1D4F86, which would disappear.
+              The underline that used to sit here is gone — the landing never
+              underlines a headline. */}
           <h1 className="text-display-xl">
             Your store data,
             <br />
-            <span className="relative inline-block text-highlight-300">
-              answerable.
-              <span
-                aria-hidden
-                className="absolute -bottom-1 left-0 h-[3px] w-full bg-highlight-300/50"
-              />
-            </span>
+            <span className="serif text-highlight-400">answerable.</span>
           </h1>
           <ul className="space-y-5">
             {[
@@ -103,7 +104,7 @@ export default async function StartPage({
         </p>
       </section>
 
-      <section className="flex items-center justify-center px-6 py-12">
+      <section className="dot-grid flex items-center justify-center px-6 py-12">
         {/* The steps carry rows and forms the sign-in column never had, so the
             measure widens once there is a session. */}
         <div className={`w-full space-y-8 ${session ? "max-w-xl" : "max-w-sm"}`}>

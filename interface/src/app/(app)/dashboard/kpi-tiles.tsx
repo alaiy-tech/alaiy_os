@@ -180,8 +180,9 @@ function Tile({
         </span>
       </div>
       <h3 className="pt-3 font-sans text-[12px] font-medium text-muted">{label}</h3>
-      {/* Poppins with tabular numerals: this is the number the seller came
-          for, holding its column steady without a separate data face. */}
+      {/* Geist Mono: the landing sets every counter and figure in the mono
+          face, and this is the number the seller came for. Tabular by
+          default, so it holds its column steady as the figure changes. */}
       <p className="pt-1 font-data text-stat font-semibold leading-none tracking-tight text-ink tabular-nums">
         {value}
       </p>
