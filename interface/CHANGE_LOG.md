@@ -4,6 +4,48 @@ All notable changes to Alaiy OS Self Serve, grouped by the release that shipped 
 
 ---
 
+## 0.1.21 — unreleased
+
+**One rail, carrying both the nav and the chats**
+
+- The seller's chat list was a second left-hand column and it existed only on
+  /home — two rails side by side on the product's main screen, and no history at
+  all on the other tabs. It is a section of the one rail now, so a chat started
+  from the docked Ask panel on Orders is in the list where it was started,
+  rather than waiting to be found on the next visit to Home.
+- The menu is four rows: **New Chat**, **Products**, **Orders**, **Connectors**.
+  Products points at `/listings`; the route keeps the backend's word and the
+  rail uses the seller's. The seven other built screens move under a **More**
+  disclosure that opens itself when the seller is standing on one of them, so
+  nothing that was reachable has stopped being reachable.
+- Settings leaves the list and becomes the gear beside the seller at the foot of
+  the rail — it is an account action, not a destination. Sign out moves into
+  that menu with it.
+- Hoisting the list is the delicate part. `Chat` resets by remounting, so its key
+  is load-bearing, and two things change it by accident: a navigation, because
+  /home with no `?chat=` opens the *newest* chat and so "new chat" cannot be a
+  push to /home; and the chat the conversation itself just created, which goes to
+  the front of the list and drags "the newest one" onto it mid-answer. The new
+  `chat-nav` tracks the open id and the remount key separately. Back and forward
+  are a `popstate` listener rather than an effect on the search param — the param
+  also moves when we navigate, and reacting to it flashed the abandoned chat for
+  a frame.
+- Two consequences of the hoist. The Ask panel follows whatever the rail says is
+  open, where before it always opened the newest chat: picking an older
+  conversation on Home and walking to Orders no longer left the panel on a
+  different one. And a chat started in that panel appears in the list at once
+  instead of on the next navigation.
+- The rail's default width goes 240px to 272px and its floor 176 to 208. The nav
+  never needed it; the chat rows do, because they are read by title and at 240px
+  a real question truncates after about three words.
+- A chat row is one line now rather than a title with a date stacked under it:
+  in a column that is also carrying the nav, that was twice the height for the
+  half of it nobody scans by. The day-level label ("Today", "Mon") keeps its
+  place to the right of the title and steps aside for the delete button on
+  hover, and it is read through `useSyncExternalStore` rather than a mounted
+  flag — that is the primitive for a value which differs between the server
+  render and the client.
+
 ## 0.1.20 — 2026-09-11
 
 **The consent screen, afterwards — permissions on the channel card**
