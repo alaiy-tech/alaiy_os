@@ -5,15 +5,18 @@ import { usePathname } from "next/navigation";
 import { suggestionsFor } from "@/lib/ask/suggestions";
 import { Chat, Mark } from "@/components/ask/chat";
 import { useShell } from "@/components/shell/shell";
+import { useChatNav } from "@/components/ask/chat-nav";
 import { askDocksAt } from "@/lib/shell/prefs";
 
 /**
  * Ask Alaiy docked to the right of the data tabs.
  *
- * It renders the same `Chat` as Home, on the same session — Home defaults to
- * the seller's newest chat and so does this, so a question asked here is
- * already open when they go back to Home. Neither surface tells the other
- * anything; asking a question is what makes that session the newest.
+ * It renders the same `Chat` as Home, on literally the same session: both
+ * read `useChatNav`, so a question asked here is open when they go back to
+ * Home, and a chat picked in the rail is the one this panel continues. That
+ * used to hold only one way round — the panel always opened the *newest*
+ * chat, so picking an older one on Home and walking to Orders left the panel
+ * on a different conversation than the rail said was open.
  *
  * It renders nothing on /home, which *is* the Ask surface. Two composers on
  * one screen, one a duplicate of the other, would be the wrong answer to "the
@@ -40,16 +43,14 @@ const ICON_BUTTON =
 
 export function AskPanel({
   greeting,
-  sessionId,
   importing = false,
 }: {
   greeting: string[];
-  /** The seller's newest chat, or null if they have never asked anything. */
-  sessionId: string | null;
   importing?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { prefs, update } = useShell();
+  const { openId, chatKey, sessionStarted } = useChatNav();
   const pathname = usePathname();
 
   // Escape leaves full screen. Bound only while expanded, so it does not
@@ -132,14 +133,17 @@ export function AskPanel({
       </header>
 
       {/* Keyed, so switching to a different chat starts a clean transcript
-          rather than appending to the one on screen. */}
+          rather than appending to the one on screen. The key is not simply the
+          session id — a chat this panel itself creates must not remount it
+          mid-answer; see `chat-nav.tsx`. */}
       <Chat
-        key={sessionId ?? "new"}
-        sessionId={sessionId}
+        key={chatKey}
+        sessionId={openId}
         greeting={greeting}
         suggestions={suggestionsFor(pathname)}
         importing={importing}
         variant="panel"
+        onSessionStarted={sessionStarted}
       />
     </>
   );

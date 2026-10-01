@@ -22,8 +22,11 @@ export const SHELL_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
    because the Ask default widens at xl and a number duplicated in TypeScript
    would be the one that stops agreeing with it. A width below is set only
    once the seller has actually dragged something. */
-export const RAIL_MIN = 176;
-export const RAIL_MAX = 360;
+/* The floor is set by the chat list rather than the nav: a chat title needs
+   roughly twenty characters before the truncation stops telling the seller
+   which conversation a row is. Below this, collapsing is the better trade. */
+export const RAIL_MIN = 208;
+export const RAIL_MAX = 380;
 /** Icon-only. Two icon widths plus the rail's own padding. */
 export const RAIL_COLLAPSED = 60;
 
