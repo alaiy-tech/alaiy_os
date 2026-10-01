@@ -6,6 +6,40 @@ All notable changes to Alaiy OS Self Serve, grouped by the release that shipped 
 
 ## 0.1.21 — unreleased
 
+**Home opens with the glance, not just the question**
+
+- The first screen keeps the composer at the top and puts the figures under it:
+  **Total Sales**, **Total Orders**, **Active Listings** and **Connected
+  Stores**, then the month's shape beside what needs attention, then the stores
+  those figures came from, then what has happened lately.
+- Sales and orders are month-to-date against the *same number of days* from the
+  start of last month. A full previous month against eleven days of this one is
+  not a comparison, and in the first two days of a month even the clamped
+  version is one day against one — so the percentage is withheld until there are
+  three, and the tile says what it covers instead of claiming a trend.
+- The whole screen — tiles, chart and store cards — comes out of **one**
+  `listOrders` read covering both months. There is no time-series or
+  per-channel-revenue method to call, and separate reads would mean several
+  definitions of "this month" that could disagree on screen.
+- **Sales Performance** draws this month against last, both real. There is no
+  7D/30D/90D toggle and no metric dropdown: the window a chart can honestly draw
+  is the window that was fetched, and a control re-ranging a fetch it does not
+  have would either lie or reload the page. Both arrive with the endpoint.
+- **Recent Activity** is built from what the app actually records — when each
+  channel last answered a sync, and what the current import is doing. No "2m
+  ago": Frappe sends a naive timestamp in the site's timezone, so an hour-level
+  difference against the browser clock is a guess. A day label plus the clock
+  time is more precise than "2m ago" and neither half is invented.
+- Stores are named with a coloured lettermark rather than the marketplace's
+  logo. The app holds no licensed brand asset for any of them, and the hues are
+  the ones `ChannelBadge` already teaches down the Orders table.
+- The starters above the figures are five named areas — Listing Optimization,
+  Check Orders, Generate Listings, Analyze Performance, Custom — each sending
+  the question behind its label. Custom sends nothing and puts the cursor in the
+  composer, which is the only honest thing a "something else" button can do.
+- The composer's send button is solid ink rather than the pale accent, which all
+  but disappeared against a white box.
+
 **One rail, carrying both the nav and the chats**
 
 - The seller's chat list was a second left-hand column and it existed only on

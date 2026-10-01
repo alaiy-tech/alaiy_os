@@ -8,6 +8,7 @@ import { VendorDealTable } from "@/components/ask/vendor-deal-table";
 import type { EvaluatedRow } from "@/lib/dev/vendor-sheet";
 import { parseVendorFile, buildVendorSheetMessage } from "@/lib/dev/vendor-sheet";
 import type { ChatFeed, ChatMessage, ChatStatus } from "@/lib/backend/types";
+import { HOME_STARTERS, type Starter } from "@/lib/ask/suggestions";
 
 /** How often to ask for more while a turn is being written. */
 const POLL_MS = 900;
@@ -89,6 +90,16 @@ export function Chat({
   const cursor = useRef(0);
   const scroller = useRef<HTMLDivElement>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  // The Custom starter has to put the cursor in the composer, and the
+  // composer is a level down. Reached through this component's own root
+  // rather than by handing a ref down: the compiler treats anything arriving
+  // as a prop as immutable, and the box's autosize has to mutate its style —
+  // so the ref stays where the mutation is. There is exactly one textarea
+  // under here, whichever composition is on screen.
+  const root = useRef<HTMLDivElement>(null);
+  const focusComposer = useCallback(() => {
+    root.current?.querySelector("textarea")?.focus();
+  }, []);
 
   // Switching chats replaces the conversation rather than appending to it, and
   // both callers key this component on the session id to make that happen.
@@ -255,18 +266,23 @@ export function Chat({
 
   // Follow-ups once there is an answer; the standing suggestions before that.
   const offered = chips.length ? chips : empty ? suggestions : [];
-  const prompts =
-    !busy && !importing && offered.length ? (
-      <Chips
-        items={offered}
-        onPick={ask}
-        layout={centred ? "cards" : hero ? "pills" : "stack"}
-        label={centred ? "Start with" : null}
-      />
-    ) : null;
+  const quiet = busy || importing;
+  // The first screen gets the five named starters rather than four whole
+  // questions — but only while Alaiy has not offered follow-ups of its own,
+  // which are about what was just said and always win.
+  const prompts = quiet ? null : centred && !chips.length ? (
+    <Starters onPick={ask} onCustom={focusComposer} />
+  ) : offered.length ? (
+    <Chips
+      items={offered}
+      onPick={ask}
+      layout={centred ? "cards" : hero ? "pills" : "stack"}
+      label={centred ? "Start with" : null}
+    />
+  ) : null;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div ref={root} className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <div ref={scroller} className="min-h-0 flex-1 overflow-y-auto">
         <div
           className={
@@ -279,7 +295,7 @@ export function Chat({
         >
           {centred ? (
             <>
-              <Masthead greeting={greeting} />
+              <Masthead />
               <div
                 className="animate-rise space-y-4"
                 style={{ animationDelay: "80ms", animationFillMode: "backwards" }}
@@ -357,31 +373,21 @@ export function Mark({ size = 7 }: { size?: 7 | 12 }) {
  * and directly under it, the one thing that isn't filler copy anywhere else
  * on this page.
  */
-function Masthead({ greeting }: { greeting: string[] }) {
+function Masthead() {
   return (
     <div className="animate-rise space-y-3">
       <h1 className="max-w-3xl text-display-lg text-ink">
-        What can I help you with <span className="serif">today?</span>
+        What should Alaiy help you with <span className="serif">today?</span>
       </h1>
-      <div className="max-w-2xl space-y-1.5">
-        {greeting.map((line, index) => (
-          // The opening line is the serif, italic — it is Alaiy speaking,
-          // and the one sentence on this screen that is read rather than
-          // scanned. Everything after it is body copy. This is the system's
-          // one whole-line use of the serif; everywhere else it is only the
-          // accent half of a headline.
-          <p
-            key={index}
-            className={
-              index === 0
-                ? "serif text-quote text-ink"
-                : "text-body leading-relaxed text-muted"
-            }
-          >
-            {line}
-          </p>
-        ))}
-      </div>
+      {/* What the product does, in one line, rather than Alaiy's read of this
+          seller's figures. That read has not gone anywhere — it is the four
+          tiles directly below, where a number is a number instead of a
+          sentence about one, and it is still what the docked panel opens
+          with on every other screen. */}
+      <p className="max-w-2xl text-lead leading-relaxed text-muted">
+        Manage your products, track and fulfil orders, connect your favourite
+        tools, and automate your store.
+      </p>
     </div>
   );
 }
@@ -591,6 +597,69 @@ function Caret() {
  * an aside to an answer; and a stack in the docked panel, which is too narrow
  * for either.
  */
+/**
+ * The first screen's five starters.
+ *
+ * A row of named areas rather than a grid of whole questions — see
+ * `HOME_STARTERS`. Each sends the question behind its label; Custom has none
+ * and puts the cursor in the composer instead, which is the one honest thing
+ * a "something else" button can do.
+ *
+ * The accent is hover and focus, not a selection. Nothing here is a mode the
+ * seller is now in, so nothing stays lit after the click — a chip that looked
+ * chosen would be claiming the conversation had a setting it does not have.
+ */
+function Starters({
+  onPick,
+  onCustom,
+}: {
+  onPick: (text: string) => void;
+  onCustom: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {HOME_STARTERS.map((starter, index) => (
+        <button
+          key={starter.label}
+          type="button"
+          onClick={() => (starter.prompt ? onPick(starter.prompt) : onCustom())}
+          title={starter.prompt ?? "Type your own question"}
+          className="animate-rise inline-flex items-center gap-2 rounded-full border border-line bg-white px-3.5 py-2 text-[12.5px] font-medium text-ink transition-colors hover:border-highlight-400 hover:bg-highlight-100 hover:text-primary-600 focus-visible:border-highlight-400 focus-visible:bg-highlight-100"
+          style={{ animationDelay: `${140 + index * 50}ms`, animationFillMode: "backwards" }}
+        >
+          <StarterIcon name={starter.icon} />
+          {starter.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+const STARTER_ICONS: Record<Starter["icon"], string> = {
+  optimize: "M3.5 6h9M3.5 10h6M3.5 14h4M14 4.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9.9-2.1Z",
+  orders: "M4 6h12M4 10h12M4 14h7",
+  generate: "M7 3.5l1.2 2.8L11 7.5 8.2 8.7 7 11.5 5.8 8.7 3 7.5l2.8-1.2L7 3.5ZM14 11l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8.8-1.9Z",
+  analyze: "M3.5 15.5v-4M8 15.5V7M12.5 15.5v-8M17 15.5v-3",
+  custom: "M3.5 3.5h5v5h-5v-5Zm8 0h5v5h-5v-5Zm-8 8h5v5h-5v-5Zm8 0h5v5h-5v-5Z",
+};
+
+function StarterIcon({ name }: { name: Starter["icon"] }) {
+  return (
+    <svg
+      viewBox="0 0 20 20"
+      aria-hidden
+      className="h-3.5 w-3.5 shrink-0 text-highlight-600"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d={STARTER_ICONS[name]} />
+    </svg>
+  );
+}
+
 function Chips({
   items,
   onPick,
@@ -811,9 +880,11 @@ function Composer({
           type="submit"
           disabled={disabled || !draft.trim()}
           aria-label="Send"
-          // The accent plate with navy on it — the system's one bright
-          // control, and this is the action the whole screen is for.
-          className={`grid shrink-0 place-items-center rounded-full bg-highlight-300 text-primary-600 transition-colors hover:bg-highlight-400 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-soft ${
+          // Solid ink, by the same rule the rail's active row follows: the
+          // most contrasted thing against its own ground is the current one,
+          // and on a white composer that is navy rather than the pale accent
+          // this used to be — which all but disappeared against the box.
+          className={`grid shrink-0 place-items-center rounded-full bg-primary-600 text-white transition-colors hover:bg-primary-500 disabled:cursor-not-allowed disabled:bg-surface disabled:text-muted-soft ${
             hero ? "h-11 w-11" : "h-10 w-10"
           }`}
         >

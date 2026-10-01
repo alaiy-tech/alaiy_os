@@ -82,3 +82,48 @@ const FALLBACK = BY_ROUTE["/home"];
 export function suggestionsFor(pathname: string): string[] {
   return BY_ROUTE[pathname] ?? FALLBACK;
 }
+
+/**
+ * The five starters on Home's first screen.
+ *
+ * Different in kind from the lists above, which are whole questions a seller
+ * can send as-is. These are named *areas* — the jobs the product does — and
+ * each one carries the question it actually asks. A seller scanning five
+ * two-word labels finds their job faster than one reading five sentences,
+ * and the sentence is still what gets sent, so nothing new is needed of the
+ * backend to make them work.
+ *
+ * `prompt: null` is Custom, which is not a question at all: it puts the
+ * cursor in the composer. A chip that sent "something else" as a message
+ * would be asking Alaiy to guess what the seller has not said yet.
+ */
+export type Starter = {
+  label: string;
+  /** Null means "focus the composer" rather than send anything. */
+  prompt: string | null;
+  icon: "optimize" | "orders" | "generate" | "analyze" | "custom";
+};
+
+export const HOME_STARTERS: Starter[] = [
+  {
+    label: "Listing Optimization",
+    prompt: "Which of my listings need work, and what should I fix first?",
+    icon: "optimize",
+  },
+  {
+    label: "Check Orders",
+    prompt: "Which orders need my attention right now?",
+    icon: "orders",
+  },
+  {
+    label: "Generate Listings",
+    prompt: "Help me write a listing — title, bullets and description.",
+    icon: "generate",
+  },
+  {
+    label: "Analyze Performance",
+    prompt: "How is this month going compared with last month?",
+    icon: "analyze",
+  },
+  { label: "Custom", prompt: null, icon: "custom" },
+];
