@@ -10,6 +10,7 @@ import { isImporting, loadCurrentImport } from "@/lib/backend/imports";
 import { listChatSessions } from "@/lib/backend/chat";
 import type { ChatSessionSummary } from "@/lib/backend/types";
 import { ShellProvider } from "@/components/shell/shell";
+import { ChatNavProvider } from "@/components/ask/chat-nav";
 import { SHELL_COOKIE, parseShellPrefs } from "@/lib/shell/prefs";
 
 /**
@@ -23,6 +24,12 @@ import { SHELL_COOKIE, parseShellPrefs } from "@/lib/shell/prefs";
  * panel are in the first paint: a width applied after hydration is a width the
  * seller watches snap into place on every navigation. `ShellProvider` takes it
  * from here — see `components/shell/shell.tsx`.
+ *
+ * `ChatNavProvider` is the other thing held at this level, and it is here for
+ * the same reason: the rail now carries the seller's chat list, and the rail
+ * is rendered once, here. Three surfaces read it — the list, the conversation
+ * on /home and the docked panel — and they are in two different subtrees, so
+ * the answer cannot live in either of them.
  *
  * The route group `(app)` keeps the URLs flat: this wraps /home, /orders,
  * /inventory and /channels without putting an "app" segment in the path.
@@ -40,9 +47,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const [{ tiles }, currentImport, sessions] = await Promise.all([
     loadHomeTiles(session.backendToken),
     loadCurrentImport(session.workspaceId, session.backendToken),
-    // The panel opens the newest chat, which is what Home defaults to as
-    // well — that is the whole of how a question asked on Orders is still
-    // open when the seller goes back to Home.
+    // Read once, here, and handed to the rail: it is the chat list the seller
+    // sees on every screen, not just Home's.
     listChatSessions(session.backendToken).catch(() => [] as ChatSessionSummary[]),
   ]);
   const greeting = tiles
@@ -53,37 +59,35 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
       ];
 
   return (
-    <ShellProvider initial={shellPrefs}>
-      <Sidebar email={session.email} tier={session.tier} />
+    <ChatNavProvider initialRows={sessions}>
+      <ShellProvider initial={shellPrefs}>
+        <Sidebar name={session.name} email={session.email} tier={session.tier} />
 
-      <div className="flex min-w-0 flex-1 flex-col">
-        {/* The rail has no room below md, so the wordmark and sign-out move
-            into a bar and the destinations into a strip under it. */}
-        <header className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
-          <Logo />
-          <form action="/api/auth/logout" method="post">
-            <button
-              type="submit"
-              className="text-xs text-muted underline-offset-2 hover:text-primary-600 hover:underline"
-            >
-              Sign out
-            </button>
-          </form>
-        </header>
-        <MobileNav />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* The rail has no room below md, so the wordmark and sign-out move
+              into a bar and the destinations into a strip under it. */}
+          <header className="flex items-center justify-between border-b border-line px-4 py-3 md:hidden">
+            <Logo />
+            <form action="/api/auth/logout" method="post">
+              <button
+                type="submit"
+                className="text-xs text-muted underline-offset-2 hover:text-primary-600 hover:underline"
+              >
+                Sign out
+              </button>
+            </form>
+          </header>
+          <MobileNav />
 
-        <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
-      </div>
+          <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
+        </div>
 
-      {/* Mounted here, not on a page, so its poll survives navigation
-          between tabs instead of restarting on each one. */}
-      <ImportStatus initialJob={currentImport} />
+        {/* Mounted here, not on a page, so its poll survives navigation
+            between tabs instead of restarting on each one. */}
+        <ImportStatus initialJob={currentImport} />
 
-      <AskPanel
-        greeting={greeting}
-        sessionId={sessions[0]?.name ?? null}
-        importing={isImporting(currentImport)}
-      />
-    </ShellProvider>
+        <AskPanel greeting={greeting} importing={isImporting(currentImport)} />
+      </ShellProvider>
+    </ChatNavProvider>
   );
 }

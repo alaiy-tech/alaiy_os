@@ -225,7 +225,11 @@
   --text-micro: 9px;
 
   --spacing-ask-panel: 360px;
-  --spacing-rail: 240px;
+  /* Wider than the nav alone needs, because the rail also carries the
+     seller's chat list and those rows are read by their title — at 240px a
+     real question truncates after about three words, which makes the list
+     something to hover rather than something to scan. */
+  --spacing-rail: 272px;
 }
 
 @media (width >= 80rem) {
