@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { formatDate, formatRelativeDate } from "@/lib/format";
 import { useChatNav } from "@/components/ask/chat-nav";
 
@@ -26,12 +26,13 @@ import { useChatNav } from "@/components/ask/chat-nav";
  */
 export function ChatHistory() {
   const { rows, openId, openChat, deleteChat, deleting } = useChatNav();
-  // Null until mounted, so the server render and the first client render
-  // agree on the plain "YYYY-MM-DD" date — only after that do the rows
-  // upgrade to "Today"/"Yesterday"/a weekday, read off the viewer's own
-  // clock rather than guessed at during the server pass.
-  const [today, setToday] = useState<Date | null>(null);
-  useEffect(() => setToday(new Date()), []);
+  // Null on the server and through hydration, so both renders agree on the
+  // plain "YYYY-MM-DD" date; only afterwards do the rows upgrade to
+  // "Today"/"Yesterday"/a weekday, read off the viewer's own clock rather
+  // than guessed at during the server pass. `useSyncExternalStore` is what
+  // says "this value differs between server and client" directly, instead of
+  // a mounted flag that has to be written from an effect.
+  const today = useSyncExternalStore(subscribeNever, clientToday, serverToday);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col pt-1">
@@ -114,6 +115,18 @@ export function ChatHistory() {
     </div>
   );
 }
+
+/* The viewer's calendar day, fixed for the session.
+ *
+ * `getSnapshot` has to return the same reference every call or React re-renders
+ * without end, so the `Date` is made once and kept. The cost is that a tab left
+ * open across midnight goes on saying "Today" about yesterday — cheaper than a
+ * timer ticking in the rail for a label nobody is watching change. */
+let fixed: Date | null = null;
+const clientToday = () => (fixed ??= new Date());
+const serverToday = () => null;
+/** Nothing ever invalidates the snapshot, so there is nothing to subscribe to. */
+const subscribeNever = () => () => {};
 
 /** The one icon that is filled rather than stroked: at 14px a hollow bubble
  *  repeated down a list reads as noise, and these rows are scanned by title. */
