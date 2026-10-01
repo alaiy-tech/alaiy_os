@@ -1,188 +1,224 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Alaiy — the design system: "The Morning Briefing."
+   Alaiy — the design system: the landing page's own.
 
-   Sourced from an authored Claude Design mockup (not an invented world) —
-   token values below are read directly off that mockup's own computed
-   styles, not guessed. One navy hue carries ink, panels and the accent, at
-   different lightness steps; white cards float on an off-white ground, told
-   apart by a hairline border rather than a shadow; one mint tone marks
-   "you are here" and nothing else. Values:
+   Sourced from `design.md`, the written-from-the-code reference for the
+   alaiy marketing site, and applied here so a seller meets one visual
+   language either side of sign-up. Where that document records two palettes
+   living side by side (a Tailwind `navy-*` theme consumed only by the
+   landing's own navbar, and the raw hex every real section actually draws
+   with) this file takes the second one — the operative one — exactly as
+   §6 "Recurring hex palette (the *real* design system)" lists it:
 
-     ink       #0D2B45   sidebar, headings, primary text
-     mid       #1A4A6B   readable mid-tone
-     link      #1E5F8B   interactive text, focus, the "accent" role
-     accent    #AED6F1   a tint — a plate, a segmented control's active fill
-     ground    #F7F9FC   the page
-     card      #FFFFFF   every card, on the ground
-     mint      #D5F3F3   the ONE "current location" marker — sidebar's
-                         active nav item. Not a general accent.
+     ink       #06182B   headings, primary text, the rail, the "active" plate
+     ink-soft  #061A2E   a dark panel — the landing's answer card and CTA
+     accent    #1D4F86   interactive text, focus, the serif accent half
+     tints     #9CC3F5 #C9DCF2 #EEF3F9 #BFD8F7
+     ground    #F6F7F4   the page — warm, not the cool #F7F9FC it replaces
+     line      #E2E6E1   the hairline that separates a card from the ground
+     muted     #5A6B7D #3E5165 #8A98A6
 
-   WHY ONE HUE, NOT TWO
-   The Arcade Ledger and Calm Console systems this file carried earlier this
-   session each spent a separate accent hue. This mockup spends one: navy at
-   several lightness steps does ink, panel and "link" duty; mint is reserved
-   for exactly one job (marking the current nav item) rather than being a
-   second general-purpose accent.
+   WHAT CHANGED, AND WHY
+   The system this file carried before ("The Morning Briefing") was read off
+   a Claude Design mockup. This one is read off the shipped landing page, by
+   brief: the product should not introduce a seller to a second visual world
+   fifteen minutes after the one that sold them. The shape of the app is
+   untouched — this is a surface reskin, not a layout pass. The rail is still
+   240px, Ask Alaiy is still docked, the sidebar is still flat.
+
+   THE MONO IS THE DATA FACE
+   The previous system had an explicit "No Separate Data Face" rule: KPI
+   figures and table rows were the body face with tabular-nums. The landing
+   does the opposite — §2 fixes `.mono` (Geist Mono) as "eyebrows, counters,
+   numeric figures, tab labels". That rule wins here, so `--font-data`
+   repoints to Geist Mono and all ~59 `font-data` call sites change with it.
+
+   THE SERIF IS ONLY EVER AN ACCENT, AND ONLY EVER ITALIC
+   Instrument Serif is "the accent half of nearly every headline on the
+   site, never body copy" — `.serif` is italic/400 by definition and is
+   applied to part of a headline, not to `h1`/`h2` wholesale. A one-word
+   page title ("Orders", "Listings") has no accent half and stays sans; the
+   landing never splits a headline that has nothing to split.
 
    CARDS GET A LINE, NOT A SHADOW
-   Confirmed against the mockup's own rendered output: a KPI tile and a
-   table-section card both compute to a 16px radius, a 0.8px hairline
-   border, and `box-shadow: none`. The shadow tokens below exist for
-   genuinely floating surfaces (a toast, a drawer, the nav bar's own edge) —
-   applying one to a resting card is a regression, not a detail.
+   Carried over unchanged — the landing is flat throughout, and its own
+   surfaces are told apart by ground/border contrast. The shadow tokens are
+   retinted to the new ink and still exist only for something that genuinely
+   floats: a toast, the Orders drawer, a dropdown.
 
-   RADIUS IS MULTI-STEP AGAIN
-   Unlike the single-5px Arcade Ledger, this system draws four real steps
-   (4/8/12/16px) plus a full pill — confirmed against a KPI card (16px), a
-   segmented control and the sidebar's active-nav pill (both effectively
-   full-round).
+   NO RED ON THE LANDING
+   §6 has no red at all — the landing has a green and an amber and nothing
+   else. The alert family is therefore the one thing here not sourced from
+   that document; it is carried over from the previous system, because a
+   suspended-account banner needs a colour the landing never had to have.
    --------------------------------------------------------------------------- */
 
 @theme {
-  /* Navy. 600 is the brand ink — the sidebar, headings, primary text.
-     300-400 are light enough to serve as the "accent" role (a tint, a
-     segmented control's active fill, a focus ring): this system spends one
-     hue for both ink and accent rather than pairing navy with a separate
-     blue. 700-900 are interpolated for a hover/pressed step on a filled
-     navy surface. */
-  --color-primary-50: #eff6fb;
-  --color-primary-100: #d6eaf8;
-  --color-primary-200: #c0e0f4;
-  --color-primary-300: #aed6f1;
-  --color-primary-400: #1e5f8b;
-  --color-primary-500: #1a4a6b;
-  --color-primary-600: #0d2b45;
-  --color-primary-700: #0b2540;
-  --color-primary-800: #0a2238;
-  --color-primary-900: #071826;
+  /* The navy ramp, anchored on the landing's ink (#06182B at 600). 400 is
+     the accent blue the landing actually draws interactive things in; the
+     light end is its blue-tint family (wires, plates, chips). 700-900 are
+     interpolated darker steps for a hover/pressed state on a filled ink
+     surface — the landing never needed one, having no filled-navy button
+     that changes on hover. */
+  --color-primary-50: #f4f8fc;
+  --color-primary-100: #eef3f9;
+  --color-primary-200: #c9dcf2;
+  --color-primary-300: #bfd8f7;
+  --color-primary-400: #1d4f86;
+  --color-primary-500: #33475b;
+  --color-primary-600: #06182b;
+  --color-primary-700: #0b2744;
+  --color-primary-800: #04111e;
+  --color-primary-900: #020a12;
 
-  /* The same hue, reused for the "accent" role rather than a second one —
-     300 is the light tint (a plate, a chip fill), 400/600 are the
-     interactive/link tone, 100-200 are the palest tints (an info notice's
-     ground). Kept as a distinct token family because the rest of the app
-     already calls on `highlight-*` by name; the values now alias the navy
-     ramp's light end instead of a separate hue. */
-  --color-highlight-100: #eaf4fb;
-  --color-highlight-200: #d6eaf8;
-  --color-highlight-300: #aed6f1;
-  --color-highlight-400: #bde0f7;
-  --color-highlight-500: #1e5f8b;
-  --color-highlight-550: #1e5f8b;
-  --color-highlight-600: #1e5f8b;
-  --color-highlight-700: #1a4a6b;
+  /* The accent family. Same two hues the landing spends — the blue tints and
+     #1D4F86 — kept under the `highlight-*` names the app already calls on by
+     the dozen, so no call site has to move. 700 is a darker step of the
+     accent for a hover on a filled accent surface; the landing has none, so
+     it is interpolated. */
+  --color-highlight-100: #eef3f9;
+  --color-highlight-200: #c9dcf2;
+  --color-highlight-300: #bfd8f7;
+  --color-highlight-400: #9cc3f5;
+  --color-highlight-500: #1d4f86;
+  --color-highlight-550: #1d4f86;
+  --color-highlight-600: #1d4f86;
+  --color-highlight-700: #163e69;
 
-  /* The one "you are here" colour. Not a general accent — its only job is
-     the sidebar's active nav item, confirmed against the mockup's own
-     rendered output (`background-color: rgb(213, 243, 243)`). Reaching for
-     it anywhere else reopens a second accent this system deliberately
-     doesn't have. */
-  --color-active: #d5f3f3;
+  /* "You are here".
 
-  /* Healthy / caution / action-required, renamed to this mockup's own
-     status vocabulary but kept on the app's existing ok/warn/alert tokens
-     so every `bg-ok-soft`/`text-warn-ink` call site updates for free. */
-  --color-ok: #16a34a;
-  --color-ok-soft: #eaf7ef;
-  --color-warn: #d97706;
-  --color-warn-soft: #fdf4e3;
+     The mint #D5F3F3 this token used to carry has no counterpart anywhere in
+     the landing palette, so it is retired rather than kept as an orphan. The
+     landing's own convention is that the current thing is the most
+     contrasted thing: an active progress dot is solid #06182B against
+     #D5DBD4 neighbours, an active module pill "lights up navy", an active
+     tab takes a solid underline. On a light ground that reads as an ink
+     plate, which is what MobileNav takes.
+
+     The rail is itself ink, so an ink plate there would vanish — the rail
+     inverts the same rule, and the active row becomes the palest blue tint
+     with ink text on it. Same idea (the current row is the one at full
+     contrast against its surroundings), flipped for its ground. */
+  --color-active: #eef3f9;
+
+  /* Green and amber, both read straight off §6. `ok` is the landing's
+     connected-dot green, `ok-ink` the darker tone it sets "connected" text
+     in, `ok-soft` its ground. Amber mirrors that: the bright low-stock
+     orange, the warning ink, the soft tint behind a stockout hatch. */
+  --color-ok: #22c55e;
+  --color-ok-soft: #e9f7ee;
+  --color-ok-ink: #15803d;
+
+  --color-warn: #fb923c;
+  --color-warn-soft: #fff1e0;
+  --color-warn-ink: #b45309;
+
+  /* The one family with no landing source — see the header note. */
   --color-alert: #dc2626;
   --color-alert-soft: #fdeded;
-
-  --color-ok-ink: #15803d;
-  --color-warn-ink: #92400e;
   --color-alert-ink: #991b1b;
 
-  --color-ink: #0d2b45;
-  --color-muted: #64748b;
-  --color-muted-soft: #94a3b8;
-  --color-line: #e2e8f0;
-  --color-paper: #f7f9fc;
-  --color-canvas: #f7f9fc;
-  /* Cards are pure white on the off-white ground above — the two ARE
-     visually distinct here (unlike the last system), so `surface` goes back
-     to meaning "a card sitting on the ground" rather than a deeper tone
-     nested inside one. */
+  --color-ink: #06182b;
+  /* The dark-panel tone: the landing's answer card (#061A2E) and its closing
+     CTA. A touch lighter and bluer than the ink it sits beside, which is why
+     it is a token and not a reuse of `ink`. */
+  --color-ink-soft: #061a2e;
+  /* Sub-copy — the landing sets every section's supporting line in this,
+     one step above `muted`. */
+  --color-ink-muted: #3e5165;
+  --color-muted: #5a6b7d;
+  --color-muted-soft: #8a98a6;
+  --color-line: #e2e6e1;
+  /* A heavier rule, for the landing's own "upcoming / inactive" neutral. */
+  --color-line-strong: #d5dbd4;
+  --color-paper: #f6f7f4;
+  --color-canvas: #f6f7f4;
   --color-surface: #ffffff;
+  /* The two deeper grounds the landing uses for a section that is not white
+     and not the default ground — a nested panel, a zebra row, a filmstrip's
+     backing. */
+  --color-sunken: #f1f4ef;
+  --color-sunken-deep: #eef1ec;
 
-  /* FOUR REAL RADIUS STEPS, PLUS A PILL.
-     Confirmed against real rendered elements: a KPI/table card computes to
-     16px; a segmented control and the sidebar's active-nav pill compute to
-     effectively full-round. */
-  --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
-  --radius-2xl: 24px;
-  --radius-3xl: 24px;
+  /* RADIUS.
+     The landing is rounder than the system it replaces. Its real measured
+     values are its chat panel (26px), its answer and query cards (22px) and
+     a great many pills; the small end is not documented, so 6/10/14 are
+     interpolated down from 22 rather than read. `lg` (22px) is the card
+     step, `xl` (26px) the panel step. */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 22px;
+  --radius-xl: 26px;
+  --radius-2xl: 26px;
+  --radius-3xl: 26px;
 
-  /* SOFT, FOR FLOATING SURFACES ONLY.
-     Confirmed a resting card carries NO shadow — just the hairline border
-     above. These four steps plus `nav` are for what genuinely floats over
-     the page: a toast, a drawer, a dropdown, the sticky nav bar's own
-     bottom edge. */
-  --shadow-sm: 0 1px 4px rgb(13 43 69 / 0.06);
-  --shadow-md: 0 2px 12px rgb(13 43 69 / 0.08);
-  --shadow-lg: 0 4px 24px rgb(13 43 69 / 0.12);
-  --shadow-xl: 0 8px 40px rgb(13 43 69 / 0.16);
-  --shadow-nav: 0 2px 16px rgb(13 43 69 / 0.1);
-  /* Kept as a name so the handful of call sites that reach for "a surface
-     genuinely floating over the page" (the import toast, the Orders detail
-     drawer, a chart tooltip) don't need to change — only what it draws did. */
+  /* FLOATING SURFACES ONLY — retinted to the new ink. A resting card still
+     gets the hairline border above and no shadow. */
+  --shadow-sm: 0 1px 4px rgb(6 24 43 / 0.06);
+  --shadow-md: 0 2px 12px rgb(6 24 43 / 0.08);
+  --shadow-lg: 0 4px 24px rgb(6 24 43 / 0.12);
+  --shadow-xl: 0 8px 40px rgb(6 24 43 / 0.16);
+  --shadow-nav: 0 2px 16px rgb(6 24 43 / 0.1);
   --shadow-float: var(--shadow-lg);
 
-  /* Playfair Display narrows to Title/Section only in this system — not
-     every heading. Poppins carries H3-H6, body, labels, nav, buttons, AND
-     table/KPI figures with tabular numerals: this mockup does not spend a
-     separate data face the way the Arcade Ledger spent Geist. `font-data`
-     repoints to Poppins so the ~20 existing `.font-data`/`font-data` call
-     sites (which only ever wanted tabular-nums, not a different typeface)
-     keep working unchanged. */
-  --font-display: var(--font-playfair), Georgia, "Times New Roman", serif;
-  --font-heading: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  --font-body: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
-  --font-label: var(--font-jetbrains-mono), ui-monospace, monospace;
-  --font-data: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
+  /* THE FACES.
+     Geist everywhere that is read; Geist Mono for every figure, eyebrow and
+     tag; Instrument Serif reserved for `.serif` (italic, accent only).
+     `--font-display` stays a name so the two call sites that mean "the
+     display face" keep resolving, but it now resolves to the serif and
+     should only ever be used italic — reach for `.serif` instead. */
+  --font-display: var(--font-instrument-serif), Georgia, serif;
+  --font-heading: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-label: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
+  --font-data: var(--font-geist-mono), ui-monospace, "SFMono-Regular", monospace;
 
   /* THE DISPLAY SCALE.
-     `display-lg` is this system's "Title" (36px) — confirmed against the
-     mockup's own tokens frame ("Title · 36/600"), weight 600 rather than
-     700. `display-md` becomes this system's "Section" (was 26px; the
-     mockup's Section is 20px, confirmed "Section · 20/600" — a real value
-     change, not drift). The xl/sm/xs steps are carried over unchanged;
-     nothing in this mockup pass exercises them. */
+     `display-xl` is the landing's own section headline, exactly: 52px/1.05.
+     `display-lg` (36px) has no landing counterpart — the landing's only
+     larger step is its 68px hero, which no product screen has room for — so
+     it is kept at 36 and simply retuned to the landing's own line-height and
+     tracking. `display-md` (a data tab's own title — "Orders",
+     "Inventory") goes 20px -> 24px: it is the most common page title in
+     the app, and 20px was sized against a serif at 600, which carried
+     more weight per pixel than Geist does at the same size. Every step
+     takes the landing's -0.035em, markedly tighter than the -0.01em the
+     previous system set. */
   --text-display-xl: 52px;
-  --text-display-xl--line-height: 1.04;
+  --text-display-xl--line-height: 1.05;
   --text-display-lg: 36px;
-  --text-display-lg--line-height: 1.08;
-  --text-display-md: 20px;
-  --text-display-md--line-height: 1.3;
+  --text-display-lg--line-height: 1.05;
+  --text-display-md: 24px;
+  --text-display-md--line-height: 1.2;
   --text-display-sm: 18px;
-  --text-display-sm--line-height: 1.2;
+  --text-display-sm--line-height: 1.25;
   --text-display-xs: 16px;
-  --text-display-xs--line-height: 1.25;
-  --text-quote: 20px;
+  --text-display-xs--line-height: 1.3;
+  /* The one step that is serif by intent: Alaiy's own opening line on the
+     Ask screen, set italic in Instrument Serif. */
+  --text-quote: 22px;
   --text-quote--line-height: 1.4;
 
   /* THE FIGURE SCALE.
-     `stat` is this mockup's own KPI size (confirmed "KPI · 30/600 tnum"),
-     up from the previous system's 27px. `stat-sm` is carried over for a
-     secondary-tile scale this pass doesn't exercise. */
-  --text-stat: 30px;
-  --text-stat-sm: 16px;
+     The landing shows a figure at 88px (a full-width answer), 60px (a card's
+     own figure) and 56px (the pricing counter). `stat` takes the card step
+     scaled to a product tile; `stat-sm` is the secondary-tile size, carried
+     over. Both are mono now, like every other number. */
+  --text-stat: 32px;
+  --text-stat-sm: 17px;
 
   /* THE BODY SCALE.
-     `body` moves to 14px, this mockup's own value ("Body · 14/400") — a
-     real, deliberate bump from the dense-UI 13px the last two systems
-     used. `lead` and `table` sit either side of it: `table` at 13.5px
-     (confirmed "Table · 13.5/400") for table rows specifically, `lead` at
-     15px carried over for a single prominent supporting line. `meta`/
-     `micro` are carried over named steps below `label` for a secondary
-     caption and a chart's own axis text. */
-  --text-lead: 15px;
+     `lead` moves to the landing's own sub size (19px/1.55) — it means "one
+     prominent supporting line", which is exactly what that value is for.
+     `body` and `table` are unchanged: the landing has no dense-table step to
+     read off, and changing a 13.5px table row is a density decision, not a
+     theme one. */
+  --text-lead: 19px;
+  --text-lead--line-height: 1.55;
   --text-body: 14px;
   --text-table: 13.5px;
   --text-meta: 10px;
@@ -212,16 +248,25 @@ body {
   background: var(--color-canvas);
   color: var(--color-ink);
   position: relative;
+  /* The landing's own two Geist features — `cv11` gives the single-storey
+     "a"/"g" and `ss01` the alternate figures the site is set in. */
+  font-feature-settings: "cv11", "ss01";
 }
 
-/* h1/h2 are Playfair at 600 (this system's Title/Section, not 700-weight
-   headlines); h3-h6 stay Poppins semibold. `text-wrap: balance` because
-   these are short, deliberate lines. */
+/* Ink on white, as the landing sets it. */
+::selection {
+  background: var(--color-ink);
+  color: #fff;
+}
+
+/* h1/h2 are the sans face now, at the landing's headline weight and
+   tracking. The serif no longer comes in at the element level — it is
+   applied to the accent half of a headline via `.serif`, inline. */
 :where(h1, h2) {
-  font-family: var(--font-display);
+  font-family: var(--font-heading);
   font-weight: 600;
-  line-height: 1.08;
-  letter-spacing: -0.01em;
+  line-height: 1.05;
+  letter-spacing: -0.035em;
   text-wrap: balance;
 }
 
@@ -229,10 +274,11 @@ body {
   font-family: var(--font-heading);
   font-weight: 600;
   line-height: 1.2;
+  letter-spacing: -0.01em;
   text-wrap: balance;
 }
 
-/* One consistent focus ring, in the link/accent tone. */
+/* One consistent focus ring, in the accent tone. */
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {
   outline: 2px solid var(--color-highlight-600);
   outline-offset: 2px;
@@ -254,35 +300,58 @@ body {
   outline: none;
 }
 
-/* Numerals stay lining/tabular wherever the data face is used, so money and
-   counts line up down a column — regardless of which typeface is behind it. */
+/* The data face is mono now, so this only has to keep the numerals lining
+   and tabular — which Geist Mono is anyway, but a column of money should not
+   depend on a fallback face getting that right. */
 .font-data {
   font-variant-numeric: tabular-nums;
 }
 
 @layer components {
   /* -------------------------------------------------------------------------
+     The serif — the accent half of a headline, and nothing else.
+
+     Always italic, always 400. It goes on a `<span>` inside an `h1`, around
+     the part of the line that turns: "Your store data, *answerable.*" A
+     heading with no natural second half does not get one invented for it.
+     ------------------------------------------------------------------------- */
+  .serif {
+    font-family: var(--font-display);
+    font-style: italic;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+  }
+
+  /* The mono, for anything that is counted rather than read. */
+  .mono {
+    font-family: var(--font-data);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* -------------------------------------------------------------------------
      The press — this system's one button shape.
 
-     Filled navy, no border, a soft shadow that only appears on hover (a
-     resting button is as flat as a resting card) and a light lift. No hard
-     offset block anywhere in this system — see the shadow tokens above.
+     Filled ink, no border, flat at rest; a soft shadow and a light lift on
+     hover only, both settling back on click. The timing is the landing's own
+     `.t-quick` (.35s ease), which is slower than the 100ms this button used
+     before — the landing's interactive surfaces all move at that pace and a
+     button that snaps while the card beside it glides reads as two systems.
      ------------------------------------------------------------------------- */
   .press {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm);
     border-width: 0;
     font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
     transition:
-      transform 100ms ease,
-      box-shadow 100ms ease,
-      background-color 100ms ease,
-      opacity 100ms ease;
+      transform 0.35s ease,
+      box-shadow 0.35s ease,
+      background-color 0.35s ease,
+      opacity 0.35s ease;
   }
 
   .press-light {
@@ -290,12 +359,12 @@ body {
     background: var(--color-primary-600);
   }
 
-  /* On a navy panel (the sidebar): the mint "current" tone would be a
-     location marker, not a button, so a press here stays a light plate
-     instead — navy text on the palest accent tint. */
+  /* On the ink rail: an ink fill would vanish, so the rail's own primary
+     action takes the palest blue tint with ink text — the same inversion the
+     active nav row makes. */
   .press-dark {
     color: var(--color-primary-600);
-    background: var(--color-primary-100);
+    background: var(--color-highlight-100);
   }
 
   .press-alert {
@@ -338,9 +407,9 @@ body {
   /* -------------------------------------------------------------------------
      The eyebrow — a section's name, above its heading.
 
-     Confirmed against the mockup's own tokens frame: "Eyebrow · 11/600
-     +.14em". JetBrains Mono, navy at 68% so it stays quieter than the
-     heading it sits above without dropping under 4.5:1.
+     Mono, as it is on the landing. The size and tracking are carried over
+     from the previous system (11px / +0.14em); the landing does not publish
+     an eyebrow size, and these read correctly in Geist Mono.
      ------------------------------------------------------------------------- */
   .eyebrow {
     display: flex;
@@ -353,16 +422,56 @@ body {
     text-transform: uppercase;
     color: color-mix(in oklab, var(--color-primary-600) 68%, transparent);
   }
+
+  /* -------------------------------------------------------------------------
+     The dotted ground.
+
+     The landing's recurring texture — Hero, Ask alaiy, FAQ and the closing
+     CTA all sit on it. In the product it belongs to the surfaces a seller
+     meets before the dense UI starts: sign-in, onboarding, an empty state.
+     ------------------------------------------------------------------------- */
+  .dot-grid {
+    background-color: var(--color-canvas);
+    background-image: radial-gradient(rgb(6 24 43 / 0.08) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* The same texture on an ink panel, for the closing-CTA treatment. */
+  .dot-grid-dark {
+    background-color: var(--color-ink-soft);
+    background-image: radial-gradient(rgb(255 255 255 / 0.06) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
 }
 
 /* ---------------------------------------------------------------------------
-   Motion, for Ask Alaiy.
+   Motion.
+
+   The landing's three transition classes, kept under their own names so a
+   component can say which kind of movement it is making. `.t-move` is for
+   something that travels, `.t-fade` for something that appears, `.t-quick`
+   for a button or a cell.
    --------------------------------------------------------------------------- */
+
+.t-move {
+  transition: all 0.9s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.t-fade {
+  transition:
+    opacity 0.6s ease,
+    transform 0.8s cubic-bezier(0.2, 0.8, 0.2, 1),
+    filter 0.6s ease;
+}
+
+.t-quick {
+  transition: all 0.35s ease;
+}
 
 @keyframes alaiy-rise {
   from {
     opacity: 0;
-    transform: translateY(6px);
+    transform: translateY(16px);
   }
   to {
     opacity: 1;
@@ -370,8 +479,10 @@ body {
   }
 }
 
+/* The landing's own `fade-up`: opacity 0→1 over translateY 16px→0, 0.6s
+   ease-out. Was 6px/0.24s with a spring curve. */
 .animate-rise {
-  animation: alaiy-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: alaiy-rise 0.6s ease-out both;
 }
 
 @keyframes alaiy-pulse-dot {
@@ -397,10 +508,18 @@ body {
     animation: none;
   }
 
+  /* The landing strips its three transition classes outright under reduced
+     motion; so does this. */
+  .t-move,
+  .t-fade,
+  .t-quick {
+    transition: none;
+  }
+
   .press {
     transition:
-      box-shadow 100ms ease,
-      background-color 100ms ease;
+      box-shadow 0.35s ease,
+      background-color 0.35s ease;
   }
 
   .press-light:hover:not(:disabled),

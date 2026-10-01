@@ -75,7 +75,9 @@ export default async function DashboardPage() {
     <div className="mx-auto w-full max-w-6xl space-y-4 px-5 py-6 sm:px-6">
       <div className="space-y-1.5">
         <Eyebrow>Your morning</Eyebrow>
-        <h1 className="text-display-lg">Where the business stands</h1>
+        <h1 className="text-display-lg">
+          Where the business <span className="serif">stands</span>
+        </h1>
         <p className="text-body text-muted">
           Today against the same point last week, and anything Alaiy noticed
           since you were last here.

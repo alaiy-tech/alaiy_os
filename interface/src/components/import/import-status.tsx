@@ -172,7 +172,7 @@ export function ImportStatus({ initialJob }: { initialJob: ImportJob | null }) {
         </span>
 
         <div className="min-w-0 flex-1 space-y-1">
-          <p className="font-display text-display-xs font-bold text-ink">
+          <p className="text-display-xs font-semibold text-ink">
             {running
               ? "Importing your data"
               : failed
