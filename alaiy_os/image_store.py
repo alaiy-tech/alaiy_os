@@ -483,6 +483,23 @@ def _local_bytes(url):
 	return content, mimetypes.guess_type(url)[0] or "image/jpeg"
 
 
+def viewable_url(url, seconds=None):
+	"""A URL a signed-in user's browser can show, for any image URL.
+
+	An object in our bucket is presigned; anything else -- a local File, which the
+	browser loads from the site itself, or a supplier photo -- is returned unchanged.
+	Unlike `fetchable_url` this never uploads, so drawing a thumbnail has no side effect.
+	"""
+	if is_stored_url(url):
+		return presigned_url(url, seconds)
+	return url
+
+
+def viewable_urls(urls, seconds=None):
+	"""`{url: viewable_url(url)}` for every distinct URL given, for a screen to swap in."""
+	return {url: viewable_url(url, seconds) for url in dict.fromkeys(u for u in urls or [] if u)}
+
+
 def read(url):
 	"""An image's bytes and media type, `(bytes, media_type)`, read with our own access.
 

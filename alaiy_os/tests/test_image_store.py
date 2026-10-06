@@ -445,6 +445,22 @@ class TestFetchableUrl(StoreTestCase):
 			self.assertEqual(image_store.fetchable_url("/files/gone.png"), "https://site.example/files/gone.png")
 
 
+class TestViewableUrl(StoreTestCase):
+	def test_our_object_is_signed_for_the_browser(self):
+		stored = image_store.upload("x.png", PNG, "image/png")
+		self.assertIn("X-Amz-Signature", image_store.viewable_url(stored))
+
+	def test_a_local_file_is_shown_from_the_site_and_never_uploaded(self):
+		self.assertEqual(image_store.viewable_url("/files/x.png"), "/files/x.png")
+		self.assertFalse(self.s3.puts)
+
+	def test_viewable_urls_maps_each_distinct_url_once(self):
+		stored = image_store.upload("x.png", PNG, "image/png")
+		links = image_store.viewable_urls([stored, stored, "/files/y.png", None])
+		self.assertEqual(set(links), {stored, "/files/y.png"})
+		self.assertEqual(len(self.s3.presigned), 1)
+
+
 class TestLocalFallback(NoBucketTestCase):
 	def test_without_a_bucket_save_writes_a_file_as_before(self):
 		with patch("frappe.utils.file_manager.save_file") as save_file:
