@@ -9,7 +9,9 @@ readme = "README.md"
 dynamic = ["version"]
 dependencies = [
     # "frappe~=16.0.0" # Installed and managed by bench.
-    
+    # Product images in S3 (alaiy_os/image_store.py). Imported lazily, so a site with
+    # no bucket configured never needs it at runtime.
+    "boto3>=1.34",
 ]
 
 [tool.bench.frappe-dependencies]
