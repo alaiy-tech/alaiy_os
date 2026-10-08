@@ -11,8 +11,6 @@
   "column_break_1",
   "role",
   "is_partial",
-  "skill_used",
-  "skill_args",
   "screen",
   "text",
   "blocks",
@@ -60,20 +58,6 @@
    "fieldname": "is_partial",
    "fieldtype": "Check",
    "label": "Is Partial"
-  },
-  {
-   "description": "Set on a user message sent as a `/skill`: the OS Agent Registry skill_slug that was invoked. `runner.run_turn` reads it to decide whether the turn opens with an agent dispatch.",
-   "fieldname": "skill_used",
-   "fieldtype": "Data",
-   "label": "Skill Used"
-  },
-  {
-   "description": "The arguments the skill was run with, as sent. Validated against the pack's Input Schema before the run.",
-   "fieldname": "skill_args",
-   "fieldtype": "Code",
-   "label": "Skill Arguments (JSON)",
-   "options": "JSON",
-   "read_only": 1
   },
   {
    "description": "Which screen the user was on when they sent this, as the client reported it (e.g. `orders`, `item/ABC-1`). Recorded for context and analytics; nothing dispatches on it.",
@@ -144,7 +128,7 @@
   }
  ],
  "links": [],
- "modified": "2026-08-28 00:00:00.000000",
+ "modified": "2026-09-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Chat Message",

@@ -11,7 +11,6 @@
   "handler_ok",
   "handler_health_detail",
   "parameters_schema",
-  "effect",
   "connector",
   "required_permissions"
  ],
@@ -64,15 +63,6 @@
    "options": "JSON"
   },
   {
-   "default": "read",
-   "description": "Whether this tool only reads, or changes something. A <code>write</code> tool is reachable only inside its own agent's run — it is withheld from Ask Alaiy's directly-callable tool surface, where the chat model would be calling it without the agent's prompt and rules. Default <code>read</code>, because every tool registered before this field existed was one.",
-   "fieldname": "effect",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "label": "Effect",
-   "options": "read\nwrite"
-  },
-  {
    "description": "Connector this tool depends on; runs fail fast when it is missing or disabled.",
    "fieldname": "connector",
    "fieldtype": "Link",
@@ -89,7 +79,7 @@
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-07-20 00:00:00.000000",
+ "modified": "2026-09-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Agent Tool",

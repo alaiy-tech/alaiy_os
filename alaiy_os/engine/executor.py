@@ -1,6 +1,6 @@
 """Run lifecycle + the LLM ⇄ tool loop.
 
-Every invocation path (API, scheduler, doc events, manual) converges here:
+Every invocation path (API, scheduler, chat) converges here:
 ``execute_agent()`` creates an OS Agent Run and enqueues it; nothing calls an
 LLM inside a web request. Callers poll the Run record.
 """
@@ -46,7 +46,7 @@ class ToolStop(Exception):
 	"""
 
 
-def execute_agent(agent, payload=None, trigger_type="Manual"):
+def execute_agent(agent, trigger_type, payload=None):
 	"""Create a Run for `agent` and enqueue it. Returns the Run name."""
 	_assert_runnable(agent)
 	run = _new_run(agent, payload, trigger_type)
@@ -60,13 +60,13 @@ def execute_agent(agent, payload=None, trigger_type="Manual"):
 	return run
 
 
-def run_now(agent, payload=None, trigger_type="Manual"):
+def run_now(agent, trigger_type, payload=None):
 	"""Create a Run for `agent` and execute it in this process. Returns the Run name.
 
 	The synchronous twin of `execute_agent`, for a caller that is *already* on a
-	worker and needs the result before it can continue — Ask Alaiy's `/skill`
-	dispatch, which has to put the agent's output into the conversation before
-	the chat model can narrate it (see `chat/skills.py`).
+	worker and needs the result before it can continue — Ask Alaiy's `run_agent`
+	tool, which has to put the agent's output into the conversation before the
+	chat model can narrate it (see `chat/agents.py`).
 
 	Enqueuing from inside a job and then polling for the child would deadlock a
 	single-worker bench, so this does not enqueue. The trade is that the caller
@@ -86,11 +86,8 @@ def run_now(agent, payload=None, trigger_type="Manual"):
 
 
 def _assert_runnable(agent):
-	enabled = frappe.db.get_value("OS Agent Registry", agent, "is_enabled")
-	if enabled is None:
+	if not frappe.db.exists("OS Agent Registry", agent):
 		frappe.throw(f"Agent {agent} does not exist.")
-	if not enabled:
-		frappe.throw(f"Agent {agent} is disabled.")
 
 
 def _new_run(agent, payload, trigger_type):
@@ -177,8 +174,8 @@ def outcome(run, label=None):
 
 	Three endings, and the difference between them is exactly what the person who
 	asked needs to hear, so it is decided here rather than in each surface that
-	runs an agent — `chat/skills.py` for `/listing`, `chat/agents.py` for a job
-	handed over in plain language, and whatever comes next.
+	runs an agent — `chat/agents.py` for a job handed over in plain language, and
+	whatever comes next.
 
 	A refusal relays its own words. That is the point of it: "no connector is
 	installed" is the complete answer, and the surface in front of the user can

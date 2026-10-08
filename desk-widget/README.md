@@ -58,7 +58,7 @@ askAlaiy/`, the most complete existing implementation (see
   content rather than shrinking it, so it never has to reach into Desk's own
   DOM/layout.
 
-Everything else -- streaming with the character-reveal animation, skills
-(`/`), mentions (`@`), attachments (uploads and generated-file artifacts),
+Everything else -- streaming with the character-reveal animation,
+mentions (`@`), attachments (uploads and generated-file artifacts),
 the `alaiy-chart` fence convention, and the hidden-during-run tool trail --
 is ported faithfully.

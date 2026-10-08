@@ -230,9 +230,8 @@ def _core_tools():
 	try:
 		agent_tool = agent_tool_spec()
 	except Exception:
-		# `catalogue()` runs the tenant's `chat_skill_filter` hooks, which fail
-		# closed to "no skills". That is already the safe answer here — no agents
-		# to offer — and must not take the rest of the tool surface down with it.
+		# No agents to offer is already the safe answer here, and a failure to list
+		# them must not take the rest of the tool surface down with it.
 		frappe.log_error(title="chat run_agent tool build failed")
 		agent_tool = None
 

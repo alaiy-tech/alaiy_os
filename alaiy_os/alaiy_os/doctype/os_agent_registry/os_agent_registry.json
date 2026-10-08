@@ -8,17 +8,10 @@
  "field_order": [
   "agent_id",
   "agent_name",
-  "agent_avatar",
-  "is_enabled",
   "description",
-  "icon",
   "surface_section",
   "run_as_user",
   "settings_doctype",
-  "page",
-  "chat_skill",
-  "skill_slug",
-  "skill_label",
   "engine_section",
   "model",
   "max_turns",
@@ -50,28 +43,9 @@
    "reqd": 1
   },
   {
-   "description": "Optional \u2014 shown in the Image (grid) list view. Agents without one get an auto-generated initial card there, so this is purely cosmetic.",
-   "fieldname": "agent_avatar",
-   "fieldtype": "Attach Image",
-   "label": "Avatar"
-  },
-  {
-   "default": "1",
-   "fieldname": "is_enabled",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Enabled"
-  },
-  {
    "fieldname": "description",
    "fieldtype": "Small Text",
    "label": "Description"
-  },
-  {
-   "description": "Feather icon name shown in workspace and sidebar links.",
-   "fieldname": "icon",
-   "fieldtype": "Data",
-   "label": "Icon"
   },
   {
    "collapsible": 1,
@@ -92,35 +66,6 @@
    "fieldtype": "Link",
    "label": "Settings DocType",
    "options": "DocType"
-  },
-  {
-   "description": "Custom UI Page shipped by the agent app; sidebar links here when set.",
-   "fieldname": "page",
-   "fieldtype": "Link",
-   "label": "Page",
-   "options": "Page"
-  },
-  {
-   "default": "0",
-   "description": "Expose this agent in Ask Alaiy as a <code>/</code> skill. A skill runs with NO payload and for ANY user who can chat \u2014 the OS Agent Run permission is not the gate, because it grants System Manager only. Tick this only when every tool on this agent enforces its own permissions (read via <code>frappe.get_list</code>, never <code>get_all</code>) and none of them write.",
-   "fieldname": "chat_skill",
-   "fieldtype": "Check",
-   "label": "Available as Chat Skill"
-  },
-  {
-   "depends_on": "chat_skill",
-   "description": "What the user types after the slash, e.g. <code>daily-digest</code>. Lowercase letters, digits and hyphens.",
-   "fieldname": "skill_slug",
-   "fieldtype": "Data",
-   "label": "Skill Slug",
-   "mandatory_depends_on": "chat_skill"
-  },
-  {
-   "depends_on": "chat_skill",
-   "description": "Name shown in the skill picker. Defaults to Agent Name.",
-   "fieldname": "skill_label",
-   "fieldtype": "Data",
-   "label": "Skill Label"
   },
   {
    "fieldname": "engine_section",
@@ -165,7 +110,7 @@
    "label": "Input"
   },
   {
-   "description": "JSON Schema the arguments must satisfy when this pack is run as a skill. Leave empty for a pack that takes none \u2014 that is the default and the majority.",
+   "description": "JSON Schema the arguments must satisfy when this agent is run from chat via <code>run_agent</code>. Leave empty for an agent that takes none \u2014 that is the default and the majority.",
    "fieldname": "input_schema",
    "fieldtype": "Code",
    "label": "Input Schema (JSON)",
@@ -193,9 +138,8 @@
    "options": "JSON"
   }
  ],
- "image_field": "agent_avatar",
  "links": [],
- "modified": "2026-07-20 00:00:00.000000",
+ "modified": "2026-09-24 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Alaiy OS",
  "name": "OS Agent Registry",
