@@ -37,25 +37,13 @@ PNG = b"\x89PNG\r\n\x1a\nfake"
 
 
 def _unset_conf(test, var):
-	"""Take a knob out of the site's own config for the length of one test.
-
-	`setting()` reads the environment first and site_config second, so a site that
-	happens to configure one of these would otherwise answer for a test that is
-	asserting about the environment (or about nothing being configured at all).
-	"""
-	key = var.lower()
-	if key in frappe.conf:
-		previous = frappe.conf[key]
-		test.addCleanup(frappe.conf.__setitem__, key, previous)
-	frappe.conf.pop(key, None)
+	"""Take a knob out of the site's own config for the length of one test."""
+	test.conf.pop(var.lower(), None)
 
 
 def _set_conf(test, var, value):
-	"""The mirror image: put a knob in site_config for one test."""
-	key = var.lower()
-	_unset_conf(test, var)
-	frappe.conf[key] = value
-	test.addCleanup(frappe.conf.pop, key, None)
+	"""Put a knob in the site's own config for one test."""
+	test.conf[var.lower()] = value
 
 
 class FakeClientError(Exception):
@@ -113,15 +101,27 @@ class FakeS3:
 		return {"Body": FakeBody(stored["Body"]), "ContentType": stored.get("ContentType")}
 
 
-class StoreTestCase(UnitTestCase):
-	"""Configures a bucket for the test and hands every call the same fake client."""
+class ConfTestCase(UnitTestCase):
+	"""Every setting comes from `self.conf`, standing in for the site's own site_config."""
 
-	env = {image_store.BUCKET_VAR: BUCKET, image_store.REGION_VAR: REGION}
+	site = {}
 
 	def setUp(self):
+		self.conf = dict(self.site)
+		p = patch.object(image_store, "_site_config", lambda: self.conf)
+		p.start()
+		self.addCleanup(p.stop)
+
+
+class StoreTestCase(ConfTestCase):
+	"""Configures a bucket for the test and hands every call the same fake client."""
+
+	site = {image_store.BUCKET_VAR.lower(): BUCKET, image_store.REGION_VAR.lower(): REGION}
+
+	def setUp(self):
+		super().setUp()
 		self.s3 = FakeS3()
 		patches = [
-			patch.dict(os.environ, self.env, clear=False),
 			patch.object(image_store, "client", lambda: self.s3),
 			# botocore is the only thing that raises the real ClientError; the
 			# retry loop has to match the stub's instead.
@@ -133,21 +133,10 @@ class StoreTestCase(UnitTestCase):
 		for p in patches:
 			p.start()
 			self.addCleanup(p.stop)
-		# site_config must not answer for these while the environment is what is
-		# under test (setting() falls through to it), and must be as it was after.
-		for var in (image_store.PREFIX_VAR, image_store.ACL_VAR, image_store.PUBLIC_BASE_VAR):
-			_unset_conf(self, var)
 
 
-class NoBucketTestCase(UnitTestCase):
-	"""A bench that has not configured S3 at all — the pre-S3 behaviour."""
-
-	def setUp(self):
-		p = patch.dict(os.environ, {}, clear=False)
-		p.start()
-		self.addCleanup(p.stop)
-		os.environ.pop(image_store.BUCKET_VAR, None)
-		_unset_conf(self, image_store.BUCKET_VAR)
+class NoBucketTestCase(ConfTestCase):
+	"""A site that has not configured S3 at all -- the pre-S3 behaviour."""
 
 
 class TestEnablement(NoBucketTestCase):
@@ -155,36 +144,46 @@ class TestEnablement(NoBucketTestCase):
 		self.assertFalse(image_store.enabled())
 		self.assertIsNone(image_store.upload("x.png", PNG, "image/png"))
 
-	def test_bucket_from_site_config_when_env_is_unset(self):
-		"""A bench that configures the app with `bench set-config` works too."""
+	def test_a_bucket_in_the_sites_own_config_turns_it_on(self):
 		_set_conf(self, image_store.BUCKET_VAR, BUCKET)
 		self.assertEqual(image_store.bucket(), BUCKET)
 		self.assertTrue(image_store.enabled())
 
-	def test_environment_wins_over_site_config(self):
-		_set_conf(self, image_store.REGION_VAR, "us-east-1")
-		os.environ[image_store.REGION_VAR] = REGION
-		self.assertEqual(image_store.region(), REGION)
+	def test_the_environment_is_never_read(self):
+		"""Shared by every site on the bench: a bucket there must not move them all."""
+		with patch.dict(os.environ, {image_store.BUCKET_VAR: BUCKET}):
+			self.assertIsNone(image_store.bucket())
+			self.assertFalse(image_store.enabled())
+
+	def test_common_site_config_is_never_read(self):
+		"""frappe.conf merges in common_site_config.json, which every site shares."""
+		key = image_store.BUCKET_VAR.lower()
+		with patch.dict(frappe.conf, {key: BUCKET}):
+			self.assertIsNone(image_store.bucket())
 
 	def test_region_defaults_to_the_documented_one(self):
-		os.environ.pop(image_store.REGION_VAR, None)
-		_unset_conf(self, image_store.REGION_VAR)
 		self.assertEqual(image_store.region(), image_store.DEFAULT_REGION)
 
 
-class TestCredentials(UnitTestCase):
-	"""Credentials are optional, and read the same way from either place — because a
-	bench's web process and its background worker do not see the same environment,
-	and an upload that works in the console but not in a job is the failure mode
-	this exists to remove."""
+class TestSiteConfig(UnitTestCase):
+	def test_it_reads_only_this_sites_file(self):
+		frappe.local.image_store_site_config = None
+		with patch("frappe.get_site_path", return_value="/site/site_config.json") as path, \
+				patch("os.path.exists", return_value=True), \
+				patch("frappe.get_file_json", return_value={"s3_bucket": BUCKET}) as read:
+			self.assertEqual(image_store._site_config(), {"s3_bucket": BUCKET})
+		path.assert_called_once_with("site_config.json")
+		read.assert_called_once_with("/site/site_config.json")
+		frappe.local.image_store_site_config = None
+
+
+class TestCredentials(ConfTestCase):
+	"""Credentials are optional, and come from the site's own config when given."""
+
+	site = {image_store.BUCKET_VAR.lower(): BUCKET}
 
 	def setUp(self):
-		p = patch.dict(os.environ, {image_store.BUCKET_VAR: BUCKET}, clear=False)
-		p.start()
-		self.addCleanup(p.stop)
-		for var in (image_store.ACCESS_KEY_VAR, image_store.SECRET_KEY_VAR, image_store.SESSION_TOKEN_VAR):
-			os.environ.pop(var, None)
-			_unset_conf(self, var)
+		super().setUp()
 		image_store._clients.clear()
 		self.addCleanup(image_store._clients.clear)
 
@@ -221,7 +220,7 @@ class TestCredentials(UnitTestCase):
 		_set_conf(self, image_store.SECRET_KEY_VAR, "old")
 		with patch("boto3.client") as boto_client:
 			image_store.client()
-			frappe.conf[image_store.ACCESS_KEY_VAR.lower()] = "AKIANEW"
+			_set_conf(self, image_store.ACCESS_KEY_VAR, "AKIANEW")
 			image_store.client()
 		self.assertEqual(boto_client.call_count, 2)
 		self.assertEqual(boto_client.call_args.kwargs["aws_access_key_id"], "AKIANEW")
@@ -258,7 +257,7 @@ class TestKeys(StoreTestCase):
 		self.assertTrue(image_store.key_for("x.jpg", None).startswith("images/generated/"))
 
 	def test_prefix_is_configurable(self):
-		with patch.dict(os.environ, {image_store.PREFIX_VAR: "amazon/pics/"}, clear=False):
+		with patch.dict(self.conf, {image_store.PREFIX_VAR.lower(): "amazon/pics/"}):
 			self.assertTrue(image_store.key_for("x.jpg", image_store.TRANSLATED).startswith("amazon/pics/translated/"))
 
 
@@ -296,7 +295,7 @@ class TestUpload(StoreTestCase):
 
 	def test_upload_gives_up_after_max_attempts_and_returns_none(self):
 		self.s3 = FakeS3(fail_code="SlowDown", fail_times=99)
-		with patch.dict(os.environ, {image_store.ATTEMPTS_VAR: "2"}, clear=False):
+		with patch.dict(self.conf, {image_store.ATTEMPTS_VAR.lower(): "2"}):
 			with patch.object(frappe, "log_error") as logged:
 				self.assertIsNone(image_store.upload("x.png", PNG, "image/png"))
 		self.assertEqual(len(self.s3.puts), 2)
@@ -319,12 +318,12 @@ class TestUpload(StoreTestCase):
 	def test_acl_can_be_switched_off(self):
 		"""`none`, not an empty string: an unset variable already reads as empty, so
 		empty cannot mean "deliberately no ACL"."""
-		with patch.dict(os.environ, {image_store.ACL_VAR: image_store.NO_ACL}, clear=False):
+		with patch.dict(self.conf, {image_store.ACL_VAR.lower(): image_store.NO_ACL}):
 			image_store.upload("x.png", PNG, "image/png")
 		self.assertNotIn("ACL", self.s3.puts[0])
 
 	def test_an_empty_acl_setting_still_means_private(self):
-		with patch.dict(os.environ, {image_store.ACL_VAR: ""}, clear=False):
+		with patch.dict(self.conf, {image_store.ACL_VAR.lower(): ""}):
 			image_store.upload("x.png", PNG, "image/png")
 		self.assertEqual(self.s3.puts[0]["ACL"], "private")
 
@@ -344,7 +343,7 @@ class TestRetrieval(StoreTestCase):
 			self.assertIsNone(image_store.key_from_url(url), url)
 
 	def test_presigned_url_signs_our_object_for_the_configured_window(self):
-		with patch.dict(os.environ, {image_store.EXPIRY_VAR: "600"}, clear=False):
+		with patch.dict(self.conf, {image_store.EXPIRY_VAR.lower(): "600"}):
 			signed = image_store.presigned_url(self.url)
 		self.assertEqual(self.s3.presigned[0][1], {"Bucket": BUCKET, "Key": self.s3.puts[0]["Key"]})
 		self.assertEqual(self.s3.presigned[0][2], 600)
@@ -378,7 +377,7 @@ class TestCdnBase(StoreTestCase):
 	signed and nothing expires — which is what the connector handing Amazon an image
 	url needs."""
 
-	env = dict(StoreTestCase.env, IMAGE_S3_PUBLIC_BASE_URL="https://cdn.example.com/img")
+	site = dict(StoreTestCase.site, image_s3_public_base_url="https://cdn.example.com/img")
 
 	def test_stored_url_is_the_cdn_url(self):
 		url = image_store.upload("x.png", PNG, "image/png", category=image_store.TRANSLATED)

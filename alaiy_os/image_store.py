@@ -33,11 +33,13 @@ the site had a bucket is uploaded the first time `fetchable_url()` is asked for 
 under a key derived from its path, so asking again finds the same object rather than
 uploading twice. Nothing is rewritten on the row and nothing is deleted.
 
-Configuration is read from the environment first, then from `site_config.json` under
-the same names lowercased (`s3_bucket`, `image_s3_region`, ...). Credentials follow the
-same rule and are optional: leave `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` out --
-the better choice -- and boto3 resolves an instance role, a profile or the ambient
-environment on its own.
+**S3 is per site.** Configuration is read from the site's own `site_config.json` and
+nowhere else, under the names lowercased (`s3_bucket`, `image_s3_region`, ...). Not from
+the environment and not from `common_site_config.json`: both are shared by every site
+on a bench, and a bucket set there would quietly move every site's images, when only a
+site that asked for S3 should store images in it. Credentials are optional: leave
+`aws_access_key_id` / `aws_secret_access_key` out -- the better choice -- and boto3
+resolves an instance role or a profile on its own.
 
 """
 
@@ -66,8 +68,8 @@ DEFAULT_ATTEMPTS = 3
 
 # Normally unset: boto3 finds an instance role or a profile on its own. They exist
 # because the upload happens on a supervisor-managed worker, which inherits neither the
-# login shell's environment nor reliably its HOME, so naming them here is the one place
-# the web process and the workers are guaranteed to read the same thing.
+# login shell's environment nor reliably its HOME, so the site's own config is the one
+# place the web process and the workers are guaranteed to read the same thing.
 ACCESS_KEY_VAR = "AWS_ACCESS_KEY_ID"
 SECRET_KEY_VAR = "AWS_SECRET_ACCESS_KEY"
 SESSION_TOKEN_VAR = "AWS_SESSION_TOKEN"
@@ -115,13 +117,30 @@ _clients_lock = threading.Lock()
 
 
 def setting(name, default=None):
-	"""One configuration value: environment first, then site_config, then the default."""
-	value = os.environ.get(name)
-	if value is None or value == "":
-		value = frappe.conf.get(name.lower())
+	"""One configuration value from this site's own `site_config.json`, or the default.
+
+	Never the environment and never `common_site_config.json`; see the module docstring.
+	"""
+	value = _site_config().get(name.lower())
 	if value is None or value == "":
 		return default
 	return value
+
+
+def _site_config():
+	"""This site's own `site_config.json`, without the bench-wide common config.
+
+	Read once per request or job, so a `bench set-config` takes effect on the next one.
+	"""
+	cached = getattr(frappe.local, "image_store_site_config", None)
+	if cached is None:
+		path = frappe.get_site_path("site_config.json")
+		try:
+			cached = frappe.get_file_json(path) if os.path.exists(path) else {}
+		except Exception:
+			cached = {}
+		frappe.local.image_store_site_config = cached
+	return cached
 
 
 def bucket():
