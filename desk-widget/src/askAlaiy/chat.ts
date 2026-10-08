@@ -17,7 +17,6 @@ export type ChatStatus = "Idle" | "Running" | "Failed";
 export interface ChatSessionSummary {
   name: string;
   title: string | null;
-  model: string;
   status: ChatStatus;
   last_activity: string | null;
   modified: string;
@@ -61,20 +60,12 @@ export interface ChatMessage {
   text: string;
   attachments: ChatAttachmentMeta[];
   mentions: ChatMention[];
-  skill: string | null;
   tool_calls: ChatToolCall[];
   tool_errors: string[];
   /** Only ever true when `partial: 1` was requested -- the assistant is still
    * writing this message. */
   partial: boolean;
   creation: string;
-}
-
-export interface ChatSkill {
-  slug: string;
-  label: string;
-  description: string | null;
-  icon: string | null;
 }
 
 export interface MentionOption {
@@ -109,7 +100,6 @@ export interface UploadAttachmentResult {
 export interface CreateSessionResult {
   session: string;
   title: string | null;
-  model: string;
   status: ChatStatus;
 }
 
@@ -133,7 +123,7 @@ export class FrappeError extends Error {
   }
 }
 
-export const createChatSession = (params: { title?: string; model?: string } = {}) =>
+export const createChatSession = (params: { title?: string } = {}) =>
   frappe.xcall<CreateSessionResult>(`${NS}.create_session`, params);
 
 export const listChatSessions = (limit = 50) =>
@@ -143,7 +133,6 @@ export const sendChatMessage = (params: {
   session: string;
   text?: string;
   attachments?: string[];
-  skill?: string;
   screen?: string;
   mentions?: { kind: string; value: string }[];
 }) => frappe.xcall<SendMessageResult>(`${NS}.send_message`, params);
@@ -153,8 +142,6 @@ export const getChatMessages = (params: { session: string; after?: number; parti
 
 export const deleteChatSession = (session: string) =>
   frappe.xcall<{ deleted: string }>(`${NS}.delete_session`, { session });
-
-export const listChatSkills = () => frappe.xcall<ChatSkill[]>(`${NS}.list_skills`);
 
 export const listChatMentions = (q: string) =>
   frappe.xcall<MentionCatalogue>(`${NS}.list_mentions`, { q });

@@ -2,13 +2,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { createPortal } from "react-dom";
 import {
   AtSign, Bot, Calendar, ChevronDown, Edit3, File as FileIcon, Loader2,
-  MoreHorizontal, Package, Paperclip, Plus, Search, Send, Slash, Sparkles, Store, Tag,
+  MoreHorizontal, Package, Paperclip, Plus, Search, Send, Sparkles, Store, Tag,
   Trash2, TriangleAlert, X,
 } from "lucide-react";
 import { groupAssistantTurns, MAX_ATTACHMENTS, type useAskAlaiy, type PendingAttachment, type ThreadTurn } from "./useAskAlaiy";
 import { listChatMentions } from "./chat";
 import type {
-  ChatAttachmentMeta, ChatMention, ChatSessionSummary, ChatSkill, MentionGroup, MentionOption,
+  ChatAttachmentMeta, ChatMention, ChatSessionSummary, MentionGroup, MentionOption,
 } from "./chat";
 import { AnswerBody } from "./AnswerBody";
 import { FeedbackControl } from "./FeedbackControl";
@@ -31,17 +31,6 @@ const SUGGESTIONS = [
 // only. The server re-checks: this attribute is trivially bypassed.
 const ATTACHMENT_ACCEPT =
   ".pdf,.xlsx,.xlsm,.csv,.tsv,.txt,.md,.json,.yaml,.yml,.py,.js,.ts,.sql,.log,.xml,.html,.htm,.css,.ini,.cfg,.toml";
-
-function skillQueryOf(value: string): string | null {
-  const match = /^\/([a-z0-9-]*)$/.exec(value.trimStart());
-  return match ? match[1] : null;
-}
-
-function exactSkillSlug(value: string, skills: ChatSkill[] | null): string | undefined {
-  const match = /^\/([a-z0-9-]+)$/.exec(value.trim());
-  if (!match || !skills) return undefined;
-  return skills.some((s) => s.slug === match[1]) ? match[1] : undefined;
-}
 
 const MENTION_RE = /(?:^|[\s(\[{,;:"'“‘])@([^\s@]{0,40}(?:[ ][^\s@]{0,40}){0,2})?$/;
 const MENTION_DEBOUNCE_MS = 120;
@@ -108,28 +97,6 @@ export function AskAlaiyPanel({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const skillQuery = skillQueryOf(text);
-  const [skillMatches, setSkillMatches] = useState<ChatSkill[]>([]);
-  const [skillIndex, setSkillIndex] = useState(0);
-  const [skillDismissedFor, setSkillDismissedFor] = useState<string | null>(null);
-  const skillsOpen = skillQuery !== null && text !== skillDismissedFor;
-
-  useEffect(() => {
-    if (skillQuery === null) {
-      setSkillMatches([]);
-      return;
-    }
-    let cancelled = false;
-    void chat.ensureSkillsLoaded().then((all) => {
-      if (cancelled || skillQueryOf(text) === null) return;
-      const q = skillQuery.toLowerCase();
-      setSkillMatches(all.filter((s) => s.slug.includes(q) || (s.label || "").toLowerCase().includes(q)));
-      setSkillIndex(0);
-    });
-    return () => { cancelled = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skillQuery]);
-
   const [mentionState, setMentionState] = useState<{
     query: { term: string; start: number; end: number };
     groups: MentionGroup[];
@@ -145,7 +112,7 @@ export function AskAlaiyPanel({
 
   const syncMentionsNow = useCallback(async (value: string, caret: number) => {
     const query = mentionQueryAt(value, caret);
-    if (!query || skillQueryOf(value) !== null) {
+    if (!query) {
       closeMentions();
       return;
     }
@@ -255,21 +222,11 @@ export function AskAlaiyPanel({
   const submit = (value?: string) => {
     const toSend = (value ?? text).trim();
     if ((!toSend && !chat.attachments.some((a) => a.status === "ready")) || chat.running) return;
-    const skill = value === undefined ? exactSkillSlug(toSend, chat.skills) : undefined;
     const mentions = value === undefined ? collectMentions(toSend) : [];
     setText("");
-    setSkillDismissedFor(null);
     setMentionTokens([]);
     closeMentions();
-    void chat.send(toSend, { skill, mentions });
-  };
-
-  const runSkill = (skill: ChatSkill) => {
-    setText("");
-    setSkillDismissedFor(null);
-    setMentionTokens([]);
-    closeMentions();
-    void chat.send(`/${skill.slug}`, { skill: skill.slug });
+    void chat.send(toSend, { mentions });
   };
 
   const insertTrigger = (char: string) => {
@@ -372,10 +329,8 @@ export function AskAlaiyPanel({
       </div>
 
       <div className="ask-alaiy-composer-wrap">
-        {mentionState ? (
+        {mentionState && (
           <MentionPicker groups={mentionState.groups} term={mentionState.query.term} activeIndex={mentionState.index} onPick={applyMention} />
-        ) : skillsOpen && (
-          <SkillPicker matches={skillMatches} activeIndex={skillIndex} allLoaded={chat.skills !== null} onPick={runSkill} />
         )}
 
         {chat.attachments.length > 0 && (
@@ -394,7 +349,6 @@ export function AskAlaiyPanel({
             {plusMenuOpen && (
               <ComposerPlusMenu
                 onMention={() => insertTrigger("@")}
-                onSkill={() => insertTrigger("/")}
                 onFiles={pickFiles}
                 filesDisabled={chat.running || chat.attachments.length >= MAX_ATTACHMENTS}
                 onClose={() => setPlusMenuOpen(false)}
@@ -426,21 +380,6 @@ export function AskAlaiyPanel({
                 if ((e.key === "Enter" || e.key === "Tab") && mentionState.options[mentionState.index]) {
                   e.preventDefault();
                   applyMention(mentionState.options[mentionState.index]);
-                  return;
-                }
-              }
-              if (skillsOpen) {
-                if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-                  e.preventDefault();
-                  if (!skillMatches.length) return;
-                  const step = e.key === "ArrowDown" ? 1 : -1;
-                  setSkillIndex((i) => (i + step + skillMatches.length) % skillMatches.length);
-                  return;
-                }
-                if (e.key === "Escape") { e.preventDefault(); setSkillDismissedFor(text); return; }
-                if ((e.key === "Enter" || e.key === "Tab") && skillMatches[skillIndex]) {
-                  e.preventDefault();
-                  runSkill(skillMatches[skillIndex]);
                   return;
                 }
               }
@@ -601,7 +540,7 @@ function ToolTrail({ turn }: { turn: ThreadTurn }) {
         // above), so this fallback never had to matter until now.
         const label = !call.name
           ? "Working…"
-          : String(call.name).startsWith("skill:") ? `/${call.name.slice(6)}` : String(call.name).replace(/_/g, " ");
+          : String(call.name).replace(/_/g, " ");
         return (
           <details key={call.id}>
             <summary className={cn("ask-alaiy-tool-summary", failed && "is-failed")}>
@@ -688,26 +627,6 @@ function AttachmentChip({ attachment, onRemove }: { attachment: PendingAttachmen
     );
   }
   return <div className={className}>{body}</div>;
-}
-
-function SkillPicker({ matches, activeIndex, allLoaded, onPick }: { matches: ChatSkill[]; activeIndex: number; allLoaded: boolean; onPick: (skill: ChatSkill) => void }) {
-  return (
-    <div role="listbox" aria-label="Skills" className="ask-alaiy-picker">
-      {matches.length === 0 ? (
-        <p className="ask-alaiy-picker-empty">{allLoaded ? "No matching skill." : "This site has no skills set up."}</p>
-      ) : (
-        matches.map((skill, i) => (
-          <button key={skill.slug} type="button" role="option" aria-selected={i === activeIndex}
-            onMouseDown={(e) => { e.preventDefault(); onPick(skill); }}
-            className={cn("ask-alaiy-picker-row", i === activeIndex && "is-active")}>
-            <span className="ask-alaiy-picker-title">/{skill.slug}</span>
-            {skill.label && <span className="ask-alaiy-picker-sub">{skill.label}</span>}
-            {skill.description && <span className="ask-alaiy-picker-desc">{skill.description}</span>}
-          </button>
-        ))
-      )}
-    </div>
-  );
 }
 
 function MentionPicker({ groups, term, activeIndex, onPick }: { groups: MentionGroup[]; term: string; activeIndex: number; onPick: (option: MentionRow) => void }) {
@@ -844,7 +763,7 @@ function HistoryPalette({
   );
 }
 
-function ComposerPlusMenu({ onMention, onSkill, onFiles, filesDisabled, onClose }: { onMention: () => void; onSkill: () => void; onFiles: () => void; filesDisabled: boolean; onClose: () => void }) {
+function ComposerPlusMenu({ onMention, onFiles, filesDisabled, onClose }: { onMention: () => void; onFiles: () => void; filesDisabled: boolean; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", onKey);
@@ -859,7 +778,6 @@ function ComposerPlusMenu({ onMention, onSkill, onFiles, filesDisabled, onClose 
           title={filesDisabled ? `Up to ${MAX_ATTACHMENTS} files per message.` : undefined} />
         <div className="ask-alaiy-menu-divider" />
         <PlusMenuItem icon={<AtSign size={15} />} label="Mention" shortcut="@" onClick={onMention} />
-        <PlusMenuItem icon={<Slash size={15} />} label="Skills" shortcut="/" onClick={onSkill} />
       </div>
     </>
   );
