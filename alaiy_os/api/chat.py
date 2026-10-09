@@ -527,7 +527,7 @@ def get_messages(session, after=0, partial=0):
 		"session": doc.name,
 		"title": doc.title,
 		"status": doc.status,
-		"error": doc.error,
+		"error": _user_error(doc.error),
 		"messages": [_present(row) for row in rows],
 		"suggestions": _suggestions(doc),
 	}
@@ -647,7 +647,7 @@ def stream_messages(session, after=0):
 				yield sse(
 					{
 						"status": status,
-						"error": done_doc.error,
+						"error": _user_error(done_doc.error),
 						"suggestions": _suggestions(done_doc),
 					},
 					event="done",
@@ -715,6 +715,33 @@ def _suggestions(doc):
 	except ValueError:
 		return []
 	return items if isinstance(items, list) else []
+
+
+#: What a user reads when a turn fails for a reason that wasn't written for them.
+GENERIC_ERROR = "Alaiy couldn't finish this reply. Please try again."
+
+#: Exceptions whose message was written for the user — `frappe.throw` (which is
+#: how the AI client reports exhausted credit) and the AI client's own
+#: InsufficientCredit. Anything else is a provider or library error whose text
+#: names the model vendor, so it stays in the Error Log.
+USER_FACING_ERRORS = ("frappe.exceptions.", "InsufficientCredit")
+
+
+def _user_error(error):
+	"""The one line of a failed turn's traceback a user may read, or None.
+
+	`OS Chat Session.error` keeps the whole traceback for whoever debugs it. The
+	clients show its last line, which for a raw provider failure is something like
+	`anthropic.APIStatusError: ... claude-...` — the vendor and model we keep off
+	user-visible surfaces.
+	"""
+	if not error:
+		return None
+	last = error.strip().splitlines()[-1]
+	kind, _, message = last.partition(": ")
+	if message and any(marker in kind for marker in USER_FACING_ERRORS):
+		return message
+	return GENERIC_ERROR
 
 
 def _present(row):
