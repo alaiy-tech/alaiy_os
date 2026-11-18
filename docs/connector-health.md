@@ -103,18 +103,60 @@ The page's Run button starts the sync in a background worker and returns at once
 
 ## Trying it on the build server
 
-The simulator writes synthetic runs into a connector's own log, so the page and the alerts can be exercised
+The simulator writes synthetic runs into each connector's own log, so the page and the alerts can be exercised
 without breaking anything real. It refuses to run unless the site opts in, so never enable it on a client site.
+
+Prepare the bench (replace `BENCH` and `SITE`; the site name is the domain):
+
+```
+cd BENCH
+bench --site SITE list-apps                    # what is installed on the site
+ls apps                                        # what is on the bench
+
+# core on its branch
+git -C apps/alaiy_os fetch origin && git -C apps/alaiy_os checkout core/18-11 && git -C apps/alaiy_os pull origin core/18-11
+
+# connectors: switch an existing app to its branch, or fetch the missing ones
+for name in bigcommerce cloudstore competitor_sites explus fedex flipkart google_sheets keepa outersignal shopify triple_whale unicommerce walmart woocommerce fulfillmen; do
+  app=alaiy_os_connector_$name
+  if [ -d apps/$app ]; then
+    git -C apps/$app fetch origin && git -C apps/$app checkout connectors/18-11 && git -C apps/$app pull origin connectors/18-11 || echo "SWITCH FAILED $app"
+  else
+    case $name in fulfillmen) org=NayaGlobal-organisation;; *) org=alaiy-tech;; esac
+    bench get-app https://github.com/$org/$app --branch connectors/18-11 || echo "GET FAILED $app"
+  fi
+  bench --site SITE list-apps | awk '{print $1}' | grep -qx $app || bench --site SITE install-app $app || echo "INSTALL FAILED $app"
+done
+
+bench --site SITE migrate && bench --site SITE clear-cache
+sudo supervisorctl status                      # find this bench's web and worker groups
+sudo supervisorctl restart <web group> <worker groups>   # name them; never restart everything
+```
+
+Then:
 
 ```
 bench --site SITE set-config health_simulation_allowed 1
-bench --site SITE execute alaiy_os.health.simulate.run --kwargs "{'scenario': 'overdue'}"
-bench --site SITE execute alaiy_os.health.simulate.cleanup
+bench --site SITE execute alaiy_os.health.simulate.demo
 ```
 
-`run` takes `scenario`, and optionally `connector_id`, `function_key` and `alerts` (1 also stores state and posts
-to Slack like the 5-minute job). It picks the first scheduled function with a health list and a valid interval,
-writes the rows, and returns the expected and actual state. Scenarios and the state each must give:
+Open `/app/connector-health` as a System Manager. `demo` gives every function of every connector with a health list
+a scenario (mostly healthy, with every problem shown), turns on the connector, its interval and its function switch where
+they are off, and reports what it could not simulate. Connectors whose settings were never saved show as config invalid
+until their settings are saved once.
+
+Single scenarios and clean-up:
+
+```
+bench --site SITE execute alaiy_os.health.simulate.run --kwargs "{'scenario': 'overdue'}"
+bench --site SITE execute alaiy_os.health.simulate.break_interval --kwargs "{'value': '30'}"
+bench --site SITE execute alaiy_os.health.simulate.cleanup
+bench --site SITE set-config health_simulation_allowed 0
+```
+
+`run` takes `scenario`, and optionally `connector_id`, `function_key` and `alerts` (1 also stores state and posts to
+Slack like the 5-minute job). `break_interval` sets the interval to a value (`'30'` gives config invalid, `'Disabled'`
+gives disabled). `cleanup` deletes the rows and restores every setting that was changed.
 
 | Scenario | State |
 |---|---|
@@ -125,7 +167,3 @@ writes the rows, and returns the expected and actual state. Scenarios and the st
 | `zero_rows` | warning |
 | `skipped_rows` | warning |
 | `stuck` | stuck |
-
-`break_interval` sets the interval to a value and reports the state (`'30'` gives config invalid, `'Disabled'`
-gives disabled); `cleanup` deletes the rows and restores the interval. Turn the option off afterwards with
-`bench --site SITE set-config health_simulation_allowed 0`.

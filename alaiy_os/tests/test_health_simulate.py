@@ -10,7 +10,7 @@ import unittest
 from datetime import datetime
 
 from alaiy_os.health.engine import compute_state
-from alaiy_os.health.simulate import EXPECTED, SCENARIOS, build_rows, log_values
+from alaiy_os.health.simulate import EXPECTED, SCENARIOS, assign_scenarios, build_rows, log_values
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 ENTRY = {"key": "stock", "label": "Stock", "interval_setting": "stock_interval"}
@@ -39,6 +39,27 @@ class ScenarioTests(unittest.TestCase):
     def test_an_unknown_scenario_is_refused(self):
         with self.assertRaises(ValueError):
             build_rows("lunar_eclipse", 30, NOW)
+
+
+class DemoPlanTests(unittest.TestCase):
+    def test_a_demo_of_ten_or_more_functions_shows_every_scenario(self):
+        plan = assign_scenarios([True] * 12)
+        self.assertEqual(len(plan), 12)
+        self.assertEqual(set(plan), set(SCENARIOS))
+
+    def test_most_of_a_demo_is_healthy_so_the_page_reads_like_a_real_one(self):
+        plan = assign_scenarios([True] * 20)
+        self.assertGreater(plan.count("healthy"), len(plan) / 3)
+
+    def test_an_on_demand_function_is_never_given_overdue(self):
+        plan = assign_scenarios([False] * 20)
+        self.assertNotIn("overdue", plan)
+
+    def test_the_plan_is_the_same_every_time(self):
+        self.assertEqual(assign_scenarios([True] * 15), assign_scenarios([True] * 15))
+
+    def test_nothing_to_plan_is_an_empty_plan(self):
+        self.assertEqual(assign_scenarios([]), [])
 
 
 class LogValuesTests(unittest.TestCase):
