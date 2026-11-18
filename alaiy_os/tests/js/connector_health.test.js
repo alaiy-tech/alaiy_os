@@ -62,7 +62,7 @@ test("an interval is written the way a person says it", () => {
 test("a connector with no contract says so and offers no buttons", () => {
 	const html = H.render_html(data({ connectors: [connector({ has_contract: false, state: "no_contract", functions: [], operations: [], can_test: false })] }));
 	assert.ok(html.includes("No health contract"));
-	assert.ok(!html.includes("data-action"));
+	assert.ok(!html.includes('data-action="run"') && !html.includes('data-action="test"') && !html.includes('data-action="log"'));
 });
 
 test("buttons follow what the connector offers", () => {
@@ -87,4 +87,92 @@ test("platform checks are drawn above the connectors", () => {
 	const html = H.render_html(data({ platform: [{ key: "disk", label: "Disk space", state: "red", detail: "9% free" }] }));
 	assert.ok(html.indexOf("Disk space") < html.indexOf("Alpha"));
 	assert.ok(html.includes("9% free"));
+});
+
+
+// ── layout: summary, filter, sections, one block per function ────────────────────────────────
+
+const mixed = () => data({
+	connectors: [
+		connector({ connector_id: "a", connector_name: "Alpha", state: "failing", functions: [
+			fn({ key: "f1", label: "Healthy one", state: "healthy" }),
+			fn({ key: "f2", label: "Failing one", state: "failing", reason: "The last 3 runs failed", last_error: "401 Unauthorized" }),
+			fn({ key: "f3", label: "Overdue one", state: "overdue" }),
+			fn({ key: "f4", label: "Off one", state: "disabled" }),
+		] }),
+		connector({ connector_id: "b", connector_name: "Beta", state: "healthy", functions: [fn({ key: "g1", label: "Fine", state: "healthy" })] }),
+		connector({ connector_id: "c", connector_name: "Gamma", state: "no_contract", has_contract: false, functions: [], operations: [], can_test: false }),
+	],
+});
+
+test("the summary counts functions and the ones that need attention", () => {
+	const s = H.summary(mixed());
+	assert.strictEqual(s.total, 5);
+	assert.strictEqual(s.attention, 2);
+	assert.strictEqual(s.counts.failing, 1);
+	assert.strictEqual(s.counts.overdue, 1);
+	assert.strictEqual(s.counts.healthy, 2);
+	assert.strictEqual(H.summary(data({ connectors: [] })).total, 0);
+});
+
+test("warning, failing, stuck, overdue and config invalid need attention; the rest do not", () => {
+	for (const state of ["warning", "failing", "stuck", "overdue", "config_invalid"]) assert.ok(H.needs_attention(state), state);
+	for (const state of ["healthy", "disabled", "no_data", "no_contract", "ok", "warn", "red", "unknown"]) assert.ok(!H.needs_attention(state), state);
+});
+
+test("the toolbar offers all and needs-attention with their counts", () => {
+	const html = H.render_html(mixed());
+	assert.ok(html.includes('data-action="filter" data-filter="all"'));
+	assert.ok(html.includes('data-action="filter" data-filter="attention"'));
+	assert.ok(/Needs attention[^<]*<b>2<\/b>/.test(html));
+	assert.ok(/All[^<]*<b>5<\/b>/.test(html));
+});
+
+test("the chosen filter is applied to the view and marks its chip", () => {
+	assert.ok(!H.render_html(mixed()).includes("ch-only-attention"));
+	const html = H.render_html(mixed(), "attention");
+	assert.ok(html.includes("ch-only-attention"));
+	assert.ok(/ch-chip-on"[^>]*data-filter="attention"/.test(html));
+});
+
+test("only problem functions and the connectors holding them are marked as needing attention", () => {
+	const html = H.render_html(mixed());
+	assert.strictEqual((html.match(/class="ch-fn [^"]*ch-needs/g) || []).length, 2);
+	assert.strictEqual((html.match(/class="ch-card [^"]*ch-needs/g) || []).length, 1);
+	assert.strictEqual((html.match(/class="ch-fn /g) || []).length, 5);
+});
+
+test("the page has Platform and Connectors sections in that order", () => {
+	const html = H.render_html(mixed());
+	assert.ok(html.indexOf(">Platform<") > -1 && html.indexOf(">Platform<") < html.indexOf(">Connectors<"));
+});
+
+test("a connector card says how many functions it has", () => {
+	const html = H.render_html(mixed());
+	assert.ok(html.includes("4 functions"));
+	assert.ok(html.includes("1 function<") || html.includes("1 function "));
+});
+
+test("every fact is still shown for a function, labelled", () => {
+	const html = H.render_html(data());
+	for (const label of ["Last synced", "Interval", "Last run", "Last 24 h", "Last error"]) assert.ok(html.includes(`>${label}<`), label);
+	assert.ok(html.includes("Sync log"));
+});
+
+test("an error is shown in its own block with the reason beside the state", () => {
+	const html = H.render_html(mixed());
+	assert.ok(html.includes("ch-err"));
+	assert.ok(html.includes("401 Unauthorized"));
+	assert.ok(html.includes("The last 3 runs failed"));
+});
+
+test("a function with no error shows a dash instead of an error block", () => {
+	const html = H.render_html(data());
+	assert.ok(!html.includes('class="ch-err"'));
+});
+
+test("a card is marked when any of its functions needs attention, and not when it has none", () => {
+	const cards = H.render_html(mixed()).split('<section class="ch-card').slice(1);
+	const byName = Object.fromEntries(cards.map((c) => [/<h4>([^<]*)<\/h4>/.exec(c)[1], /^[^"]*ch-needs/.test(c.slice(0, c.indexOf(">")))]));
+	assert.deepStrictEqual(byName, { Alpha: true, Beta: false, Gamma: false });
 });

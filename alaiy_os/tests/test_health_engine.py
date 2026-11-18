@@ -100,6 +100,10 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state(three)["state"], FAILING)
         self.assertEqual(state([run(10, "failed", 0), run(40)])["state"], HEALTHY)
 
+    def test_a_traceback_error_shows_the_exception_not_the_header(self):
+        error = "Traceback (most recent call last):\n  File x, line 1\nValueError: bad value"
+        self.assertEqual(state([run(10, "failed", 0, error=error)])["last_error"], "ValueError: bad value")
+
     def test_remote_401_shows_the_error(self):
         runs = [run(m, "failed", 0, error="401 Unauthorized\ntraceback...") for m in (10, 40, 70)]
         result = state(runs)

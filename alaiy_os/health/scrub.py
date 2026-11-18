@@ -21,8 +21,11 @@ _RULES = [
 def scrub(text, max_len=300):
     if not text:
         return ""
-    lines = str(text).strip().splitlines()
+    lines = [part for part in str(text).strip().splitlines() if part.strip()]
     line = lines[0] if lines else ""
+    # A Python traceback opens with a header that says nothing; the last line is the exception.
+    if line.startswith("Traceback") and len(lines) > 1:
+        line = lines[-1].strip()
     for pattern, replacement in _RULES:
         line = pattern.sub(replacement, line)
     return line[:max_len]

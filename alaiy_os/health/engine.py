@@ -8,6 +8,7 @@ newest first, and says whether it is healthy and why.
 from datetime import timedelta
 
 from alaiy_os.health.intervals import parse_interval
+from alaiy_os.health.scrub import scrub
 
 DISABLED = "disabled"
 INVALID = "config_invalid"
@@ -38,10 +39,6 @@ DEFAULTS = {
 
 def _minutes(delta):
     return max(0, int(delta.total_seconds() // 60))
-
-
-def _first_line(text):
-    return (str(text).strip().splitlines() or [""])[0][:300] if text else ""
 
 
 def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True, function_enabled=True):
@@ -76,7 +73,7 @@ def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True, func
         "last_status": last.get("status") if last else None,
         "last_run_at": last.get("started_at") if last else None,
         "last_success_at": last_success_at,
-        "last_error": _first_line(last.get("error")) if last else "",
+        "last_error": scrub(last.get("error")) if last else "",
         "last_counts": {k: (last.get(k) or 0) for k in ("processed", "changed", "failed", "skipped")} if last else None,
         "runs_24h": len(recent),
         "failures_24h": sum(1 for r in recent if r.get("status") == "failed"),

@@ -19,6 +19,20 @@ class ScrubTests(unittest.TestCase):
         text = "Request failed\nTraceback (most recent call last):\n  password=hunter2"
         self.assertEqual(scrub(text), "Request failed")
 
+    def test_a_python_traceback_is_reduced_to_its_exception_line(self):
+        text = ('Traceback (most recent call last):\n  File "/apps/x/y.py", line 3, in run\n    fetch()\n'
+                "requests.exceptions.ConnectionError: could not reach the host")
+        self.assertEqual(scrub(text), "requests.exceptions.ConnectionError: could not reach the host")
+
+    def test_the_exception_line_of_a_traceback_is_scrubbed_too(self):
+        text = "Traceback (most recent call last):\n  File x\nValueError: rejected token=abc123secret\n\n"
+        out = scrub(text)
+        self.assertTrue(out.startswith("ValueError: rejected"))
+        self.assertNotIn("abc123secret", out)
+
+    def test_a_traceback_with_only_its_header_keeps_the_header(self):
+        self.assertEqual(scrub("Traceback (most recent call last):"), "Traceback (most recent call last):")
+
     def test_a_bearer_token_is_hidden(self):
         out = scrub("Rejected: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.signature")
         self.assertNotIn("eyJhbGci", out)
