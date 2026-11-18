@@ -229,6 +229,7 @@ frappe.provide("alaiy_os.health");
 			frappe.dom.set_style(health.CSS, "connector-health-style");
 			this.$body = $('<div class="ch-root"></div>').appendTo(page.body);
 			page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
+			page.set_secondary_action(__("Alert settings"), () => frappe.set_route("Form", "Connector Health Settings"), "settings");
 			this.$body.on("click", "[data-action]", (event) => this.act(event));
 		}
 

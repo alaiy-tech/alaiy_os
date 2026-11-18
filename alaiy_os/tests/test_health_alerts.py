@@ -8,7 +8,7 @@ No network: the poster is a stand-in that records what it was given.
 import unittest
 from datetime import datetime
 
-from alaiy_os.health.alerts import BATCH_OVER, change_message, digest_message, notify
+from alaiy_os.health.alerts import BATCH_OVER, change_message, digest_message, notify, resolve_alert_config, valid_webhook
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 HOOK = "https://hooks.example.com/services/T000/B000/hunter2hunter2hunter2hunter2"
@@ -87,6 +87,56 @@ class DigestTests(unittest.TestCase):
         self.assertIn("Alpha", text)
         self.assertIn("Overdue", text)
         self.assertIn("Disk space", text)
+
+
+HOOK2 = "https://hooks.example.com/services/T111/B111/other"
+
+
+class AlertConfigTests(unittest.TestCase):
+    def test_the_site_config_alone_turns_alerts_on_with_the_defaults(self):
+        config = resolve_alert_config(None, {"alert_slack_webhook": HOOK})
+        self.assertEqual(config, {"webhook": HOOK, "enabled": True, "digest": True, "cooldown_min": 60})
+
+    def test_a_webhook_on_the_settings_page_wins_over_the_site_config(self):
+        config = resolve_alert_config({"slack_webhook": HOOK2, "alerts_enabled": 1}, {"alert_slack_webhook": HOOK})
+        self.assertEqual(config["webhook"], HOOK2)
+
+    def test_a_blank_webhook_on_the_page_falls_back_to_the_site_config(self):
+        for blank in ("", None, "   "):
+            config = resolve_alert_config({"slack_webhook": blank, "alerts_enabled": 1}, {"alert_slack_webhook": HOOK})
+            self.assertEqual(config["webhook"], HOOK, repr(blank))
+
+    def test_the_switch_on_the_page_turns_alerts_off_even_with_a_webhook(self):
+        config = resolve_alert_config({"slack_webhook": HOOK2, "alerts_enabled": 0}, {})
+        self.assertFalse(config["enabled"])
+
+    def test_a_switch_stored_as_text_zero_is_off(self):
+        self.assertFalse(resolve_alert_config({"slack_webhook": HOOK2, "alerts_enabled": "0"}, {})["enabled"])
+        self.assertFalse(resolve_alert_config({"slack_webhook": HOOK2, "daily_digest": "0"}, {})["digest"])
+
+    def test_no_webhook_anywhere_means_nothing_is_sent(self):
+        config = resolve_alert_config({"slack_webhook": "", "alerts_enabled": 1}, {})
+        self.assertEqual((config["webhook"], config["enabled"]), (None, False))
+
+    def test_the_digest_can_be_switched_off_on_its_own(self):
+        config = resolve_alert_config({"slack_webhook": HOOK2, "alerts_enabled": 1, "daily_digest": 0}, {})
+        self.assertEqual((config["enabled"], config["digest"]), (True, False))
+
+    def test_the_cooldown_comes_from_the_page_when_it_is_a_sensible_number(self):
+        self.assertEqual(resolve_alert_config({"slack_webhook": HOOK2, "alert_cooldown_minutes": 15}, {})["cooldown_min"], 15)
+        for bad in (0, -5, None, "soon"):
+            self.assertEqual(resolve_alert_config({"slack_webhook": HOOK2, "alert_cooldown_minutes": bad}, {})["cooldown_min"], 60, repr(bad))
+
+
+class WebhookValidationTests(unittest.TestCase):
+    def test_an_https_url_is_accepted_and_empty_is_allowed(self):
+        self.assertTrue(valid_webhook(HOOK))
+        self.assertTrue(valid_webhook(""))
+        self.assertTrue(valid_webhook(None))
+
+    def test_anything_else_is_refused(self):
+        for bad in ("http://hooks.example.com/x", "hooks.example.com/x", "javascript:alert(1)", "https://", "not a url", "ftp://x.y/z"):
+            self.assertFalse(valid_webhook(bad), bad)
 
 
 class NotifyTests(unittest.TestCase):

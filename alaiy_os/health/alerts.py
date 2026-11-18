@@ -11,8 +11,64 @@ STATE_LABELS = {
     "warning": "Warning", "healthy": "Healthy", "no_data": "No data", "disabled": "Disabled",
     "red": "Red", "warn": "Warning", "ok": "OK", "unknown": "Unknown",
 }
+DEFAULT_COOLDOWN_MIN = 60
 BATCH_OVER = 5  # more changes than this in one run (a first run, an outage) go out as one summary
 _FROM_CONFIG = object()
+
+
+def _on(value, default=True):
+    return default if value is None else value not in (0, False, "0", "")
+
+
+def resolve_alert_config(settings, site_conf):
+    """How alerts behave. The Connector Health Settings page wins; a `alert_slack_webhook` in the site
+    config is the fallback. `settings` is the page's values (or None before it exists)."""
+    page = settings or {}
+    page_hook = page.get("slack_webhook")
+    page_hook = page_hook.strip() if isinstance(page_hook, str) else ""
+    conf_hook = site_conf.get("alert_slack_webhook")
+    webhook = page_hook or (conf_hook.strip() if isinstance(conf_hook, str) and conf_hook.strip() else None)
+    try:
+        cooldown = int(page.get("alert_cooldown_minutes"))
+    except (TypeError, ValueError):
+        cooldown = 0
+    return {
+        "webhook": webhook,
+        "enabled": bool(webhook) and _on(page.get("alerts_enabled")),
+        "digest": _on(page.get("daily_digest")),
+        "cooldown_min": cooldown if cooldown > 0 else DEFAULT_COOLDOWN_MIN,
+    }
+
+
+def valid_webhook(url):
+    """An https URL, or nothing. Anything else is refused when the settings are saved."""
+    if not url:
+        return True
+    from urllib.parse import urlparse
+
+    parsed = urlparse(str(url))
+    return parsed.scheme == "https" and bool(parsed.netloc) and not any(ch.isspace() for ch in str(url))
+
+
+def _settings_values():
+    import frappe
+
+    try:
+        doc = frappe.get_single("Connector Health Settings")
+        return {
+            "alerts_enabled": doc.alerts_enabled,
+            "slack_webhook": doc.get_password("slack_webhook", raise_exception=False),
+            "daily_digest": doc.daily_digest,
+            "alert_cooldown_minutes": doc.alert_cooldown_minutes,
+        }
+    except Exception:
+        return None  # before the settings doctype is migrated in: the site config alone
+
+
+def alert_config():
+    import frappe
+
+    return resolve_alert_config(_settings_values(), frappe.conf)
 
 
 def _label(state):
@@ -96,9 +152,8 @@ def notify(changes, collected, *, site=None, webhook=_FROM_CONFIG, post=None, lo
 
 
 def _configured_webhook():
-    import frappe
-
-    return frappe.conf.get("alert_slack_webhook")
+    config = alert_config()
+    return config["webhook"] if config["enabled"] else None
 
 
 def _site():

@@ -90,6 +90,55 @@ class ApiTests(unittest.TestCase):
         self.api.run_sync("alpha", "Items")
         self.assertEqual(self.guarded, ["System Manager"])
 
+    def test_a_test_message_is_system_manager_only_and_posts_to_the_configured_webhook(self):
+        from alaiy_os.health import alerts
+
+        posted = []
+        alerts_config = {"webhook": "https://hooks.example.com/services/T/B/secret", "enabled": True, "digest": True, "cooldown_min": 60}
+        real_config, real_post = alerts.alert_config, alerts._post
+        alerts.alert_config = lambda: alerts_config
+        alerts._post = lambda url, text: posted.append((url, text))
+        try:
+            result = self.api.send_test_alert()
+        finally:
+            alerts.alert_config, alerts._post = real_config, real_post
+        self.assertEqual(self.guarded, ["System Manager"])
+        self.assertTrue(result["sent"])
+        self.assertEqual(len(posted), 1)
+        self.assertIn("site-one", posted[0][1])
+        self.assertNotIn("secret", json.dumps(result))
+
+    def test_a_test_message_without_a_webhook_says_so_and_sends_nothing(self):
+        from alaiy_os.health import alerts
+
+        real_config = alerts.alert_config
+        alerts.alert_config = lambda: {"webhook": None, "enabled": False, "digest": True, "cooldown_min": 60}
+        try:
+            result = self.api.send_test_alert()
+        finally:
+            alerts.alert_config = real_config
+        self.assertFalse(result["sent"])
+        self.assertIn("webhook", result["message"].lower())
+
+    def test_a_failed_test_message_never_shows_the_webhook(self):
+        from alaiy_os.health import alerts
+
+        real_config, real_post = alerts.alert_config, alerts._post
+        hook = "https://hooks.example.com/services/T/B/topsecret"
+        alerts.alert_config = lambda: {"webhook": hook, "enabled": True, "digest": True, "cooldown_min": 60}
+
+        def broken(url, text):
+            raise RuntimeError(f"cannot reach {url}")
+
+        alerts._post = broken
+        try:
+            result = self.api.send_test_alert()
+        finally:
+            alerts.alert_config, alerts._post = real_config, real_post
+        self.assertFalse(result["sent"])
+        self.assertNotIn("topsecret", json.dumps(result))
+        self.assertIn("RuntimeError", result["message"])
+
     def test_the_summary_is_plain_json_with_iso_times_and_the_instance(self):
         summary = self.api.get_summary()
         json.dumps(summary)

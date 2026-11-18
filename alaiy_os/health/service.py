@@ -200,9 +200,12 @@ def send_digest():
 
     from alaiy_os.health import alerts
 
+    config = alerts.alert_config()
+    if not (config["enabled"] and config["digest"]):
+        return
     collected = snapshot(now_datetime())
     text = alerts.digest_message(alerts._site(), collected)
-    webhook = alerts._configured_webhook()
+    webhook = config["webhook"]
     if text and webhook:
         try:
             alerts._post(webhook, text)
@@ -222,7 +225,7 @@ def run_checks():
     frappe.cache.set_value(CACHE_KEY, collected, expires_in_sec=CACHE_SECONDS)
     flat = flatten(collected)
     previous = load_previous()
-    changes = diff(previous, flat, now)
+    changes = diff(previous, flat, now, cooldown_min=alerts.alert_config()["cooldown_min"])
     save_states(flat, now, flags_for(changes, previous, now))
     frappe.db.commit()
     alerts.notify(changes, collected)

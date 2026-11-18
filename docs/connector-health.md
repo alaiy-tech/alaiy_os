@@ -77,7 +77,9 @@ to run is red, with the exception class only.
 
 ## Alerts
 
-Set `alert_slack_webhook` in site config to a Slack incoming webhook. One message per change into a bad
+Open **Connector Health Settings** (the page has an Alert settings button): paste a Slack incoming-webhook URL (https,
+kept encrypted), switch alerts and the daily digest on or off, set the cooldown, save, and press **Send test message**.
+A webhook in `alert_slack_webhook` in the site config still works and is used when the page has none. One message per change into a bad
 state, one on recovery, a daily digest. No webhook means no messages. A problem is announced once, when it starts; moving between bad states is the same problem. A function that flaps is not announced again within 60 minutes, and a problem that lasts longer is announced when the cooldown ends. More than 5 changes in one run (a first run, an outage) go out as one summary. Alerts are at most once: the state is stored before posting, so a post that fails is logged in the Error Log and not retried. The alert job runs on the scheduler, so a stopped scheduler cannot alert on itself: the Scheduler platform check shows it on the page. Error text is cut to its first line
 and credentials are removed before it reaches the page or Slack.
 

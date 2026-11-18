@@ -82,6 +82,23 @@ def get_connector(connector_id, live=0):
 
 
 @frappe.whitelist(methods=["POST"])
+def send_test_alert():
+    """Post a test message to the configured Slack webhook, whether or not alerts are switched on."""
+    frappe.only_for("System Manager")
+    from alaiy_os.health import alerts
+
+    webhook = alerts.alert_config()["webhook"]
+    if not webhook:
+        return {"sent": False, "message": "No Slack webhook is set. Add one in Connector Health Settings."}
+    try:
+        alerts._post(webhook, f"Connector health: test message from {frappe.local.site}")
+    except Exception as exc:
+        # The webhook is a credential: say what failed, never where it was posted.
+        return {"sent": False, "message": f"The message could not be sent ({type(exc).__name__})."}
+    return {"sent": True, "message": "Test message sent."}
+
+
+@frappe.whitelist(methods=["POST"])
 def run_sync(connector_id, operation):
     """Run one of the sync operations a connector registered (for example "Items")."""
     frappe.only_for("System Manager")
