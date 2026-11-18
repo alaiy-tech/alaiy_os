@@ -67,3 +67,9 @@ def normalise_health(value):
             _fail(index, "a scheduled function needs 'interval_setting'")
         entries.append(entry)
     return entries
+
+
+def health_for_storage(value):
+    """The normalised list as the JSON text kept on the registry row, or "" for none."""
+    entries = normalise_health(value)
+    return json.dumps(entries) if entries else ""

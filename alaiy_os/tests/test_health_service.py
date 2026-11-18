@@ -11,7 +11,7 @@ import json
 import unittest
 from datetime import datetime, timedelta
 
-from alaiy_os.health.service import collect, flatten
+from alaiy_os.health.service import collect, flatten, pick_operation
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 
@@ -62,6 +62,19 @@ class CollectTests(unittest.TestCase):
             connector = collect_with([row(health=health)])["connectors"][0]
             self.assertEqual((connector["state"], connector["has_contract"]), ("no_contract", False))
 
+    def test_the_page_gets_the_actions_a_connector_offers(self):
+        full = {**row(health=[entry()]), "sync_items_method": "pkg.items", "sync_items_label": "Items",
+                "sync_categories_method": "pkg.cats", "sync_categories_label": "", "test_method": "pkg.test"}
+        connector = collect_with([full])["connectors"][0]
+        self.assertEqual(connector["operations"], ["categories", "Items"])
+        self.assertTrue(connector["can_test"])
+        bare = collect_with([row(health=[entry()])])["connectors"][0]
+        self.assertEqual((bare["operations"], bare["can_test"]), ([], False))
+
+    def test_each_function_names_its_log_for_the_page_link(self):
+        function = functions(collect_with([row(health=[entry(log_filter={"sync_type": "stock"})])]), "alpha")[0]
+        self.assertEqual((function["log_doctype"], function["log_filter"]), ("Some Log", {"sync_type": "stock"}))
+
     def test_the_connector_state_is_its_worst_function(self):
         result = collect_with([row(health=[entry("a"), entry("b")])],
                               runs=lambda e: [run(5)] if e["key"] == "a" else [run(500)])
@@ -109,6 +122,19 @@ class FlattenTests(unittest.TestCase):
         flat = flatten(collected)
         self.assertEqual(flat["alpha::stock"]["state"], "healthy")
         self.assertEqual(flat["platform::disk"]["state"], "red")
+
+
+class PickOperationTests(unittest.TestCase):
+    OPS = {"items": "pkg.sync.items", "category tree": "pkg.sync.categories"}
+
+    def test_a_declared_operation_resolves_case_insensitively(self):
+        self.assertEqual(pick_operation(self.OPS, "Items"), "pkg.sync.items")
+        self.assertEqual(pick_operation(self.OPS, " Category Tree "), "pkg.sync.categories")
+
+    def test_anything_else_is_refused_including_a_dotted_path(self):
+        for requested in ("orders", "", None, "pkg.sync.items", "os.system"):
+            with self.assertRaises(ValueError, msg=repr(requested)):
+                pick_operation(self.OPS, requested)
 
 
 if __name__ == "__main__":

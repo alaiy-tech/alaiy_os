@@ -1,0 +1,30 @@
+{
+ "autoname": "field:state_key",
+ "creation": "2026-11-18 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["state_key", "connector_id", "function_key", "state", "since", "last_checked", "reason"],
+ "fields": [
+  {"fieldname": "state_key", "fieldtype": "Data", "label": "State Key", "reqd": 1, "unique": 1, "read_only": 1},
+  {"fieldname": "connector_id", "fieldtype": "Data", "label": "Connector", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "function_key", "fieldtype": "Data", "label": "Function", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "state", "fieldtype": "Data", "label": "State", "in_list_view": 1, "read_only": 1},
+  {"fieldname": "since", "fieldtype": "Datetime", "label": "Since", "read_only": 1},
+  {"fieldname": "last_checked", "fieldtype": "Datetime", "label": "Last Checked", "read_only": 1},
+  {"fieldname": "reason", "fieldtype": "Small Text", "label": "Reason", "read_only": 1}
+ ],
+ "links": [],
+ "modified": "2026-11-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "OS Connector Health State",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {"read": 1, "role": "System Manager"}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 0
+}

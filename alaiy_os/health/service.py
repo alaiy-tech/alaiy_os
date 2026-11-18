@@ -19,6 +19,16 @@ def _problem(key, label, reason):
     return {"key": key, "label": label, "state": INVALID, "reason": reason, "last_error": ""}
 
 
+def _operation_labels(row):
+    """Button labels for the sync operations the connector registered, as the registry names them."""
+    labels = []
+    for method, label, fallback in (("sync_categories_method", "sync_categories_label", "categories"),
+                                    ("sync_items_method", "sync_items_label", "items")):
+        if row.get(method):
+            labels.append((row.get(label) or fallback).strip())
+    return labels
+
+
 def _function(row, entry, now, runs_reader, interval_reader):
     try:
         runs = runs_reader(entry)
@@ -30,13 +40,16 @@ def _function(row, entry, now, runs_reader, interval_reader):
                 raw = UNREADABLE_INTERVAL
         result = compute_state(entry, runs, now, interval_raw=raw, connector_enabled=bool(row.get("is_enabled")))
         result["last_error"] = scrub(result.get("last_error"))
+        result["log_doctype"] = entry["log_doctype"]
+        result["log_filter"] = entry.get("log_filter") or {}
         return result
     except Exception as exc:
         return _problem(entry["key"], entry.get("label"), f"The log could not be read ({type(exc).__name__})")
 
 
 def _connector(row, now, runs_reader, interval_reader):
-    base = {"connector_id": row["connector_id"], "connector_name": row.get("connector_name") or row["connector_id"]}
+    base = {"connector_id": row["connector_id"], "connector_name": row.get("connector_name") or row["connector_id"],
+            "operations": _operation_labels(row), "can_test": bool(row.get("test_method"))}
     try:
         entries = normalise_health(row.get("health"))
     except ValueError:
@@ -61,6 +74,14 @@ def collect(now, *, rows=None, runs_reader=None, interval_reader=None):
     }
 
 
+def pick_operation(operations, requested):
+    """The dotted path of a sync operation the registry declares. Never a path the caller supplies."""
+    key = str(requested or "").strip().lower()
+    if not key or key not in operations:
+        raise ValueError("That operation is not one this connector declares")
+    return operations[key]
+
+
 def flatten(collected):
     """One entry per function and per platform check, keyed for `changes.diff`."""
     flat = {}
@@ -82,7 +103,8 @@ def _registry_rows():
         return []
     return frappe.get_all(
         "OS Connector Registry",
-        fields=["connector_id", "connector_name", "is_enabled", "health"],
+        fields=["connector_id", "connector_name", "is_enabled", "health", "test_method",
+                "sync_categories_method", "sync_categories_label", "sync_items_method", "sync_items_label"],
         order_by="connector_name asc",
         limit=500,
     )
@@ -123,17 +145,40 @@ def save_states(flat, now):
             frappe.db.set_value("OS Connector Health State", row["name"], values, update_modified=False)
 
 
+def snapshot(now):
+    """Connector states plus platform checks: what the page, the API and the jobs all use."""
+    from alaiy_os.health.platform import run_platform_checks
+
+    collected = collect(now)
+    collected["platform"] = run_platform_checks(now)
+    return collected
+
+
+def send_digest():
+    """The daily digest of anything not healthy. Silent when everything is fine."""
+    from frappe.utils import now_datetime
+
+    from alaiy_os.health import alerts
+
+    collected = snapshot(now_datetime())
+    text = alerts.digest_message(alerts._site(), collected)
+    webhook = alerts._configured_webhook()
+    if text and webhook:
+        try:
+            alerts._post(webhook, text)
+        except Exception as exc:
+            alerts._log(f"The connector health digest could not be sent ({type(exc).__name__})")
+
+
 def run_checks():
-    """The 5-minute job: collect, store, and send what changed. Never raises into the scheduler."""
+    """The 5-minute job: collect, store, and send what changed."""
     import frappe
     from frappe.utils import now_datetime
 
     from alaiy_os.health import alerts
-    from alaiy_os.health.platform import run_platform_checks
 
     now = now_datetime()
-    collected = collect(now)
-    collected["platform"] = run_platform_checks(now)
+    collected = snapshot(now)
     flat = flatten(collected)
     changes = diff(load_previous(), flat, now)
     save_states(flat, now)

@@ -9,7 +9,7 @@ not later as a page that shows nothing.
 import json
 import unittest
 
-from alaiy_os.health.contract import normalise_health
+from alaiy_os.health.contract import health_for_storage, normalise_health
 
 GOOD = {
     "key": "stock", "label": "Stock sync", "log_doctype": "Some Sync Log",
@@ -75,6 +75,21 @@ class NormaliseHealthTests(unittest.TestCase):
         for value in ("{not json", '{"key": "x"}', 5, ["text"]):
             with self.assertRaises(ValueError, msg=repr(value)):
                 normalise_health(value)
+
+
+class StorageTests(unittest.TestCase):
+    def test_empty_is_stored_as_an_empty_string(self):
+        for value in (None, "", [], "[]"):
+            self.assertEqual(health_for_storage(value), "", repr(value))
+
+    def test_a_valid_list_round_trips_through_json(self):
+        stored = health_for_storage([GOOD])
+        self.assertEqual(json.loads(stored), normalise_health([GOOD]))
+        self.assertEqual(health_for_storage(stored), stored)
+
+    def test_an_invalid_list_is_refused(self):
+        with self.assertRaises(ValueError):
+            health_for_storage([{"key": "x"}])
 
 
 if __name__ == "__main__":

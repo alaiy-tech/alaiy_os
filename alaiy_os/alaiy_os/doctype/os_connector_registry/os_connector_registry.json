@@ -24,7 +24,8 @@
   "connection_status",
   "last_tested_at",
   "handlers_ok",
-  "handlers_health_detail"
+  "handlers_health_detail",
+  "health"
  ],
  "fields": [
   {
@@ -144,6 +145,13 @@
    "fieldtype": "Small Text",
    "label": "Handlers Health Detail",
    "read_only": 1
+  },
+  {
+   "description": "The functions this connector performs, for the Connector Health page. Set by the connector's connector_meta.py; checked on save.",
+   "fieldname": "health",
+   "fieldtype": "Code",
+   "label": "Health",
+   "options": "JSON"
   }
  ],
  "links": [],
