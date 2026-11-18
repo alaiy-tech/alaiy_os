@@ -71,7 +71,7 @@ frappe.provide("alaiy_os.health");
 
 	const connectorCard = (c) => {
 		const body = c.has_contract
-			? `<table class="ch-table"><thead><tr>
+			? `<table class="ch-table"><colgroup><col style="width:22%"><col style="width:12%"><col style="width:13%"><col style="width:8%"><col style="width:18%"><col style="width:12%"><col style="width:9%"><col style="width:6%"></colgroup><thead><tr>
 					<th>${esc(__("State"))}</th><th>${esc(__("Function"))}</th><th>${esc(__("Last synced"))}</th><th>${esc(__("Interval"))}</th>
 					<th>${esc(__("Last run"))}</th><th>${esc(__("Last error"))}</th><th>${esc(__("Last 24 h"))}</th><th></th>
 				</tr></thead><tbody>${(c.functions || []).map(functionRow).join("")}</tbody></table>`
@@ -95,7 +95,7 @@ frappe.provide("alaiy_os.health");
 		.ch-card { border: 1px solid var(--s-border, var(--border-color)); border-radius: var(--s-radius, 8px); background: var(--s-white, var(--card-bg)); margin-bottom: 16px; padding: var(--s-card-pad, 16px); overflow-x: auto; }
 		.ch-card header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
 		.ch-actions { margin-left: auto; display: flex; gap: 6px; }
-		.ch-table { width: 100%; border-collapse: collapse; }
+		.ch-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 		.ch-table th { text-align: left; font-weight: 500; color: var(--s-muted, var(--text-muted)); padding: 6px 8px; border-bottom: 1px solid var(--s-border, var(--border-color)); }
 		.ch-table td { vertical-align: top; padding: 8px; border-bottom: 1px solid var(--s-border, var(--border-color)); }
 		.ch-error { max-width: 22em; word-break: break-word; }
