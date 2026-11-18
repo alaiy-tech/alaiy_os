@@ -317,7 +317,7 @@ def run(scenario, connector_id=None, function_key=None, alerts=0):
         frappe.throw("No connector function with a health list matches. Pass connector_id and function_key.")
     row, entry = targets[0]
     now = now_datetime()
-    written, parked = _insert_rows(entry, build_rows(scenario, _interval_minutes(row, entry), now))
+    written, parked = _insert_rows(entry, build_rows(scenario, _interval_minutes(row, entry, make_valid=True), now))
     frappe.db.commit()
     if alerts:
         service.run_checks()
