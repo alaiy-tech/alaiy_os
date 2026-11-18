@@ -9,7 +9,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from alaiy_os.health.engine import (
-    DISABLED, FAILING, HEALTHY, INVALID, NO_DATA, OVERDUE, STUCK, WARNING, compute_state, worst,
+    ALERT_STATES, DISABLED, FAILING, HEALTHY, INVALID, NO_DATA, OVERDUE, STUCK, WARNING, compute_state, worst,
 )
 from alaiy_os.health.intervals import parse_interval
 
@@ -102,6 +102,12 @@ class StateTests(unittest.TestCase):
         self.assertEqual(state(zero)["state"], WARNING)
         self.assertEqual(state(zero, expects_rows=False)["state"], HEALTHY)
 
+    def test_unset_overrides_fall_back_to_the_defaults(self):
+        # A registry entry carries None for every override it does not set.
+        unset = dict(overdue_factor=None, overdue_floor_min=None, max_runtime_min=None)
+        self.assertEqual(state([run(10)], **unset)["state"], HEALTHY)
+        self.assertEqual(state([run(95)], **unset)["state"], OVERDUE)
+
     def test_one_or_two_empty_runs_are_not_yet_a_warning(self):
         self.assertEqual(state([run(10, processed=0), run(40)])["state"], HEALTHY)
         self.assertEqual(state([run(10, processed=0), run(40, processed=0), run(70)])["state"], HEALTHY)
@@ -123,6 +129,10 @@ class StateTests(unittest.TestCase):
     def test_twenty_four_hour_counts(self):
         result = state([run(10), run(40, "failed", 0), run(2000)])
         self.assertEqual((result["runs_24h"], result["failures_24h"]), (2, 1))
+
+    def test_the_states_that_alert_include_an_invalid_interval(self):
+        # An interval the sync cannot read stops it silently, the same outage as a stopped scheduler.
+        self.assertEqual(ALERT_STATES, {OVERDUE, STUCK, FAILING, INVALID})
 
     def test_worst_state_wins(self):
         self.assertEqual(worst([HEALTHY, OVERDUE, WARNING]), OVERDUE)

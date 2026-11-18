@@ -20,7 +20,7 @@ HEALTHY = "healthy"
 
 # Worst first. Alerts fire on a move into one of ALERT_STATES.
 SEVERITY = [STUCK, FAILING, OVERDUE, INVALID, WARNING, NO_DATA, DISABLED, HEALTHY]
-ALERT_STATES = {OVERDUE, STUCK, FAILING}
+ALERT_STATES = {OVERDUE, STUCK, FAILING, INVALID}
 IN_PROGRESS = {"running", "queued"}
 
 DEFAULTS = {
@@ -46,7 +46,7 @@ def _first_line(text):
 
 def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True):
     """Return the state of one function together with the figures the page shows."""
-    cfg = {**DEFAULTS, **fn}
+    cfg = {**DEFAULTS, **{k: v for k, v in fn.items() if v is not None}}
     interval = parse_interval(interval_raw) if cfg["scheduled"] and fn.get("interval_setting") else None
 
     running = [r for r in runs if r.get("status") in IN_PROGRESS]
