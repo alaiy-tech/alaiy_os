@@ -409,7 +409,7 @@ def sync_custom_pages():
     "Updating DocTypes" sync just because the .json/.js files exist on disk —
     they need an explicit reload_doc, same as a core migration patch would do.
     """
-    for page_name in ("ask_alaiy",):
+    for page_name in ("ask_alaiy", "connector_health"):
         frappe.reload_doc("alaiy_os", "page", page_name)
 
 
