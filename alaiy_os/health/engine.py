@@ -50,7 +50,8 @@ def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True):
     interval = parse_interval(interval_raw) if cfg["scheduled"] and fn.get("interval_setting") else None
 
     running = [r for r in runs if r.get("status") in IN_PROGRESS]
-    finished = [r for r in runs if r.get("status") not in IN_PROGRESS]
+    # A run logged as "skipped" never started (another run was active): it is not evidence either way.
+    finished = [r for r in runs if r.get("status") not in IN_PROGRESS and r.get("status") != "skipped"]
     last = finished[0] if finished else None
     last_success = next((r for r in finished if r.get("status") == "success"), None)
     last_success_at = (last_success.get("finished_at") or last_success.get("started_at")) if last_success else None
@@ -118,7 +119,7 @@ def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True):
     if last is None:
         return done(NO_DATA, "First run in progress" if running else "No runs recorded yet")
 
-    if last.get("status") == "skipped" or (last.get("skipped") or 0) > 0:
+    if (last.get("skipped") or 0) > 0:
         return done(WARNING, "Rows were skipped in the last run")
     zero = finished[: cfg["zero_streak"]]
     if (cfg["expects_rows"] and len(zero) >= cfg["zero_streak"]

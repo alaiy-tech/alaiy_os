@@ -117,7 +117,14 @@ class StateTests(unittest.TestCase):
 
     def test_skipped_rows_warn(self):
         self.assertEqual(state([run(10, skipped=5)])["state"], WARNING)
-        self.assertEqual(state([run(10, "skipped", 0, skipped=5), run(40)])["state"], WARNING)
+
+    def test_a_run_skipped_because_another_was_active_is_not_a_run(self):
+        # Some connectors log status "skipped" when the previous run is still going. It must not
+        # warn, break a failure streak, or hide the real last run.
+        self.assertEqual(state([run(2, "skipped", 0), run(10)])["state"], HEALTHY)
+        three = [run(2, "skipped", 0), run(10, "failed", 0), run(40, "failed", 0), run(70, "failed", 0)]
+        self.assertEqual(state(three)["state"], FAILING)
+        self.assertEqual(state([run(2, "skipped", 0), run(95)])["state"], OVERDUE)
 
     def test_never_succeeded_is_overdue_only_after_the_limit(self):
         self.assertEqual(state([run(10, "failed", 0)])["state"], HEALTHY)

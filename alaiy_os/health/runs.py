@@ -15,10 +15,8 @@ _ALIASES = {"completed": "success", "complete": "success", "done": "success",
 def run_status(processed, failed, skipped, error=None):
     if processed > 0 and failed >= processed:
         return "failed"
-    if processed == 0 and error:
+    if processed == 0 and (error or skipped > 0):
         return "failed"
-    if processed == 0 and skipped > 0:
-        return "skipped"
     return "success"
 
 

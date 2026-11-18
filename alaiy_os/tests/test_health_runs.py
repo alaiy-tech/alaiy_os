@@ -29,8 +29,8 @@ class RunStatusTests(unittest.TestCase):
     def test_some_failures_still_succeed(self):
         self.assertEqual(run_status(100, 5, 0), "success")
 
-    def test_everything_skipped_is_skipped(self):
-        self.assertEqual(run_status(0, 0, 40), "skipped")
+    def test_everything_skipped_is_a_failure_to_do_the_work(self):
+        self.assertEqual(run_status(0, 0, 40), "failed")
 
     def test_an_error_with_nothing_processed_is_failed(self):
         self.assertEqual(run_status(0, 0, 0, error="401 Unauthorized"), "failed")
