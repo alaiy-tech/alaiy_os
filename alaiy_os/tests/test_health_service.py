@@ -86,8 +86,10 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(functions(result, "alpha")[0]["state"], "config_invalid")
 
     def test_an_on_demand_function_never_reads_settings(self):
-        result = collect_with([row(health=[entry(scheduled=False, interval_setting=None)])],
-                              interval=RuntimeError("must not be called"))
+        calls = []
+        result = collect(NOW, rows=[row(health=[entry(scheduled=False, interval_setting=None)])],
+                         runs_reader=lambda e: [run(5)], interval_reader=lambda r, e: calls.append(e))
+        self.assertEqual(calls, [])
         self.assertEqual(functions(result, "alpha")[0]["state"], "healthy")
 
     def test_a_disabled_connector_is_disabled(self):
