@@ -29,16 +29,23 @@ def _operation_labels(row):
     return labels
 
 
-def _function(row, entry, now, runs_reader, interval_reader):
+def _function(row, entry, now, runs_reader, interval_reader, switch_reader):
     try:
         runs = runs_reader(entry)
+        enabled = True
+        if entry.get("enabled_setting"):
+            try:
+                enabled = bool(switch_reader(row, entry))
+            except Exception:
+                return _problem(entry["key"], entry.get("label"), "The connector's settings could not be read")
         raw = None
         if entry.get("scheduled", True):
             try:
                 raw = interval_reader(row, entry)
             except Exception:
                 raw = UNREADABLE_INTERVAL
-        result = compute_state(entry, runs, now, interval_raw=raw, connector_enabled=bool(row.get("is_enabled")))
+        result = compute_state(entry, runs, now, interval_raw=raw, connector_enabled=bool(row.get("is_enabled")),
+                               function_enabled=enabled)
         result["last_error"] = scrub(result.get("last_error"))
         result["log_doctype"] = entry["log_doctype"]
         result["log_filter"] = entry.get("log_filter") or {}
@@ -47,7 +54,7 @@ def _function(row, entry, now, runs_reader, interval_reader):
         return _problem(entry["key"], entry.get("label"), f"The log could not be read ({type(exc).__name__})")
 
 
-def _connector(row, now, runs_reader, interval_reader):
+def _connector(row, now, runs_reader, interval_reader, switch_reader):
     base = {"connector_id": row["connector_id"], "connector_name": row.get("connector_name") or row["connector_id"],
             "operations": _operation_labels(row), "can_test": bool(row.get("test_method"))}
     try:
@@ -57,20 +64,21 @@ def _connector(row, now, runs_reader, interval_reader):
                 "functions": [_problem("health", "Health list", "The connector's health list is not valid")]}
     if not entries:
         return {**base, "has_contract": False, "state": NO_CONTRACT, "functions": []}
-    functions = [_function(row, e, now, runs_reader, interval_reader) for e in entries]
+    functions = [_function(row, e, now, runs_reader, interval_reader, switch_reader) for e in entries]
     state = min((f["state"] for f in functions), key=SEVERITY.index)
     return {**base, "has_contract": True, "state": state, "functions": functions}
 
 
-def collect(now, *, rows=None, runs_reader=None, interval_reader=None):
+def collect(now, *, rows=None, runs_reader=None, interval_reader=None, switch_reader=None):
     """Return {"checked_at", "platform", "connectors"}. Platform checks are added by `run_checks`."""
     rows = _registry_rows() if rows is None else rows
     runs_reader = runs_reader or read_runs
     interval_reader = interval_reader or _read_interval
+    switch_reader = switch_reader or _read_switch
     return {
         "checked_at": now,
         "platform": [],
-        "connectors": [_connector(r, now, runs_reader, interval_reader) for r in rows],
+        "connectors": [_connector(r, now, runs_reader, interval_reader, switch_reader) for r in rows],
     }
 
 
@@ -117,6 +125,15 @@ def _read_interval(row, entry):
 
     registry = frappe.get_doc("OS Connector Registry", row["connector_id"])
     return _settings_doc(registry).get(entry["interval_setting"])
+
+
+def _read_switch(row, entry):
+    """Whether the function's own on/off switch is on, from the connector's settings document."""
+    import frappe
+    from alaiy_os.api.connectors import _settings_doc
+
+    registry = frappe.get_doc("OS Connector Registry", row["connector_id"])
+    return _settings_doc(registry).get(entry["enabled_setting"])
 
 
 def load_previous():

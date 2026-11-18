@@ -15,6 +15,8 @@ OPTIONAL = {
     "fields": {},
     "status_map": {},
     "interval_setting": None,
+    "interval_unit": None,
+    "enabled_setting": None,
     "scheduled": True,
     "expects_rows": True,
     "max_runtime_min": None,
@@ -63,6 +65,8 @@ def normalise_health(value):
         bad = set(entry["fields"]) - set(STANDARD_FIELDS)
         if bad:
             _fail(index, f"'fields' names '{sorted(bad)[0]}', which is not a standard field")
+        if entry["interval_unit"] not in (None, "min", "hour", "day"):
+            _fail(index, "'interval_unit' must be 'min', 'hour' or 'day'")
         if entry["scheduled"] and not entry["interval_setting"]:
             _fail(index, "a scheduled function needs 'interval_setting'")
         entries.append(entry)

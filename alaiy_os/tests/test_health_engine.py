@@ -40,6 +40,17 @@ class IntervalTests(unittest.TestCase):
         for value in ("Disabled", "", None):
             self.assertEqual(parse_interval(value).kind, "disabled")
 
+    def test_word_intervals_some_connectors_use(self):
+        for word, minutes in (("Hourly", 60), ("Daily", 1440), ("Weekly", 10080), ("hourly", 60)):
+            self.assertEqual(parse_interval(word).minutes, minutes, word)
+
+    def test_a_bare_number_is_minutes_only_when_the_connector_says_so(self):
+        self.assertEqual(parse_interval("30", bare_unit="min").minutes, 30)
+        self.assertEqual(parse_interval("2", bare_unit="hour").minutes, 120)
+        self.assertEqual(parse_interval("1", bare_unit="day").minutes, 1440)
+        self.assertEqual(parse_interval("soon", bare_unit="min").kind, "invalid")
+        self.assertEqual(parse_interval("30 min", bare_unit="hour").minutes, 30)  # a stated unit wins
+
     def test_a_bare_number_is_invalid_not_disabled(self):
         # "30" saved instead of "30 min" once stopped a sync for 17 hours because it read as off.
         for value in ("30", "30 mins ago", "soon", "0 min"):
@@ -61,6 +72,16 @@ class StateTests(unittest.TestCase):
         # 3 x 1 minute would alarm on any queue delay; nothing is overdue before 15 minutes.
         self.assertEqual(state([run(10)], interval="1 min")["state"], HEALTHY)
         self.assertEqual(state([run(20)], interval="1 min")["state"], OVERDUE)
+
+    def test_bare_minutes_read_when_the_function_declares_the_unit(self):
+        self.assertEqual(state([run(10)], interval="30", interval_unit="min")["state"], HEALTHY)
+        self.assertEqual(state([run(200)], interval="30", interval_unit="min")["state"], OVERDUE)
+        self.assertEqual(state([run(10)], interval="30")["state"], INVALID)
+
+    def test_a_function_switched_off_in_settings_is_disabled_not_overdue(self):
+        result = compute_state({**FN}, [run(500)], NOW, interval_raw="30 min", function_enabled=False)
+        self.assertEqual(result["state"], DISABLED)
+        self.assertIn("switched off", result["reason"])
 
     def test_disabled_and_invalid_interval(self):
         self.assertEqual(state([run(10)], interval="Disabled")["state"], DISABLED)

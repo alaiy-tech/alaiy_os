@@ -72,11 +72,14 @@ def check_connector(meta_path):
                     errors.append(f"{who}: the log filter uses '{name}', which the log does not have")
 
         if entry["scheduled"]:
-            errors.extend(_interval_errors(who, entry["interval_setting"], meta.get("settings_doctype"), doctypes))
+            errors.extend(_interval_errors(who, entry["interval_setting"], meta.get("settings_doctype"),
+                                           doctypes, entry["interval_unit"]))
+        if entry["enabled_setting"]:
+            errors.extend(_switch_errors(who, entry["enabled_setting"], meta.get("settings_doctype"), doctypes))
     return errors
 
 
-def _interval_errors(who, setting, settings_doctype, doctypes):
+def _interval_errors(who, setting, settings_doctype, doctypes, bare_unit=None):
     settings = doctypes.get(settings_doctype)
     if settings is None:
         return [f"{who}: the settings doctype '{settings_doctype}' is not in this repository, so the interval cannot be read"]
@@ -88,5 +91,17 @@ def _interval_errors(who, setting, settings_doctype, doctypes):
     return [
         f"{who}: the interval option '{option}' is not one the health check can read"
         for option in (field.get("options") or "").splitlines()
-        if option.strip() and parse_interval(option).kind == "invalid"
+        if option.strip() and parse_interval(option, bare_unit).kind == "invalid"
     ]
+
+
+def _switch_errors(who, setting, settings_doctype, doctypes):
+    settings = doctypes.get(settings_doctype)
+    if settings is None:
+        return [f"{who}: the settings doctype '{settings_doctype}' is not in this repository, so the switch cannot be read"]
+    field = settings.get(setting)
+    if field is None:
+        return [f"{who}: the settings doctype has no '{setting}' field"]
+    if field.get("fieldtype") != "Check":
+        return [f"{who}: '{setting}' must be a Check field (it is {field.get('fieldtype')})"]
+    return []

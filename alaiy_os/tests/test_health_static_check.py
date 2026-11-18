@@ -22,7 +22,8 @@ LOG = {"name": "Thing Sync Log", "fields": [
 SETTINGS = {"name": "Thing Settings", "fields": [
     {"fieldname": "stock_interval", "fieldtype": "Select", "options": "Disabled\n5 min\n1 hour\n1 day"},
     {"fieldname": "bad_interval", "fieldtype": "Select", "options": "Disabled\n30\n1 hour"},
-    {"fieldname": "minutes", "fieldtype": "Int"}]}
+    {"fieldname": "minutes", "fieldtype": "Int"},
+    {"fieldname": "sync_stock", "fieldtype": "Check"}, {"fieldname": "note", "fieldtype": "Data"}]}
 GOOD = {"key": "stock", "label": "Stock", "log_doctype": "Thing Sync Log", "log_filter": {"sync_type": "stock"},
         "interval_setting": "stock_interval",
         "fields": {"processed": "items_processed", "failed": "items_failed", "error": "error_message"}}
@@ -78,6 +79,14 @@ class StaticCheckTests(unittest.TestCase):
     def test_an_interval_option_the_engine_cannot_read_is_reported(self):
         errors = self.check([{**GOOD, "interval_setting": "bad_interval"}])
         self.assertTrue(any("'30'" in e for e in errors), errors)
+
+    def test_an_enabled_setting_must_be_a_check_field_that_exists(self):
+        self.assertEqual(self.check([{**GOOD, "enabled_setting": "sync_stock"}]), [])
+        self.assertTrue(any("missing_switch" in e for e in self.check([{**GOOD, "enabled_setting": "missing_switch"}])))
+        self.assertTrue(any("Check" in e for e in self.check([{**GOOD, "enabled_setting": "note"}])))
+
+    def test_bare_numbers_are_fine_when_the_unit_is_declared(self):
+        self.assertEqual(self.check([{**GOOD, "interval_setting": "bad_interval", "interval_unit": "min"}]), [])
 
     def test_a_numeric_interval_field_is_reported(self):
         self.assertTrue(any("Select" in e for e in self.check([{**GOOD, "interval_setting": "minutes"}])))

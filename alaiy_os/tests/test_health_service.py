@@ -105,6 +105,24 @@ class CollectTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertEqual(functions(result, "alpha")[0]["state"], "healthy")
 
+    def test_a_function_with_its_own_switch_off_is_disabled(self):
+        result = collect(NOW, rows=[row(health=[entry(enabled_setting="sync_stock")])], runs_reader=lambda e: [run(500)],
+                         interval_reader=lambda r, e: "30 min", switch_reader=lambda r, e: 0)
+        self.assertEqual(functions(result, "alpha")[0]["state"], "disabled")
+
+    def test_an_unreadable_switch_is_a_configuration_problem_not_disabled(self):
+        def broken(r, e):
+            raise RuntimeError("no settings")
+        result = collect(NOW, rows=[row(health=[entry(enabled_setting="sync_stock")])], runs_reader=lambda e: [run(5)],
+                         interval_reader=lambda r, e: "30 min", switch_reader=broken)
+        self.assertEqual(functions(result, "alpha")[0]["state"], "config_invalid")
+
+    def test_a_function_without_a_switch_never_reads_one(self):
+        calls = []
+        collect(NOW, rows=[row(health=[entry()])], runs_reader=lambda e: [run(5)],
+                interval_reader=lambda r, e: "30 min", switch_reader=lambda r, e: calls.append(e))
+        self.assertEqual(calls, [])
+
     def test_a_disabled_connector_is_disabled(self):
         result = collect_with([row(health=[entry()], enabled=0)])
         self.assertEqual(functions(result, "alpha")[0]["state"], "disabled")

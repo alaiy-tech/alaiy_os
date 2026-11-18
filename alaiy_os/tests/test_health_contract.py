@@ -65,6 +65,16 @@ class NormaliseHealthTests(unittest.TestCase):
         ok = normalise_health([{**GOOD, "fields": {"processed": "items_processed", "changed": ["a", "b"]}}])
         self.assertEqual(ok[0]["fields"]["changed"], ["a", "b"])
 
+    def test_enabled_setting_is_an_accepted_optional_key(self):
+        self.assertEqual(normalise_health([{**GOOD, "enabled_setting": "sync_stock"}])[0]["enabled_setting"], "sync_stock")
+        self.assertIsNone(normalise_health([GOOD])[0]["enabled_setting"])
+
+    def test_interval_unit_is_min_hour_or_day(self):
+        for unit in ("min", "hour", "day"):
+            self.assertEqual(normalise_health([{**GOOD, "interval_unit": unit}])[0]["interval_unit"], unit)
+        with self.assertRaises(ValueError):
+            normalise_health([{**GOOD, "interval_unit": "fortnight"}])
+
     def test_a_scheduled_function_needs_an_interval_setting(self):
         entry = {k: v for k, v in GOOD.items() if k != "interval_setting"}
         with self.assertRaises(ValueError):

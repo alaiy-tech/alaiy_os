@@ -44,10 +44,10 @@ def _first_line(text):
     return (str(text).strip().splitlines() or [""])[0][:300] if text else ""
 
 
-def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True):
+def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True, function_enabled=True):
     """Return the state of one function together with the figures the page shows."""
     cfg = {**DEFAULTS, **{k: v for k, v in fn.items() if v is not None}}
-    interval = parse_interval(interval_raw) if cfg["scheduled"] and fn.get("interval_setting") else None
+    interval = parse_interval(interval_raw, cfg.get("interval_unit")) if cfg["scheduled"] and fn.get("interval_setting") else None
 
     running = [r for r in runs if r.get("status") in IN_PROGRESS]
     # A run logged as "skipped" never started (another run was active): it is not evidence either way.
@@ -89,6 +89,8 @@ def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True):
 
     if not connector_enabled:
         return done(DISABLED, "The connector is not enabled")
+    if not function_enabled:
+        return done(DISABLED, "This function is switched off in the connector's settings")
     if interval is not None and interval.kind == "disabled":
         return done(DISABLED, "The sync interval is off")
     if interval is not None and interval.kind == "invalid":
