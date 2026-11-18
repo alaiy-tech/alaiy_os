@@ -88,6 +88,12 @@ def plan_demo(infos):
     return plan
 
 
+def interfering(rows, oldest_start):
+    """Names of real rows, given as (name, started_at), that are newer than the oldest synthetic run.
+    A real run after the synthetic ones would decide the state instead of the scenario."""
+    return [name for name, started in rows if started and started >= oldest_start]
+
+
 _SUCCESS_WORDS = ("success", "completed", "complete", "done")
 _FAILED_WORDS = ("failed", "error", "errored")
 
@@ -132,16 +138,36 @@ def _allowed():
         frappe.throw("Simulation is off on this site. Set health_simulation_allowed in the site config, on a build site only.")
 
 
-def _load(key):
+def _store():
+    import os
+
     import frappe
 
-    return json.loads(frappe.db.get_default(key) or "[]")
+    return os.path.join(frappe.get_site_path("private"), "health_simulation.json")
+
+
+def _load(key):
+    import os
+
+    path = _store()
+    if not os.path.exists(path):
+        return []
+    with open(path, encoding="utf-8") as handle:
+        return json.load(handle).get(key, [])
 
 
 def _save(key, value):
-    import frappe
+    import os
 
-    frappe.db.set_default(key, json.dumps(value))
+    path = _store()
+    data = {}
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as handle:
+            data = json.load(handle)
+    data[key] = value
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w", encoding="utf-8") as handle:
+        json.dump(data, handle)
 
 
 def _targets(connector_id=None, function_key=None):
@@ -224,8 +250,34 @@ def _info(entry):
     return {"scheduled": entry["scheduled"], "expects_rows": entry["expects_rows"], "can_skip": can_skip}
 
 
+def _park(entry, oldest_start):
+    """Move real runs of this function that are newer than the synthetic ones far into the past, so the
+    scenario decides the state. `cleanup` puts them back. Returns how many were parked."""
+    from datetime import timedelta
+
+    import frappe
+
+    meta = frappe.get_meta(entry["log_doctype"])
+    time_field = (entry.get("fields") or {}).get("started_at") or "started_at"
+    if not meta.has_field(time_field):
+        time_field = "creation"
+    ours = {name for _, name in _load(_ROWS_KEY)}
+    existing = frappe.get_all(entry["log_doctype"], filters=entry.get("log_filter") or {},
+                              fields=["name", time_field], order_by=f"{time_field} desc", limit=50)
+    rows = [(r["name"], r[time_field]) for r in existing if r["name"] not in ours]
+    names = interfering(rows, oldest_start)
+    started = dict(rows)
+    for name in names:
+        _remember({"kind": "park", "doctype": entry["log_doctype"], "name": name, "field": time_field,
+                   "original": started[name].isoformat(sep=" ")})
+        frappe.db.set_value(entry["log_doctype"], name, time_field, started[name] - timedelta(days=3650), update_modified=False)
+    return len(names)
+
+
 def _insert_rows(entry, rows):
     import frappe
+
+    parked = _park(entry, min(r["started_at"] for r in rows))
 
     meta = frappe.get_meta(entry["log_doctype"])
     time_field = (entry.get("fields") or {}).get("started_at") or "started_at"
@@ -242,7 +294,7 @@ def _insert_rows(entry, rows):
         if not meta.has_field(time_field):
             frappe.db.set_value(entry["log_doctype"], doc.name, "creation", run_row["started_at"], update_modified=False)
     _save(_ROWS_KEY, _load(_ROWS_KEY) + created)
-    return len(created)
+    return len(created), parked
 
 
 def _state_of(row, entry, collected):
@@ -265,14 +317,14 @@ def run(scenario, connector_id=None, function_key=None, alerts=0):
         frappe.throw("No connector function with a health list matches. Pass connector_id and function_key.")
     row, entry = targets[0]
     now = now_datetime()
-    written = _insert_rows(entry, build_rows(scenario, _interval_minutes(row, entry), now))
+    written, parked = _insert_rows(entry, build_rows(scenario, _interval_minutes(row, entry), now))
     frappe.db.commit()
     if alerts:
         service.run_checks()
     function = _state_of(row, entry, service.snapshot(now))
     return {"scenario": scenario, "connector": row["connector_id"], "function": entry["key"],
             "expected": EXPECTED[scenario], "actual": function["state"], "reason": function.get("reason"),
-            "last_error": function.get("last_error"), "rows_written": written}
+            "last_error": function.get("last_error"), "rows_written": written, "real_rows_parked": parked}
 
 
 def demo(alerts=0):
@@ -293,8 +345,8 @@ def demo(alerts=0):
         try:
             minutes = _interval_minutes(row, entry, make_valid=True) if entry["scheduled"] else 30
             _switch_on(row, entry)
-            _insert_rows(entry, build_rows(scenario, minutes, now))
-            done.append((row, entry, scenario))
+            _, parked = _insert_rows(entry, build_rows(scenario, minutes, now))
+            done.append((row, entry, scenario, parked))
         except Exception as exc:
             skipped.append({"connector": row["connector_id"], "function": entry["key"], "why": f"{type(exc).__name__}: {exc}"[:160]})
     import frappe
@@ -304,10 +356,10 @@ def demo(alerts=0):
         service.run_checks()
     collected = service.snapshot(now)
     report = []
-    for r, e, s in done:
+    for r, e, s, parked in done:
         state = (_state_of(r, e, collected) or {}).get("state")
         report.append({"connector": r["connector_id"], "function": e["key"], "scenario": s,
-                       "expected": EXPECTED[s], "state": state, "match": state == EXPECTED[s]})
+                       "expected": EXPECTED[s], "state": state, "match": state == EXPECTED[s], "real_rows_parked": parked})
     return {"simulated": len(report), "skipped": skipped, "functions": report}
 
 
@@ -350,6 +402,11 @@ def cleanup():
     registry = {r["connector_id"]: r for r in _registry_rows()}
     restored = 0
     for change in reversed(_load(_CHANGES_KEY)):
+        if change["kind"] == "park":
+            if frappe.db.exists(change["doctype"], change["name"]):
+                frappe.db.set_value(change["doctype"], change["name"], change["field"], change["original"], update_modified=False)
+                restored += 1
+            continue
         row = registry.get(change["connector_id"])
         if row is None:
             continue

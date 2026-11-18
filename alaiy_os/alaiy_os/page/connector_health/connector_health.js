@@ -25,6 +25,11 @@ frappe.provide("alaiy_os.health");
 	const ATTENTION = ["warning", "failing", "stuck", "overdue", "config_invalid"];
 	const BREAKDOWN = ["failing", "overdue", "stuck", "config_invalid", "warning"];
 
+	const ORDER = ["stuck", "failing", "overdue", "config_invalid", "warning", "no_data", "disabled", "healthy", "no_contract"];
+	const rank = (state) => (ORDER.includes(state) ? ORDER.indexOf(state) : ORDER.length);
+	const sortConnectors = (connectors) =>
+		[...connectors].sort((a, b) => rank(a.state) - rank(b.state) || String(a.connector_name).localeCompare(String(b.connector_name)));
+
 	health.tone = (state) => TONES[state] || "gray";
 	health.needs_attention = (state) => ATTENTION.includes(state);
 
@@ -34,6 +39,15 @@ frappe.provide("alaiy_os.health");
 		if (minutes % 1440 === 0) return unit(minutes / 1440, "day");
 		if (minutes % 60 === 0) return unit(minutes / 60, "hour");
 		return `${minutes} min`;
+	};
+
+	// The connector whose detail is shown: the one asked for, else the worst one. "*" shows every connector.
+	health.pick_selected = (data, selected) => {
+		const connectors = sortConnectors(data.connectors || []);
+		if (selected === "*") return "*";
+		if (selected && connectors.some((c) => c.connector_id === selected)) return selected;
+		const first = connectors.find((c) => health.needs_attention(c.state)) || connectors[0];
+		return first ? first.connector_id : "*";
 	};
 
 	health.summary = (data) => {
@@ -112,9 +126,31 @@ frappe.provide("alaiy_os.health");
 	const breakdown = (s) =>
 		BREAKDOWN.filter((state) => s.counts[state]).map((state) => `${esc(__(LABELS[state]))} ${esc(s.counts[state])}`).join(" · ");
 
-	health.render_html = (data, filter) => {
+	const tile = (c, selected) => {
+		const functions = c.functions || [];
+		const attention = functions.filter((fn) => health.needs_attention(fn.state)).length;
+		const meta = c.has_contract
+			? `${functions.length} ${functions.length === 1 ? "function" : "functions"}${attention ? ` · <b class="ch-attn">${attention} ${esc(__("need attention"))}</b>` : ""}`
+			: esc(__("No health contract"));
+		const on = selected === c.connector_id ? " ch-tile-on" : "";
+		return `<button class="ch-tile ch-tone-${health.tone(c.state)}${on}" data-action="select" data-connector="${esc(c.connector_id)}">
+			<span class="ch-tile-top"><span class="ch-tile-name">${esc(c.connector_name)}</span>${pill(c.state)}</span>
+			<span class="ch-tile-meta ch-muted">${meta}</span>
+		</button>`;
+	};
+
+	const allTile = (s, selected) =>
+		`<button class="ch-tile ch-tile-all${selected === "*" ? " ch-tile-on" : ""}" data-action="select" data-connector="*">
+			<span class="ch-tile-top"><span class="ch-tile-name">${esc(__("All connectors"))}</span></span>
+			<span class="ch-tile-meta ch-muted">${s.total} ${esc(__("functions"))}${s.attention ? ` · <b class="ch-attn">${s.attention} ${esc(__("need attention"))}</b>` : ""}</span>
+		</button>`;
+
+	health.render_html = (data, filter, selected) => {
 		const s = health.summary(data);
 		const mode = filter === "attention" ? "attention" : "all";
+		const connectors = sortConnectors(data.connectors || []);
+		const chosen = health.pick_selected(data, selected);
+		const shown = chosen === "*" ? connectors : connectors.filter((c) => c.connector_id === chosen);
 		const chip = (name, label, n) =>
 			`<button class="ch-chip${mode === name ? " ch-chip-on" : ""}" data-action="filter" data-filter="${name}">${esc(__(label))} <b>${esc(n)}</b></button>`;
 		return `<div class="ch-view${mode === "attention" ? " ch-only-attention" : ""}">
@@ -126,7 +162,8 @@ frappe.provide("alaiy_os.health");
 			<h3 class="ch-section">${esc(__("Platform"))}</h3>
 			<div class="ch-platform">${(data.platform || []).map(platformCard).join("")}</div>
 			<h3 class="ch-section">${esc(__("Connectors"))}</h3>
-			${(data.connectors || []).map(connectorCard).join("")}
+			<div class="ch-tiles">${allTile(s, chosen)}${connectors.map((c) => tile(c, chosen)).join("")}</div>
+			<div class="ch-detail">${shown.map(connectorCard).join("")}</div>
 		</div>`;
 	};
 
@@ -140,8 +177,18 @@ frappe.provide("alaiy_os.health");
 		.ch-chip-on { background: var(--s-ink, #111827); color: var(--s-white, #fff); border-color: var(--s-ink, #111827); }
 		.ch-breakdown { flex: 1; }
 		.ch-section { font-size: 12px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--s-muted, var(--text-muted, #6b7280)); margin: 36px 0 14px; }
-		.ch-platform { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
-		.ch-check { display: flex; gap: 12px; align-items: flex-start; border: 1px solid var(--s-border, var(--border-color, #e5e7eb)); border-radius: var(--s-radius, 8px); padding: 16px 18px; background: var(--s-white, var(--card-bg, #ffffff)); }
+		.ch-platform { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+		.ch-check { display: flex; gap: 10px; align-items: flex-start; border: 1px solid var(--s-border, var(--border-color, #e5e7eb)); border-radius: var(--s-radius, 8px); padding: 10px 14px; background: var(--s-white, var(--card-bg, #ffffff)); }
+		.ch-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+		.ch-tile { display: flex; flex-direction: column; gap: 10px; text-align: left; font: inherit; color: inherit; cursor: pointer; border: 1px solid var(--s-border, var(--border-color, #e5e7eb)); border-top: 3px solid var(--s-border, var(--border-color, #e5e7eb)); border-radius: var(--s-radius, 8px); background: var(--s-white, var(--card-bg, #ffffff)); padding: 14px 16px; }
+		.ch-tile.ch-tone-red { border-top-color: var(--s-red, #b42318); }
+		.ch-tile.ch-tone-amber { border-top-color: var(--s-amber, #b45309); }
+		.ch-tile.ch-tone-green { border-top-color: var(--s-green, #15803d); }
+		.ch-tile-on { outline: 2px solid var(--s-ink, #111827); outline-offset: -1px; }
+		.ch-tile-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+		.ch-tile-name { font-weight: 600; font-size: 14px; }
+		.ch-attn { color: var(--s-red, #b42318); font-weight: 600; }
+		.ch-detail { margin-top: 28px; }
 		.ch-card { border: 1px solid var(--s-border, var(--border-color, #e5e7eb)); border-radius: var(--s-radius, 8px); background: var(--s-white, var(--card-bg, #ffffff)); margin-bottom: 28px; overflow: hidden; }
 		.ch-card > header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; padding: 20px 24px; border-bottom: 1px solid var(--s-border, var(--border-color, #e5e7eb)); }
 		.ch-card-title { display: flex; align-items: center; gap: 14px; }
@@ -178,6 +225,7 @@ frappe.provide("alaiy_os.health");
 			this.timer = null;
 			this.data = null;
 			this.filter = this.savedFilter();
+			this.selected = null;
 			frappe.dom.set_style(health.CSS, "connector-health-style");
 			this.$body = $('<div class="ch-root"></div>').appendTo(page.body);
 			page.set_primary_action(__("Refresh"), () => this.load(), "refresh");
@@ -207,7 +255,7 @@ frappe.provide("alaiy_os.health");
 		}
 
 		draw() {
-			if (this.data) this.$body.html(health.render_html(this.data, this.filter));
+			if (this.data) this.$body.html(health.render_html(this.data, this.filter, this.selected));
 		}
 
 		load(quiet) {
@@ -222,7 +270,12 @@ frappe.provide("alaiy_os.health");
 			event.preventDefault();
 			const $el = $(event.currentTarget);
 			const action = $el.data("action");
-			if (action === "filter") {
+			if (action === "select") {
+				this.selected = $el.attr("data-connector");
+				this.draw();
+				const detail = this.$body.find(".ch-detail")[0];
+				if (detail && detail.scrollIntoView) detail.scrollIntoView({ behavior: "smooth", block: "start" });
+			} else if (action === "filter") {
 				this.filter = $el.attr("data-filter") === "attention" ? "attention" : "all";
 				try { window.localStorage.setItem("alaiy_connector_health_filter", this.filter); } catch (e) { /* a view preference only */ }
 				this.draw();

@@ -136,7 +136,7 @@ test("the chosen filter is applied to the view and marks its chip", () => {
 });
 
 test("only problem functions and the connectors holding them are marked as needing attention", () => {
-	const html = H.render_html(mixed());
+	const html = H.render_html(mixed(), "all", "*");
 	assert.strictEqual((html.match(/class="ch-fn [^"]*ch-needs/g) || []).length, 2);
 	assert.strictEqual((html.match(/class="ch-card [^"]*ch-needs/g) || []).length, 1);
 	assert.strictEqual((html.match(/class="ch-fn /g) || []).length, 5);
@@ -148,7 +148,7 @@ test("the page has Platform and Connectors sections in that order", () => {
 });
 
 test("a connector card says how many functions it has", () => {
-	const html = H.render_html(mixed());
+	const html = H.render_html(mixed(), "all", "*");
 	assert.ok(html.includes("4 functions"));
 	assert.ok(html.includes("1 function<") || html.includes("1 function "));
 });
@@ -160,7 +160,7 @@ test("every fact is still shown for a function, labelled", () => {
 });
 
 test("an error is shown in its own block with the reason beside the state", () => {
-	const html = H.render_html(mixed());
+	const html = H.render_html(mixed(), "all", "*");
 	assert.ok(html.includes("ch-err"));
 	assert.ok(html.includes("401 Unauthorized"));
 	assert.ok(html.includes("The last 3 runs failed"));
@@ -172,7 +172,81 @@ test("a function with no error shows a dash instead of an error block", () => {
 });
 
 test("a card is marked when any of its functions needs attention, and not when it has none", () => {
-	const cards = H.render_html(mixed()).split('<section class="ch-card').slice(1);
+	const cards = H.render_html(mixed(), "all", "*").split('<section class="ch-card').slice(1);
 	const byName = Object.fromEntries(cards.map((c) => [/<h4>([^<]*)<\/h4>/.exec(c)[1], /^[^"]*ch-needs/.test(c.slice(0, c.indexOf(">")))]));
 	assert.deepStrictEqual(byName, { Alpha: true, Beta: false, Gamma: false });
+});
+
+
+// ── overview: a tile per connector, one connector's detail at a time ────────────────────────
+
+const tiles = (html) => html.split('data-action="select"').slice(1);
+
+test("every connector gets a tile, worst first, whatever order they arrive in", () => {
+	const data = mixed();
+	data.connectors = [data.connectors[2], data.connectors[1], data.connectors[0]];
+	const html = H.render_html(data);
+	const at = (name) => html.indexOf(`<span class="ch-tile-name">${name}</span>`);
+	assert.ok(at("Alpha") > -1 && at("Alpha") < at("Beta") && at("Beta") < at("Gamma"));
+});
+
+test("a tile shows the connector's status and its counts", () => {
+	const html = H.render_html(mixed());
+	const alpha = tiles(html).find((t) => t.includes('data-connector="a"'));
+	for (const part of ["Alpha", "Failing", "4 functions", "2 need attention"]) assert.ok(alpha.includes(part), part);
+	const beta = tiles(html).find((t) => t.includes('data-connector="b"'));
+	assert.ok(beta.includes("Healthy") && beta.includes("1 function") && !beta.includes("need attention"));
+	const gamma = tiles(html).find((t) => t.includes('data-connector="c"'));
+	assert.ok(gamma.includes("No health contract"));
+});
+
+test("there is a tile for showing every connector at once", () => {
+	assert.ok(H.render_html(mixed()).includes('data-action="select" data-connector="*"'));
+});
+
+test("the connector to open is the worst one unless another is chosen", () => {
+	assert.strictEqual(H.pick_selected(mixed()), "a");
+	assert.strictEqual(H.pick_selected(mixed(), "b"), "b");
+	assert.strictEqual(H.pick_selected(mixed(), "*"), "*");
+	assert.strictEqual(H.pick_selected(mixed(), "does-not-exist"), "a");
+	const allFine = data({ connectors: [connector({ connector_id: "z", connector_name: "Zed" }), connector({ connector_id: "y", connector_name: "Why" })] });
+	assert.strictEqual(H.pick_selected(allFine), "y");
+	assert.strictEqual(H.pick_selected(data({ connectors: [] })), "*");
+});
+
+test("only the chosen connector's functions are drawn", () => {
+	const first = H.render_html(mixed());
+	assert.ok(first.includes("Failing one") && !first.includes(">Fine<"));
+	const second = H.render_html(mixed(), "all", "b");
+	assert.ok(second.includes(">Fine<") && !second.includes("Failing one"));
+	const every = H.render_html(mixed(), "all", "*");
+	assert.ok(every.includes(">Fine<") && every.includes("Failing one"));
+});
+
+test("the chosen tile is marked", () => {
+	const html = H.render_html(mixed(), "all", "b");
+	assert.ok(/class="ch-tile[^"]*ch-tile-on[^"]*"[^>]*data-connector="b"/.test(html));
+	assert.ok(!/class="ch-tile[^"]*ch-tile-on[^"]*"[^>]*data-connector="a"/.test(html));
+});
+
+test("the needs-attention filter still hides healthy functions inside the chosen connector", () => {
+	const html = H.render_html(mixed(), "attention", "a");
+	assert.ok(html.includes("ch-only-attention"));
+	assert.ok(html.includes('ch-fn ch-tone-green">') || html.includes("ch-fn ch-tone-green"));
+});
+
+test("the platform checks are a compact strip above the tiles", () => {
+	const html = H.render_html(data({ platform: [{ key: "disk", label: "Disk space", state: "red", detail: "9% free" }] }));
+	assert.ok(html.indexOf("Disk space") < html.indexOf('data-action="select"'));
+	assert.ok(html.includes("ch-platform"));
+});
+
+test("connectors in the same state are listed by name", () => {
+	const data2 = data({ connectors: [connector({ connector_id: "z", connector_name: "Zulu" }), connector({ connector_id: "a", connector_name: "Alpha" })] });
+	const html = H.render_html(data2);
+	assert.ok(html.indexOf('<span class="ch-tile-name">Alpha</span>') < html.indexOf('<span class="ch-tile-name">Zulu</span>'));
+});
+
+test("the all-connectors tile is named", () => {
+	assert.ok(H.render_html(mixed()).includes("All connectors"));
 });

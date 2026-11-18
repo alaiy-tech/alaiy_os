@@ -10,7 +10,7 @@ import unittest
 from datetime import datetime
 
 from alaiy_os.health.engine import compute_state
-from alaiy_os.health.simulate import EXPECTED, SCENARIOS, build_rows, fits, log_values, plan_demo, status_value
+from alaiy_os.health.simulate import EXPECTED, SCENARIOS, build_rows, fits, interfering, log_values, plan_demo, status_value
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 ENTRY = {"key": "stock", "label": "Stock", "interval_setting": "stock_interval"}
@@ -83,6 +83,20 @@ class DemoPlanTests(unittest.TestCase):
 
     def test_nothing_to_plan_is_an_empty_plan(self):
         self.assertEqual(plan_demo([]), [])
+
+
+class InterferingTests(unittest.TestCase):
+    OLDEST = datetime(2026, 11, 18, 8, 0, 0)
+
+    def test_real_rows_newer_than_the_oldest_synthetic_one_would_override_it(self):
+        rows = [("new", datetime(2026, 11, 18, 11, 0, 0)), ("same", self.OLDEST), ("old", datetime(2026, 11, 17, 9, 0, 0))]
+        self.assertEqual(interfering(rows, self.OLDEST), ["new", "same"])
+
+    def test_a_row_with_no_time_is_left_alone(self):
+        self.assertEqual(interfering([("blank", None)], self.OLDEST), [])
+
+    def test_nothing_to_park_when_the_log_is_empty(self):
+        self.assertEqual(interfering([], self.OLDEST), [])
 
 
 class StatusValueTests(unittest.TestCase):
