@@ -10,7 +10,7 @@ import unittest
 from datetime import datetime
 
 from alaiy_os.health.engine import compute_state
-from alaiy_os.health.simulate import EXPECTED, SCENARIOS, assign_scenarios, build_rows, log_values
+from alaiy_os.health.simulate import EXPECTED, SCENARIOS, build_rows, fits, log_values, plan_demo, status_value
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 ENTRY = {"key": "stock", "label": "Stock", "interval_setting": "stock_interval"}
@@ -41,25 +41,70 @@ class ScenarioTests(unittest.TestCase):
             build_rows("lunar_eclipse", 30, NOW)
 
 
+class FitsTests(unittest.TestCase):
+    FULL = {"scheduled": True, "expects_rows": True, "can_skip": True}
+
+    def test_everything_fits_a_full_function(self):
+        self.assertTrue(all(fits(s, self.FULL) for s in SCENARIOS))
+
+    def test_overdue_needs_a_schedule(self):
+        self.assertFalse(fits("overdue", {**self.FULL, "scheduled": False}))
+
+    def test_zero_rows_needs_a_function_that_expects_rows(self):
+        self.assertFalse(fits("zero_rows", {**self.FULL, "expects_rows": False}))
+
+    def test_skipped_rows_needs_a_log_that_records_skips(self):
+        self.assertFalse(fits("skipped_rows", {**self.FULL, "can_skip": False}))
+
+
 class DemoPlanTests(unittest.TestCase):
+    FULL = {"scheduled": True, "expects_rows": True, "can_skip": True}
+
     def test_a_demo_of_ten_or_more_functions_shows_every_scenario(self):
-        plan = assign_scenarios([True] * 12)
+        plan = plan_demo([self.FULL] * 12)
         self.assertEqual(len(plan), 12)
         self.assertEqual(set(plan), set(SCENARIOS))
 
     def test_most_of_a_demo_is_healthy_so_the_page_reads_like_a_real_one(self):
-        plan = assign_scenarios([True] * 20)
+        plan = plan_demo([self.FULL] * 20)
         self.assertGreater(plan.count("healthy"), len(plan) / 3)
 
-    def test_an_on_demand_function_is_never_given_overdue(self):
-        plan = assign_scenarios([False] * 20)
-        self.assertNotIn("overdue", plan)
+    def test_no_function_is_given_a_scenario_it_cannot_show(self):
+        infos = [
+            {"scheduled": False, "expects_rows": False, "can_skip": False},
+            {"scheduled": True, "expects_rows": False, "can_skip": True},
+            {"scheduled": True, "expects_rows": True, "can_skip": False},
+        ] * 8
+        for info, scenario in zip(infos, plan_demo(infos)):
+            self.assertTrue(fits(scenario, info), (info, scenario))
 
     def test_the_plan_is_the_same_every_time(self):
-        self.assertEqual(assign_scenarios([True] * 15), assign_scenarios([True] * 15))
+        self.assertEqual(plan_demo([self.FULL] * 15), plan_demo([self.FULL] * 15))
 
     def test_nothing_to_plan_is_an_empty_plan(self):
-        self.assertEqual(assign_scenarios([]), [])
+        self.assertEqual(plan_demo([]), [])
+
+
+class StatusValueTests(unittest.TestCase):
+    def test_a_log_with_lowercase_options_gets_the_plain_words(self):
+        options = ["queued", "running", "success", "failed"]
+        self.assertEqual([status_value(s, options) for s in ("running", "success", "failed")], ["running", "success", "failed"])
+
+    def test_a_log_with_its_own_words_gets_the_matching_option(self):
+        options = ["Queued", "Running", "Done", "Partial", "Failed"]
+        self.assertEqual(status_value("success", options), "Done")
+        self.assertEqual(status_value("failed", options), "Failed")
+        self.assertEqual(status_value("running", options), "Running")
+
+    def test_completed_counts_as_success(self):
+        self.assertEqual(status_value("success", ["Pending", "Completed", "Error"]), "Completed")
+        self.assertEqual(status_value("failed", ["Pending", "Completed", "Error"]), "Error")
+
+    def test_a_status_the_log_cannot_hold_is_not_guessed(self):
+        self.assertIsNone(status_value("running", ["Open", "Closed"]))
+
+    def test_no_options_means_the_plain_word(self):
+        self.assertEqual(status_value("success", []), "success")
 
 
 class LogValuesTests(unittest.TestCase):

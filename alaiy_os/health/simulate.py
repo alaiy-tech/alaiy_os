@@ -8,7 +8,7 @@ config has `health_simulation_allowed` set, which only a build site should have.
     bench --site SITE execute alaiy_os.health.simulate.run --kwargs "{'scenario': 'overdue'}"
     bench --site SITE execute alaiy_os.health.simulate.cleanup       # remove rows, restore settings
 
-`build_rows`, `log_values`, `assign_scenarios` and the scenario table are plain Python and tested; the
+`build_rows`, `log_values`, `plan_demo`, `status_value` and the scenario table are plain Python and tested; the
 rest touches Frappe and has not been run on a bench.
 """
 
@@ -64,14 +64,45 @@ def build_rows(scenario, interval_minutes, now):
     raise ValueError(f"Unknown scenario '{scenario}'. Choose one of: {', '.join(SCENARIOS)}")
 
 
-def assign_scenarios(scheduled_flags):
-    """One scenario per function, in order. A function that is on demand is never overdue, so it gets
-    a healthy run where the cycle would have said overdue."""
+def fits(scenario, info):
+    """Whether a function can show a scenario. `info` has `scheduled`, `expects_rows` and `can_skip`
+    (the log has a column that records skipped rows)."""
+    if scenario == "overdue":
+        return bool(info["scheduled"])
+    if scenario == "zero_rows":
+        return bool(info["expects_rows"])
+    if scenario == "skipped_rows":
+        return bool(info["can_skip"])
+    return True
+
+
+def plan_demo(infos):
+    """One scenario per function, in order, each one the function can show."""
     plan = []
-    for index, scheduled in enumerate(scheduled_flags):
-        scenario = DEMO_ORDER[index % len(DEMO_ORDER)]
-        plan.append(scenario if scheduled or scenario != "overdue" else "healthy")
+    for index, info in enumerate(infos):
+        for step in range(len(DEMO_ORDER)):
+            scenario = DEMO_ORDER[(index + step) % len(DEMO_ORDER)]
+            if fits(scenario, info):
+                break
+        plan.append(scenario)
     return plan
+
+
+_SUCCESS_WORDS = ("success", "completed", "complete", "done")
+_FAILED_WORDS = ("failed", "error", "errored")
+
+
+def status_value(status, options):
+    """The option a log's status field holds for a standard status (`running`, `success`, `failed`).
+    A log with no options takes the plain word; a status the log cannot hold is None, never guessed."""
+    if not options:
+        return status
+    words = {"success": _SUCCESS_WORDS, "failed": _FAILED_WORDS}.get(status, (status,))
+    by_lower = {option.strip().lower(): option.strip() for option in options if option.strip()}
+    for word in words:
+        if word in by_lower:
+            return by_lower[word]
+    return None
 
 
 def log_values(row, entry):
@@ -181,14 +212,31 @@ def _switch_on(row, entry):
         _settings(row).db_set(entry["enabled_setting"], 1, update_modified=False)
 
 
+def _info(entry):
+    """What a function can show in a demo."""
+    import frappe
+
+    fields = {name: name for name in STANDARD_FIELDS} | (entry.get("fields") or {})
+    try:
+        can_skip = frappe.get_meta(entry["log_doctype"]).has_field(fields["skipped"])
+    except Exception:
+        can_skip = False
+    return {"scheduled": entry["scheduled"], "expects_rows": entry["expects_rows"], "can_skip": can_skip}
+
+
 def _insert_rows(entry, rows):
     import frappe
 
     meta = frappe.get_meta(entry["log_doctype"])
     time_field = (entry.get("fields") or {}).get("started_at") or "started_at"
+    status_field = (entry.get("fields") or {}).get("status") or "status"
+    options = [o for o in ((meta.get_field(status_field).options if meta.has_field(status_field) else "") or "").splitlines()]
     created = []
     for run_row in rows:
-        values = {k: v for k, v in log_values(run_row, entry).items() if meta.has_field(k)}
+        status = status_value(run_row["status"], options)
+        if status is None:
+            raise ValueError(f"The log's status field has no option for '{run_row['status']}'")
+        values = {k: v for k, v in log_values({**run_row, "status": status}, entry).items() if meta.has_field(k)}
         doc = frappe.get_doc({"doctype": entry["log_doctype"], **values}).insert(ignore_permissions=True)
         created.append([entry["log_doctype"], doc.name])
         if not meta.has_field(time_field):
@@ -238,7 +286,7 @@ def demo(alerts=0):
 
     _allowed()
     targets = _targets()
-    plan = assign_scenarios([entry["scheduled"] for _, entry in targets])
+    plan = plan_demo([_info(entry) for _, entry in targets])
     now = now_datetime()
     done, skipped = [], []
     for (row, entry), scenario in zip(targets, plan):
@@ -255,8 +303,11 @@ def demo(alerts=0):
     if alerts:
         service.run_checks()
     collected = service.snapshot(now)
-    report = [{"connector": r["connector_id"], "function": e["key"], "scenario": s,
-               "state": (_state_of(r, e, collected) or {}).get("state")} for r, e, s in done]
+    report = []
+    for r, e, s in done:
+        state = (_state_of(r, e, collected) or {}).get("state")
+        report.append({"connector": r["connector_id"], "function": e["key"], "scenario": s,
+                       "expected": EXPECTED[s], "state": state, "match": state == EXPECTED[s]})
     return {"simulated": len(report), "skipped": skipped, "functions": report}
 
 
