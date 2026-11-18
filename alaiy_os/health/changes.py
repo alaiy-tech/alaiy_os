@@ -1,10 +1,17 @@
 """When does a state change deserve a message?
 
-Once on the move into a bad state, once on recovery, and nothing while the state stays the same.
+A problem is announced once, when it starts; moving between bad states is the same problem. A
+recovery is sent once, and only for a problem that was announced. A function that flaps is not
+announced again inside the cooldown, and a problem that outlasts the cooldown is announced then.
 Keys are "connector::function" for connector functions and "platform::check" for platform checks.
+Each previous entry carries `state`, `alerted` (an alert is outstanding) and `alerted_at`.
 """
 
+from datetime import timedelta
+
 from alaiy_os.health.engine import ALERT_STATES, HEALTHY, WARNING
+
+COOLDOWN_MIN = 60
 
 
 def _alerting(key, state):
@@ -15,19 +22,23 @@ def _recovered(key, state):
     return state in ("ok", "warn") if key.startswith("platform::") else state in (HEALTHY, WARNING)
 
 
-def diff(previous, current, now):
-    """Return [{key, old, new, kind}] for the states that changed; kind is "alert" or "recovery"."""
+def diff(previous, current, now, cooldown_min=COOLDOWN_MIN):
+    """Return [{key, old, new, kind, at}]; kind is "alert" or "recovery"."""
     changes = []
     for key, entry in current.items():
         new = entry["state"]
-        old = (previous.get(key) or {}).get("state")
-        if new == old:
-            continue
+        before = previous.get(key) or {}
+        announced = bool(before.get("alerted"))
         if _alerting(key, new):
+            if announced:
+                continue
+            last = before.get("alerted_at")
+            if last and now - last < timedelta(minutes=cooldown_min):
+                continue
             kind = "alert"
-        elif old is not None and _alerting(key, old) and _recovered(key, new):
+        elif announced and _recovered(key, new):
             kind = "recovery"
         else:
             continue
-        changes.append({"key": key, "old": old, "new": new, "kind": kind, "at": now})
+        changes.append({"key": key, "old": before.get("state"), "new": new, "kind": kind, "at": now})
     return changes

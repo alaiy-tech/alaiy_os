@@ -9,9 +9,11 @@ import re
 _RULES = [
     (re.compile(r"(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+"), "Bearer [hidden]"),
     (re.compile(r"""(?i)(https?://[^\s?"']+)\?[^\s"']*"""), r"\1?[hidden]"),
+    # Any identifier containing a credential word (client_secret, X-Api-Token, db_password ...) and
+    # its value; "Basic"/"Bearer" prefixes are part of the value.
     (re.compile(
-        r"""(?i)\b(token|key|secret|password|passwd|pwd|authorization|api[_-]?key|access[_-]?key)"""
-        r"""(["']?\s*[=:]\s*["']?)[^\s,;"'}&]+"""), r"\1\2[hidden]"),
+        r"""(?i)\b([A-Za-z0-9_.-]*(?:token|key|secret|password|passwd|pwd|authorization|credential)[A-Za-z0-9_-]*)"""
+        r"""(["']?\s*[=:]\s*["']?)(?:(?:basic|bearer)\s+)?[^\s,;"'}&]+"""), r"\1\2[hidden]"),
     (re.compile(r"\b[A-Za-z0-9_-]{32,}\b"), "[hidden]"),
 ]
 

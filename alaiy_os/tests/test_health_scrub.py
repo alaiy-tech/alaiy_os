@@ -40,6 +40,12 @@ class ScrubTests(unittest.TestCase):
             for leaked in ("abc123", "hunter2", "s3cr3t", "k-123"):
                 self.assertNotIn(leaked, out, text)
 
+    def test_compound_credential_names_are_hidden(self):
+        cases = ['"client_secret": "abc123"', "access_token=abc123", "refresh_token: abc123", "X-Api-Token: abc123",
+                 "Authorization: Basic abc123", "db_password=abc123", "apikey=abc123", "client_credential=abc123"]
+        for text in cases:
+            self.assertNotIn("abc123", scrub(f"call failed ({text})"), text)
+
     def test_a_long_secret_like_string_is_hidden(self):
         out = scrub("bad credentials 3f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a")
         self.assertNotIn("3f9a8b7c", out)

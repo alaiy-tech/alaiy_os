@@ -11,6 +11,7 @@ STATE_LABELS = {
     "warning": "Warning", "healthy": "Healthy", "no_data": "No data", "disabled": "Disabled",
     "red": "Red", "warn": "Warning", "ok": "OK", "unknown": "Unknown",
 }
+BATCH_OVER = 5  # more changes than this in one run (a first run, an outage) go out as one summary
 _FROM_CONFIG = object()
 
 
@@ -49,6 +50,17 @@ def change_message(change, site, collected):
     return "\n".join(lines)
 
 
+def batch_message(changes, site, collected):
+    lines = [f"Connector health: {len(changes)} changes on {site}"]
+    for change in changes[:20]:
+        title, reason, _ = _lookup(change["key"], collected)
+        verb = "recovered" if change["kind"] == "recovery" else _label(change["new"])
+        lines.append(f"- {title}: {verb}" + (f" ({scrub(reason)})" if reason and change["kind"] != "recovery" else ""))
+    if len(changes) > 20:
+        lines.append(f"... and {len(changes) - 20} more")
+    return "\n".join(lines)
+
+
 def digest_message(site, collected):
     """Everything not healthy, or None when there is nothing to report."""
     items = []
@@ -74,9 +86,11 @@ def notify(changes, collected, *, site=None, webhook=_FROM_CONFIG, post=None, lo
     site = site or _site()
     post = post or _post
     log = log or _log
-    for change in changes:
+    messages = ([batch_message(changes, site, collected)] if len(changes) > BATCH_OVER
+                else [change_message(change, site, collected) for change in changes])
+    for text in messages:
         try:
-            post(webhook, change_message(change, site, collected))
+            post(webhook, text)
         except Exception as exc:
             log(f"A connector health alert could not be sent ({type(exc).__name__})")
 

@@ -37,7 +37,7 @@ DEFAULTS = {
 
 
 def _minutes(delta):
-    return int(delta.total_seconds() // 60)
+    return max(0, int(delta.total_seconds() // 60))
 
 
 def _first_line(text):
@@ -53,6 +53,9 @@ def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True, func
     # A run logged as "skipped" never started (another run was active): it is not evidence either way.
     finished = [r for r in runs if r.get("status") not in IN_PROGRESS and r.get("status") != "skipped"]
     last = finished[0] if finished else None
+    # A "running" row older than a run that has since finished is an orphan (a killed worker), not a live run.
+    if last and last.get("started_at"):
+        running = [r for r in running if not r.get("started_at") or r["started_at"] >= last["started_at"]]
     last_success = next((r for r in finished if r.get("status") == "success"), None)
     last_success_at = (last_success.get("finished_at") or last_success.get("started_at")) if last_success else None
 

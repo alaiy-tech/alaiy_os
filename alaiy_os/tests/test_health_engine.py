@@ -113,6 +113,15 @@ class StateTests(unittest.TestCase):
         self.assertEqual(result["running_minutes"], 130)
         self.assertEqual(state([{**run(30), "status": "running", "finished_at": None}, run(60)])["state"], HEALTHY)
 
+    def test_an_orphaned_running_row_older_than_a_finished_run_is_not_stuck(self):
+        orphan = {**run(180), "status": "running", "finished_at": None}
+        self.assertEqual(state([run(5), run(20), orphan], interval="1 day")["state"], HEALTHY)
+
+    def test_a_clock_ahead_of_us_never_gives_negative_figures(self):
+        future = {**run(-30)}
+        result = state([future])
+        self.assertGreaterEqual(result["lag_minutes"], 0)
+
     def test_per_function_runtime_limit(self):
         slow = {**run(130), "status": "running", "finished_at": None}
         self.assertEqual(state([slow, run(200)], interval="1 day", max_runtime_min=240)["state"], HEALTHY)

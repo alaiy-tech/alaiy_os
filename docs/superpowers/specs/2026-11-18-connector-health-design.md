@@ -29,7 +29,7 @@ function each installed connector performs with when it last synced, the result 
 - A cross-instance dashboard (the JSON API only makes it possible later).
 - Repairing data or restarting anything. Health reports; it never fixes.
 - Replacing a connector's own sync log or settings screen.
-- Shopify and the remaining connectors in the first release (same contract, added later).
+- Connectors with no run log of their own in the first release (they show "No health contract" until they gain one).
 
 ## Anti-goals
 
@@ -101,7 +101,7 @@ and long queues; cache writable; database reachable; site disk free above 15%; q
 - Frappe Page `/app/connector-health`: platform checks on top, one card per connector with a row per
   function (state colour, last synced relative and exact, interval, last counts, last error, 24 h
   success and failed, Run now and Test connection reusing the registered methods, link to the log).
-  Refreshes every 60 seconds. The page follows the NayaGlobal-neutral desk styling already in core.
+  Refreshes every 60 seconds. The page follows the desk theme already in core.
 - `alaiy_os.api.health.get_health` returns the same data as JSON (System Manager only).
 - A 5-minute job computes every state, stores it in `OS Connector Health State`, and posts to the
   Slack webhook in site config on a move into overdue, stuck, failing or a red platform check; one

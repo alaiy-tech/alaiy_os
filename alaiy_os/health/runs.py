@@ -30,7 +30,7 @@ def _count(row, source):
 
 def normalise_run(row, fields=None, status_map=None):
     f = {**_IDENTITY, **(fields or {})}
-    aliases = {**_ALIASES, **(status_map or {})}
+    aliases = {**_ALIASES, **{str(k).lower(): v for k, v in (status_map or {}).items()}}
     status = str(row.get(f["status"]) or "").strip().lower()
     started, finished = row.get(f["started_at"]), row.get(f["finished_at"])
     if started and finished and finished < started:
@@ -88,4 +88,5 @@ def read_runs(entry, limit=50):
         order_by=f"{time_column} desc",
         limit=limit,
     )
+    f = {**f, "started_at": time_column}
     return [normalise_run(row, f, entry.get("status_map")) for row in rows]

@@ -117,9 +117,11 @@ class ReadRunsTests(unittest.TestCase):
         frappe = types.ModuleType("frappe")
         outer = self
 
+        self.has = {"sync_type", "status", "started_at", "finished_at", "items_processed", "items_failed"}
+
         class Meta:
             def has_field(self, name):
-                return name in {"sync_type", "status", "started_at", "finished_at", "items_processed", "items_failed"}
+                return name in outer.has
 
         frappe.get_meta = lambda doctype: Meta()
         frappe.get_all = lambda doctype, **kw: outer.calls.append((doctype, kw)) or [
@@ -150,6 +152,18 @@ class ReadRunsTests(unittest.TestCase):
         fields = self.calls[0][1]["fields"]
         self.assertIn("items_processed", fields)
         self.assertNotIn("items_skipped", fields)
+
+    def test_a_log_without_started_at_is_read_by_creation(self):
+        self.has = {"sync_type", "status", "items_processed"}
+        sys.modules["frappe"].get_all = lambda doctype, **kw: self.calls.append((doctype, kw)) or [
+            {"status": "Success", "creation": T0, "items_processed": 4}]
+        runs = read_runs(self.entry())
+        self.assertEqual(self.calls[0][1]["order_by"], "creation desc")
+        self.assertEqual(runs[0]["started_at"], T0)
+
+    def test_status_map_keys_match_whatever_their_case(self):
+        run = normalise_run({"status": "OK"}, status_map={"OK": "success"})
+        self.assertEqual(run["status"], "success")
 
     def test_rows_come_back_normalised(self):
         runs = read_runs(self.entry())

@@ -21,7 +21,7 @@ def get_health():
 def run_sync(connector_id, operation):
     """Run one of the sync operations a connector registered (for example "Items")."""
     frappe.only_for("System Manager")
-    from alaiy_os.connectors import call_dotted, sync_operations
+    from alaiy_os.connectors import sync_operations
     from alaiy_os.health.service import pick_operation
 
     registry = frappe.get_doc("OS Connector Registry", connector_id)
@@ -29,4 +29,6 @@ def run_sync(connector_id, operation):
         path = pick_operation(sync_operations(registry), operation)
     except ValueError as error:
         frappe.throw(str(error))
-    return call_dotted(path)
+    # A sync outlasts a web request: run it in a worker, and never send its errors back to the browser.
+    frappe.enqueue("alaiy_os.connectors.call_dotted", queue="long", timeout=3600, method_path=path)
+    return {"queued": True}

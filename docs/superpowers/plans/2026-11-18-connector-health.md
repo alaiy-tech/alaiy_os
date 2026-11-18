@@ -122,12 +122,12 @@
 **Files:** Create `alaiy_os/alaiy_os/page/connector_health/` (`.json` with roles System Manager, `.js`, `.py`); modify `setup/install.py` `sync_custom_pages` list.
 
 - [ ] Platform checks on top; a card per connector; a row per function with state dot and word, last synced (relative and exact), interval, last counts, scrubbed error, 24 h success/failed, Run now, Test connection, link to the log list; refresh every 60 seconds; "No health contract" row for connectors without one.
-- [ ] Colours from the NayaGlobal tokens already used in core desk styling only; no gradients, no shadows on cards.
+- [ ] Colours from the theme tokens already used in core desk styling only; no gradients, no shadows on cards.
 - [ ] Verify page loads by reading JS against Frappe page API in `reference/frappe`; commit.
 
 ### Task 9: First connector adapter and `finish_run` adoption
 
-**Files (CloudStore repo):** `connector_meta.py` (health list for items, stock, events, categories, orders); Sync Log doctype (add `items_skipped` Int); sync code uses `finish_run`.
+**Files (first connector repo):** `connector_meta.py` (health list for each of its sync functions). Its sync code already ends a run failed when every item failed or rows were skipped, so no schema or sync change was needed.
 
 - [ ] Health entries with `interval_setting` names `cs_*_sync_interval`, `log_filter` on `sync_type`.
 - [ ] Stock sync records skipped rows instead of ending `success` with nothing written.

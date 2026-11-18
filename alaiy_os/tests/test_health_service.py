@@ -11,7 +11,7 @@ import json
 import unittest
 from datetime import datetime, timedelta
 
-from alaiy_os.health.service import collect, flatten, pick_operation
+from alaiy_os.health.service import collect, flatten, flags_for, pick_operation, settings_value
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 
@@ -140,6 +140,42 @@ class FlattenTests(unittest.TestCase):
         flat = flatten(collected)
         self.assertEqual(flat["alpha::stock"]["state"], "healthy")
         self.assertEqual(flat["platform::disk"]["state"], "red")
+
+
+class _Doc(dict):
+    """A stand-in for a settings document."""
+
+    def __init__(self, values, new=False, modified="2026-11-01 10:00:00"):
+        super().__init__({**values, "modified": modified})
+        self._new = new
+
+    def is_new(self):
+        return self._new
+
+
+class SettingsValueTests(unittest.TestCase):
+    def test_a_saved_value_is_returned(self):
+        self.assertEqual(settings_value(_Doc({"interval": "30 min"}), "interval"), "30 min")
+        self.assertEqual(settings_value(_Doc({"interval": "Disabled"}), "interval"), "Disabled")
+
+    def test_a_settings_record_that_was_never_saved_is_unreadable_not_disabled(self):
+        # An unsaved record carries field defaults, which would read as "disabled".
+        for doc in (_Doc({"interval": ""}, new=True), _Doc({"interval": ""}, modified=None)):
+            with self.assertRaises(LookupError):
+                settings_value(doc, "interval")
+
+
+class FlagsTests(unittest.TestCase):
+    def test_an_alert_marks_the_key_announced_and_a_recovery_clears_it(self):
+        previous = {"a::x": {"state": "healthy", "alerted": False, "alerted_at": None}}
+        sent = flags_for([{"key": "a::x", "kind": "alert"}], previous, NOW)
+        self.assertEqual(sent["a::x"], {"alerted": True, "alerted_at": NOW})
+        later = flags_for([{"key": "a::x", "kind": "recovery"}], {"a::x": sent["a::x"]}, NOW)
+        self.assertEqual(later["a::x"], {"alerted": False, "alerted_at": NOW})
+
+    def test_an_unchanged_key_keeps_its_flags(self):
+        previous = {"a::x": {"state": "failing", "alerted": True, "alerted_at": NOW}}
+        self.assertEqual(flags_for([], previous, NOW)["a::x"], {"alerted": True, "alerted_at": NOW})
 
 
 class PickOperationTests(unittest.TestCase):

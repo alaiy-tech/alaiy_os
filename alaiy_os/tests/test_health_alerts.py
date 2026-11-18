@@ -8,7 +8,7 @@ No network: the poster is a stand-in that records what it was given.
 import unittest
 from datetime import datetime
 
-from alaiy_os.health.alerts import change_message, digest_message, notify
+from alaiy_os.health.alerts import BATCH_OVER, change_message, digest_message, notify
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 HOOK = "https://hooks.example.com/services/T000/B000/hunter2hunter2hunter2hunter2"
@@ -96,6 +96,27 @@ class NotifyTests(unittest.TestCase):
                site="site-one", webhook=HOOK, post=lambda url, text: sent.append((url, text)))
         self.assertEqual(len(sent), 2)
         self.assertTrue(all(url == HOOK for url, _ in sent))
+
+    def test_a_burst_of_changes_is_one_summary_not_a_storm(self):
+        sent = []
+        many = [change(key=f"alpha::f{i}") for i in range(BATCH_OVER + 3)]
+        notify(many, collected(), site="site-one", webhook=HOOK, post=lambda url, text: sent.append(text))
+        self.assertEqual(len(sent), 1)
+        self.assertIn(str(len(many)), sent[0])
+
+    def test_the_threshold_is_exactly_five_changes(self):
+        for count, posts in ((5, 5), (6, 1)):
+            sent = []
+            changes = [change(key=f"alpha::f{i}") for i in range(count)]
+            notify(changes, collected(), site="site-one", webhook=HOOK, post=lambda url, text: sent.append(text))
+            self.assertEqual(len(sent), posts, count)
+
+    def test_a_burst_summary_is_scrubbed_too(self):
+        sent = []
+        data = collected(error="rejected token=abc123secret")
+        many = [change(key="alpha::stock")] * (BATCH_OVER + 1)
+        notify(many, data, site="site-one", webhook=HOOK, post=lambda url, text: sent.append(text))
+        self.assertNotIn("abc123secret", sent[0])
 
     def test_no_webhook_sends_nothing_and_does_not_fail(self):
         sent = []

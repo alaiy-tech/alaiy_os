@@ -27,13 +27,15 @@ One entry per function, in `connector_meta["health"]`:
 | `log_filter` | Filter selecting this function's rows, for example `{"sync_type": "stock"}` |
 | `fields` | Map from the log's field names to the standard ones: `status`, `started_at`, `finished_at`, `processed`, `changed`, `failed`, `skipped`, `error`. A value may be a list of fields, which are summed |
 | `status_map` | Extra status words, for example `{"partial": "failed"}`. `completed`, `done` mean success; `error` means failed |
-| `interval_setting` | Field on the connector's settings doctype holding the expected interval. Must be a Select with options like `Disabled`, `5 min`, `1 hour`, `1 day` |
+| `interval_setting` | Field on the connector's settings doctype holding the expected interval. Must be a Select with options like `Disabled`, `5 min`, `1 hour`, `1 day` (`Hourly`, `Daily` and `Weekly` are also read) |
+| `interval_unit` | `min`, `hour` or `day`: what a number with no unit means in that field, for connectors that store plain numbers |
+| `enabled_setting` | A Check field on the settings doctype that switches this one function on or off; off shows Disabled instead of Overdue |
 | `scheduled` | `false` for on-demand or webhook-driven functions: they are never overdue |
 | `expects_rows` | `true` (default) when the function always has work, so three runs that process nothing is a warning |
 | `direction` | `pull` (default) or `push` |
 | `max_runtime_min`, `overdue_floor_min`, `overdue_factor` | Optional per-function overrides |
 
-A run whose status is `skipped` means it never started (another run was active); it is ignored.
+A run whose status is `skipped` means it never started (another run was active); it is ignored. A run still `running` that started before a newer finished run is treated as orphaned, not stuck. When the log has no start column the row's creation time is used.
 
 Check a list without a bench:
 
@@ -64,7 +66,7 @@ Worst first: stuck, failing, overdue, config invalid, warning, no data, disabled
 - **No data:** no runs recorded. Never shown as healthy. A connector with no health list shows
   "No health contract".
 
-Config invalid, overdue, stuck and failing alert.
+Config invalid, overdue, stuck and failing alert. A settings record that was never saved counts as unreadable (config invalid), never as disabled.
 
 ## Platform checks
 
@@ -76,12 +78,14 @@ to run is red, with the exception class only.
 ## Alerts
 
 Set `alert_slack_webhook` in site config to a Slack incoming webhook. One message per change into a bad
-state, one on recovery, a daily digest. No webhook means no messages. Error text is cut to its first line
+state, one on recovery, a daily digest. No webhook means no messages. A problem is announced once, when it starts; moving between bad states is the same problem. A function that flaps is not announced again within 60 minutes, and a problem that lasts longer is announced when the cooldown ends. More than 5 changes in one run (a first run, an outage) go out as one summary. Alerts are at most once: the state is stored before posting, so a post that fails is logged in the Error Log and not retried. The alert job runs on the scheduler, so a stopped scheduler cannot alert on itself: the Scheduler platform check shows it on the page. Error text is cut to its first line
 and credentials are removed before it reaches the page or Slack.
 
 ## Acceptance run on the build server
 
 Never on a client site. Replace `SITE` with the build site.
+
+The page's Run button starts the sync in a background worker and returns at once.
 
 1. Deploy the branch, then `bench --site SITE migrate` and `bench --site SITE clear-cache`, and restart the web
    and worker supervisor groups of that bench. Open `/app/connector-health`: every connector with a health

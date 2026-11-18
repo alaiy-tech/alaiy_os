@@ -18,8 +18,11 @@ def kinds(previous, current):
     return {c["key"]: c["kind"] for c in diff(previous, current, NOW)}
 
 
-def s(state):
-    return {"state": state}
+BAD = {"overdue", "stuck", "failing", "config_invalid", "red"}
+
+
+def s(state, alerted=None, alerted_at=None):
+    return {"state": state, "alerted": state in BAD if alerted is None else alerted, "alerted_at": alerted_at}
 
 
 class DiffTests(unittest.TestCase):
@@ -36,8 +39,29 @@ class DiffTests(unittest.TestCase):
     def test_staying_bad_does_not_repeat(self):
         self.assertEqual(diff({"a::x": s("failing")}, {"a::x": s("failing")}, NOW), [])
 
-    def test_moving_between_bad_states_alerts_once(self):
-        self.assertEqual(kinds({"a::x": s("failing")}, {"a::x": s("overdue")}), {"a::x": "alert"})
+    def test_moving_between_bad_states_is_the_same_announced_problem(self):
+        self.assertEqual(diff({"a::x": s("failing")}, {"a::x": s("overdue")}, NOW), [])
+
+    def test_a_flap_inside_the_cooldown_is_not_announced_again(self):
+        recent = datetime(2026, 11, 18, 11, 30, 0)
+        previous = {"a::x": s("healthy", alerted=False, alerted_at=recent)}
+        self.assertEqual(diff(previous, {"a::x": s("failing")}, NOW), [])
+
+    def test_the_same_problem_is_announced_once_the_cooldown_has_passed(self):
+        old = datetime(2026, 11, 18, 9, 0, 0)
+        previous = {"a::x": s("healthy", alerted=False, alerted_at=old)}
+        self.assertEqual(kinds(previous, {"a::x": s("failing")}), {"a::x": "alert"})
+
+    def test_a_suppressed_problem_that_persists_is_announced_when_the_cooldown_ends(self):
+        recent = datetime(2026, 11, 18, 11, 30, 0)
+        stale = {"a::x": s("failing", alerted=False, alerted_at=recent)}
+        self.assertEqual(diff(stale, {"a::x": s("failing")}, NOW), [])
+        later = datetime(2026, 11, 18, 12, 31, 0)
+        self.assertEqual([c["kind"] for c in diff(stale, {"a::x": s("failing")}, later)], ["alert"])
+
+    def test_a_recovery_is_only_sent_for_a_problem_that_was_announced(self):
+        quiet = {"a::x": s("failing", alerted=False)}
+        self.assertEqual(diff(quiet, {"a::x": s("healthy")}, NOW), [])
 
     def test_recovery_is_reported_once(self):
         self.assertEqual(kinds({"a::x": s("failing")}, {"a::x": s("healthy")}), {"a::x": "recovery"})

@@ -90,6 +90,18 @@ def pick_operation(operations, requested):
     return operations[key]
 
 
+def flags_for(changes, previous, now):
+    """The announced/last-announced flags to store, after the changes of this run."""
+    flags = {k: {"alerted": bool(v.get("alerted")), "alerted_at": v.get("alerted_at")} for k, v in previous.items()}
+    for change in changes:
+        before = flags.get(change["key"], {"alerted_at": None})
+        if change["kind"] == "alert":
+            flags[change["key"]] = {"alerted": True, "alerted_at": now}
+        else:
+            flags[change["key"]] = {"alerted": False, "alerted_at": before["alerted_at"]}
+    return flags
+
+
 def flatten(collected):
     """One entry per function and per platform check, keyed for `changes.diff`."""
     flat = {}
@@ -118,32 +130,39 @@ def _registry_rows():
     )
 
 
-def _read_interval(row, entry):
-    """The raw interval setting from the connector's own settings document."""
+def settings_value(doc, fieldname):
+    """A field of the connector's settings document. A record that was never saved carries only
+    field defaults, which would read as "disabled", so it is unreadable instead."""
+    if doc.is_new() or not doc.get("modified"):
+        raise LookupError("The settings record has never been saved")
+    return doc.get(fieldname)
+
+
+def _settings(row):
     import frappe
     from alaiy_os.api.connectors import _settings_doc
 
-    registry = frappe.get_doc("OS Connector Registry", row["connector_id"])
-    return _settings_doc(registry).get(entry["interval_setting"])
+    return _settings_doc(frappe.get_doc("OS Connector Registry", row["connector_id"]))
+
+
+def _read_interval(row, entry):
+    """The raw interval setting from the connector's own settings document."""
+    return settings_value(_settings(row), entry["interval_setting"])
 
 
 def _read_switch(row, entry):
     """Whether the function's own on/off switch is on, from the connector's settings document."""
-    import frappe
-    from alaiy_os.api.connectors import _settings_doc
-
-    registry = frappe.get_doc("OS Connector Registry", row["connector_id"])
-    return _settings_doc(registry).get(entry["enabled_setting"])
+    return settings_value(_settings(row), entry["enabled_setting"])
 
 
 def load_previous():
     import frappe
 
-    rows = frappe.get_all("OS Connector Health State", fields=["state_key", "state"], limit=5000)
-    return {r["state_key"]: {"state": r["state"]} for r in rows}
+    rows = frappe.get_all("OS Connector Health State", fields=["state_key", "state", "alerted", "alerted_at"], limit=5000)
+    return {r["state_key"]: {"state": r["state"], "alerted": bool(r["alerted"]), "alerted_at": r["alerted_at"]} for r in rows}
 
 
-def save_states(flat, now):
+def save_states(flat, now, flags=None):
     """Upsert one row per key; `since` moves only when the state changes."""
     import frappe
 
@@ -151,7 +170,9 @@ def save_states(flat, now):
         "OS Connector Health State", fields=["name", "state_key", "state"], limit=5000)}
     for key, entry in flat.items():
         connector_id, _, function_key = key.partition("::")
-        values = {"state": entry["state"], "reason": scrub(entry.get("reason")), "last_checked": now}
+        flag = (flags or {}).get(key) or {"alerted": False, "alerted_at": None}
+        values = {"state": entry["state"], "reason": scrub(entry.get("reason")), "last_checked": now,
+                  "alerted": 1 if flag["alerted"] else 0, "alerted_at": flag["alerted_at"]}
         row = existing.get(key)
         if row is None:
             frappe.get_doc({"doctype": "OS Connector Health State", "state_key": key, "connector_id": connector_id,
@@ -197,8 +218,9 @@ def run_checks():
     now = now_datetime()
     collected = snapshot(now)
     flat = flatten(collected)
-    changes = diff(load_previous(), flat, now)
-    save_states(flat, now)
+    previous = load_previous()
+    changes = diff(previous, flat, now)
+    save_states(flat, now, flags_for(changes, previous, now))
     frappe.db.commit()
     alerts.notify(changes, collected)
     return changes
