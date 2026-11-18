@@ -101,6 +101,61 @@ The page's Run button starts the sync in a background worker and returns at once
 7. Fill the disk past the threshold: the Disk space check goes red. Free it afterwards.
 8. Kill a worker mid-run: the function reads Stuck after the maximum runtime, then Failing.
 
+## API for dashboards
+
+Every instance serves the same endpoints, so a custom dashboard can read any deployment, or poll several and show
+them side by side. Times are ISO 8601 with the site's offset, every response carries `schema` (currently 1), `instance`
+(the site name), `generated_at` and `overall` (`ok`, `warning` or `critical`).
+
+| Endpoint | Returns |
+|---|---|
+| `alaiy_os.api.health.get_summary` | Compact: overall status, `counts` per state, `total`, `attention`, the `platform` checks, the `problems` (functions needing attention, worst first, with reason, last error, last success and lag), and a one-line entry per connector. Small enough to poll every minute. |
+| `alaiy_os.api.health.get_connector` (`connector_id`) | One connector with all its functions, in full. |
+| `alaiy_os.api.health.get_report` | Everything the page shows: platform checks and every connector with every function. |
+
+Add `live=1` to recompute instead of reading the snapshot the 5-minute job keeps warm (a snapshot older than 5 minutes
+is recomputed anyway). Read access is for System Manager and OS Manager, so a dashboard can use a read-only user.
+
+Authenticate with an API key: open the user, "API Access", Generate Keys, then send `Authorization: token KEY:SECRET`.
+Frappe wraps every response in `{"message": ...}`.
+
+```
+curl -H "Authorization: token KEY:SECRET"   "https://SITE/api/method/alaiy_os.api.health.get_summary"
+
+curl -H "Authorization: token KEY:SECRET"   "https://SITE/api/method/alaiy_os.api.health.get_connector?connector_id=cloudstore"
+```
+
+Several deployments, one dashboard (the keys belong in your dashboard's secret store, never in a page):
+
+```python
+import requests
+
+INSTANCES = {"site-one": ("KEY", "SECRET"), "site-two": ("KEY", "SECRET")}
+for site, (key, secret) in INSTANCES.items():
+    summary = requests.get(f"https://{site}/api/method/alaiy_os.api.health.get_summary",
+                           headers={"Authorization": f"token {key}:{secret}"}, timeout=15).json()["message"]
+    print(site, summary["overall"], summary["attention"], "need attention of", summary["total"])
+```
+
+An abridged summary:
+
+```json
+{
+  "schema": 1, "instance": "site-one", "generated_at": "2026-11-18T12:00:00+05:30", "overall": "critical",
+  "total": 28, "attention": 11,
+  "counts": {"healthy": 17, "warning": 2, "failing": 5, "overdue": 3, "stuck": 1, "config_invalid": 0, "no_data": 0, "disabled": 0},
+  "platform": [{"key": "disk", "label": "Disk space", "state": "ok", "detail": "39% free"}],
+  "problems": [{"connector_id": "fulfillmen", "connector_name": "Fulfillmen", "function_key": "stock", "function": "Stock",
+                "state": "failing", "reason": "The last 3 runs failed", "last_error": "401 Unauthorized",
+                "last_success_at": "2026-11-18T08:00:00+05:30", "lag_minutes": 240, "consecutive_failures": 3}],
+  "connectors": [{"connector_id": "fulfillmen", "connector_name": "Fulfillmen", "state": "failing", "has_contract": true, "functions": 5}]
+}
+```
+
+States in `counts` and `problems`: healthy, warning, failing, overdue, stuck, config_invalid, no_data, disabled. A connector
+with no health list has state `no_contract` and zero functions. New keys may be added; existing ones keep their meaning
+within a schema version.
+
 ## Trying it on the build server
 
 The simulator writes synthetic runs into each connector's own log, so the page and the alerts can be exercised

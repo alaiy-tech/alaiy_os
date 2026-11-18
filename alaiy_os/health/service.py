@@ -12,6 +12,8 @@ from alaiy_os.health.runs import read_runs
 from alaiy_os.health.scrub import scrub
 
 NO_CONTRACT = "no_contract"
+CACHE_KEY = "alaiy_health_snapshot"  # the latest snapshot, kept warm by the 5-minute job for dashboards
+CACHE_SECONDS = 900
 UNREADABLE_INTERVAL = "?"  # parses as invalid, so unreadable settings never read as disabled
 
 
@@ -217,6 +219,7 @@ def run_checks():
 
     now = now_datetime()
     collected = snapshot(now)
+    frappe.cache.set_value(CACHE_KEY, collected, expires_in_sec=CACHE_SECONDS)
     flat = flatten(collected)
     previous = load_previous()
     changes = diff(previous, flat, now)
