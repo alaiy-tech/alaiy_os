@@ -67,6 +67,57 @@ def finish_run(log, processed, failed=0, skipped=0, error=None, fields=None, now
         put("error", scrub(error, max_len=500))
 
 
+def _filter_list(log_filter):
+    """A log filter dict as the list form Frappe takes, so a time condition can sit beside it."""
+    out = []
+    for field, wanted in (log_filter or {}).items():
+        if isinstance(wanted, (list, tuple)) and len(wanted) == 2:
+            out.append([field, wanted[0], wanted[1]])
+        else:
+            out.append([field, "=", wanted])
+    return out
+
+
+def read_requests(entry, now, limit=1000):
+    """(rows, last_success_at, last_error) for a request log: the calls in the entry's window, newest
+    first, then the last call that did not fail whenever it was, then the last failure's message. Three
+    bounded queries on the connector's own log."""
+    from datetime import timedelta
+
+    import frappe
+
+    from alaiy_os.health.engine import error_words
+
+    f = {**_IDENTITY, "duration": "duration", **(entry.get("fields") or {})}
+    doctype = entry["log_doctype"]
+    meta = frappe.get_meta(doctype)
+    time_field = f["started_at"] if meta.has_field(f["started_at"]) else "creation"
+    status_field, error_field, duration_field = f["status"], f["error"], f["duration"]
+    base = _filter_list(entry.get("log_filter"))
+    failed = sorted(error_words(entry))
+    wanted = [time_field, status_field]
+    for name in (duration_field, error_field):
+        if meta.has_field(name) and name not in wanted:
+            wanted.append(name)
+
+    cutoff = now - timedelta(minutes=entry.get("window_min") or 60)
+    rows = frappe.get_all(doctype, filters=base + [[time_field, ">=", cutoff]], fields=wanted,
+                          order_by=f"{time_field} desc", limit=limit)
+    out = [{
+        "status": str(row.get(status_field) or "").strip().lower(), "at": row.get(time_field),
+        "duration_ms": row.get(duration_field) if meta.has_field(duration_field) else None,
+        "error": (row.get(error_field) if meta.has_field(error_field) else "") or "",
+    } for row in rows]
+
+    ok = frappe.get_all(doctype, filters=base + [[status_field, "not in", failed]], fields=[time_field],
+                        order_by=f"{time_field} desc", limit=1, pluck=time_field)
+    bad = frappe.get_all(doctype, filters=base + [[status_field, "in", failed]],
+                         fields=[error_field if meta.has_field(error_field) else status_field],
+                         order_by=f"{time_field} desc", limit=1)
+    message = (bad[0].get(error_field if meta.has_field(error_field) else status_field) if bad else "") or ""
+    return out, (ok[0] if ok else None), message
+
+
 def read_runs(entry, limit=50):
     """The latest runs of one function, newest first. One bounded query on the connector's own log."""
     import frappe

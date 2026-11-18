@@ -48,10 +48,14 @@ def check_connector(meta_path):
 
     doctypes = _doctypes(meta_path.parent.parent)
     errors = []
+    if meta.get("health_method"):
+        errors.extend(_method_errors(meta_path.parent.parent, meta["health_method"]))
     for entry in entries:
         who = f"'{entry['key']}'"
         log = doctypes.get(entry["log_doctype"])
         columns = None
+        if entry["log_external"]:
+            continue
         if log is not None:
             columns = set(log) | STANDARD_COLUMNS
         elif entry["log_doctype"] in EXTERNAL:
@@ -77,6 +81,18 @@ def check_connector(meta_path):
         if entry["enabled_setting"]:
             errors.extend(_switch_errors(who, entry["enabled_setting"], meta.get("settings_doctype"), doctypes))
     return errors
+
+
+def _method_errors(root, dotted):
+    """The custom check must be a function defined in this repository."""
+    parts = str(dotted).split(".")
+    if len(parts) < 2:
+        return [f"the health method '{dotted}' is not a dotted path to a function"]
+    module, function = Path(root, *parts[:-1]), parts[-1]
+    for candidate in (module.with_suffix(".py"), module / "__init__.py"):
+        if candidate.exists() and f"def {function}(" in candidate.read_text(encoding="utf-8"):
+            return []
+    return [f"the health method '{dotted}' is not defined in this repository"]
 
 
 def _interval_errors(who, setting, settings_doctype, doctypes, bare_unit=None):

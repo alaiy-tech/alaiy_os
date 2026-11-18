@@ -36,10 +36,20 @@ def _functions(collected):
             yield connector, function
 
 
+_CHECK_STATE = {"red": "failing", "warn": "warning"}
+
+
+def _checks(collected):
+    for connector in collected.get("connectors", []):
+        for check in connector.get("checks", []):
+            yield connector, check
+
+
 def overall(collected):
     """"critical", "warning" or "ok" for everything collected, platform checks included."""
     states = {function["state"] for _, function in _functions(collected)}
     platform = {check["state"] for check in collected.get("platform", [])}
+    platform |= {check["state"] for _, check in _checks(collected)}
     if states & CRITICAL or "red" in platform:
         return "critical"
     if "warning" in states or "warn" in platform:
@@ -62,6 +72,14 @@ def summary_payload(collected, site, now):
                 "last_success_at": function.get("last_success_at"), "lag_minutes": function.get("lag_minutes"),
                 "consecutive_failures": function.get("consecutive_failures", 0),
             })
+    for connector, check in _checks(collected):
+        if check["state"] in _CHECK_STATE:
+            problems.append({
+                "connector_id": connector["connector_id"], "connector_name": connector["connector_name"],
+                "function_key": check["key"], "function": check["label"], "state": _CHECK_STATE[check["state"]],
+                "reason": check.get("detail", ""), "last_error": "", "last_success_at": None, "lag_minutes": None,
+                "consecutive_failures": 0,
+            })
     problems.sort(key=lambda p: (SEVERITY.index(p["state"]) if p["state"] in SEVERITY else len(SEVERITY), p["connector_id"]))
     return {
         "schema": SCHEMA, "instance": site, "generated_at": now, "overall": overall(collected),
@@ -70,7 +88,8 @@ def summary_payload(collected, site, now):
         "problems": problems,
         "connectors": [
             {"connector_id": c["connector_id"], "connector_name": c["connector_name"], "state": c["state"],
-             "has_contract": c.get("has_contract", False), "functions": len(c.get("functions", []))}
+             "has_contract": c.get("has_contract", False), "functions": len(c.get("functions", [])),
+             "checks": len(c.get("checks", []))}
             for c in collected.get("connectors", [])
         ],
     }

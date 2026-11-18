@@ -142,6 +142,97 @@ class FlattenTests(unittest.TestCase):
         self.assertEqual(flat["platform::disk"]["state"], "red")
 
 
+def request_entry(**extra):
+    return {"key": "calls", "label": "API calls", "kind": "requests", "log_doctype": "Some Request Log", **extra}
+
+
+def req_rows(n, failed=0):
+    return [{"status": "failed" if i < failed else "success", "at": NOW - timedelta(minutes=i), "duration_ms": 100, "error": ""}
+            for i in range(n)]
+
+
+class RequestKindTests(unittest.TestCase):
+    def run_one(self, rows, **kw):
+        def requests_reader(entry, now):
+            return rows, NOW - timedelta(minutes=1), "boom"
+
+        def never(*a):
+            raise AssertionError("a request log has no interval and no switch to read")
+
+        return collect(NOW, rows=[row(health=[request_entry(**kw)])], runs_reader=never, interval_reader=never,
+                       switch_reader=never, requests_reader=requests_reader)["connectors"][0]
+
+    def test_a_request_log_is_judged_on_its_window_and_reads_no_interval(self):
+        connector = self.run_one(req_rows(10))
+        self.assertEqual((connector["state"], connector["functions"][0]["kind"]), ("healthy", "requests"))
+
+    def test_failing_calls_make_it_failing_with_the_last_error(self):
+        function = self.run_one(req_rows(10, failed=6))["functions"][0]
+        self.assertEqual((function["state"], function["last_error"]), ("failing", "boom"))
+
+    def test_it_names_the_log_for_the_page_link(self):
+        function = self.run_one(req_rows(10), log_filter={"context": "search"})["functions"][0]
+        self.assertEqual((function["log_doctype"], function["log_filter"]), ("Some Request Log", {"context": "search"}))
+
+    def test_an_unreadable_request_log_is_a_configuration_problem(self):
+        def broken(entry, now):
+            raise RuntimeError("table gone")
+        result = collect(NOW, rows=[row(health=[request_entry()])], requests_reader=broken)
+        self.assertEqual(result["connectors"][0]["functions"][0]["state"], "config_invalid")
+
+
+def check(key="fresh", state="ok", detail=""):
+    return {"key": key, "label": key.title(), "state": state, "detail": detail}
+
+
+class CustomCheckTests(unittest.TestCase):
+    def collect(self, checks_reader, health=None, method="pkg.check", enabled=1):
+        r = {**row(health=health if health is not None else [entry()], enabled=enabled), "health_method": method}
+        return collect(NOW, rows=[r], runs_reader=lambda e: [run(5)], interval_reader=lambda r_, e: "30 min",
+                       checks_reader=checks_reader)["connectors"][0]
+
+    def test_the_connectors_checks_are_returned_with_it(self):
+        connector = self.collect(lambda r: [check(state="warn", detail="2 of 10 differ")])
+        self.assertEqual(connector["checks"], [check(state="warn", detail="2 of 10 differ")])
+
+    def test_a_red_check_makes_the_connector_failing_and_a_warn_check_a_warning(self):
+        self.assertEqual(self.collect(lambda r: [check(state="red")])["state"], "failing")
+        self.assertEqual(self.collect(lambda r: [check(state="warn")])["state"], "warning")
+        self.assertEqual(self.collect(lambda r: [check(state="ok")])["state"], "healthy")
+
+    def test_a_connector_with_only_a_check_has_a_contract(self):
+        connector = self.collect(lambda r: [check(state="ok")], health=[])
+        self.assertEqual((connector["has_contract"], connector["state"], connector["functions"]), (True, "healthy", []))
+
+    def test_a_connector_without_a_method_never_calls_the_reader(self):
+        calls = []
+        r = row(health=[entry()])
+        result = collect(NOW, rows=[r], runs_reader=lambda e: [run(5)], interval_reader=lambda r_, e: "30 min",
+                         checks_reader=lambda r_: calls.append(r_))
+        self.assertEqual((calls, result["connectors"][0]["checks"]), ([], []))
+
+    def test_a_check_that_raises_becomes_a_red_check_and_hides_nothing_else(self):
+        def broken(r):
+            raise RuntimeError("down https://x.example.com/?token=abc123secret")
+        connector = self.collect(broken)
+        self.assertEqual(connector["checks"][0]["state"], "red")
+        self.assertNotIn("abc123secret", connector["checks"][0]["detail"])
+        self.assertEqual(connector["functions"][0]["state"], "healthy")
+
+    def test_a_malformed_result_becomes_a_red_check(self):
+        self.assertEqual(self.collect(lambda r: "nonsense")["checks"][0]["state"], "red")
+
+    def test_a_disabled_connector_does_not_run_its_check(self):
+        calls = []
+        connector = self.collect(lambda r: calls.append(r) or [check()], enabled=0)
+        self.assertEqual((calls, connector["checks"]), ([], []))
+
+    def test_checks_are_flattened_for_change_detection(self):
+        connector = self.collect(lambda r: [check(state="red")])
+        flat = flatten({"platform": [], "connectors": [connector]})
+        self.assertEqual(flat["check::alpha::fresh"]["state"], "red")
+
+
 class _Doc(dict):
     """A stand-in for a settings document."""
 

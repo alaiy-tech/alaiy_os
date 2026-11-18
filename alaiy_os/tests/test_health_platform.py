@@ -9,7 +9,7 @@ tested here.
 import unittest
 from datetime import datetime, timedelta
 
-from alaiy_os.health.platform import backlog_state, disk_state, scheduler_state, workers_state
+from alaiy_os.health.platform import backlog_state, disk_state, error_log_state, scheduler_state, workers_state
 
 NOW = datetime(2026, 11, 18, 12, 0, 0)
 
@@ -81,6 +81,32 @@ class BacklogTests(unittest.TestCase):
         result = backlog_state({"default": 5, "long": 1500})
         self.assertEqual(result["state"], "red")
         self.assertIn("long", result["detail"])
+
+
+class ErrorLogTests(unittest.TestCase):
+    def test_no_errors_is_ok(self):
+        self.assertEqual(error_log_state({})["state"], "ok")
+        self.assertEqual(error_log_state({"alpha": 0, "beta": 0})["state"], "ok")
+
+    def test_the_thresholds_are_inclusive(self):
+        self.assertEqual(error_log_state({"alpha": 19})["state"], "ok")
+        self.assertEqual(error_log_state({"alpha": 20})["state"], "warn")
+        self.assertEqual(error_log_state({"alpha": 99})["state"], "warn")
+        self.assertEqual(error_log_state({"alpha": 100})["state"], "red")
+
+    def test_the_noisiest_connectors_are_named_worst_first_up_to_three(self):
+        result = error_log_state({"a": 5, "b": 60, "c": 30, "d": 45, "e": 0})
+        self.assertEqual(result["detail"], "b 60, d 45, c 30 in the last hour")
+
+    def test_the_worst_connector_decides_the_state(self):
+        self.assertEqual(error_log_state({"a": 150, "b": 1})["state"], "red")
+
+    def test_a_quiet_hour_says_so(self):
+        self.assertIn("No connector errors", error_log_state({"a": 3})["detail"] if False else error_log_state({})["detail"])
+
+    def test_a_few_errors_below_the_threshold_are_still_named(self):
+        result = error_log_state({"a": 3})
+        self.assertEqual((result["state"], result["detail"]), ("ok", "a 3 in the last hour"))
 
 
 if __name__ == "__main__":

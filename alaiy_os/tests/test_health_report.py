@@ -120,6 +120,32 @@ class SummaryTests(unittest.TestCase):
         self.assertNotIn("functions", self.summary)
 
 
+class CheckTests(unittest.TestCase):
+    def with_check(self, state):
+        data = collected(states=("healthy",))
+        data["connectors"][0]["checks"] = [{"key": "fresh", "label": "Stock matches", "state": state, "detail": "5 of 10 differ"}]
+        return data
+
+    def test_a_red_check_makes_it_critical_and_a_warn_check_a_warning(self):
+        self.assertEqual(overall(self.with_check("red")), "critical")
+        self.assertEqual(overall(self.with_check("warn")), "warning")
+        self.assertEqual(overall(self.with_check("ok")), "ok")
+
+    def test_a_check_that_needs_attention_is_a_problem_in_the_summary(self):
+        summary = summary_payload(self.with_check("red"), "site-one", NOW)
+        problem = summary["problems"][0]
+        self.assertEqual((problem["state"], problem["function_key"], problem["reason"]), ("failing", "fresh", "5 of 10 differ"))
+        self.assertEqual(summary["attention"], 1)
+
+    def test_a_healthy_check_is_not_a_problem(self):
+        self.assertEqual(summary_payload(self.with_check("ok"), "site-one", NOW)["problems"], [])
+
+    def test_the_connector_line_counts_its_checks(self):
+        by_id = {c["connector_id"]: c for c in summary_payload(self.with_check("ok"), "site-one", NOW)["connectors"]}
+        self.assertEqual(by_id["alpha"]["checks"], 1)
+        self.assertEqual(by_id["beta"]["checks"], 0)
+
+
 class FullAndConnectorTests(unittest.TestCase):
     def test_the_full_report_keeps_the_collected_data_and_adds_the_envelope(self):
         report = full_payload(collected(), "site-one", NOW)

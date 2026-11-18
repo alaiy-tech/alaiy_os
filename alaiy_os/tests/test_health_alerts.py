@@ -61,6 +61,15 @@ class ChangeMessageTests(unittest.TestCase):
         self.assertIn("gone", text)
 
 
+class CheckMessageTests(unittest.TestCase):
+    def test_a_connector_check_is_named_by_connector_and_label(self):
+        data = collected()
+        data["connectors"][0]["checks"] = [{"key": "fresh", "label": "Stock matches", "state": "red", "detail": "5 of 10 differ"}]
+        text = change_message(change(key="check::alpha::fresh", old="ok", new="red"), "site-one", data)
+        for part in ("Alpha", "Stock matches", "5 of 10 differ", "site-one"):
+            self.assertIn(part, text)
+
+
 class DigestTests(unittest.TestCase):
     def test_nothing_unhealthy_means_no_digest(self):
         data = collected("healthy", "")

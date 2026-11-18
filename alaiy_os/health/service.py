@@ -5,10 +5,13 @@ the connector's settings document and its own log. One connector, or one functio
 read never hides the others: it shows as a configuration problem with a generic reason.
 """
 
+from types import SimpleNamespace
+
 from alaiy_os.health.changes import diff
+from alaiy_os.health.checks import connector_state_for, failed_check, normalise_checks
 from alaiy_os.health.contract import normalise_health
-from alaiy_os.health.engine import INVALID, SEVERITY, compute_state
-from alaiy_os.health.runs import read_runs
+from alaiy_os.health.engine import HEALTHY, INVALID, SEVERITY, compute_request_state, compute_state
+from alaiy_os.health.runs import read_requests, read_runs
 from alaiy_os.health.scrub import scrub
 
 NO_CONTRACT = "no_contract"
@@ -31,23 +34,28 @@ def _operation_labels(row):
     return labels
 
 
-def _function(row, entry, now, runs_reader, interval_reader, switch_reader):
+def _function(row, entry, now, readers):
     try:
-        runs = runs_reader(entry)
-        enabled = True
-        if entry.get("enabled_setting"):
-            try:
-                enabled = bool(switch_reader(row, entry))
-            except Exception:
-                return _problem(entry["key"], entry.get("label"), "The connector's settings could not be read")
-        raw = None
-        if entry.get("scheduled", True):
-            try:
-                raw = interval_reader(row, entry)
-            except Exception:
-                raw = UNREADABLE_INTERVAL
-        result = compute_state(entry, runs, now, interval_raw=raw, connector_enabled=bool(row.get("is_enabled")),
-                               function_enabled=enabled)
+        if entry.get("kind") == "requests":
+            rows, last_ok, last_error = readers.requests(entry, now)
+            result = compute_request_state(entry, rows, now, last_success_at=last_ok, last_error=last_error,
+                                           connector_enabled=bool(row.get("is_enabled")))
+        else:
+            runs = readers.runs(entry)
+            enabled = True
+            if entry.get("enabled_setting"):
+                try:
+                    enabled = bool(readers.switch(row, entry))
+                except Exception:
+                    return _problem(entry["key"], entry.get("label"), "The connector's settings could not be read")
+            raw = None
+            if entry.get("scheduled", True):
+                try:
+                    raw = readers.interval(row, entry)
+                except Exception:
+                    raw = UNREADABLE_INTERVAL
+            result = compute_state(entry, runs, now, interval_raw=raw, connector_enabled=bool(row.get("is_enabled")),
+                                   function_enabled=enabled)
         result["last_error"] = scrub(result.get("last_error"))
         result["log_doctype"] = entry["log_doctype"]
         result["log_filter"] = entry.get("log_filter") or {}
@@ -56,31 +64,47 @@ def _function(row, entry, now, runs_reader, interval_reader, switch_reader):
         return _problem(entry["key"], entry.get("label"), f"The log could not be read ({type(exc).__name__})")
 
 
-def _connector(row, now, runs_reader, interval_reader, switch_reader):
+def _checks_of(row, readers):
+    """The connector's own checks: validated, and never allowed to break the connector."""
+    if not (row.get("health_method") and row.get("is_enabled")):
+        return []
+    try:
+        return normalise_checks(readers.checks(row))
+    except Exception as exc:
+        return [failed_check(exc)]
+
+
+def _connector(row, now, readers):
     base = {"connector_id": row["connector_id"], "connector_name": row.get("connector_name") or row["connector_id"],
             "operations": _operation_labels(row), "can_test": bool(row.get("test_method"))}
     try:
         entries = normalise_health(row.get("health"))
     except ValueError:
-        return {**base, "has_contract": True, "state": INVALID,
+        return {**base, "has_contract": True, "state": INVALID, "checks": [],
                 "functions": [_problem("health", "Health list", "The connector's health list is not valid")]}
-    if not entries:
-        return {**base, "has_contract": False, "state": NO_CONTRACT, "functions": []}
-    functions = [_function(row, e, now, runs_reader, interval_reader, switch_reader) for e in entries]
-    state = min((f["state"] for f in functions), key=SEVERITY.index)
-    return {**base, "has_contract": True, "state": state, "functions": functions}
+    checks = _checks_of(row, readers)
+    if not entries and not checks:
+        return {**base, "has_contract": False, "state": NO_CONTRACT, "functions": [], "checks": []}
+    functions = [_function(row, e, now, readers) for e in entries]
+    states = [f["state"] for f in functions]
+    implied = connector_state_for(checks)
+    if implied:
+        states.append(implied)
+    state = min(states, key=SEVERITY.index) if states else HEALTHY
+    return {**base, "has_contract": True, "state": state, "functions": functions, "checks": checks}
 
 
-def collect(now, *, rows=None, runs_reader=None, interval_reader=None, switch_reader=None):
+def collect(now, *, rows=None, runs_reader=None, interval_reader=None, switch_reader=None,
+            requests_reader=None, checks_reader=None):
     """Return {"checked_at", "platform", "connectors"}. Platform checks are added by `run_checks`."""
     rows = _registry_rows() if rows is None else rows
-    runs_reader = runs_reader or read_runs
-    interval_reader = interval_reader or _read_interval
-    switch_reader = switch_reader or _read_switch
+    readers = SimpleNamespace(
+        runs=runs_reader or read_runs, interval=interval_reader or _read_interval, switch=switch_reader or _read_switch,
+        requests=requests_reader or read_requests, checks=checks_reader or _read_checks)
     return {
         "checked_at": now,
         "platform": [],
-        "connectors": [_connector(r, now, runs_reader, interval_reader, switch_reader) for r in rows],
+        "connectors": [_connector(r, now, readers) for r in rows],
     }
 
 
@@ -111,6 +135,8 @@ def flatten(collected):
         for function in connector["functions"]:
             flat[f"{connector['connector_id']}::{function['key']}"] = {
                 "state": function["state"], "reason": function.get("reason", "")}
+        for check in connector.get("checks", []):
+            flat[f"check::{connector['connector_id']}::{check['key']}"] = {"state": check["state"], "reason": check.get("detail", "")}
     for check in collected["platform"]:
         flat[f"platform::{check['key']}"] = {"state": check["state"], "reason": check.get("detail", "")}
     return flat
@@ -125,7 +151,7 @@ def _registry_rows():
         return []
     return frappe.get_all(
         "OS Connector Registry",
-        fields=["connector_id", "connector_name", "is_enabled", "health", "test_method",
+        fields=["connector_id", "connector_name", "is_enabled", "health", "health_method", "test_method",
                 "sync_categories_method", "sync_categories_label", "sync_items_method", "sync_items_label"],
         order_by="connector_name asc",
         limit=500,
@@ -155,6 +181,28 @@ def _read_interval(row, entry):
 def _read_switch(row, entry):
     """Whether the function's own on/off switch is on, from the connector's settings document."""
     return settings_value(_settings(row), entry["enabled_setting"])
+
+
+CHECK_OK_SECONDS = 1800      # a connector's own check is not re-run more often than this
+CHECK_FAILED_SECONDS = 300   # and a failing one is retried sooner, but not on every page load
+
+
+def _read_checks(row):
+    """Run the connector's health_method, remembering the answer so a check that calls a remote API is not
+    run on every page load. Returns the validated checks; a failure is cached too, as a red check."""
+    import frappe
+
+    key = f"alaiy_health_check:{row['connector_id']}"
+    cached = frappe.cache.get_value(key)
+    if cached is not None:
+        return cached
+    try:
+        checks = normalise_checks(frappe.get_attr(row["health_method"])())
+        ttl = CHECK_OK_SECONDS
+    except Exception as exc:
+        checks, ttl = [failed_check(exc)], CHECK_FAILED_SECONDS
+    frappe.cache.set_value(key, checks, expires_in_sec=ttl)
+    return checks
 
 
 def load_previous():

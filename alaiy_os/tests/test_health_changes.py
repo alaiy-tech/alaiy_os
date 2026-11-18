@@ -83,6 +83,12 @@ class DiffTests(unittest.TestCase):
         for state in ("warn", "unknown", "ok"):
             self.assertEqual(diff({"platform::disk": s("ok")}, {"platform::disk": s(state)}, NOW), [], state)
 
+    def test_a_connector_check_is_alerted_like_a_platform_check(self):
+        key = "check::a::fresh"
+        self.assertEqual(kinds({key: s("ok")}, {key: s("red")}), {key: "alert"})
+        self.assertEqual(diff({key: s("ok")}, {key: s("warn")}, NOW), [])
+        self.assertEqual(kinds({key: s("red")}, {key: s("ok")}), {key: "recovery"})
+
     def test_a_function_that_vanished_is_ignored(self):
         self.assertEqual(diff({"a::x": s("failing")}, {}, NOW), [])
 

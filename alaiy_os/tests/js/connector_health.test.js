@@ -259,3 +259,69 @@ test("a worse connector is listed before a better one even when its name sorts l
 	const html = H.render_html(d);
 	assert.ok(html.indexOf('<span class="ch-tile-name">Zulu</span>') < html.indexOf('<span class="ch-tile-name">Alpha</span>'));
 });
+
+
+// ── request logs and a connector's own checks ───────────────────────────────────────────
+
+const requestFn = (extra = {}) => fn({
+	key: "calls", label: "API calls", kind: "requests", window_minutes: 60, requests: 40, error_rate: 0.075, latency_avg_ms: 420,
+	latency_p95_ms: 1200, interval_minutes: null, last_counts: { processed: 40, changed: 37, failed: 3, skipped: 0 }, ...extra,
+});
+
+test("a request log shows its window, error rate and latency instead of an interval", () => {
+	const html = H.render_html(data({ connectors: [connector({ functions: [requestFn()] })] }));
+	for (const part of [">Last success<", ">Requests (last hour)<", "40 requests, 3 failed (7.5%)", ">Latency<", "avg 420 ms", "p95 1.2 s"]) assert.ok(html.includes(part), part);
+	assert.ok(!html.includes(">Interval<") && !html.includes(">Last 24 h<"));
+});
+
+test("the window is worded in minutes unless it is an hour", () => {
+	const html = H.render_html(data({ connectors: [connector({ functions: [requestFn({ window_minutes: 30 })] })] }));
+	assert.ok(html.includes(">Requests (last 30 min)<"));
+});
+
+test("a request log with no latency or requests shows dashes", () => {
+	const html = H.render_html(data({ connectors: [connector({ functions: [requestFn({ requests: 0, error_rate: null, latency_avg_ms: null, latency_p95_ms: null })] })] }));
+	assert.ok(html.includes("0 requests"));
+	assert.ok(/Latency<\/dt><dd>—/.test(html));
+});
+
+test("latency is written in milliseconds under a second and seconds above", () => {
+	assert.strictEqual(H.latency_text(95), "95 ms");
+	assert.strictEqual(H.latency_text(1200), "1.2 s");
+	assert.strictEqual(H.latency_text(null), "—");
+});
+
+const withChecks = (checks, functions) => connector({ checks, functions: functions || [fn()] });
+
+test("a connector's own checks are drawn above its functions with their detail", () => {
+	const html = H.render_html(data({ connectors: [withChecks([{ key: "fresh", label: "Stock matches", state: "warn", detail: "2 of 10 sampled items differ" }])] }));
+	assert.ok(html.includes(">Extra checks<"));
+	assert.ok(html.includes("Stock matches") && html.includes("2 of 10 sampled items differ"));
+	assert.ok(html.indexOf("Stock matches") < html.indexOf("Stock sync"));
+});
+
+test("a connector with no checks has no extra-checks block", () => {
+	assert.ok(!H.render_html(data()).includes("Extra checks"));
+});
+
+test("a failing check counts toward the tile and marks the card even when every function is healthy", () => {
+	const html = H.render_html(data({ connectors: [withChecks([{ key: "fresh", label: "Stock matches", state: "red", detail: "x" }])] }), "all", "*");
+	assert.ok(html.includes("1 need attention"));
+	assert.ok(/<section class="ch-card[^"]*ch-needs/.test(html));
+});
+
+test("check text is escaped", () => {
+	const evil = "<img src=x onerror=alert(1)>";
+	const html = H.render_html(data({ connectors: [withChecks([{ key: "k", label: evil, state: "red", detail: evil }])] }));
+	assert.ok(!html.includes("<img"));
+});
+
+test("a check that only warns also needs attention", () => {
+	const html = H.render_html(data({ connectors: [withChecks([{ key: "k", label: "Soft", state: "warn", detail: "x" }])] }), "all", "*");
+	assert.ok(html.includes("1 need attention"));
+});
+
+test("an unknown or ok check does not", () => {
+	const html = H.render_html(data({ connectors: [withChecks([{ key: "a", label: "A", state: "ok", detail: "" }, { key: "b", label: "B", state: "unknown", detail: "" }])] }), "all", "*");
+	assert.ok(!html.includes("need attention"));
+});

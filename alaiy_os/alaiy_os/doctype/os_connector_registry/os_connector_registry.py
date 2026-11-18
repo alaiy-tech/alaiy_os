@@ -10,6 +10,7 @@ _HANDLER_FIELDS = {
     "sync_categories_method": "Sync Categories Method",
     "sync_items_method": "Sync Items Method",
     "sync_status_method": "Sync Status Method",
+    "health_method": "Health Check Method",
 }
 
 

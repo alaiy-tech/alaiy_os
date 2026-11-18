@@ -88,6 +88,29 @@ class StaticCheckTests(unittest.TestCase):
     def test_bare_numbers_are_fine_when_the_unit_is_declared(self):
         self.assertEqual(self.check([{**GOOD, "interval_setting": "bad_interval", "interval_unit": "min"}]), [])
 
+    def test_a_request_log_needs_no_interval_but_must_have_its_status_field(self):
+        entry = {"key": "calls", "label": "Calls", "kind": "requests", "log_doctype": "Thing Sync Log"}
+        self.assertEqual(self.check([entry]), [])
+        bare = {"name": "Thing Sync Log", "fields": [{"fieldname": "sync_type", "fieldtype": "Select"}]}
+        self.assertTrue(any("status" in e for e in self.check([entry], doctypes=(bare, SETTINGS))))
+
+    def test_a_log_kept_by_another_app_is_not_looked_for_here(self):
+        entry = {"key": "calls", "label": "Calls", "kind": "requests", "log_doctype": "Kept Elsewhere", "log_external": True,
+                 "log_filter": {"context": "search"}}
+        self.assertEqual(self.check([entry]), [])
+        self.assertTrue(any("Kept Elsewhere" in e for e in self.check([{**entry, "log_external": False}])))
+
+    def test_a_custom_check_must_exist_in_the_repository(self):
+        with tempfile.TemporaryDirectory() as root:
+            meta = build(root, [GOOD])
+            text = meta.read_text(encoding="utf-8").replace("'health':", "'health_method': 'thing_connector.checks.fresh', 'health':")
+            meta.write_text(text, encoding="utf-8")
+            self.assertTrue(any("thing_connector.checks.fresh" in e for e in check_connector(meta)))
+            (meta.parent / "checks.py").write_text("def other():\n    return []\n", encoding="utf-8")
+            self.assertTrue(any("thing_connector.checks.fresh" in e for e in check_connector(meta)))
+            (meta.parent / "checks.py").write_text("def fresh():\n    return []\n", encoding="utf-8")
+            self.assertEqual(check_connector(meta), [])
+
     def test_a_numeric_interval_field_is_reported(self):
         self.assertTrue(any("Select" in e for e in self.check([{**GOOD, "interval_setting": "minutes"}])))
 

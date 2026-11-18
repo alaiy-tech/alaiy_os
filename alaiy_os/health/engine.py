@@ -5,6 +5,7 @@ processed, changed, failed, skipped, error. `compute_state` takes the records of
 newest first, and says whether it is healthy and why.
 """
 
+import math
 from datetime import timedelta
 
 from alaiy_os.health.intervals import parse_interval
@@ -39,6 +40,67 @@ DEFAULTS = {
 
 def _minutes(delta):
     return max(0, int(delta.total_seconds() // 60))
+
+
+ERROR_WORDS = ("failed", "error", "errored", "failure")
+REQUEST_DEFAULTS = {"window_min": 60, "min_requests": 5, "error_warn_rate": 0.1, "error_fail_rate": 0.5}
+
+
+def error_words(fn):
+    """The status words that count as a failed call, lower-cased."""
+    return {str(word).lower() for word in (fn.get("error_statuses") or ERROR_WORDS)}
+
+
+def compute_request_state(fn, rows, now, last_success_at=None, last_error=None, connector_enabled=True):
+    """The state of a function that is a log of calls. `rows` are the calls in the window, newest
+    first: {status, at, duration_ms, error}. Too few calls to judge is a warning only when one failed;
+    no calls at all is "no data", never healthy."""
+    cfg = {**REQUEST_DEFAULTS, **{k: v for k, v in fn.items() if v is not None}}
+    failed_words = error_words(fn)
+    total = len(rows)
+    errors = sum(1 for r in rows if str(r.get("status") or "").lower() in failed_words)
+    streak = 0
+    for r in rows:
+        if str(r.get("status") or "").lower() not in failed_words:
+            break
+        streak += 1
+    durations = sorted(r["duration_ms"] for r in rows if r.get("duration_ms") is not None)
+    average = round(sum(durations) / len(durations)) if durations else None
+    p95 = durations[max(math.ceil(0.95 * len(durations)) - 1, 0)] if durations else None
+    window = cfg["window_min"]
+    rate = errors / total if total else None
+    out = {
+        "key": fn.get("key"), "label": fn.get("label") or fn.get("key"), "direction": fn.get("direction"),
+        "kind": "requests", "window_minutes": window, "requests": total, "error_rate": rate,
+        "latency_avg_ms": average, "latency_p95_ms": p95,
+        "last_status": rows[0].get("status") if rows else None,
+        "last_run_at": rows[0].get("at") if rows else None,
+        "last_success_at": last_success_at,
+        "last_error": scrub(last_error),
+        "last_counts": {"processed": total, "changed": total - errors, "failed": errors, "skipped": 0},
+        "runs_24h": total, "failures_24h": errors, "consecutive_failures": streak,
+        "lag_minutes": _minutes(now - last_success_at) if last_success_at else None,
+        "interval_minutes": None, "running_minutes": None,
+    }
+
+    def done(state, reason=""):
+        out["state"], out["reason"] = state, reason
+        return out
+
+    if not connector_enabled:
+        return done(DISABLED, "The connector is not enabled")
+    if not total:
+        return done(NO_DATA, f"No requests in the last {window} minutes")
+    percent = f"{rate * 100:.0f}%"
+    if total < cfg["min_requests"]:
+        if errors:
+            return done(WARNING, f"{errors} of {total} requests failed in the last {window} minutes (too few requests to judge)")
+        return done(HEALTHY)
+    if rate >= cfg["error_fail_rate"]:
+        return done(FAILING, f"{errors} of {total} requests failed in the last {window} minutes ({percent})")
+    if rate >= cfg["error_warn_rate"]:
+        return done(WARNING, f"{errors} of {total} requests failed in the last {window} minutes ({percent})")
+    return done(HEALTHY)
 
 
 def compute_state(fn, runs, now, interval_raw=None, connector_enabled=True, function_enabled=True):

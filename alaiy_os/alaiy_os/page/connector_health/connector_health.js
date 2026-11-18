@@ -62,6 +62,19 @@ frappe.provide("alaiy_os.health");
 		return { total, counts, attention: ATTENTION.reduce((sum, state) => sum + (counts[state] || 0), 0) };
 	};
 
+	health.latency_text = (ms) => {
+		if (ms == null) return "—";
+		return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
+	};
+
+	// A check (a connector's own, or the platform's) needs attention when it is red or warn.
+	const checkNeeds = (check) => check.state === "red" || check.state === "warn";
+	const attentionCount = (c) =>
+		(c.functions || []).filter((fn) => health.needs_attention(fn.state)).length + (c.checks || []).filter(checkNeeds).length;
+
+	const windowText = (minutes) => (minutes === 60 ? "last hour" : `last ${minutes} min`);
+	const percent = (rate) => `${Number((rate * 100).toFixed(1))}%`;
+
 	const pill = (state) =>
 		`<span class="ch-pill ch-${health.tone(state)}"><span class="ch-dot"></span>${esc(__(LABELS[state] || state))}</span>`;
 
@@ -76,6 +89,22 @@ frappe.provide("alaiy_os.health");
 	const platformCard = (check) =>
 		`<div class="ch-check ch-tone-${health.tone(check.state)}">${pill(check.state)}<div><b>${esc(check.label)}</b><div class="ch-muted">${esc(check.detail)}</div></div></div>`;
 
+	const runFacts = (fn, ok) =>
+		fact("Last synced", synced(fn.last_success_at)) +
+		fact("Interval", esc(health.interval_text(fn.interval_minutes))) +
+		fact("Last run", counts(fn.last_counts)) +
+		fact("Last 24 h", `${esc(ok)} ${esc(__("ok"))}, ${esc(fn.failures_24h || 0)} ${esc(__("failed"))}`);
+
+	const requestFacts = (fn) => {
+		const total = fn.requests || 0;
+		const failed = (fn.last_counts && fn.last_counts.failed) || 0;
+		const rate = fn.error_rate == null ? "" : ` (${percent(fn.error_rate)})`;
+		const latency = fn.latency_avg_ms == null ? "—" : `avg ${health.latency_text(fn.latency_avg_ms)} · p95 ${health.latency_text(fn.latency_p95_ms)}`;
+		return fact("Last success", synced(fn.last_success_at)) +
+			fact(`Requests (${windowText(fn.window_minutes || 60)})`, `${esc(total)} ${esc(__("requests"))}, ${esc(failed)} ${esc(__("failed"))}${esc(rate)}`) +
+			fact("Latency", esc(latency));
+	};
+
 	const functionBlock = (fn) => {
 		const ok = (fn.runs_24h || 0) - (fn.failures_24h || 0);
 		const filter = esc(JSON.stringify(fn.log_filter || {}));
@@ -87,10 +116,7 @@ frappe.provide("alaiy_os.health");
 			</div>
 			${fn.reason ? `<p class="ch-reason">${esc(fn.reason)}</p>` : ""}
 			<dl class="ch-facts">
-				${fact("Last synced", synced(fn.last_success_at))}
-				${fact("Interval", esc(health.interval_text(fn.interval_minutes)))}
-				${fact("Last run", counts(fn.last_counts))}
-				${fact("Last 24 h", `${esc(ok)} ${esc(__("ok"))}, ${esc(fn.failures_24h || 0)} ${esc(__("failed"))}`)}
+				${fn.kind === "requests" ? requestFacts(fn) : runFacts(fn, ok)}
 				${fn.last_error ? "" : fact("Last error", "—")}
 			</dl>
 			${fn.last_error ? `<div class="ch-err"><div class="ch-label">${esc(__("Last error"))}</div>${esc(fn.last_error)}</div>` : ""}
@@ -109,10 +135,15 @@ frappe.provide("alaiy_os.health");
 
 	const connectorCard = (c) => {
 		const functions = c.functions || [];
-		const needs = functions.some((fn) => health.needs_attention(fn.state)) ? " ch-needs" : "";
+		const needs = attentionCount(c) ? " ch-needs" : "";
 		const count = `${functions.length} ${functions.length === 1 ? "function" : "functions"}`;
+		const checks = (c.checks || []).length
+			? `<div class="ch-fn ch-checks"><div class="ch-label">${esc(__("Extra checks"))}</div>${c.checks.map(
+				(check) => `<div class="ch-check-row">${pill(check.state)}<b>${esc(check.label)}</b><span class="ch-muted">${esc(check.detail)}</span></div>`
+			).join("")}</div>`
+			: "";
 		const body = c.has_contract
-			? functions.map(functionBlock).join("")
+			? checks + functions.map(functionBlock).join("")
 			: `<div class="ch-fn"><p class="ch-muted">${esc(__("No health contract"))}</p></div>`;
 		return `<section class="ch-card${needs}">
 			<header>
@@ -128,7 +159,7 @@ frappe.provide("alaiy_os.health");
 
 	const tile = (c, selected) => {
 		const functions = c.functions || [];
-		const attention = functions.filter((fn) => health.needs_attention(fn.state)).length;
+		const attention = attentionCount(c);
 		const meta = c.has_contract
 			? `${functions.length} ${functions.length === 1 ? "function" : "functions"}${attention ? ` · <b class="ch-attn">${attention} ${esc(__("need attention"))}</b>` : ""}`
 			: esc(__("No health contract"));
@@ -215,6 +246,7 @@ frappe.provide("alaiy_os.health");
 		.ch-green.ch-pill { background: color-mix(in srgb, var(--s-green, #15803d) 12%, transparent); }
 		.ch-amber.ch-pill { background: color-mix(in srgb, var(--s-amber, #b45309) 14%, transparent); }
 		.ch-red.ch-pill { background: color-mix(in srgb, var(--s-red, #b42318) 12%, transparent); }
+		.ch-check-row { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 14px; padding: 6px 0; }
 		.ch-only-attention .ch-fn:not(.ch-needs) { display: none; }
 		.ch-only-attention .ch-card:not(.ch-needs) { display: none; }
 	`;

@@ -12,14 +12,15 @@ from datetime import timedelta
 from alaiy_os.health.engine import ALERT_STATES, HEALTHY, WARNING
 
 COOLDOWN_MIN = 60
+CHECK_PREFIXES = ("platform::", "check::")  # states ok / warn / red, not the function states
 
 
 def _alerting(key, state):
-    return state == "red" if key.startswith("platform::") else state in ALERT_STATES
+    return state == "red" if key.startswith(CHECK_PREFIXES) else state in ALERT_STATES
 
 
 def _recovered(key, state):
-    return state in ("ok", "warn") if key.startswith("platform::") else state in (HEALTHY, WARNING)
+    return state in ("ok", "warn") if key.startswith(CHECK_PREFIXES) else state in (HEALTHY, WARNING)
 
 
 def diff(previous, current, now, cooldown_min=COOLDOWN_MIN):

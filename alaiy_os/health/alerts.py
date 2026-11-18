@@ -78,6 +78,13 @@ def _label(state):
 def _lookup(key, collected):
     """(title, reason, last_error) for a state key, tolerating one that no longer exists."""
     group, _, name = key.partition("::")
+    if group == "check":
+        connector_id, _, check_key = name.partition("::")
+        for connector in collected.get("connectors", []):
+            if connector["connector_id"] == connector_id:
+                for check in connector.get("checks", []):
+                    if check["key"] == check_key:
+                        return f"{connector['connector_name']} - {check['label']}", check.get("detail", ""), ""
     if group == "platform":
         for check in collected.get("platform", []):
             if check["key"] == name:
