@@ -250,3 +250,12 @@ test("connectors in the same state are listed by name", () => {
 test("the all-connectors tile is named", () => {
 	assert.ok(H.render_html(mixed()).includes("All connectors"));
 });
+
+test("a worse connector is listed before a better one even when its name sorts later", () => {
+	const d = data({ connectors: [
+		connector({ connector_id: "a", connector_name: "Alpha", state: "healthy" }),
+		connector({ connector_id: "z", connector_name: "Zulu", state: "failing", functions: [fn({ state: "failing" })] }),
+	] });
+	const html = H.render_html(d);
+	assert.ok(html.indexOf('<span class="ch-tile-name">Zulu</span>') < html.indexOf('<span class="ch-tile-name">Alpha</span>'));
+});
