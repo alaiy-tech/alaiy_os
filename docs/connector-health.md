@@ -100,3 +100,32 @@ The page's Run button starts the sync in a background worker and returns at once
 6. Make the remote API return 401 (wrong credentials): Failing, with the error shown.
 7. Fill the disk past the threshold: the Disk space check goes red. Free it afterwards.
 8. Kill a worker mid-run: the function reads Stuck after the maximum runtime, then Failing.
+
+## Trying it on the build server
+
+The simulator writes synthetic runs into a connector's own log, so the page and the alerts can be exercised
+without breaking anything real. It refuses to run unless the site opts in, so never enable it on a client site.
+
+```
+bench --site SITE set-config health_simulation_allowed 1
+bench --site SITE execute alaiy_os.health.simulate.run --kwargs "{'scenario': 'overdue'}"
+bench --site SITE execute alaiy_os.health.simulate.cleanup
+```
+
+`run` takes `scenario`, and optionally `connector_id`, `function_key` and `alerts` (1 also stores state and posts
+to Slack like the 5-minute job). It picks the first scheduled function with a health list and a valid interval,
+writes the rows, and returns the expected and actual state. Scenarios and the state each must give:
+
+| Scenario | State |
+|---|---|
+| `healthy` | healthy |
+| `overdue` | overdue |
+| `failing_all_items` | failing (the run is marked success, every item failed) |
+| `failing_runs` | failing (three failed runs; the page must show the error without the token) |
+| `zero_rows` | warning |
+| `skipped_rows` | warning |
+| `stuck` | stuck |
+
+`break_interval` sets the interval to a value and reports the state (`'30'` gives config invalid, `'Disabled'`
+gives disabled); `cleanup` deletes the rows and restores the interval. Turn the option off afterwards with
+`bench --site SITE set-config health_simulation_allowed 0`.
