@@ -35,72 +35,6 @@ fixtures = [
 after_install = "alaiy_os.setup.install.after_install"
 after_migrate = "alaiy_os.setup.install.after_migrate"
 
-# OS Agent Run is an append-only audit log of what an agent did. Like Frappe's
-# own Communication / Activity Log / Version, it must never *block* deletion of
-# the thing it references: without this, an agent app that has run even once
-# cannot be uninstalled, because its own unregister() hits
-#
-#     LinkExistsError: Cannot delete ... OS Agent Registry <id> is linked with
-#     OS Agent Run RUN-...
-#
-# and the uninstall aborts. Deleting the registry row deliberately leaves the
-# run rows intact — each keeps its agent id, transcript, output and token
-# counts, so the audit trail survives with only the Link left dangling.
-ignore_links_on_delete = ["OS Agent Run"]
-
-# ── MCP tools (Frappe Assistant Core) ────────────────────────────────────────
-# These are dotted-path STRINGS. Frappe never imports them; only FAC's
-# custom_tools plugin resolves them, and only when FAC is installed. So this
-# block adds no dependency — a site without frappe_assistant_core simply never
-# touches alaiy_os/assistant_tools/ and runs exactly as before. That is why
-# frappe_assistant_core is deliberately absent from required_apps above.
-#
-assistant_tools = [
-    # Channel tools
-    "alaiy_os.assistant_tools.sync_channel.SyncChannel",
-    "alaiy_os.assistant_tools.get_channel_sync_status.GetChannelSyncStatus",
-    # Catalogue
-    "alaiy_os.assistant_tools.get_catalogue_health.GetCatalogueHealth",
-    # Order tools
-    "alaiy_os.assistant_tools.cancel_order.CancelOrder",
-]
-
-# AI client seam. Agents call llm.complete(), which resolves this scalar hook
-# and delegates. The default is a BYOK client (customer-supplied Anthropic key).
-# A managed bench installs a private app *after* alaiy_os that re-registers this
-# hook to route through our LiteLLM proxy — install order decides the winner, so
-# no conditional logic is needed anywhere in agent or executor code.
-ai_client = "alaiy_os.engine.ai_client.get_ai_client"
-
-# Ask Alaiy's tenant-context seam. A list hook: each entry is a dotted path to a
-# no-argument callable returning a paragraph appended to the chat's system
-# prompt — currency, date format, which marketplaces exist, what the role names
-# mean. A deployment app declares its own; alaiy_os registers none, because
-# there is nothing tenant-specific to say about a bare Alaiy OS. See
-# runner._tenant_context() in chat/runner.py.
-#
-# chat_system_context = ["alaiy_os_globali.chat_context.system_context"]
-
-# Ask Alaiy's `@` mention seam. Also a list hook: each entry is a dotted path to
-# a no-argument callable returning the sources a deployment lets people mention —
-# its brands, its SKUs, its marketplaces, its date vocabulary — each with a
-# search and a resolve. alaiy_os registers none on purpose: a bare Alaiy OS has
-# no opinion about which doctype holds a customer's brands, and guessing one in
-# core would be a hardcoded assumption every deployment then has to work around.
-# See chat/mentions.py for the contract.
-#
-# chat_mention_sources = ["alaiy_os_globali.chat_mentions.sources"]
-
-# Ask Alaiy's tool seam. A list hook whose entries return a source that may
-# narrow the tool surface and contribute tools of its own. It exists because
-# FAC's checks are Frappe's — a role reads a doctype or it does not — and a
-# deployment scoping rows more narrowly than that (brands assigned per user)
-# cannot express it through the registry. Unlike the two hooks above, this one
-# fails CLOSED: a broken source leaves the chat with no tools rather than the
-# unscoped set. See chat/tools.py for the contract and the reasoning.
-#
-# chat_tool_sources = ["alaiy_os_globali.chat_tools.source"]
-
 # Boot + auth hooks
 on_login = "alaiy_os.setup.boot.on_login"
 
@@ -110,10 +44,10 @@ on_login = "alaiy_os.setup.boot.on_login"
 # home-page hook just substitutes the *template* rendered at "/" without
 # changing the browser's actual URL, so the desk SPA boots seeing path "/"
 # and falls back to its own default ("Dashboard") instead of "os". A real
-# redirect sends the browser to an actual /desk/ask-alaiy request, which does hit
+# redirect sends the browser to an actual /desk/os request, which does hit
 # that fast path — exactly how /app already behaves (301 -> /desk).
 website_redirects = [
-    {"source": "/", "target": "/desk/ask-alaiy"},
+    {"source": "/", "target": "/desk/os"},
 ]
 get_website_user_home_page = "alaiy_os.setup.boot.get_home_page"
 
@@ -132,7 +66,6 @@ website_route_rules = [
     {"from_route": f"/os/{route}", "to_route": "os"}
     for route in (
         "login",
-        "ask-alaiy",
         "products",
         "products/<id>",
         "item-groups",
@@ -203,19 +136,12 @@ app_include_js = [
     f"/assets/alaiy_os/js/alaiy_workspace.js?v={_V}",
     f"/assets/alaiy_os/js/route_guard.js?v={_V}",
     f"/assets/alaiy_os/js/alaiy_connector_card.js?v={_V}",
-    # Ask Alaiy floating launcher + panel -- a self-contained React bundle
-    # (desk-widget/, built with `npm run build`), independent of the vanilla-JS
-    # constellation above: it owns its own DOM node and never reads window
-    # globals those scripts define, so it's order-independent and safe to load
-    # last. See desk-widget/README.md for the build.
-    f"/assets/alaiy_os/dist/ask_alaiy.js?v={_V}",
 ]
 app_include_css = [
     f"/assets/alaiy_os/css/core.css?v={_V}",
     # Served by a whitelisted method (not a static file) so every OS Theme
     # Settings save reflects on the next reload — see alaiy_os/api/theme.py.
     "/api/method/alaiy_os.api.theme.custom_theme_css",
-    f"/assets/alaiy_os/dist/ask_alaiy.css?v={_V}",
 ]
 
 # Per-doctype form scripts. Unlike app_include_js these are read server-side and

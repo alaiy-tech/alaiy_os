@@ -20,7 +20,7 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    fixture (`fixtures/role.json`). It is **not** granted any DocType
    permissions automatically — there is no `Custom DocPerm` reconciliation
    anywhere in this app. If a non-`System Manager` role needs access to
-   `OS Agent Registry`, `OS Connector Registry`, etc., that has to be
+   `OS Connector Registry`, etc., that has to be
    configured explicitly (Role Permission Manager / a `Custom DocPerm`),
    the same as for any other Frappe app.
 2. **Workspace + sidebar** — the `OS` and `OS Settings` workspaces, with
@@ -47,7 +47,7 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    docstring in `setup/install.py`. The stock "Welcome Workspace" and
    "desktop" Page are removed outright.
 5. **Login/home redirects** — a bare `/`, a bare `/desk`, and login all
-   resolve to the OS workspace (`/desk/ask-alaiy`) instead of Frappe's own
+   resolve to the OS workspace (`/desk/os`) instead of Frappe's own
    defaults.
 6. **CDN image referrer policy** — Item product images are usually supplier
    or marketplace CDN URLs with hotlink protection that 403s any
@@ -64,53 +64,6 @@ Frappe's own fixtures sync (`alaiy_os/fixtures/*.json`, declared in
    better than the observer rather than a workaround for its absence: the
    attribute is present on the first fetch, so no image ever leaks a
    `Referer` or needs a reload to recover from a 403.
-
-## `interface/` — the frontend this app ships
-
-The Next.js app in `interface/` is **Alaiy OS Self-Serve**: a seller signs up,
-connects Shopify or Amazon, imports 90 days of data and starts operating. It is
-the frontend a deployment gets by default, and every backend call it makes is
-made server-side only — the browser never reaches Frappe directly. See
-[interface/README.md](interface/README.md) for its architecture and
-[interface/DESIGN.md](interface/DESIGN.md) for the design system.
-
-The REST surface it calls is **not** all in this app. Ask Alaiy
-(`alaiy_os.api.chat`) answers from here; the seller-facing data — sign-in OTP,
-workspace, dashboard, orders, listings, inventory, imports, connections,
-account health — answers from
-[alaiy_os_self_serve_apis](https://github.com/alaiy-tech/alaiy_os_self_serve_apis),
-a separate app the self-serve bench installs alongside this one (see
-`devbench/clients/api.py`). Those endpoints stay there deliberately: that app
-depends on the Amazon SP-API and Shopify connectors, and both of those already
-require `alaiy_os`, so folding it in would make `required_apps` a cycle.
-
-The consequence worth knowing: **installing `alaiy_os` on its own gives you
-this frontend with no data behind it.** Every screen except Ask Alaiy needs
-`alaiy_os_self_serve_apis` on the bench as well.
-
-It is a **base** in devbench's composition: `interface/interface.config.json`
-declares `"base": true`, so `devbench compose` builds a client's workspace out
-of this tree. Two more things it declares there:
-
-- `"acceptsContributions": false` — this app is not the `@alaiy-os/*` platform
-  those screens are written against, so a connector's `interface/` overlay is
-  skipped by name rather than dropped into a tree that cannot compile it. The
-  platform lives in
-  [alaiy_os_commerce](https://github.com/alaiy-tech/alaiy_os_commerce)`/interface`,
-  which claims the base itself on any bench that installs it and takes over
-  completely there.
-- `"env"` — the variables this app's server-side code reads
-  (`ALAIY_BACKEND_URL`, `APP_URL`, `SESSION_SECRET` and the two service
-  credentials), which devbench answers when it writes `.env.local` and again
-  when it writes the production supervisor program. Anything else in
-  `interface/.env.example` — Google SSO's two keys, for instance — has to be
-  added to that map *and* to `devbench/.env`, because `.env.local` is generated
-  and a hand-edit there does not survive the next compose.
-
-Not to be confused with `desk-widget/`, which is a Frappe **Desk** asset of this
-app: a React IIFE built into `alaiy_os/public/dist/` and loaded on every Desk
-page by `app_include_js`. It has nothing to do with the Next.js app, and moved
-to the repo root when the platform frontend left.
 
 ## Access control
 
@@ -131,60 +84,6 @@ Neither mechanism restricts what `System Manager` or `Administrator` can see
 restriction of *other* apps' workspaces is handled server-side, by
 `restrict_foreign_workspaces()` (see above), not by any client-side code.
 
-## MCP tools
-
-`assistant_tools/` exposes the OS's basic commerce operations to any MCP client
-(Claude, GPT, Gemini, local models) through
-[Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core)
-(FAC), which supplies the MCP protocol, OAuth, and audit logging.
-
-| Tool | What it does |
-|---|---|
-| `sync_channel` | Trigger a sync for one/all channels via the connector registry |
-| `get_channel_sync_status` | Health + last-sync status of every channel |
-| `get_catalogue_health` | Items missing images / description / price / attributes + health score |
-| `cancel_order` | Cascade-cancel a Sales Order; `dry_run` previews without changing anything |
-
-**Every tool here is connector-agnostic.** Channel behaviour is resolved through
-`OS Connector Registry` — sync operations by label — never by naming a connector.
-A tool that can't be written that way belongs in the connector app:
-`publish_products` and `get_stock_overview` live in `alaiy_os_connector_shopify`
-because they read `Item.sync_to_shopify` and `Item.sh_shopify_product_id`, which
-that app owns.
-
-**FAC is not a dependency of this app.** `hooks.py`'s `assistant_tools` entries
-are dotted-path *strings*; only FAC's `custom_tools` plugin ever resolves them.
-On a site without FAC, `assistant_tools/` is never imported and the OS runs
-unchanged — which is why `required_apps` stays `["erpnext"]`.
-
-Installing the OS sets FAC up for you: `after_install` fetches and installs it,
-and provisioning's `enable_fac_custom_tools` step turns on the `custom_tools`
-plugin on every migrate (FAC admin → Plugins remains the manual fallback). See
-[Install](#install) — including how to opt out.
-
-Agent- and connector-specific tools are *not* registered here. Those apps ship
-their own tools via their own `assistant_tools` hook, so a tool appears only
-when the app that owns it is installed (e.g. `alaiy_os_assistant` adds the
-listing-enrichment tools).
-
-### Permissions
-
-`assistant_tools/permissions.py` is the single source of truth. Four roles are
-created on install (`Alaiy Admin`, `Alaiy Ops`, `Alaiy Catalogue`,
-`Alaiy Analyst`); `System Manager`, `OS Manager`, and `Alaiy Admin` are
-superusers. A tool with no allow-list entry is **superuser-only** — the model
-fails closed, never open. Destructive tools are gated harder: `cancel_order`
-with `dry_run=false` requires Alaiy Admin even though Ops may preview it.
-
-Other apps declare roles for their own tools without editing core, via the
-`assistant_tool_roles` hook (Frappe merges the dict across installed apps):
-
-```python
-assistant_tool_roles = {
-    "run_enrichment_agent": ["Alaiy Catalogue"],
-}
-```
-
 ## Install
 
 ```bash
@@ -194,67 +93,19 @@ bench --site <site> migrate
 bench build --app alaiy_os
 ```
 
-### FAC
-
-`install-app alaiy_os` brings [Frappe Assistant Core](https://github.com/buildswithpaul/Frappe_Assistant_Core)
-in with it. After provisioning commits, `after_install` runs
-`ensure_fac_installed()`, which fetches FAC into `apps/` if it isn't there,
-installs it on the site, and enables its `custom_tools` plugin — the three
-manual steps that used to stand between a fresh site and working MCP tools:
-
-```
-Installing alaiy_os...
-Alaiy OS: 19/19 provisioning steps succeeded.
-Alaiy OS: installing frappe_assistant_core (skip with ALAIY_OS_INSTALL_FAC=false)...
-Installing frappe_assistant_core...
-Alaiy OS: frappe_assistant_core installed.
-Alaiy OS: FAC plugin 'custom_tools' enabled.
-```
-
-It only ever runs on **install**, never on `bench migrate` — a deploy must not
-depend on the network. Migrate still re-runs `enable_fac_custom_tools`, so the
-plugin cannot drift off, and prints the manual command on a site that has no FAC.
-
-**Opting out.** `ALAIY_OS_INSTALL_FAC=false bench --site <site> install-app alaiy_os`
-installs the OS and nothing else, making no network call — the CI-safe path. The
-OS runs unchanged on a site without FAC; only the MCP tools go unexposed.
-
-**Doing it separately.** `scripts/install_fac.sh` is the same three steps as a
-standalone command, for a site that opted out or was installed before this
-existed:
-
-```bash
-bash apps/alaiy_os/scripts/install_fac.sh --site <site>
-```
-
-Every step is skipped when already satisfied, so it is idempotent and safe to
-re-run. `--dry-run` prints the commands it would run (only the read-only checks
-actually execute); `--repo`/`--branch` override what is fetched; `--no-fac` and
-`ALAIY_OS_INSTALL_FAC=false` both make it exit before any network call;
-`--help` lists the rest.
-
-The split — a subprocess for `bench get-app`, an in-process
-`frappe.installer.install_app()` for the site install — is not cosmetic.
-`bench install-app` wraps itself in a per-site filelock with a 1s timeout, which
-`install-app alaiy_os` already holds, so a nested one dies with
-`LockTimeoutError`. Calling the installer directly is what Frappe itself does
-for `required_apps`: same process, same lock, same transaction.
-
 ## Structure
 
 ```
 alaiy_os/
-├── hooks.py                          # app_include_js/css, fixtures, provisioning, MCP tools
+├── hooks.py                          # app_include_js/css, fixtures, provisioning
 ├── setup/install.py                  # after_install/after_migrate provisioning
-├── assistant_tools/                  # MCP tools + AlaiyTool base + permission model
 ├── connectors.py                     # OS Connector Registry helpers (label-based sync resolution)
 ├── analytics.py                      # channel-aware Sales Order analytics
 ├── setup/boot.py                     # on_login + get_home_page redirects
 ├── constants/                        # workspace/sidebar/role/onboarding definitions
 ├── fixtures/role.json                # OS Manager role (synced via Frappe's fixtures hook)
 ├── fixtures/custom_field.json        # Item custom fields (synced via Frappe's fixtures hook)
-├── doctype/                          # this app's DocTypes — OS Agent Registry,
-│                                      # OS Connector Registry, OS Theme Settings, the
+├── doctype/                          # this app's DocTypes — OS Connector Registry, OS Theme Settings, the
 │                                      # shared connector doctypes, ...
 ├── public/images/logo-square.png     # app icon / favicon / sidebar logo
 ├── public/js/route_guard.js          # client-side sidebar-ownership + route patch
@@ -263,13 +114,3 @@ alaiy_os/
 └── public/css/core.css               # scoped styles (no global ERPNext UI overrides)
 ```
 
-Two directories sit at the repo root, outside the app package:
-
-```
-interface/                            # the self-serve Next.js frontend (above)
-desk-widget/                          # Ask Alaiy's Desk widget -> alaiy_os/public/dist/
-```
-
-`scripts/install_fac.sh` sits at the repo root, outside the app package, because
-it drives `bench` rather than running inside a site. It is the manual equivalent
-of what `after_install` does — see [Install](#install).

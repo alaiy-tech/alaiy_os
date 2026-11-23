@@ -15,8 +15,6 @@ WORKSPACE_NAME = "OS"
 WORKSPACE_ROUTE = "os"  # URL slug: /desk/os
 
 WORKSPACE_SHORTCUTS = [
-    {"type": "Page", "link_to": "ask-alaiy",
-        "label": "Ask Alaiy",   "color": "purple"},
     {"type": "DocType", "link_to": "Stock Entry",
         "label": "Dashboard",   "color": "blue"},
 ]
@@ -161,8 +159,6 @@ WORKSPACE_LINKS = [
 # else needs updating here. icon names are Lucide/Frappe icon names.
 WORKSPACE_SIDEBAR_ITEMS = [
     # ── Top standalone actions ─────────────────────────────────────────────────
-    {"type": "Link", "link_type": "Page", "link_to": "ask-alaiy",
-     "label": "Ask Alaiy",  "child": 0, "indent": 0, "icon": "sparkles"},
     {"type": "Link", "link_type": "Workspace", "link_to": WORKSPACE_NAME,
      "label": "Dashboard",  "child": 0, "indent": 0, "icon": "layout-dashboard"},
 
