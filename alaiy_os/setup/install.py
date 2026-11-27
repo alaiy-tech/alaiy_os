@@ -22,12 +22,9 @@ Data definitions:
 import hashlib
 import json
 import os
-import subprocess
-import sys
 from contextlib import contextmanager
 
 import frappe
-from frappe.utils import get_bench_path
 
 from alaiy_os.constants.roles import OS_MANAGER_ROLE
 from alaiy_os.constants.workspace import (
@@ -46,7 +43,6 @@ from alaiy_os.constants.workspace_settings import (
 )
 from alaiy_os.constants.onboarding import ONBOARDING_NAME, ONBOARDING_STEPS
 from alaiy_os.alaiy_os.doctype.os_connector_registry.os_connector_registry import _HANDLER_FIELDS
-from alaiy_os.assistant_tools.permissions import ensure_roles as _ensure_assistant_roles
 
 MODULE_NAME = "Alaiy OS"
 
@@ -55,9 +51,6 @@ MODULE_NAME = "Alaiy OS"
 
 def after_install():
     _run_provisioning()
-    # Deliberately after _run_provisioning()'s commit, and only on install --
-    # never on migrate. See ensure_fac_installed().
-    ensure_fac_installed()
 
 
 def after_migrate():
@@ -135,8 +128,6 @@ def _run_provisioning():
         configure_portal_settings,
         check_dotted_path_handlers,
         ensure_sales_channel_field,
-        ensure_assistant_roles,
-        enable_fac_custom_tools,
     ]
     failed = []
     for step in steps:
@@ -248,17 +239,16 @@ def skip_erpnext_onboarding():
 
 def delete_desktop_page():
     """
-    Delete the stock Frappe "desktop" Page outright. /desk itself keeps
-    landing on the OS workspace regardless (see setup/boot.py::on_login),
-    this just removes the old default-desktop route entirely.
+    Delete the stock Frappe "desktop" Page and the retired Ask Alaiy Page. /desk
+    itself keeps landing on the OS workspace regardless (see setup/boot.py::on_login).
     """
-    if not frappe.db.exists("Page", "desktop"):
-        return
     # Page.on_trash() throws outside developer mode unless this flag is set —
     # Frappe core's own drop_unused_pages patch relies on the same toggle.
     frappe.flags.in_migrate = True
     try:
-        frappe.delete_doc("Page", "desktop", ignore_permissions=True, force=True)
+        for page in ("desktop", "ask-alaiy"):
+            if frappe.db.exists("Page", page):
+                frappe.delete_doc("Page", page, ignore_permissions=True, force=True)
     finally:
         frappe.flags.in_migrate = False
 
@@ -409,7 +399,7 @@ def sync_custom_pages():
     "Updating DocTypes" sync just because the .json/.js files exist on disk —
     they need an explicit reload_doc, same as a core migration patch would do.
     """
-    for page_name in ("ask_alaiy", "connector_health"):
+    for page_name in ("connector_health",):
         frappe.reload_doc("alaiy_os", "page", page_name)
 
 
@@ -951,14 +941,11 @@ def create_or_update_onboarding():
 
 # ── Dotted-path handler health check ─────────────────────────────────────────
 #
-# OS Agent Tool.handler and OS Connector Registry's test_method/sync_*_method
-# fields are only validated once, at save time (OSAgentTool._validate_handler(),
-# OSConnectorRegistry._validate_handlers()). If the app providing one is later
+# OS Connector Registry's test_method/sync_*_method fields are only validated
+# once, at save time (OSConnectorRegistry._validate_handlers()). If the app providing one is later
 # uninstalled, or refactors the target function away, that's otherwise only
-# discovered the next time something actually calls it — engine/factory.py's
-# build_runnable() had no try/except around its frappe.get_attr() at all
-# before this, and api/connectors.py's test/sync calls just report a generic
-# {"success": False} either way. Re-check every registered path on every
+# discovered the next time something actually calls it — api/connectors.py's
+# test/sync calls just report a generic {"success": False} either way. Re-check every registered path on every
 # migrate instead, and record the result on the row itself so it's visible
 # without waiting for a live failure.
 
@@ -971,20 +958,6 @@ def _resolve_handler(path):
     if not callable(fn):
         return False, f"{path} is not callable"
     return True, ""
-
-
-def _check_agent_tool_handlers():
-    if not frappe.db.exists("DocType", "OS Agent Tool"):
-        return
-    for row in frappe.get_all("OS Agent Tool", fields=["name", "handler"]):
-        if not row.handler:
-            continue
-        ok, detail = _resolve_handler(row.handler)
-        frappe.db.set_value(
-            "OS Agent Tool", row.name,
-            {"handler_ok": 1 if ok else 0, "handler_health_detail": detail},
-            update_modified=False,
-        )
 
 
 def _check_connector_registry_handlers():
@@ -1011,235 +984,4 @@ def _check_connector_registry_handlers():
 
 
 def check_dotted_path_handlers():
-    _check_agent_tool_handlers()
     _check_connector_registry_handlers()
-
-
-# ── MCP tool roles ────────────────────────────────────────────────────────────
-
-def ensure_assistant_roles():
-    """Create the Alaiy Admin/Ops/Catalogue/Analyst roles the MCP tools gate on.
-
-    Runs regardless of whether frappe_assistant_core is installed — the roles
-    are ordinary desk roles and creating them early costs nothing, so a site
-    that adds FAC later has a working permission model immediately.
-    """
-    _ensure_assistant_roles()
-
-
-# ── FAC (Frappe Assistant Core) ───────────────────────────────────────────────
-
-FAC_APP = "frappe_assistant_core"
-FAC_PLUGIN = "custom_tools"
-FAC_REPO = "https://github.com/buildswithpaul/Frappe_Assistant_Core"
-FAC_INSTALL_SCRIPT = "bash apps/alaiy_os/scripts/install_fac.sh --site {site}"
-# bench get-app clones and pip-installs, which is minutes on a cold cache.
-FAC_INSTALL_TIMEOUT = 1800
-
-
-def _fac_install_opted_out():
-    return os.environ.get("ALAIY_OS_INSTALL_FAC", "true").strip().lower() in (
-        "false", "0", "no", "off",
-    )
-
-
-def _bench_bin_dir():
-    """The bench virtualenv's bin/, where `bench` itself lives.
-
-    We are running inside that virtualenv, so sys.executable's directory is it.
-    Calling that path directly means get-app works even when whatever invoked
-    us had a bare PATH (a systemd unit, a Docker ENTRYPOINT, supervisord).
-    """
-    return os.path.dirname(sys.executable)
-
-
-def ensure_fac_installed():
-    """Fetch and install FAC as part of `bench install-app alaiy_os`.
-
-    Runs on after_install only -- never after_migrate, which would mean a
-    network fetch on every deploy.
-
-    Two steps, deliberately split:
-
-    * `bench get-app` runs as a subprocess. It clones and pip-installs, which
-      is a bench-level operation with no site involved -- and no site lock.
-    * The site install runs **in-process**, via frappe.installer.install_app().
-      A nested `bench install-app` cannot work here: that CLI command wraps
-      itself in a per-site filelock with a 1s timeout (frappe/commands/site.py),
-      which the parent `bench install-app alaiy_os` already holds, so the child
-      dies with LockTimeoutError. Calling the installer directly is exactly
-      what Frappe does for `required_apps` (frappe/installer.py) -- same
-      process, same lock, same transaction.
-
-    Never raises: FAC failing to install must not fail the alaiy_os install.
-    The OS runs fine without it; only the MCP tools go unexposed.
-    """
-    if _fac_install_opted_out():
-        print("Alaiy OS: skipping FAC install (ALAIY_OS_INSTALL_FAC).")
-        return
-
-    if getattr(frappe.flags, "in_test", False):
-        return
-
-    if FAC_APP in frappe.get_installed_apps():
-        print(f"Alaiy OS: {FAC_APP} already installed.")
-        return
-
-    if not _fetch_fac_app():
-        return
-
-    print(f"Alaiy OS: installing {FAC_APP} (skip with ALAIY_OS_INSTALL_FAC=false)...")
-    # install_app() flips this to False when it finishes; the caller
-    # (frappe.installer.install_app for alaiy_os) still has syncing to do
-    # afterwards and reads it, so put it back exactly as we found it.
-    outer_in_install = frappe.flags.in_install
-    try:
-        from frappe.installer import install_app as _install_app
-
-        frappe.clear_cache()  # so get_all_apps() sees a just-fetched app
-        _install_app(FAC_APP)
-    except Exception:
-        frappe.log_error(
-            title=f"Alaiy OS: installing {FAC_APP} failed",
-            message=frappe.get_traceback(),
-        )
-        print(
-            f"Alaiy OS: could not install {FAC_APP} — see the Error Log. "
-            f"alaiy_os itself is installed and working; the MCP tools in "
-            f"assistant_tools/ are simply not exposed yet. Retry with:\n"
-            f"    {FAC_INSTALL_SCRIPT.format(site=frappe.local.site)}"
-        )
-        return
-    finally:
-        frappe.flags.in_install = outer_in_install
-
-    print(f"Alaiy OS: {FAC_APP} installed.")
-    enable_fac_custom_tools()
-    frappe.db.commit()
-
-
-def _fetch_fac_app():
-    """Ensure apps/frappe_assistant_core exists, running `bench get-app` if not.
-
-    Returns True when FAC is on disk and ready to install. Prints an actionable
-    message and returns False otherwise -- this is the step that needs the
-    network, so it is the one that realistically fails.
-    """
-    apps_dir = os.path.join(get_bench_path(), "apps", FAC_APP)
-    if os.path.isdir(apps_dir):
-        return True
-
-    bench = os.path.join(_bench_bin_dir(), "bench")
-    if not os.path.exists(bench):
-        bench = "bench"
-
-    print(f"Alaiy OS: fetching {FAC_APP} from {FAC_REPO}...")
-    # Output is intentionally not captured: bench get-app's clone and pip
-    # progress should reach the terminal that ran install-app.
-    try:
-        completed = subprocess.run(
-            [bench, "get-app", FAC_REPO],
-            cwd=get_bench_path(),
-            timeout=FAC_INSTALL_TIMEOUT,
-            check=False,
-        )
-    except subprocess.TimeoutExpired:
-        print(f"Alaiy OS: 'bench get-app {FAC_REPO}' timed out after {FAC_INSTALL_TIMEOUT}s.")
-        return False
-    except Exception as e:
-        print(f"Alaiy OS: could not run 'bench get-app' ({e}).")
-        return False
-
-    if completed.returncode:
-        print(
-            f"Alaiy OS: 'bench get-app {FAC_REPO}' failed (exit {completed.returncode}). "
-            f"Check network access and permissions on {get_bench_path()}. "
-            f"alaiy_os is installed and working without it; retry with:\n"
-            f"    {FAC_INSTALL_SCRIPT.format(site=frappe.local.site)}"
-        )
-        return False
-
-    # A freshly pip-installed package is invisible to an already-running
-    # interpreter until the import system re-scans sys.path.
-    import importlib
-    import site as _site
-
-    importlib.invalidate_caches()
-    try:
-        _site.main()
-    except Exception:
-        pass
-    return os.path.isdir(apps_dir)
-
-
-def enable_fac_custom_tools():
-    """Enable FAC's custom_tools plugin so the OS's MCP tools are actually exposed.
-
-    hooks.py's `assistant_tools` entries are dotted-path strings that nothing
-    resolves until FAC's custom_tools plugin is on — so a site with FAC
-    installed but the plugin off has the tools present and invisible. That was
-    a manual step in FAC admin -> Plugins; this makes it part of provisioning.
-
-    Never fetches or installs anything: pulling FAC in is a bench-level
-    operation (see scripts/install_fac.sh) and a freshly pip-installed app is
-    not importable in the process that installed it. On a site without FAC this
-    only prints a pointer to that script, so FAC stays optional exactly as
-    hooks.py describes.
-
-    Public and importable on its own — scripts/install_fac.sh calls it via
-    `bench --site <site> execute`.
-    """
-    if FAC_APP not in frappe.get_installed_apps():
-        # During `bench install-app alaiy_os` this step runs before
-        # ensure_fac_installed(), which is about to fetch and install FAC --
-        # printing "not installed, run this script" there would be wrong by
-        # the time the command finishes.
-        if not _fac_install_opted_out() and not frappe.flags.in_install:
-            # Keep opted-out CI logs clean; otherwise say exactly what to run.
-            print(
-                f"Alaiy OS: {FAC_APP} is not installed, so the MCP tools in "
-                f"assistant_tools/ are not exposed. To install it:\n"
-                f"    {FAC_INSTALL_SCRIPT.format(site=frappe.local.site)}\n"
-                f"  (skip with ALAIY_OS_INSTALL_FAC=false)"
-            )
-        return
-
-    try:
-        from frappe_assistant_core.utils.plugin_manager import get_plugin_manager
-    except (ImportError, AttributeError) as e:
-        # FAC is installed on the site but its internals moved between
-        # versions. Fall back to the setting the plugin manager persists to,
-        # rather than failing provisioning over a refactor upstream.
-        print(
-            f"Alaiy OS: could not load FAC's plugin manager ({e}); "
-            f"falling back to writing enabled_plugins_list directly."
-        )
-        _enable_fac_plugin_via_settings()
-        return
-
-    # enable_plugin() is itself idempotent -- it returns early when the plugin
-    # is already in the enabled set -- so this is safe on every migrate.
-    get_plugin_manager().enable_plugin(FAC_PLUGIN)
-    print(f"Alaiy OS: FAC plugin '{FAC_PLUGIN}' enabled.")
-
-
-def _enable_fac_plugin_via_settings():
-    """Append custom_tools to Assistant Core Settings.enabled_plugins_list.
-
-    The JSON field the plugin manager persists to (default `["core"]`). Only
-    used when FAC's plugin_manager API is unavailable; FAC picks the value up
-    on its next plugin discovery.
-    """
-    settings = frappe.get_single("Assistant Core Settings")
-    try:
-        enabled = json.loads(settings.enabled_plugins_list or "[]")
-    except ValueError:
-        enabled = []
-    if not isinstance(enabled, list):
-        enabled = []
-    if FAC_PLUGIN in enabled:
-        return
-    enabled.append(FAC_PLUGIN)
-    settings.enabled_plugins_list = json.dumps(enabled)
-    settings.save(ignore_permissions=True)
-    print(f"Alaiy OS: FAC plugin '{FAC_PLUGIN}' added to enabled_plugins_list.")
