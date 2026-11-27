@@ -1,0 +1,28 @@
+{
+ "creation": "2026-11-18 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["alerts_section", "alerts_enabled", "slack_webhook", "webhook_note", "options_section", "daily_digest", "alert_cooldown_minutes"],
+ "fields": [
+  {"fieldname": "alerts_section", "fieldtype": "Section Break", "label": "Slack alerts"},
+  {"default": "1", "description": "Post to Slack when a connector function starts to fail, becomes overdue or stuck, or its interval is invalid, and when it recovers.", "fieldname": "alerts_enabled", "fieldtype": "Check", "label": "Send alerts"},
+  {"description": "An https incoming-webhook URL. Kept encrypted. Leave empty to use alert_slack_webhook from the site config.", "fieldname": "slack_webhook", "fieldtype": "Password", "label": "Slack webhook URL"},
+  {"fieldname": "webhook_note", "fieldtype": "HTML", "options": "<p class=\"text-muted\">Save, then use <b>Send test message</b> to check the webhook.</p>"},
+  {"fieldname": "options_section", "fieldtype": "Section Break", "label": "Options"},
+  {"default": "1", "description": "Once a day, list everything that is still not healthy.", "fieldname": "daily_digest", "fieldtype": "Check", "label": "Daily digest"},
+  {"default": "60", "description": "A function that flaps is not announced again within this many minutes.", "fieldname": "alert_cooldown_minutes", "fieldtype": "Int", "label": "Alert cooldown (minutes)"}
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-11-18 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Alaiy OS",
+ "name": "Connector Health Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "read": 1, "role": "System Manager", "write": 1}
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

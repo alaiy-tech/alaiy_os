@@ -24,7 +24,9 @@
   "connection_status",
   "last_tested_at",
   "handlers_ok",
-  "handlers_health_detail"
+  "handlers_health_detail",
+  "health",
+  "health_method"
  ],
  "fields": [
   {
@@ -144,6 +146,19 @@
    "fieldtype": "Small Text",
    "label": "Handlers Health Detail",
    "read_only": 1
+  },
+  {
+   "description": "The functions this connector performs, for the Connector Health page. Set by the connector's connector_meta.py; checked on save.",
+   "fieldname": "health",
+   "fieldtype": "Code",
+   "label": "Health",
+   "options": "JSON"
+  },
+  {
+   "description": "Optional. A Python dotted path to a function returning extra checks for the Connector Health page: a list of {key, label, state (ok/warn/red/unknown), detail}. Its answer is remembered for 30 minutes.",
+   "fieldname": "health_method",
+   "fieldtype": "Data",
+   "label": "Health Check Method (Python dotted path)"
   }
  ],
  "links": [],

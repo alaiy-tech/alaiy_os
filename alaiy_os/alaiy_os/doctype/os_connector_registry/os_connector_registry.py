@@ -1,6 +1,8 @@
 import frappe
 from frappe.model.document import Document
 
+from alaiy_os.health.contract import health_for_storage
+
 # Data fields holding a Python dotted path, keyed by their form label — kept
 # in sync with os_connector_registry.json's field_order.
 _HANDLER_FIELDS = {
@@ -8,12 +10,21 @@ _HANDLER_FIELDS = {
     "sync_categories_method": "Sync Categories Method",
     "sync_items_method": "Sync Items Method",
     "sync_status_method": "Sync Status Method",
+    "health_method": "Health Check Method",
 }
 
 
 class OSConnectorRegistry(Document):
     def validate(self):
         self._validate_handlers()
+        self._validate_health()
+
+    def _validate_health(self):
+        # A connector passes its health list as Python data; keep it as checked JSON text.
+        try:
+            self.health = health_for_storage(self.health)
+        except ValueError as error:
+            frappe.throw(str(error))
 
     def _validate_handlers(self):
         # Fail at registration time, not mid-sync: every configured dotted

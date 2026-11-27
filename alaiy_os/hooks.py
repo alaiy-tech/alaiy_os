@@ -156,3 +156,12 @@ doctype_js = {
 web_include_css = [
     f"/assets/alaiy_os/css/login.css?v={_V}",
 ]
+
+# Connector Health: compare every connector's last successful run with what is expected, check the
+# platform, and alert on a change. The digest lists anything still not healthy once a day.
+scheduler_events = {
+    "cron": {
+        "*/5 * * * *": ["alaiy_os.health.service.run_checks"],
+        "0 8 * * *": ["alaiy_os.health.service.send_digest"],
+    }
+}
